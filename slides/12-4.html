@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Session Actor 的线程与状态边界 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--accent:#d99518;--gold:#f4b942;--soft:rgba(217,149,24,.09)}
+.lesson-header{position:relative;overflow:hidden;padding:42px 38px;border:1px solid rgba(217,149,24,.24);border-radius:24px;background:radial-gradient(circle at 87% 8%,rgba(244,185,66,.24),transparent 34%),linear-gradient(145deg,#fffaf0,var(--card));box-shadow:0 18px 50px rgba(100,64,7,.09)}
+.lesson-header:after{content:"ACTOR";position:absolute;right:25px;bottom:-12px;font-size:90px;font-weight:900;color:rgba(217,149,24,.07)}.subtitle{max-width:770px;position:relative;z-index:1}
+.goal,.snapshot,.takeaway{margin-top:18px;border:1px solid rgba(217,149,24,.22);background:var(--soft);border-radius:16px;padding:16px 20px;line-height:1.7}.goal b,.snapshot b,.takeaway b{color:var(--accent)}
+.section-title{margin:34px 0 14px;font-size:13px;font-weight:800;letter-spacing:.12em;color:var(--accent)}
+.stack{padding:25px;border:1px solid var(--border);border-radius:20px;background:var(--card);box-shadow:var(--shadow-card)}.stack svg{display:block;width:100%;height:auto;min-height:270px}
+.loop-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel,.code-card{padding:20px;border:1px solid var(--border);border-radius:16px;background:var(--card);box-shadow:var(--shadow-card)}.panel h3{margin:0 0 10px;font-size:16px;color:var(--accent)}.panel ul{margin:0;padding-left:19px}.panel li{margin:8px 0;font-size:13px;line-height:1.6;color:var(--text)}
+.agent-fields{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.field{padding:15px;border-radius:14px;background:linear-gradient(145deg,#fffaf0,var(--card));border:1px solid rgba(217,149,24,.22)}.field code{font-weight:800;color:var(--accent);font-size:11px}.field p{margin:7px 0 0;color:var(--sub);font-size:12px;line-height:1.55}
+.note{margin-top:12px;padding:14px 17px;border-left:4px solid var(--accent);background:var(--soft);font-size:13px;line-height:1.7}
+.source-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.path{font:700 11px/1.5 ui-monospace,monospace;color:var(--accent);overflow-wrap:anywhere}.code{margin-top:9px;padding:15px;border-radius:12px;background:#17130d;color:#f7e8c6;overflow:auto;font:12px/1.65 ui-monospace,monospace}.cm{color:#aa9570}.kw{color:#ffc85a}
+.exercise{padding:20px;border:1px dashed rgba(217,149,24,.48);border-radius:18px;background:linear-gradient(120deg,var(--soft),transparent)}.exercise h3{margin:0 0 6px}.exercise p{margin:0;color:var(--sub);line-height:1.7}.takeaway{display:flex;gap:12px}.takeaway svg{width:26px;flex:none;color:var(--accent)}
+@media(max-width:760px){.lesson-header{padding:30px 22px}.lesson-header:after{font-size:54px}.loop-grid,.source-grid{grid-template-columns:1fr}.agent-fields{grid-template-columns:1fr 1fr}.stack{padding:10px;overflow:auto}.stack svg{min-width:700px}}@media(max-width:430px){.agent-fields{grid-template-columns:1fr}}
+</style>
+<meta name="description" content="准确理解 Grok Build 的每 Session OS 线程、Tokio LocalSet、SessionActor turn loop、ChatStateActor 与取消机制。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.app/slides/12-4.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">CHAPTER 12 · SESSION RUNTIME</div>
+    <h1>Session Actor：线程、状态与取消边界</h1>
+    <p class="subtitle">每个 Session 在独立 OS 线程上运行 current-thread Tokio runtime 与 LocalSet。SessionActor 协调 turn，ChatStateActor 串行拥有对话状态，CancellationToken 负责协作式终止。</p>
+  </header>
+
+  <div class="goal reveal"><b>课程目标</b><br>能解释线程隔离、Actor 状态所有权和取消信号如何配合，并准确描述 Agent 的“有效不可变”边界。</div>
+
+  <div class="section-title">核心视觉 · 教学化运行时图</div>
+  <div class="stack reveal">
+    <svg viewBox="0 0 900 330" role="img" aria-label="Session 线程与 Actor 边界">
+      <defs><marker id="a4" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#d99518"/></marker></defs>
+      <rect x="20" y="18" width="860" height="294" rx="22" fill="#fffaf0" stroke="#d99518" stroke-width="1.5"/><text x="45" y="48" fill="#6a4609" font-size="14" font-weight="800">Session OS thread · ses-&lt;id&gt;</text>
+      <rect x="45" y="65" width="810" height="218" rx="18" fill="white" stroke="#e2c17d"/><text x="70" y="94" fill="#7a6137" font-size="12">Tokio current-thread runtime + LocalSet</text>
+      <rect x="75" y="120" width="210" height="112" rx="16" fill="#2b2418"/><text x="180" y="151" text-anchor="middle" fill="#ffd57d" font-size="15" font-weight="800">SessionActor</text><text x="180" y="176" text-anchor="middle" fill="#d8c6a4" font-size="11">SessionCommand</text><text x="180" y="196" text-anchor="middle" fill="#d8c6a4" font-size="11">turn completion / events</text>
+      <rect x="355" y="112" width="200" height="128" rx="16" fill="#fff8e7" stroke="#d99518"/><text x="455" y="143" text-anchor="middle" fill="#604008" font-size="15" font-weight="800">ChatStateActor</text><text x="455" y="168" text-anchor="middle" fill="#806f55" font-size="11">conversation</text><text x="455" y="188" text-anchor="middle" fill="#806f55" font-size="11">tokens / timing / persistence</text><text x="455" y="211" text-anchor="middle" fill="#806f55" font-size="10">专属状态，无共享锁</text>
+      <rect x="625" y="120" width="190" height="112" rx="16" fill="#fff8e7" stroke="#d99518"/><text x="720" y="151" text-anchor="middle" fill="#604008" font-size="15" font-weight="800">SamplerActor</text><text x="720" y="176" text-anchor="middle" fill="#806f55" font-size="11">request task</text><text x="720" y="196" text-anchor="middle" fill="#806f55" font-size="11">SamplingEvent</text>
+      <path d="M285 165h60M355 202h-60M555 165h60M625 202h-60" stroke="#d99518" stroke-width="2" marker-end="url(#a4)"/>
+      <path d="M180 244v31h540v-31" stroke="#c58c22" stroke-width="1.5" stroke-dasharray="5 5" fill="none"/><text x="450" y="270" text-anchor="middle" fill="#806f55" font-size="10">CancellationToken / handle drop 驱动协作式收尾</text>
+    </svg>
+  </div>
+
+  <div class="section-title">Turn loop 的真实职责</div>
+  <div class="loop-grid">
+    <div class="panel reveal"><h3>SessionActor 协调</h3><ul><li><code>run_session</code> 同时接收 SessionCommand、ChatStateEvent、SessionEvent 与 turn completion。</li><li><code>maybe_start_running_task</code> 启动待处理 turn。</li><li>turn 完成后执行 completion、turn end 和后续通知处理。</li></ul></div>
+    <div class="panel reveal"><h3>ChatStateActor 拥有状态</h3><ul><li>专属拥有 conversation、token、配置与 persistence。</li><li>通过 <code>mpsc::UnboundedReceiver</code> 串行处理命令。</li><li>取消 token 触发退出，全部 handle 被丢弃也会结束循环。</li></ul></div>
+  </div>
+
+  <div class="section-title">Agent 的真实字段边界</div>
+  <div class="agent-fields">
+    <div class="field reveal"><code>definition</code><p><code>AgentDefinition</code>，定义身份、模式与策略输入。</p></div>
+    <div class="field reveal"><code>prompt_context</code><p>支持检查、重渲染与序列化的 PromptContext。</p></div>
+    <div class="field reveal"><code>system_prompt</code><p>从 prompt context 渲染并缓存的字符串。</p></div>
+    <div class="field reveal"><code>tool_bridge</code><p><code>Arc&lt;ToolBridge&gt;</code>，工具注册与会话上下文桥梁。</p></div>
+    <div class="field reveal"><code>reminder_policy</code><p>Session 级 reminder 策略。</p></div>
+    <div class="field reveal"><code>compaction_policy</code><p>自动压缩、memory flush 和 two-pass 配置。</p></div>
+    <div class="field reveal"><code>hosted_tools</code><p>发送给 API 的后端托管工具定义。</p></div>
+    <div class="field reveal"><code>backend_search_enabled</code><p>构建时的服务端搜索开关。</p></div>
+  </div>
+  <div class="note reveal"><b>准确表述：</b>源码注释称 Agent 构建后“effectively immutable”。它仍提供 <code>finalize_prompt(&amp;mut self)</code> 更新构建时间并重新渲染 prompt，所以不能描述成绝对不可变。</div>
+
+  <div class="section-title">真实源码证据</div>
+  <div class="source-grid">
+    <div class="code-card reveal">
+      <div class="path">crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs</div>
+      <div class="code">let join_handle = std::thread::Builder::new()<br>&nbsp;&nbsp;.name(thread_name)<br>&nbsp;&nbsp;.stack_size(8 * 1024 * 1024)<br>&nbsp;&nbsp;.spawn(move || {<br>&nbsp;&nbsp;&nbsp;&nbsp;let rt = tokio::runtime::Builder<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;::new_current_thread().enable_all().build()?;<br>&nbsp;&nbsp;&nbsp;&nbsp;let local = tokio::task::LocalSet::new();<br>&nbsp;&nbsp;});</div>
+    </div>
+    <div class="code-card reveal">
+      <div class="path">crates/codegen/xai-grok-agent/src/agent.rs</div>
+      <div class="code"><span class="cm">/// Re-render the system prompt</span><br>pub async fn <span class="kw">finalize_prompt</span>(&amp;mut self) {<br>&nbsp;&nbsp;self.prompt_context.build_timestamp_utc =<br>&nbsp;&nbsp;&nbsp;&nbsp;chrono::Utc::now().to_rfc3339();<br>&nbsp;&nbsp;self.system_prompt = self.prompt_context<br>&nbsp;&nbsp;&nbsp;&nbsp;.render(&amp;self.tool_bridge).await<br>&nbsp;&nbsp;&nbsp;&nbsp;.unwrap_or_default();<br>}</div>
+    </div>
+  </div>
+
+  <div class="snapshot reveal"><b>源码快照说明</b>：本页依据本地同步副本核对。该副本没有 <code>.git</code> 元数据，因此不声称对应某个 commit 版本。</div>
+
+  <div class="section-title">课堂练习</div>
+  <div class="exercise reveal"><h3>给状态找唯一拥有者</h3><p>把 conversation、system_prompt、tool registry、sampling request 分别放到 ChatStateActor、Agent、ToolBridge、SamplerActor。再说明取消 token 与消息优先级属于不同概念，本源码没有“高优先级消息插入队首”的通用设计。</p></div>
+
+  <div class="takeaway reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5M16 16l2 2"/></svg><div><b>Takeaway</b>：Session 的隔离单位是 OS 线程加 LocalSet。SessionActor 负责 turn 编排，ChatStateActor 拥有对话状态，CancellationToken 负责取消。Agent 以有效不可变为主，同时保留显式重渲染入口。</div></div>
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+</body>
+</html>

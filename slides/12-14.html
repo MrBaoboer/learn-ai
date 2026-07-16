@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AgentDefinition 与 Persona 如何合并 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--accent:#d99a22;--gold:#f5b942;--line:rgba(217,154,34,.23)}
+.lesson{position:relative}.lesson:before{content:"";position:absolute;inset:0 0 auto;height:320px;background:radial-gradient(circle at 80% 6%,rgba(245,185,66,.14),transparent 43%);pointer-events:none}.lesson-header{position:relative}.lesson-header h1{letter-spacing:-.04em}
+.objective{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:center;margin:20px 0 10px;padding:20px 24px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(245,185,66,.10),rgba(245,185,66,.02))}.objective b{color:var(--accent);font-size:13px;letter-spacing:.14em}.objective p{margin:0;line-height:1.75}
+.hero{margin-top:18px;border-radius:24px;overflow:hidden;background:linear-gradient(145deg,#17130c,#2a1d09);box-shadow:0 22px 60px rgba(57,35,4,.22)}.hero-copy{padding:28px 30px 8px;color:#fff}.hero-copy small{color:#efb849;letter-spacing:.16em;font-weight:800}.hero-copy h2{margin:8px 0 6px;font-size:24px}.hero-copy p{margin:0;color:#cfc5b4;line-height:1.7}.hero svg{display:block;width:100%;height:auto}
+.box{fill:#241b0d;stroke:#d99a22;stroke-width:1.5}.box2{fill:#201c15;stroke:#8b7041;stroke-width:1.2}.t1{fill:#fff8e8;font:700 13px ui-monospace,SFMono-Regular,Menlo,monospace}.t2{fill:#cdbb9b;font:12px system-ui,sans-serif}.arrow{stroke:#e1a632;stroke-width:2;fill:none;marker-end:url(#arr)}
+.grid2,.grid3{display:grid;gap:14px;margin-top:14px}.grid2{grid-template-columns:repeat(2,1fr)}.grid3{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow-card)}.card h3{font-size:15px;margin:0 0 8px}.card p,.card li{font-size:13px;color:var(--sub);line-height:1.72}.card ul{margin:8px 0 0;padding-left:18px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent)}
+.priority{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:14px;border:1px solid var(--line);border-radius:16px;overflow:hidden}.priority div{position:relative;padding:18px 16px;background:var(--card);border-right:1px solid var(--line)}.priority div:last-child{border:0}.priority b{display:block;color:var(--accent);font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace}.priority span{display:block;margin-top:7px;font-size:12px;color:var(--sub);line-height:1.55}
+.path-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.path{padding:7px 10px;border-radius:9px;background:rgba(217,154,34,.09);border:1px solid var(--line);font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text)}
+.source{margin-top:14px;background:#15120d;border:1px solid #342713;border-radius:16px;overflow:hidden}.source-head{display:flex;justify-content:space-between;gap:12px;padding:11px 16px;background:#211a10;color:#dbc79e;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}.source-head span:last-child{color:#efb849}.source pre{margin:0;padding:18px;overflow:auto;color:#eee3cd;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}.kw{color:#efb849}.cm{color:#897c68}.caption{margin-top:8px;color:var(--sub);font-size:12px;line-height:1.6}.caption b{color:var(--accent)}
+.exercise{margin-top:16px;border:1px dashed rgba(217,154,34,.5);border-radius:16px;padding:20px;background:linear-gradient(135deg,rgba(217,154,34,.08),transparent)}.exercise h3{margin:0 0 8px;font-size:16px}.exercise p{margin:0;color:var(--sub);line-height:1.75}
+.takeaway{margin-top:18px;display:flex;gap:14px;padding:20px 22px;border-radius:16px;background:#1b160d;color:#f8ecd4;line-height:1.75}.takeaway svg{flex:0 0 auto;color:#f5b942}.takeaway b{color:#f5b942}
+@media(max-width:760px){.objective{grid-template-columns:1fr;gap:5px}.grid2,.grid3,.priority{grid-template-columns:1fr}.priority div{border-right:0;border-bottom:1px solid var(--line)}.hero-copy{padding:22px 20px 8px}.source-head{flex-direction:column}}
+</style>
+<meta name="description" content="基于 Grok Build 真实源码解析 AgentDefinition、Persona 与 EffectiveRuntimeConfig。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.app/slides/12-14.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Grok Build · Subagent Resolution</div>
+    <h1>AgentDefinition 与 Persona 如何合并</h1>
+    <p class="subtitle">子 Agent 先解析可执行骨架，再把 spawn 参数、role 默认值和 Persona 默认值折叠为运行时配置。两套结构在不同阶段生效，最终共同决定子会话。</p>
+  </header>
+
+  <section class="objective reveal">
+    <b>课程目标</b>
+    <p>能区分 <span class="mono">AgentDefinition</span>、<span class="mono">SubagentRole</span>、<span class="mono">SubagentPersona</span> 与 <span class="mono">EffectiveRuntimeConfig</span>，并按字段准确判断合并优先级。</p>
+  </section>
+
+  <section class="hero reveal" aria-label="子 Agent 解析教学图">
+    <div class="hero-copy"><small>TEACHING DIAGRAM</small><h2>定义解析与运行时覆盖是两条输入线</h2><p>图中类型和函数名来自源码，箭头用于讲解数据汇合关系。</p></div>
+    <svg viewBox="0 0 920 300" role="img" aria-labelledby="rTitle">
+      <title id="rTitle">AgentDefinition 和运行时覆盖共同形成子 Agent</title>
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#e1a632"/></marker></defs>
+      <path class="arrow" d="M220 75H350M220 215H350M570 145H700"/>
+      <rect class="box" x="30" y="38" rx="14" width="190" height="74"/><text class="t1" x="125" y="68" text-anchor="middle">AgentDefinition</text><text class="t2" x="125" y="91" text-anchor="middle">tools · prompt · permission · model</text>
+      <rect class="box" x="30" y="178" rx="14" width="190" height="74"/><text class="t1" x="125" y="208" text-anchor="middle">spawn / role / persona</text><text class="t2" x="125" y="231" text-anchor="middle">runtime defaults and overrides</text>
+      <rect class="box2" x="350" y="95" rx="14" width="220" height="100"/><text class="t1" x="460" y="129" text-anchor="middle">resolve_effective_overrides</text><text class="t2" x="460" y="152" text-anchor="middle">EffectiveRuntimeConfig</text><text class="t2" x="460" y="173" text-anchor="middle">prompt fragments + runtime choices</text>
+      <rect class="box" x="700" y="103" rx="14" width="185" height="84"/><text class="t1" x="792" y="136" text-anchor="middle">child session</text><text class="t2" x="792" y="160" text-anchor="middle">definition filtered and rendered</text>
+    </svg>
+  </section>
+
+  <div class="sec-label">四个真实结构各管什么</div>
+  <div class="grid2">
+    <section class="card reveal"><h3>AgentDefinition：可版本化的 Agent 合同</h3><p>从 <span class="mono">.grok/agents/*.md</span> 解析，真实字段包括 <span class="mono">prompt_mode</span>、<span class="mono">tool_config</span>、<span class="mono">capability_mode</span>、<span class="mono">permission_mode</span>、<span class="mono">tools</span>、<span class="mono">isolation</span>、<span class="mono">model</span>、hooks 与 MCP 继承等。项目定义的发现优先级高于 user 与 bundled。</p></section>
+    <section class="card reveal"><h3>SubagentRole：按类型命中的运行时预设</h3><p>role 可给出 capability、model、reasoning effort、prompt file 与默认 isolation。它由 <span class="mono">subagent_type</span> 查找，role prompt 在 spawn 时读取。</p></section>
+    <section class="card reveal"><h3>SubagentPersona：按名称选择的行为层</h3><p>Persona 有 inline instructions、instructions file、inputs、outputs、model、reasoning effort 与 default isolation。inline 文本在文件内容之前合并，再作为 <span class="mono">&lt;persona&gt;</span> 块进入 prompt。</p></section>
+    <section class="card reveal"><h3>EffectiveRuntimeConfig：已解析结果</h3><p>真实字段是 model、reasoning_effort、capability_mode、persona、persona_instructions、role_prompt、role_prompt_warning、role_name、persona_error 与 isolation。源码中没有 temperature、max_tokens 或 tools 字段。</p></section>
+  </div>
+  <div class="path-list reveal">
+    <span class="path">crates/codegen/xai-grok-agent/src/config.rs</span>
+    <span class="path">crates/codegen/xai-grok-agent/src/discovery.rs</span>
+    <span class="path">crates/codegen/xai-grok-subagent-resolution/src/config.rs</span>
+    <span class="path">resolve_effective_overrides</span>
+  </div>
+
+  <div class="sec-label">优先级需要按字段阅读</div>
+  <div class="priority reveal">
+    <div><b>01 · spawn override</b><span>调用 task 时显式给出的 model、reasoning、capability、persona、isolation。</span></div>
+    <div><b>02 · role default</b><span>model、reasoning、capability 与 isolation 的 role 默认值。</span></div>
+    <div><b>03 · persona default</b><span>model、reasoning 与 isolation。Persona 不提供 capability_mode。</span></div>
+    <div><b>04 · parent / none</b><span>未命中的字段保留 None，交由下游继承父级；isolation 最终落到 None 模式。</span></div>
+  </div>
+  <div class="card reveal" style="margin-top:14px">
+    <h3>EffectiveRuntimeConfig 之后还有 definition fallback</h3>
+    <p>shell 收到解析结果后，若 <span class="mono">reasoning_effort</span> 仍为空，会读取 <span class="mono">AgentDefinition.effort</span>；若 runtime isolation 为 None 且 definition isolation 为 Worktree，也会升级为 Worktree。model 解析中，已解析的 runtime override 先于 per-agent pin、<span class="mono">AgentDefinition.model</span> 与父模型继承。</p>
+  </div>
+  <div class="grid2">
+    <section class="card reveal"><h3>失败关闭：Persona</h3><p>请求了 Persona 后，找不到、内容为空或读取文件失败都会写入 <span class="mono">persona_error</span>。文件 I/O 失败会提前返回默认化结果；spawn 侧看到 Persona 错误后中止创建。</p></section>
+    <section class="card reveal"><h3>软降级：role prompt</h3><p>role 的 <span class="mono">prompt_file</span> 读取失败只产生 <span class="mono">role_prompt_warning</span>，其余 model、reasoning、capability 与 isolation 仍继续解析。</p></section>
+  </div>
+
+  <div class="sec-label">真实源码快照</div>
+  <section class="source reveal">
+    <div class="source-head"><span>crates/codegen/xai-grok-subagent-resolution/src/types.rs</span><span>REAL SOURCE · abridged</span></div>
+    <pre><code><span class="kw">pub struct</span> EffectiveRuntimeConfig {
+    <span class="kw">pub</span> model: Option&lt;String&gt;,
+    <span class="kw">pub</span> reasoning_effort: Option&lt;String&gt;,
+    <span class="kw">pub</span> capability_mode: Option&lt;SubagentCapabilityMode&gt;,
+    <span class="kw">pub</span> persona: Option&lt;String&gt;,
+    <span class="kw">pub</span> persona_instructions: Option&lt;String&gt;,
+    <span class="kw">pub</span> role_prompt: Option&lt;String&gt;,
+    <span class="kw">pub</span> persona_error: Option&lt;String&gt;,
+    <span class="kw">pub</span> isolation: SubagentIsolationMode,
+}</code></pre>
+  </section>
+  <p class="caption reveal"><b>快照说明：</b>字段名与类型来自真实结构体，省略了注释和两个观测字段。上方合流图是教学化视觉，不表示源码中存在同名的单体管线类。</p>
+
+  <section class="exercise reveal">
+    <h3>课堂练习：手算有效配置</h3>
+    <p>spawn 指定 <span class="mono">reasoning_effort=high</span> 和 Persona reviewer；role 指定 model=A、capability=read-only、isolation=worktree；Persona 指定 model=B、reasoning=low、isolation=none。写出四个字段的最终值，并解释 capability 为何不会读取 Persona。</p>
+  </section>
+
+  <div class="takeaway reveal">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+    <span><b>Takeaway：</b>AgentDefinition 提供 Agent 骨架，role 与 Persona 提供 spawn 阶段的运行时输入。优先级是逐字段级联，准确分析要先确认该字段真实存在于哪一种结构。</span>
+  </div>
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+<script>document.querySelectorAll('.reveal').forEach(function(el){var ob=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');ob.unobserve(e.target)}})},{threshold:.12});ob.observe(el)});</script>
+</body>
+</html>

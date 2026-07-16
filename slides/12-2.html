@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rust 技术选型：事实与推断 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--accent:#d99518;--gold:#f4b942;--soft:rgba(217,149,24,.09)}
+.lesson-header{position:relative;overflow:hidden;padding:42px 38px;border:1px solid rgba(217,149,24,.24);border-radius:24px;background:radial-gradient(circle at 88% 12%,rgba(244,185,66,.25),transparent 34%),linear-gradient(145deg,#fffaf0,var(--card));box-shadow:0 18px 50px rgba(100,64,7,.09)}
+.lesson-header:after{content:"RUST";position:absolute;right:24px;bottom:-10px;font-size:86px;font-weight:900;color:rgba(217,149,24,.07);line-height:1}.subtitle{max-width:760px;position:relative;z-index:1}
+.goal,.snapshot,.takeaway{margin-top:18px;border:1px solid rgba(217,149,24,.22);background:var(--soft);border-radius:16px;padding:16px 20px;line-height:1.7}.goal b,.snapshot b,.takeaway b{color:var(--accent)}
+.section-title{margin:34px 0 14px;font-size:13px;font-weight:800;letter-spacing:.12em;color:var(--accent)}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.fact,.panel,.code-card{padding:19px;border:1px solid var(--border);border-radius:16px;background:var(--card);box-shadow:var(--shadow-card)}
+.fact svg{width:28px;height:28px;color:var(--accent)}.fact h3{font-size:14px;margin:10px 0 5px}.fact p,.panel p,.snapshot{font-size:13px;color:var(--sub);line-height:1.65}
+.lane{display:grid;grid-template-columns:1fr 70px 1fr;align-items:stretch}.lane .mid{display:grid;place-items:center;color:var(--accent)}.lane .panel:first-child{border-color:rgba(217,149,24,.35)}
+.tag{display:inline-block;padding:4px 9px;border-radius:99px;background:var(--soft);color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.08em}.panel h3{margin:10px 0;font-size:17px}.panel ul{padding-left:18px;margin:0}.panel li{margin:8px 0;color:var(--text);font-size:13px;line-height:1.6}
+.source-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.path{font:700 11px/1.5 ui-monospace,monospace;color:var(--accent);overflow-wrap:anywhere}.code{margin-top:9px;padding:15px;border-radius:12px;background:#17130d;color:#f7e8c6;overflow:auto;font:12px/1.65 ui-monospace,monospace}.cm{color:#aa9570}.kw{color:#ffc85a}
+.compare{padding:22px;border-radius:18px;background:#211a10;color:#f8e8c5}.compare h3{margin:0 0 12px;color:#ffc85a}.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.compare-grid div{padding:14px;border:1px solid rgba(255,213,125,.2);border-radius:12px;font-size:13px;line-height:1.65}.compare small{display:block;margin-top:12px;color:#c4ad84}
+.exercise{padding:20px;border:1px dashed rgba(217,149,24,.48);border-radius:18px;background:linear-gradient(120deg,var(--soft),transparent)}.exercise h3{margin:0 0 6px}.exercise p{margin:0;color:var(--sub);line-height:1.7}
+.takeaway{display:flex;gap:12px}.takeaway svg{width:26px;flex:none;color:var(--accent)}
+@media(max-width:760px){.lesson-header{padding:30px 22px}.lesson-header:after{font-size:54px}.facts{grid-template-columns:1fr 1fr}.lane{grid-template-columns:1fr;gap:12px}.lane .mid{transform:rotate(90deg);height:35px}.source-grid,.compare-grid{grid-template-columns:1fr}}@media(max-width:430px){.facts{grid-template-columns:1fr}}
+</style>
+<meta name="description" content="从真实 Cargo 配置区分 Grok Build 的 Rust 源码事实与课程推断，并给出公开行为对照。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.app/slides/12-2.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">CHAPTER 12 · ENGINEERING CHOICE</div>
+    <h1>为什么 Rust 合适：先分清事实与推断</h1>
+    <p class="subtitle">源码能证明 Rust 2024、Tokio、强类型建模和原生二进制产物。技术选择背后的组织动机没有写入源码，本课只给出有边界的课程推断。</p>
+  </header>
+
+  <div class="goal reveal"><b>课程目标</b><br>用“仓库证据”和“工程推断”两套标签分析技术选型，避免把合理解释写成 xAI 官方动机。</div>
+
+  <div class="section-title">源码可验证事实</div>
+  <div class="facts">
+    <div class="fact reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h14v16H5zM8 8h8M8 12h5"/></svg><h3>Rust 2024</h3><p><code>[workspace.package]</code> 明确设置 <code>edition = "2024"</code>。</p></div>
+    <div class="fact reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><h3>Tokio 全功能</h3><p>workspace 依赖使用 Tokio 1，并启用 <code>full</code> feature。</p></div>
+    <div class="fact reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M7 4v6M17 4v6M6 14h4v4H6zM14 14h4v4h-4z"/></svg><h3>强类型状态</h3><p><code>enum</code>、<code>Result</code>、newtype 与 Actor handle 广泛用于边界建模。</p></div>
+    <div class="fact reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 10l2 2-2 2M12 15h4"/></svg><h3>二进制目标</h3><p><code>xai-grok-pager-bin</code> 定义一个名为 <code>xai-grok-pager</code> 的 bin target。</p></div>
+  </div>
+
+  <div class="section-title">证据边界</div>
+  <div class="lane">
+    <div class="panel reveal">
+      <span class="tag">源码事实</span>
+      <h3>仓库直接支持的结论</h3>
+      <ul><li>入口创建 Tokio 多线程 runtime。</li><li>会话另建 current-thread runtime 与 LocalSet。</li><li>release-dist 配置 panic、LTO、codegen units 等原生发布参数。</li><li>类型系统承载 Agent、Session、Sampler、Prompt 等领域边界。</li></ul>
+    </div>
+    <div class="mid"><svg width="34" viewBox="0 0 34 18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 9h28M24 3l6 6-6 6"/></svg></div>
+    <div class="panel reveal">
+      <span class="tag">课程推断</span>
+      <h3>可讨论的工程收益</h3>
+      <ul><li>原生二进制便于把 CLI 与运行时一起交付。</li><li>所有权与 Send 边界有助于管理多线程会话。</li><li>强类型适合复杂协议、工具参数和状态转换。</li><li>代价包括编译时间、生命周期约束与更高学习门槛。</li></ul>
+      <p>这些是基于代码形态的解释，不代表 xAI 官方披露的选型原因。</p>
+    </div>
+  </div>
+
+  <div class="section-title">真实源码证据</div>
+  <div class="source-grid">
+    <div class="code-card reveal">
+      <div class="path">Cargo.toml</div>
+      <div class="code">[workspace.package]<br>edition = <span class="kw">"2024"</span><br><br>[workspace.dependencies]<br>tokio = { version = <span class="kw">"1"</span>, features = [<span class="kw">"full"</span>] }</div>
+    </div>
+    <div class="code-card reveal">
+      <div class="path">crates/codegen/xai-grok-pager-bin/src/main.rs</div>
+      <div class="code">let runtime = tokio::runtime::Builder::<br>&nbsp;&nbsp;::new_multi_thread()<br>&nbsp;&nbsp;.enable_all()<br>&nbsp;&nbsp;.build()<br>&nbsp;&nbsp;.unwrap_or_else(|e| panic!(<span class="kw">"failed to start tokio runtime: {e}"</span>));</div>
+    </div>
+  </div>
+
+  <div class="section-title">公开行为对照</div>
+  <div class="compare reveal">
+    <h3>Grok Build 与 Claude Code</h3>
+    <div class="compare-grid">
+      <div><b>Grok Build 本地源码</b><br>可验证 Rust workspace、原生 bin target、Tokio runtime 和 crate 边界。</div>
+      <div><b>Claude Code 公开行为</b><br>公开安装文档提供原生安装方式，也提供 Homebrew、WinGet 等方式。用户可见行为包括终端交互、无头模式和工具调用。</div>
+    </div>
+    <small>此处仅比较公开可验证的安装与产品行为，不推断 Claude Code 的私有内部实现、语言或并发架构。</small>
+  </div>
+
+  <div class="snapshot reveal"><b>源码快照说明</b>：本页依据本地同步副本核对。该副本没有 <code>.git</code> 元数据，因此不声称对应某个 commit 版本。</div>
+
+  <div class="section-title">课堂练习</div>
+  <div class="exercise reveal"><h3>给每条结论贴标签</h3><p>判断下列陈述属于“源码事实”还是“课程推断”：使用 Rust 2024、入口采用 Tokio、多线程一定更快、xAI 为降低内存占用选择 Rust。最后两条缺少仓库直接证据。</p></div>
+
+  <div class="takeaway reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18h16M7 15l3-3 3 2 4-6"/></svg><div><b>Takeaway</b>：技术选型分析先建立证据边界。Rust 2024、Tokio、类型边界和 bin target 属于事实，性能收益与团队动机需要标为推断并接受验证。</div></div>
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+</body>
+</html>

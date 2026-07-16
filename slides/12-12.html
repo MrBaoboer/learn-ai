@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>记忆混合检索流水线 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--accent:#d99516;--gold:#f4b942;--amber-soft:rgba(217,149,22,.09)}
+.objective{display:flex;gap:14px;padding:18px 20px;border:1px solid rgba(217,149,22,.28);border-radius:14px;background:linear-gradient(135deg,var(--amber-soft),transparent);margin:18px 0 28px}.objective svg{color:var(--accent);flex:0 0 auto}.objective b{display:block;color:var(--accent);margin-bottom:4px}.objective span{font-size:14px;line-height:1.7}
+.pipeline{background:#17130d;border:1px solid #5b4116;border-radius:18px;padding:18px;box-shadow:0 18px 50px rgba(75,48,5,.18)}.pipeline svg{display:block;width:100%;height:auto}.caption{text-align:center;color:#a99779;font-size:12px;margin-top:8px}
+.stages{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.stage{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:17px;box-shadow:var(--shadow-card)}.stage .n{font-size:10px;letter-spacing:.1em;color:var(--accent);font-weight:900}.stage h3{font-size:14px;margin:5px 0 7px}.stage p{font-size:12px;color:var(--sub);line-height:1.68;margin:0}.stage code{color:var(--accent)}
+.switches{display:grid;grid-template-columns:1fr 1fr;gap:16px}.switch{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:19px}.switch h3{margin:0 0 8px;font-size:15px}.switch p{margin:0;color:var(--sub);font-size:13px;line-height:1.75}.state{display:inline-block;margin-top:10px;padding:5px 9px;border-radius:7px;background:var(--bg);color:var(--accent);font:800 11px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source{background:#18140e;border:1px solid #4d3816;border-radius:14px;overflow:hidden}.source-head{padding:10px 16px;background:#251d11;color:#d9c39c;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.source pre{padding:17px;margin:0;overflow:auto}.source code{color:#f5ead7;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace}.kw{color:#f4b942}.fn{color:#e8a92f}.num{color:#f7c75c}.str{color:#c9db96}.cm{color:#968970}
+.path-list{display:grid;gap:7px;margin-top:12px}.path-list code{display:block;padding:9px 11px;border-radius:7px;background:var(--bg);font-size:11px;color:var(--text);overflow-wrap:anywhere}
+.exercise{display:grid;grid-template-columns:48px 1fr;gap:15px;padding:19px;border:1px solid rgba(217,149,22,.3);border-radius:14px;background:linear-gradient(135deg,#fff8e9,var(--card))}.exercise-num{height:48px;border-radius:12px;background:var(--accent);display:grid;place-items:center;color:#fff;font-weight:900}.exercise h3{margin:0 0 6px;font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:13px;line-height:1.72}
+.snapshot{margin-top:13px;padding:13px 16px;border-left:3px solid var(--accent);background:var(--bg);font-size:12px;line-height:1.7;color:var(--sub)}.snapshot code{color:var(--text)}
+.takeaway{margin-top:22px;padding:19px 22px;border-radius:14px;background:#241a0b;color:#f7ead2;display:flex;gap:13px;line-height:1.75}.takeaway svg{color:var(--gold);flex:0 0 auto}.takeaway b{color:var(--gold)}
+@media(max-width:780px){.stages{grid-template-columns:1fr 1fr}.switches{grid-template-columns:1fr}.pipeline{padding:8px}}@media(max-width:480px){.stages{grid-template-columns:1fr}.objective{flex-direction:column}}
+</style>
+<meta name="description" content="基于 memory/search.rs 讲解 FTS5、sqlite-vec、时间衰减、来源权重、MMR 与同步回退。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/12-12.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="记忆混合检索流水线">
+<meta property="og:url" content="https://xueai.app/slides/12-12.html">
+<meta property="og:locale" content="zh_CN">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Grok Build · 记忆检索</div>
+    <h1>从文件变更到混合排序</h1>
+    <p class="subtitle">查询前先同步脏文件，再结合 FTS5 BM25 与可选的 sqlite-vec KNN。合并分数经过时间衰减、来源权重与访问增益，最后可选择启用 MMR 多样性重排。</p>
+  </header>
+
+  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg>
+    <span><b>课程目标</b>按真实顺序复述 sync-on-search、FTS、embedding、KNN、合并加权与 MMR，并能说明 embedding 失败和 MMR 关闭时各自发生什么。</span>
+  </div>
+
+  <div class="sec-label">核心视觉 · 完整检索路径</div>
+  <div class="pipeline reveal">
+    <svg viewBox="0 0 1040 430" role="img" aria-label="记忆混合检索完整路径">
+      <defs><marker id="arr12" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#d99516"/></marker></defs>
+      <rect x="25" y="38" width="180" height="72" rx="13" fill="#2b200f" stroke="#966716"/><text x="115" y="67" fill="#f4b942" text-anchor="middle" font-size="14" font-weight="800">Watcher 脏路径</text><text x="115" y="90" fill="#ead7b7" text-anchor="middle" font-size="11">create · modify · remove</text>
+      <path d="M205 74H270" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/>
+      <rect x="282" y="38" width="184" height="72" rx="13" fill="#9b6b18"/><text x="374" y="67" fill="#fff" text-anchor="middle" font-size="14" font-weight="800">sync-on-search</text><text x="374" y="90" fill="#fff3d7" text-anchor="middle" font-size="11">reindex_file / delete_path</text>
+      <path d="M466 74H532" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/>
+      <rect x="544" y="38" width="174" height="72" rx="13" fill="#2b200f" stroke="#966716"/><text x="631" y="67" fill="#f4b942" text-anchor="middle" font-size="14" font-weight="800">用户查询</text><text x="631" y="90" fill="#ead7b7" text-anchor="middle" font-size="11">query</text>
+      <path d="M631 110V170M631 140H354V170M631 140H826V170" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/>
+      <rect x="244" y="182" width="220" height="84" rx="14" fill="#2b200f" stroke="#966716"/><text x="354" y="213" fill="#f4b942" text-anchor="middle" font-size="14" font-weight="800">FTS5 BM25</text><text x="354" y="238" fill="#ead7b7" text-anchor="middle" font-size="11">始终可用 · 关键词候选</text>
+      <rect x="716" y="182" width="220" height="84" rx="14" fill="#2b200f" stroke="#966716"/><text x="826" y="213" fill="#f4b942" text-anchor="middle" font-size="14" font-weight="800">Embedding + KNN</text><text x="826" y="238" fill="#ead7b7" text-anchor="middle" font-size="11">可用时走 sqlite-vec</text>
+      <path d="M826 266V300H676" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/><path d="M354 266V300H492" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/>
+      <path d="M826 182V143H957V222" stroke="#a76b28" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arr12)"/><text x="955" y="132" fill="#c49b62" text-anchor="end" font-size="10">embedding 失败</text><text x="955" y="241" fill="#c49b62" text-anchor="end" font-size="10">FTS-only</text>
+      <rect x="504" y="312" width="260" height="84" rx="15" fill="#9b6b18"/><text x="634" y="340" fill="#fff" text-anchor="middle" font-size="14" font-weight="800">合并与排序</text><text x="634" y="363" fill="#fff3d7" text-anchor="middle" font-size="11">decay × source weight × access boost</text><text x="634" y="382" fill="#fff3d7" text-anchor="middle" font-size="11">MMR 可选，随后 truncate</text>
+      <path d="M764 354H850" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/><rect x="862" y="318" width="150" height="72" rx="13" fill="#d99516"/><text x="937" y="347" fill="#fff" text-anchor="middle" font-size="14" font-weight="800">SearchResult</text><text x="937" y="371" fill="#fff8e8" text-anchor="middle" font-size="11">max_results</text>
+    </svg>
+    <div class="caption">教学化结构图：失败分支回到 FTS-only；MMR 是 opt-in，默认不会重排。</div>
+  </div>
+
+  <div class="sec-label">流水线中的真实机制</div>
+  <div class="stages">
+    <div class="stage reveal"><div class="n">01 · SYNC</div><h3>查询前同步</h3><p><code>MemoryFileWatcher</code> 累积变化的 Markdown 路径。backend 在 search 开始时重新索引新增或修改文件，并删除已移除文件的旧 chunk。</p></div>
+    <div class="stage reveal"><div class="n">02 · FTS</div><h3>BM25 候选</h3><p>先执行普通 FTS，再补充 global 与 workspace 来源查询，降低 session 数量过多造成的挤出。</p></div>
+    <div class="stage reveal"><div class="n">03 · VECTOR</div><h3>可选 KNN</h3><p>仅在 sqlite-vec 与 provider 可用时嵌入 query。embedding 报错会记录 warning，并传入 <code>None</code> 继续 FTS-only。</p></div>
+    <div class="stage reveal"><div class="n">04 · SCORE</div><h3>归一化与合并</h3><p>BM25 分数与向量 L2 距离分别归一化。双路命中时按权重合并，同时保证结果不低于该 chunk 的 FTS 分数。</p></div>
+    <div class="stage reveal"><div class="n">05 · WEIGHT</div><h3>时间与来源</h3><p>session 按半衰期指数衰减，global 与 workspace 视为 evergreen。随后乘 source weight 与适度的 access boost。</p></div>
+    <div class="stage reveal"><div class="n">06 · DIVERSITY</div><h3>可选 MMR</h3><p>开启后按相关性与 snippet 的 Jaccard 差异做贪心重排。最后截断到 <code>max_results</code>。</p></div>
+  </div>
+
+  <div class="sec-label">两个容易误读的开关</div>
+  <div class="switches">
+    <div class="switch reveal"><h3>Embedding 失败</h3><p>向量路径停止，FTS 结果仍进入 <code>hybrid_search_merge</code>。页面或调用方无需把 embedding 故障当成整次搜索失败。</p><span class="state">fallback = FTS-only</span></div>
+    <div class="switch reveal"><h3>MMR 默认状态</h3><p><code>MmrConfig::default()</code> 设置 <code>enabled: false</code> 与 <code>lambda: 0.7</code>。0.7 只在显式开启 MMR 后生效。</p><span class="state">enabled = false</span></div>
+  </div>
+
+  <div class="sec-label">真实源码证据</div>
+  <div class="source reveal">
+    <div class="source-head">crates/codegen/xai-grok-memory/src/search.rs · 第 146 至 190 行节选</div>
+    <pre><code><span class="kw">pub async fn</span> <span class="fn">hybrid_search</span>(
+    index: &amp;MemoryIndex,
+    embedding_provider: Option&lt;&amp;<span class="kw">dyn</span> EmbeddingProvider&gt;,
+    query: &amp;str,
+    config: &amp;MemorySearchConfig,
+) -&gt; Result&lt;Vec&lt;SearchResult&gt;, Box&lt;<span class="kw">dyn</span> std::error::Error&gt;&gt; {
+    <span class="kw">let</span> candidate_limit = config.max_results * <span class="num">3</span>;
+    <span class="kw">let mut</span> fts_results =
+        index.search_fts(query, candidate_limit).unwrap_or_default();
+    <span class="cm">/* 补充 evergreen FTS 候选的源码在此处 */</span>
+
+    <span class="kw">let</span> vec_available = index.vec_available();
+    <span class="kw">let</span> query_embedding = <span class="kw">if</span> vec_available {
+        <span class="kw">if let</span> Some(provider) = embedding_provider {
+            <span class="kw">match</span> provider.embed_batch(&amp;[query]).<span class="kw">await</span> {
+                Ok(embeddings) <span class="kw">if</span> !embeddings.is_empty() =&gt;
+                    Some(embeddings.into_iter().next().unwrap()),
+                Ok(_) =&gt; None,
+                Err(e) =&gt; {
+                    tracing::warn!(error = %e,
+                        <span class="str">"embedding query failed, falling back to FTS-only"</span>);
+                    None
+                }
+            }
+        } <span class="kw">else</span> { None }
+    } <span class="kw">else</span> { None };
+
+    hybrid_search_merge(index, fts_results, query_embedding.as_deref(), config)
+}</code></pre>
+  </div>
+  <div class="path-list reveal">
+    <code>crates/codegen/xai-grok-memory/src/backend.rs：search() 中执行 watcher 同步与查询</code>
+    <code>crates/codegen/xai-grok-memory/src/watcher.rs：MemoryFileWatcher</code>
+    <code>crates/codegen/xai-grok-memory/src/mmr.rs：mmr_rerank</code>
+    <code>crates/codegen/xai-grok-config-types/src/memory.rs：MmrConfig 默认值</code>
+  </div>
+  <div class="snapshot"><b>源码快照说明：</b>依据本地仓库 <code>grok-build-main</code>，核对日期 2026-07-17。代码块保留真实函数与分支，唯一的折叠处已用注释说明；流程图明确标为教学化结构图。</div>
+
+  <div class="sec-label">课堂练习</div>
+  <div class="exercise reveal">
+    <div class="exercise-num">06</div>
+    <div><h3>推演一次降级查询</h3><p>假设 watcher 发现一个文件被修改，query embedding 随后失败，MMR 保持默认配置。请按顺序写出索引更新、候选生成、加权排序与最终截断，并标出没有发生的两个步骤。</p></div>
+  </div>
+
+  <div class="takeaway reveal">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
+    <span><b>Takeaway：</b>记忆检索具备可降级与可同步两条关键保障。FTS 始终提供基础候选，向量搜索按可用性增强；时间衰减和来源权重调整排序；MMR 需要显式开启；watcher 让外部 Markdown 修改在下一次查询前进入索引。</span>
+  </div>
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+</body>
+</html>

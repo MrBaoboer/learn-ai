@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>子 Agent 的四个隔离维度 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--accent:#d99a22;--gold:#f5b942;--line:rgba(217,154,34,.23)}
+.lesson{position:relative}.lesson:before{content:"";position:absolute;inset:0 0 auto;height:320px;background:radial-gradient(circle at 82% 7%,rgba(245,185,66,.14),transparent 42%);pointer-events:none}.lesson-header{position:relative}.lesson-header h1{letter-spacing:-.04em}
+.objective{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:center;margin:20px 0 10px;padding:20px 24px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(245,185,66,.10),rgba(245,185,66,.02))}.objective b{color:var(--accent);font-size:13px;letter-spacing:.14em}.objective p{margin:0;line-height:1.75}
+.hero{margin-top:18px;border-radius:24px;overflow:hidden;background:linear-gradient(145deg,#17130c,#2a1d09);box-shadow:0 22px 60px rgba(57,35,4,.22)}.hero-copy{padding:28px 30px 8px;color:#fff}.hero-copy small{color:#efb849;letter-spacing:.16em;font-weight:800}.hero-copy h2{margin:8px 0 6px;font-size:24px}.hero-copy p{margin:0;color:#cfc5b4;line-height:1.7}.hero svg{display:block;width:100%;height:auto}
+.ring{fill:none;stroke:#d99a22;stroke-width:1.6}.ring2{fill:none;stroke:#806a40;stroke-width:1.2;stroke-dasharray:6 5}.core{fill:#2a1d09;stroke:#f5b942;stroke-width:2}.t1{fill:#fff8e8;font:700 13px ui-monospace,SFMono-Regular,Menlo,monospace}.t2{fill:#cdbb9b;font:12px system-ui,sans-serif}
+.grid2,.grid4{display:grid;gap:14px;margin-top:14px}.grid2{grid-template-columns:repeat(2,1fr)}.grid4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow-card)}.card h3{font-size:15px;margin:0 0 8px}.card p,.card li{font-size:13px;color:var(--sub);line-height:1.72}.card ul{margin:8px 0 0;padding-left:18px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent)}
+.dimension{padding:18px 14px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:14px}.dimension svg{color:var(--accent)}.dimension b{display:block;margin-top:9px;font-size:13px}.dimension span{display:block;margin-top:5px;font-size:11px;color:var(--sub);line-height:1.5}
+.path-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.path{padding:7px 10px;border-radius:9px;background:rgba(217,154,34,.09);border:1px solid var(--line);font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text)}
+.callout{margin-top:14px;padding:18px 20px;border-left:4px solid var(--accent);border-radius:0 14px 14px 0;background:rgba(217,154,34,.07);line-height:1.75}.callout b{color:var(--accent)}
+.source{margin-top:14px;background:#15120d;border:1px solid #342713;border-radius:16px;overflow:hidden}.source-head{display:flex;justify-content:space-between;gap:12px;padding:11px 16px;background:#211a10;color:#dbc79e;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}.source-head span:last-child{color:#efb849}.source pre{margin:0;padding:18px;overflow:auto;color:#eee3cd;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}.kw{color:#efb849}.cm{color:#897c68}.caption{margin-top:8px;color:var(--sub);font-size:12px;line-height:1.6}.caption b{color:var(--accent)}
+.exercise{margin-top:16px;border:1px dashed rgba(217,154,34,.5);border-radius:16px;padding:20px;background:linear-gradient(135deg,rgba(217,154,34,.08),transparent)}.exercise h3{margin:0 0 8px;font-size:16px}.exercise p{margin:0;color:var(--sub);line-height:1.75}
+.takeaway{margin-top:18px;display:flex;gap:14px;padding:20px 22px;border-radius:16px;background:#1b160d;color:#f8ecd4;line-height:1.75}.takeaway svg{flex:0 0 auto;color:#f5b942}.takeaway b{color:#f5b942}
+@media(max-width:760px){.objective{grid-template-columns:1fr;gap:5px}.grid2,.grid4{grid-template-columns:1fr}.hero-copy{padding:22px 20px 8px}.source-head{flex-direction:column}}
+</style>
+<meta name="description" content="核实 ContextSource、ResumeSourceData、SubagentIsolationMode 与 worktree 真实语义。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.app/slides/12-15.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Grok Build · Context Isolation</div>
+    <h1>子 Agent 的四个隔离维度</h1>
+    <p class="subtitle">上下文来源、身份连续性、工作目录和文件改动空间分别控制不同边界。把它们混成一个“隔离等级”，容易误读恢复和 worktree 的真实行为。</p>
+  </header>
+
+  <section class="objective reveal">
+    <b>课程目标</b>
+    <p>能准确解释 <span class="mono">ContextSource::New / Resumed</span>、<span class="mono">ResumeSourceData</span>、<span class="mono">SubagentIsolationMode</span>，并根据任务选择新会话、恢复与 worktree。</p>
+  </section>
+
+  <section class="hero reveal" aria-label="子 Agent 隔离维度教学图">
+    <div class="hero-copy"><small>TEACHING DIAGRAM</small><h2>隔离是一组正交维度</h2><p>同一个 Resumed 子 Agent 可以复用 worktree，也可以继承普通 cwd。上下文连续与文件空间隔离要分别判断。</p></div>
+    <svg viewBox="0 0 920 330" role="img" aria-labelledby="isoTitle">
+      <title id="isoTitle">上下文、身份、工作目录和改动空间四个隔离维度</title>
+      <circle class="ring2" cx="460" cy="175" r="142"/><circle class="ring" cx="460" cy="175" r="92"/><circle class="core" cx="460" cy="175" r="49"/>
+      <text class="t1" x="460" y="170" text-anchor="middle">child</text><text class="t2" x="460" y="192" text-anchor="middle">session</text>
+      <rect class="core" x="70" y="55" rx="13" width="180" height="66"/><text class="t1" x="160" y="83" text-anchor="middle">ContextSource</text><text class="t2" x="160" y="104" text-anchor="middle">New / Resumed</text>
+      <rect class="core" x="670" y="55" rx="13" width="180" height="66"/><text class="t1" x="760" y="83" text-anchor="middle">Identity</text><text class="t2" x="760" y="104" text-anchor="middle">type / persona / model pin</text>
+      <rect class="core" x="70" y="238" rx="13" width="180" height="66"/><text class="t1" x="160" y="266" text-anchor="middle">Effective cwd</text><text class="t2" x="160" y="287" text-anchor="middle">worktree &gt; override &gt; parent</text>
+      <rect class="core" x="670" y="238" rx="13" width="180" height="66"/><text class="t1" x="760" y="266" text-anchor="middle">Isolation mode</text><text class="t2" x="760" y="287" text-anchor="middle">None / Worktree</text>
+    </svg>
+  </section>
+
+  <div class="sec-label">ContextSource 的公开语义</div>
+  <div class="grid2">
+    <section class="card reveal">
+      <h3>ContextSource::New</h3>
+      <p>新会话不继承历史。spawn 流程建立新的 system prompt 和 prompt context，再接收当前任务输入。它不代表独立文件空间，文件空间仍取决于 isolation 与 cwd。</p>
+    </section>
+    <section class="card reveal">
+      <h3>ContextSource::Resumed</h3>
+      <p>从已完成的 peer subagent 继续。源码复制原始 transcript 与 tool state，模型沿用 source model；system prompt 和 prompt context 根据当前 AgentDefinition 重新渲染。</p>
+    </section>
+  </div>
+  <div class="callout reveal"><b>实现补充：</b><span class="mono">xai-grok-subagent-resolution::ContextSource</span> 公开枚举只有 New 与 Resumed。shell 内部还有 <span class="mono">InitialContextSource::Forked</span>，用于从父会话镜像或摘要上下文；它属于另一条 bootstrap 分支，不应伪装成公开枚举成员。</div>
+
+  <div class="sec-label">ResumeSourceData 传递恢复定位信息</div>
+  <div class="grid4">
+    <div class="dimension reveal"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg><b>身份</b><span>subagent_id、type、persona、model_id</span></div>
+    <div class="dimension reveal"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h7l2 2h9v10H3z"/></svg><b>目录</b><span>child_cwd、worktree_path</span></div>
+    <div class="dimension reveal"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8"/></svg><b>会话数据</b><span>child_session_id 定位 transcript 与 tool state</span></div>
+    <div class="dimension reveal"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18L12 4l8 14z"/></svg><b>快照</b><span>snapshot_ref 可重建已删除 worktree</span></div>
+  </div>
+  <div class="grid2">
+    <section class="card reveal"><h3>身份校验</h3><ul><li>subagent_type 必须与 source 一致。</li><li>显式 Persona 必须与 source 一致；未显式给出则沿用 source。</li><li>model 不参与身份 gate。请求中的 model override 会被软忽略，并 pin 到 source model。</li></ul></section>
+    <section class="card reveal"><h3>恢复限制</h3><ul><li>复制 transcript 或读取失败时，显式 resume 会失败关闭。</li><li>source transcript 超过目标模型上下文窗口 80% 时拒绝恢复。</li><li>恢复复制 tool state，不复制 plan state、plan mode state 与 signals。</li></ul></section>
+  </div>
+
+  <div class="sec-label">SubagentIsolationMode 只有两种</div>
+  <div class="grid2">
+    <section class="card reveal"><h3>None</h3><p>子 Agent 使用解析后的 cwd，通常与父工作区相同。上下文窗口依然是独立子会话。None 描述文件工作空间隔离，不等于共享对话历史。</p></section>
+    <section class="card reveal"><h3>Worktree</h3><p>子 Agent 使用独立 worktree 路径。恢复时优先复用 source worktree；路径已移除且存在 <span class="mono">snapshot_ref</span> 时，可从持久 git ref 重新水化。该枚举没有“sandbox”成员。</p></section>
+  </div>
+  <div class="path-list reveal">
+    <span class="path">crates/codegen/xai-grok-subagent-resolution/src/types.rs</span>
+    <span class="path">crates/codegen/xai-grok-subagent-resolution/src/resume.rs</span>
+    <span class="path">crates/common/xai-tool-types/src/task.rs</span>
+    <span class="path">bootstrap_initial_context</span>
+    <span class="path">resolve_child_cwd</span>
+  </div>
+
+  <div class="sec-label">真实源码快照</div>
+  <section class="source reveal">
+    <div class="source-head"><span>crates/common/xai-tool-types/src/task.rs</span><span>REAL SOURCE</span></div>
+    <pre><code><span class="kw">pub enum</span> SubagentIsolationMode {
+    #[default]
+    #[serde(alias = <span class="cm">"None"</span>)]
+    None,
+    #[serde(alias = <span class="cm">"Worktree"</span>, alias = <span class="cm">"work_tree"</span>, alias = <span class="cm">"work-tree"</span>)]
+    Worktree,
+}</code></pre>
+  </section>
+  <p class="caption reveal"><b>快照说明：</b>枚举完整保留，展示 wire alias。上方同心圆是课程视觉，用于强调维度正交，并非源码中的对象层级。</p>
+
+  <section class="exercise reveal">
+    <h3>课堂练习：给两个任务选边界</h3>
+    <p>任务 A 要继续昨天完成一半的重构，并保留原 worktree 未提交改动。任务 B 只需独立分析当前仓库。分别选择 New 或 Resumed、None 或 Worktree，并说明 transcript、model、cwd 与文件改动空间如何处理。</p>
+  </section>
+
+  <div class="takeaway reveal">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8M12 8v8"/></svg>
+    <span><b>Takeaway：</b>New 与 Resumed 控制信息连续性，None 与 Worktree 控制文件空间，ResumeSourceData 负责定位身份、目录、会话和快照。先拆维度，再谈隔离强度。</span>
+  </div>
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+<script>document.querySelectorAll('.reveal').forEach(function(el){var ob=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');ob.unobserve(e.target)}})},{threshold:.12});ob.observe(el)});</script>
+</body>
+</html>

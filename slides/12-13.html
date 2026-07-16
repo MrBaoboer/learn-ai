@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dream 的真实机制 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--accent:#d99a22;--gold:#f5b942;--ink:#17120a;--night:#17130c;--line:rgba(217,154,34,.22)}
+.lesson{position:relative}.lesson:before{content:"";position:absolute;inset:0 0 auto;height:310px;background:radial-gradient(circle at 82% 8%,rgba(245,185,66,.15),transparent 44%);pointer-events:none}
+.lesson-header{position:relative}.lesson-header h1{letter-spacing:-.04em}.subtitle{max-width:780px}
+.objective{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:center;margin:20px 0 10px;padding:20px 24px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(245,185,66,.10),rgba(245,185,66,.025))}
+.objective b{color:var(--accent);font-size:13px;letter-spacing:.14em}.objective p{margin:0;color:var(--text);line-height:1.75}
+.hero{margin-top:18px;border-radius:24px;overflow:hidden;background:linear-gradient(145deg,#17130c,#2a1d09);box-shadow:0 22px 60px rgba(57,35,4,.22)}
+.hero-copy{padding:28px 30px 10px;color:#fff}.hero-copy small{color:#efb849;letter-spacing:.16em;font-weight:800}.hero-copy h2{margin:8px 0 6px;font-size:24px}.hero-copy p{margin:0;color:#cfc5b4;line-height:1.7}
+.hero svg{display:block;width:100%;height:auto}.node{fill:#241b0d;stroke:#d99a22;stroke-width:1.5}.node-text{fill:#fff8e8;font:700 13px ui-monospace,SFMono-Regular,Menlo,monospace}.note-text{fill:#cdbb9b;font:12px system-ui,sans-serif}.flow{stroke:#e1a632;stroke-width:2;fill:none;marker-end:url(#arrow)}
+.grid3,.grid2{display:grid;gap:14px;margin-top:14px}.grid3{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow-card)}.card h3{font-size:15px;margin:0 0 8px;color:var(--text)}.card p,.card li{font-size:13px;color:var(--sub);line-height:1.7}.card ul{margin:8px 0 0;padding-left:18px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent)}
+.path-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.path{padding:7px 10px;border-radius:9px;background:rgba(217,154,34,.09);border:1px solid var(--line);font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text)}
+.callout{margin-top:14px;padding:18px 20px;border-left:4px solid var(--accent);border-radius:0 14px 14px 0;background:rgba(217,154,34,.07);color:var(--text);line-height:1.75}.callout b{color:var(--accent)}
+.source{margin-top:14px;background:#15120d;border:1px solid #342713;border-radius:16px;overflow:hidden}.source-head{display:flex;justify-content:space-between;gap:12px;padding:11px 16px;background:#211a10;color:#dbc79e;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}.source-head span:last-child{color:#efb849}.source pre{margin:0;padding:18px;overflow:auto;color:#eee3cd;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}.kw{color:#efb849}.cm{color:#897c68}.fn{color:#ffd98a}
+.caption{margin-top:8px;color:var(--sub);font-size:12px;line-height:1.6}.caption b{color:var(--accent)}
+.exercise{margin-top:16px;border:1px dashed rgba(217,154,34,.5);border-radius:16px;padding:20px;background:linear-gradient(135deg,rgba(217,154,34,.08),transparent)}.exercise h3{margin:0 0 8px;font-size:16px}.exercise p{margin:0;color:var(--sub);line-height:1.75}
+.takeaway{margin-top:18px;display:flex;gap:14px;padding:20px 22px;border-radius:16px;background:#1b160d;color:#f8ecd4;line-height:1.75}.takeaway svg{flex:0 0 auto;color:#f5b942}.takeaway b{color:#f5b942}
+@media(max-width:760px){.objective{grid-template-columns:1fr;gap:5px}.grid3,.grid2{grid-template-columns:1fr}.hero-copy{padding:22px 20px 8px}.source-head{flex-direction:column}.card{padding:17px}.takeaway{align-items:flex-start}}
+</style>
+<meta name="description" content="从 Grok Build 真实源码理解 Dream 的门控、幂等、锁与失败恢复。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.app/slides/12-13.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Grok Build · Memory Engineering</div>
+    <h1>Dream 的真实机制</h1>
+    <p class="subtitle">Dream 会把近期 session 日志与现有 MEMORY.md 合并成长期记忆。它由会话结束、可选周期检查或手动命令进入，并受门控与最佳努力锁共同约束。</p>
+  </header>
+
+  <section class="objective reveal">
+    <b>课程目标</b>
+    <p>读懂 Dream 从触发到重建索引的完整链路，能解释 <span class="mono">DreamGate</span>、幂等要求、锁竞争和写入失败回滚各自解决什么问题。</p>
+  </section>
+
+  <section class="hero reveal" aria-label="Dream 教学化流程图">
+    <div class="hero-copy">
+      <small>TEACHING DIAGRAM</small>
+      <h2>一次 Dream 的状态机</h2>
+      <p>下图是教学化图示。节点名称来自源码，布局与文字说明经过课程化整理。</p>
+    </div>
+    <svg viewBox="0 0 920 285" role="img" aria-labelledby="dreamTitle dreamDesc">
+      <title id="dreamTitle">Dream 从入口到索引同步的流程</title>
+      <desc id="dreamDesc">入口经过三道门控，构建消息，调用模型，获取锁，写入记忆，清理并同步索引。</desc>
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#e1a632"/></marker></defs>
+      <path class="flow" d="M135 76H265M395 76H525M655 76H785M790 108V190H675M545 222H415M285 222H155"/>
+      <rect class="node" x="25" y="45" rx="12" width="110" height="62"/><text class="node-text" x="80" y="71" text-anchor="middle">入口</text><text class="note-text" x="80" y="91" text-anchor="middle">end / timer / slash</text>
+      <rect class="node" x="265" y="45" rx="12" width="130" height="62"/><text class="node-text" x="330" y="71" text-anchor="middle">DreamGate</text><text class="note-text" x="330" y="91" text-anchor="middle">enabled / hours / sessions</text>
+      <rect class="node" x="525" y="45" rx="12" width="130" height="62"/><text class="node-text" x="590" y="71" text-anchor="middle">build message</text><text class="note-text" x="590" y="91" text-anchor="middle">32K input cap</text>
+      <rect class="node" x="785" y="45" rx="12" width="110" height="62"/><text class="node-text" x="840" y="71" text-anchor="middle">model call</text><text class="note-text" x="840" y="91" text-anchor="middle">30 min timeout</text>
+      <rect class="node" x="545" y="191" rx="12" width="130" height="62"/><text class="node-text" x="610" y="217" text-anchor="middle">try_acquire</text><text class="note-text" x="610" y="237" text-anchor="middle">best effort lock</text>
+      <rect class="node" x="285" y="191" rx="12" width="130" height="62"/><text class="node-text" x="350" y="217" text-anchor="middle">write MEMORY</text><text class="note-text" x="350" y="237" text-anchor="middle">failure → rollback</text>
+      <rect class="node" x="25" y="191" rx="12" width="130" height="62"/><text class="node-text" x="90" y="217" text-anchor="middle">cleanup + index</text><text class="note-text" x="90" y="237" text-anchor="middle">only deleted stems</text>
+    </svg>
+  </section>
+
+  <div class="sec-label">入口与门控</div>
+  <div class="grid3">
+    <section class="card reveal"><h3>1. 配置门</h3><p><span class="mono">MemoryDreamConfig.enabled</span> 默认为 true。子 Agent 会话直接跳过 Dream。</p></section>
+    <section class="card reveal"><h3>2. 时间门</h3><p><span class="mono">min_hours</span> 默认为 4。锁文件 mtime 记录上次成功 consolidation 的时间。</p></section>
+    <section class="card reveal"><h3>3. 会话门</h3><p><span class="mono">min_sessions</span> 默认为 3。统计上次 consolidation 后修改的 session Markdown，并排除当前会话。</p></section>
+  </div>
+  <div class="callout reveal"><b>触发事实：</b>默认 <span class="mono">check_interval_secs = None</span>，代表不启用周期检查。源码明确支持 session end 和 <span class="mono">/dream</span>；只有配置检查间隔后，session actor 才会按周期检查门控。因此不能概括为“所有空闲时必然自动运行”。</div>
+  <div class="path-list reveal">
+    <span class="path">crates/codegen/xai-grok-memory/src/dream.rs</span>
+    <span class="path">crates/codegen/xai-grok-memory/src/dream_lock.rs</span>
+    <span class="path">crates/codegen/xai-grok-memory/src/storage.rs</span>
+    <span class="path">crates/codegen/xai-grok-memory/src/index.rs</span>
+    <span class="path">crates/codegen/xai-grok-config-types/src/memory.rs</span>
+    <span class="path">crates/codegen/xai-grok-shell/src/session/acp_session_impl/memory_dream.rs</span>
+    <span class="path">check_dream_gates</span>
+    <span class="path">maybe_run_dream</span>
+  </div>
+
+  <div class="sec-label">锁、幂等与失败恢复</div>
+  <div class="grid2">
+    <section class="card reveal">
+      <h3>DreamLock 是最佳努力协调</h3>
+      <p><span class="mono">.dream-lock</span> 保存 PID，并用 mtime 兼作上次成功时间。活进程持有且未过期时返回 <span class="mono">Ok(None)</span>。死进程或超时锁可被回收。</p>
+      <p>源码注释明确说明它并非严格互斥。写后复读能降低竞争概率，仍可能有两个进程都认为自己获胜，所以 Dream 必须容忍重复 consolidation。</p>
+    </section>
+    <section class="card reveal">
+      <h3>成功边界决定清理边界</h3>
+      <ul>
+        <li>模型返回空、NO_REPLY 或无 Markdown 标题时，不写入也不删 session。</li>
+        <li>写 MEMORY.md 失败时调用 <span class="mono">rollback(prior)</span> 恢复旧锁状态。</li>
+        <li>写入成功后才清理已读取的 session；5 分钟内仍活跃的文件会跳过。</li>
+        <li>搜索索引只移除实际删掉的路径，再为新 MEMORY.md 重建索引与 embedding。</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="sec-label">真实源码快照</div>
+  <section class="source reveal">
+    <div class="source-head"><span>crates/codegen/xai-grok-memory/src/dream.rs</span><span>REAL SOURCE · abridged</span></div>
+    <pre><code><span class="kw">pub fn</span> <span class="fn">check_dream_gates</span>(
+    config: &amp;MemoryDreamConfig,
+    lock: &amp;DreamLock,
+    sessions_dir: &amp;Path,
+    current_session_sid8: Option&lt;&amp;str&gt;,
+) -&gt; DreamGate {
+    <span class="kw">if</span> !config.enabled { <span class="kw">return</span> DreamGate::Disabled; }
+    <span class="cm">// Time gate, then session gate</span>
+    ...
+    DreamGate::Open { sessions }
+}</code></pre>
+  </section>
+  <p class="caption reveal"><b>快照说明：</b>代码保留真实函数签名与返回类型，中间实现以省略号压缩。页面中的状态机 SVG 属于教学化表达，不对应仓库生成的架构图。</p>
+
+  <section class="exercise reveal">
+    <h3>课堂练习：定位失败后的系统状态</h3>
+    <p>情境：Dream 已完成模型调用，但写入 MEMORY.md 失败。请回答：锁文件应恢复到什么状态？哪些 session 文件可以删除？索引需要更新吗？再从 <span class="mono">execute_dream</span> 的分支给出依据。</p>
+  </section>
+
+  <div class="takeaway reveal">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway：</b>Dream 的可靠性来自成功边界设计。门控减少无效调用，最佳努力锁降低并发，幂等承担少量重复风险，回滚与延迟清理保证失败后仍能再次尝试。</span>
+  </div>
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){var ob=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');ob.unobserve(e.target)}})},{threshold:.12});ob.observe(el)});
+</script>
+</body>
+</html>

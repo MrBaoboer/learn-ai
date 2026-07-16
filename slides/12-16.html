@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>多 Agent 的组织方式 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--accent:#d99a22;--gold:#f5b942;--line:rgba(217,154,34,.23)}
+.lesson{position:relative}.lesson:before{content:"";position:absolute;inset:0 0 auto;height:320px;background:radial-gradient(circle at 82% 7%,rgba(245,185,66,.14),transparent 42%);pointer-events:none}.lesson-header{position:relative}.lesson-header h1{letter-spacing:-.04em}
+.objective{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:center;margin:20px 0 10px;padding:20px 24px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(245,185,66,.10),rgba(245,185,66,.02))}.objective b{color:var(--accent);font-size:13px;letter-spacing:.14em}.objective p{margin:0;line-height:1.75}
+.hero{margin-top:18px;border-radius:24px;overflow:hidden;background:linear-gradient(145deg,#17130c,#2a1d09);box-shadow:0 22px 60px rgba(57,35,4,.22)}.hero-copy{padding:28px 30px 8px;color:#fff}.hero-copy small{color:#efb849;letter-spacing:.16em;font-weight:800}.hero-copy h2{margin:8px 0 6px;font-size:24px}.hero-copy p{margin:0;color:#cfc5b4;line-height:1.7}.hero svg{display:block;width:100%;height:auto}
+.node{fill:#241b0d;stroke:#d99a22;stroke-width:1.5}.node2{fill:#1f1b15;stroke:#816b43;stroke-width:1.2}.t1{fill:#fff8e8;font:700 13px ui-monospace,SFMono-Regular,Menlo,monospace}.t2{fill:#cdbb9b;font:12px system-ui,sans-serif}.edge{stroke:#e1a632;stroke-width:2;fill:none;marker-end:url(#arr)}
+.grid2,.grid3{display:grid;gap:14px;margin-top:14px}.grid2{grid-template-columns:repeat(2,1fr)}.grid3{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow-card)}.card h3{font-size:15px;margin:0 0 8px}.card p,.card li{font-size:13px;color:var(--sub);line-height:1.72}.card ul{margin:8px 0 0;padding-left:18px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent)}
+.event{display:flex;gap:10px;align-items:center;margin-top:9px;padding:9px 11px;background:rgba(217,154,34,.06);border-radius:9px;font-size:12px;color:var(--sub)}.event b{color:var(--accent);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.public{margin-top:14px;padding:20px;border:1px solid var(--border);border-radius:16px;background:var(--card)}.public h3{margin:0 0 8px;font-size:16px}.public p{margin:0;color:var(--sub);font-size:13px;line-height:1.75}.public strong{color:var(--accent)}
+.path-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.path{padding:7px 10px;border-radius:9px;background:rgba(217,154,34,.09);border:1px solid var(--line);font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text)}
+.source{margin-top:14px;background:#15120d;border:1px solid #342713;border-radius:16px;overflow:hidden}.source-head{display:flex;justify-content:space-between;gap:12px;padding:11px 16px;background:#211a10;color:#dbc79e;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}.source-head span:last-child{color:#efb849}.source pre{margin:0;padding:18px;overflow:auto;color:#eee3cd;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}.kw{color:#efb849}.cm{color:#897c68}.caption{margin-top:8px;color:var(--sub);font-size:12px;line-height:1.6}.caption b{color:var(--accent)}
+.exercise{margin-top:16px;border:1px dashed rgba(217,154,34,.5);border-radius:16px;padding:20px;background:linear-gradient(135deg,rgba(217,154,34,.08),transparent)}.exercise h3{margin:0 0 8px;font-size:16px}.exercise p{margin:0;color:var(--sub);line-height:1.75}.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.choice{padding:12px;border:1px solid var(--line);border-radius:10px;font-size:12px;line-height:1.55;color:var(--text)}
+.takeaway{margin-top:18px;display:flex;gap:14px;padding:20px 22px;border-radius:16px;background:#1b160d;color:#f8ecd4;line-height:1.75}.takeaway svg{flex:0 0 auto;color:#f5b942}.takeaway b{color:#f5b942}
+@media(max-width:760px){.objective{grid-template-columns:1fr;gap:5px}.grid2,.grid3,.choices{grid-template-columns:1fr}.hero-copy{padding:22px 20px 8px}.source-head{flex-direction:column}}
+</style>
+<meta name="description" content="基于 Grok Build subagent_coordinator、AgentDefinition 和 Persona 理解多 Agent 组织。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.app/slides/12-16.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Grok Build · Multi-Agent Organization</div>
+    <h1>多 Agent 的组织方式</h1>
+    <p class="subtitle">多 Agent 系统要同时解决角色定义、spawn、状态查询、取消、完成通知与资源继承。Grok Build 的源码把这些职责落在定义层与协调事件层。</p>
+  </header>
+
+  <section class="objective reveal">
+    <b>课程目标</b>
+    <p>从 <span class="mono">subagent_coordinator</span> 读出 Grok Build 的实际组织方式，能用任务依赖、上下文需求、文件冲突和结果汇总成本选择组织策略。</p>
+  </section>
+
+  <section class="hero reveal" aria-label="Grok Build 多 Agent 教学图">
+    <div class="hero-copy"><small>TEACHING DIAGRAM</small><h2>父会话通过事件通道管理一组有身份的子 Agent</h2><p>Coordinator 在这里是 Grok Build 源码中的真实组件名。图形布局属于课程表达。</p></div>
+    <svg viewBox="0 0 920 330" role="img" aria-labelledby="orgTitle">
+      <title id="orgTitle">父会话、subagent coordinator 与三个子 Agent 的关系</title>
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#e1a632"/></marker></defs>
+      <path class="edge" d="M225 165H350M570 165H690M570 165L690 75M570 165L690 255"/>
+      <rect class="node" x="35" y="122" rx="14" width="190" height="86"/><text class="t1" x="130" y="155" text-anchor="middle">parent session</text><text class="t2" x="130" y="179" text-anchor="middle">task / query / cancel</text>
+      <rect class="node2" x="350" y="112" rx="14" width="220" height="106"/><text class="t1" x="460" y="150" text-anchor="middle">SubagentCoordinator</text><text class="t2" x="460" y="175" text-anchor="middle">pending · active · completed</text><text class="t2" x="460" y="196" text-anchor="middle">wait slots · completions</text>
+      <rect class="node" x="690" y="38" rx="13" width="190" height="74"/><text class="t1" x="785" y="68" text-anchor="middle">explore</text><text class="t2" x="785" y="90" text-anchor="middle">AgentDefinition + Persona</text>
+      <rect class="node" x="690" y="128" rx="13" width="190" height="74"/><text class="t1" x="785" y="158" text-anchor="middle">general-purpose</text><text class="t2" x="785" y="180" text-anchor="middle">AgentDefinition + Persona</text>
+      <rect class="node" x="690" y="218" rx="13" width="190" height="74"/><text class="t1" x="785" y="248" text-anchor="middle">plan</text><text class="t2" x="785" y="270" text-anchor="middle">AgentDefinition + Persona</text>
+    </svg>
+  </section>
+
+  <div class="sec-label">Grok Build 源码侧：定义与协调</div>
+  <div class="grid2">
+    <section class="card reveal">
+      <h3>定义层：AgentDefinition + Persona</h3>
+      <p>AgentDefinition 给出 prompt、工具、权限、模型、MCP 继承和可 spawn 类型等合同。Persona 追加行为指令、I/O 契约及部分运行时默认值。二者使每个子 Agent 有可观察身份与能力边界。</p>
+      <div class="event"><b>resolve</b><span>type → definition → role/persona runtime config</span></div>
+    </section>
+    <section class="card reveal">
+      <h3>协调层：SubagentEvent</h3>
+      <p><span class="mono">start_subagent_coordinator</span> 只启动一次 drain task。每个 Spawn 事件再启动本地异步任务，调用 <span class="mono">handle_subagent_request</span>。</p>
+      <div class="event"><b>events</b><span>Spawn · Query · Cancel · ListActive · Completions · Outstanding</span></div>
+    </section>
+  </div>
+  <div class="grid3">
+    <section class="card reveal"><h3>并行执行</h3><p>Spawn 事件独立进入 <span class="mono">spawn_local</span>，协调器登记 pending、active 与 completed 状态。并行能力来自异步任务，不受 Persona 数量限制。</p></section>
+    <section class="card reveal"><h3>结果与等待</h3><p>Query 可立即返回快照，也可注册 block wait slot 并轮询状态。Completions 会 drain 待通知完成项，并按 suppress_ids 过滤。</p></section>
+    <section class="card reveal"><h3>取消与清理</h3><p>Cancel 支持按 subagent ID 或 parent prompt ID。协调器还会淘汰过期 completed 记录，并记录显式 kill。</p></section>
+  </div>
+  <div class="path-list reveal">
+    <span class="path">crates/codegen/xai-grok-shell/src/agent/mvp_agent/subagent_coordinator.rs</span>
+    <span class="path">crates/codegen/xai-grok-agent/src/config.rs</span>
+    <span class="path">start_subagent_coordinator</span>
+    <span class="path">handle_subagent_request</span>
+  </div>
+
+  <div class="sec-label">Claude 对照：只使用公开行为</div>
+  <section class="public reveal">
+    <h3>可对照的是产品表面能力</h3>
+    <p>Claude Code 公开支持自定义 subagents：每个 subagent 可拥有独立上下文、system prompt、工具权限与模型，主会话可自动委派或由用户显式调用。公开的 Agent Teams 功能描述包含共享任务、成员间消息与独立上下文。<strong>本课不把 “Coordinator” 或 “Swarm” 当作 Claude Code 源码内部类型，也不推断其调度器实现。</strong></p>
+  </section>
+  <div class="grid3">
+    <section class="card reveal"><h3>单主会话委派</h3><p>适合一个 owner 统一拆解、串联依赖并汇总。Grok 的 task + coordinator 事件与 Claude 公开的 subagent 委派都能支持这类工作流。</p></section>
+    <section class="card reveal"><h3>多成员协作</h3><p>适合成员需要彼此通信、认领共享任务的工作。评估时应以公开 Agent Teams 行为和当前版本限制为准。</p></section>
+    <section class="card reveal"><h3>角色复用</h3><p>适合长期重复的 reviewer、explorer、planner。Grok 用 AgentDefinition 与 Persona；Claude 公开配置用 subagent 定义文件。</p></section>
+  </div>
+
+  <div class="sec-label">真实源码快照</div>
+  <section class="source reveal">
+    <div class="source-head"><span>crates/codegen/xai-grok-shell/src/agent/mvp_agent/subagent_coordinator.rs</span><span>REAL SOURCE · abridged</span></div>
+    <pre><code><span class="kw">while let</span> Some(event) = rx.recv().await {
+    <span class="kw">match</span> event {
+        SubagentEvent::Spawn(boxed) =&gt; { <span class="cm">/* handle request */</span> }
+        SubagentEvent::Query(query) =&gt; { <span class="cm">/* snapshot or block */</span> }
+        SubagentEvent::Cancel(request) =&gt; { <span class="cm">/* cancel target */</span> }
+        SubagentEvent::ListActive(request) =&gt; { <span class="cm">/* summaries */</span> }
+        SubagentEvent::Completions(request) =&gt; { <span class="cm">/* drain */</span> }
+        ...
+    }
+}</code></pre>
+  </section>
+  <p class="caption reveal"><b>快照说明：</b>事件变体与控制结构来自真实源码，分支体为课堂压缩。Claude 侧没有源码快照，所有描述限于公开功能行为。</p>
+
+  <section class="exercise reveal">
+    <h3>课堂练习：场景决策</h3>
+    <p>为下面三个场景选择“单 Agent”“主会话 + subagents”或“多成员共享任务”，并说明并行收益、依赖关系、上下文复制成本、文件冲突与汇总责任。</p>
+    <div class="choices"><div class="choice">检索 8 个互不依赖的模块，最后汇总风险清单。</div><div class="choice">同一支付模块内连续修改 schema、service 与测试，步骤强依赖。</div><div class="choice">三个独立服务并行迁移，成员需要互相同步接口变更。</div></div>
+  </section>
+
+  <div class="takeaway reveal">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M9 11l6-4M9 13l6 4"/></svg>
+    <span><b>Takeaway：</b>多 Agent 组织先解决任务图，再选择产品机制。Grok 源码展示了事件协调器和可配置 Agent 身份；跨产品比较应停留在公开行为层，避免把营销术语写成内部架构事实。</span>
+  </div>
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+<script>document.querySelectorAll('.reveal').forEach(function(el){var ob=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');ob.unobserve(e.target)}})},{threshold:.12});ob.observe(el)});</script>
+</body>
+</html>
