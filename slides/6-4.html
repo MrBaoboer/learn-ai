@@ -4,76 +4,129 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>流式返回与格式配合：让 AI 产品秒响应 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
 <style>
-:root{--bg:#f7f5f0;--text:#1c1c1e;--sub:#6b6b70;--border:rgba(0,0,0,0.08);--surface:white;--surface2:#f0ede6;--purple:#9333ea;--green:#16a34a;--red:#dc2626;--orange:#ea580c;--cyan:#0891b2;--amber:#d97706;--muted:#8e8e93}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;opacity:0;animation:_si .15s ease .08s forwards}
-@keyframes _si{to{opacity:1}}
-.slide{width:94vw;max-width:1440px;aspect-ratio:16/9;background:var(--bg);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.08);display:flex;flex-direction:column;overflow:hidden}
-.header{padding:14px 32px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);flex-shrink:0}
-.tag{font-size:15px;font-weight:800;color:var(--purple);letter-spacing:.5px}
-.title{font-size:26px;font-weight:800;color:var(--text)}
-.title em{font-style:normal;color:var(--purple)}
-.body{flex:1;display:grid;grid-template-columns:300px 1fr;min-height:0}
+/* 页面局部别名 —— 映射到设计系统变量（JS 中引用了这些名字） */
+:root {
+  --surface2: #f0ede6;
+  --muted: var(--sub);
+  --green: var(--success);
+  --red: var(--danger);
+  --orange: #ea580c;
+}
 
-/* ── 左栏 ── */
-.left{padding:18px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:12px;overflow:auto}
-.desc{font-size:16px;color:var(--sub);line-height:1.65}
-.mode-label{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-.mode-tabs{display:flex;flex-direction:column;gap:5px}
-.mode-btn{padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:left;transition:all .2s;display:flex;align-items:center;gap:8px}
-.mode-btn .badge{font-size:11px;font-weight:800;font-family:monospace;padding:2px 7px;border-radius:4px;flex-shrink:0}
-.mode-btn .txt h4{font-size:14px;font-weight:700;color:var(--text)}
-.mode-btn .txt p{font-size:12px;color:var(--muted);margin-top:1px}
-.mode-btn.active{border-color:var(--purple)}
-.mode-btn.active .txt h4{color:var(--purple)}
+/* ── 场景选择 ── */
+.mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mode-btn {
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--card);
+  cursor: pointer; font-family: inherit; text-align: left;
+  transition: all 0.2s; display: flex; align-items: center; gap: 10px;
+  min-height: 44px; box-shadow: var(--shadow-card);
+}
+.mode-btn .badge {
+  font-size: 11px; font-weight: 800; font-family: "SF Mono", Menlo, monospace;
+  padding: 3px 8px; border-radius: 4px; flex-shrink: 0;
+}
+.mode-btn .txt h4 { font-size: 14px; font-weight: 700; color: var(--text); }
+.mode-btn .txt p { font-size: 12px; color: var(--sub); margin-top: 1px; line-height: 1.5; }
+.mode-btn.active { border-color: var(--purple); }
+.mode-btn.active .txt h4 { color: var(--purple); }
 
-.ctrl-btn{width:100%;padding:10px;background:var(--purple);color:white;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity .2s}
-.ctrl-btn:hover{opacity:.85}
-.ctrl-btn:disabled{opacity:.45;cursor:default}
+/* ── 控制按钮 ── */
+.ctrl-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.ctrl-btn {
+  padding: 11px 24px; background: var(--purple); color: white;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: opacity 0.2s; min-height: 44px;
+}
+.ctrl-btn:hover { opacity: 0.85; }
+.ctrl-btn:disabled { opacity: 0.45; cursor: default; }
 
-.insight-row{font-size:14px;color:var(--text);line-height:1.6;background:rgba(147,51,234,.06);border:1px solid rgba(147,51,234,.18);border-radius:9px;padding:10px 12px}
-.insight-row b{color:var(--purple)}
+.insight-row {
+  font-size: 14px; color: var(--text); line-height: 1.7;
+  background: rgba(124,58,237,0.06); border: 1.5px solid rgba(124,58,237,0.18);
+  border-radius: var(--radius); padding: 14px 18px; margin-top: 16px;
+}
+.insight-row b { color: var(--purple); }
 
-/* ── 右栏：三列对比 ── */
-.right{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
-.compare-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;flex:1;min-height:0}
-.col-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;transition:border-color .3s}
-.col-panel.streaming{border-color:var(--purple)}
-.col-panel.done-good{border-color:var(--green)}
-.col-panel.done-bad{border-color:var(--red)}
-.col-header{padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.col-header .fmt-badge{font-size:12px;font-weight:800;font-family:monospace;padding:2px 8px;border-radius:4px}
-.col-header .status{font-size:12px;font-weight:600}
-.col-body{flex:1;overflow:auto;padding:12px}
+/* ── 三列对比 ── */
+.compare-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.col-panel {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column;
+  overflow: hidden; transition: border-color 0.3s;
+}
+.col-panel.streaming { border-color: var(--purple); }
+.col-panel.done-good { border-color: var(--success); }
+.col-panel.done-bad { border-color: var(--danger); }
+.col-header {
+  padding: 10px 14px; background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.col-header .fmt-badge {
+  font-size: 12px; font-weight: 800; font-family: "SF Mono", Menlo, monospace;
+  padding: 2px 8px; border-radius: 4px;
+}
+.col-header .status { font-size: 12px; font-weight: 600; }
+.col-body { min-height: 260px; max-height: 380px; overflow: auto; padding: 12px; }
 
 /* 渲染区域 */
-.render-area{font-size:14px;line-height:1.7;min-height:60px}
-.render-area .chunk{display:inline}
-.render-area .visible{color:var(--text)}
-.render-area .pending{color:var(--muted);opacity:.4}
+.render-area { font-size: 14px; line-height: 1.7; min-height: 60px; }
+.render-area .chunk { display: inline; }
+.render-area .visible { color: var(--text); }
+.render-area .pending { color: var(--sub); opacity: 0.4; }
 
 /* 原始流 */
-.raw-stream{font-size:12px;font-family:'Cascadia Code','Fira Code',monospace;color:#6c7086;background:#1e1b2e;border-radius:6px;padding:8px;margin-top:8px;line-height:1.6;max-height:70px;overflow:auto;word-break:break-all}
+.raw-stream {
+  font-size: 12px; font-family: "SF Mono", "Fira Code", Menlo, monospace;
+  color: #6c7086; background: #1e1b2e; border-radius: 6px;
+  padding: 8px; margin-top: 8px; line-height: 1.6;
+  max-height: 120px; overflow: auto; word-break: break-all;
+  white-space: pre-wrap;
+}
 
 /* 解析结果卡片 */
-.parsed-card{background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);border-radius:7px;padding:8px 10px;margin-top:6px;font-size:13px;color:var(--text);line-height:1.6;display:none}
-.parsed-card.show{display:block}
-.parsed-card .pc-label{font-size:11px;font-weight:800;color:var(--green);margin-bottom:4px}
-.parsed-field{display:flex;gap:6px;margin-bottom:2px}
-.parsed-field .k{color:var(--cyan);font-weight:700;flex-shrink:0;font-size:12px}
-.parsed-field .v{color:var(--text);font-size:12px}
+.parsed-card {
+  background: rgba(22,163,74,0.06); border: 1px solid rgba(22,163,74,0.2);
+  border-radius: 7px; padding: 8px 10px; margin-top: 6px;
+  font-size: 13px; color: var(--text); line-height: 1.6; display: none;
+}
+.parsed-card.show { display: block; }
+.parsed-card .pc-label { font-size: 11px; font-weight: 800; color: var(--success); margin-bottom: 4px; }
+.parsed-field { display: flex; gap: 6px; margin-bottom: 2px; }
+.parsed-field .k { color: var(--cyan); font-weight: 700; flex-shrink: 0; font-size: 12px; }
+.parsed-field .v { color: var(--text); font-size: 12px; }
 
-.wait-card{background:rgba(220,38,38,.05);border:1px solid rgba(220,38,38,.15);border-radius:7px;padding:8px 10px;margin-top:6px;font-size:12px;color:var(--red);display:none}
-.wait-card.show{display:block}
+.wait-card {
+  background: rgba(220,38,38,0.05); border: 1px solid rgba(220,38,38,0.15);
+  border-radius: 7px; padding: 8px 10px; margin-top: 6px;
+  font-size: 12px; color: var(--danger); display: none; line-height: 1.6;
+}
+.wait-card.show { display: block; }
 
 /* 底部说明 */
-.bottom-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;flex-shrink:0}
-.insight-cell{background:rgba(147,51,234,.06);border:1px solid rgba(147,51,234,.15);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);line-height:1.5}
-.insight-cell b{color:var(--purple)}
+.bottom-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.insight-cell {
+  background: rgba(124,58,237,0.06); border: 1.5px solid rgba(124,58,237,0.15);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+  font-size: 13px; color: var(--text); line-height: 1.6;
+}
+.insight-cell b { color: var(--purple); }
 
-@keyframes blink-cur{0%,100%{opacity:1}50%{opacity:0}}
-.cursor::after{content:'▋';animation:blink-cur .8s infinite;font-size:14px;color:var(--purple)}
+@keyframes blink-cur { 0%,100%{opacity:1} 50%{opacity:0} }
+.cursor::after { content: '▋'; animation: blink-cur 0.8s infinite; font-size: 14px; color: var(--purple); }
+
+@media (max-width: 768px) {
+  .mode-tabs { grid-template-columns: 1fr; }
+  .compare-cols { grid-template-columns: 1fr; }
+  .bottom-bar { grid-template-columns: 1fr; }
+  .col-body { min-height: 0; max-height: 300px; }
+}
 </style>
 <!-- SEO Start -->
 <meta name="description" content="流式返回（Streaming）是 AI 产品用户体验的关键。本页讲解 SSE 协议原理、流式输出与 Markdown 渲染的配合、流式 JSON 解析的挑战与解决方案。">
@@ -99,124 +152,119 @@ body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang S
 <!-- SEO End -->
 </head>
 <body>
-<div class="slide">
-  <div class="header">
-    <div>
-      <div class="tag">模块六 · Prompt Engineering · 第 6 页</div>
-      <div class="title">流式返回：<em>格式选择影响实时体验</em></div>
-    </div>
-    <div style="font-size:15px;color:var(--muted)">点击格式后播放，观察三种渲染差异 →</div>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt 工程</div>
+    <h1>流式返回与格式配合</h1>
+    <p class="subtitle">LLM 是<b>逐 Token 输出</b>的。同一个响应内容，格式不同，流式体验完全不同。选择场景后点击播放，观察三种格式的渲染差异。</p>
+  </header>
+
+  <div class="sec-label">选择演示场景</div>
+
+  <div class="mode-tabs">
+    <button class="mode-btn active" onclick="selectMode(this,0)">
+      <span class="badge" style="background:#ede9fe;color:#6d28d9">工具推荐</span>
+      <div class="txt"><h4>结构化列表输出</h4><p>3 个工具，包含名称/类型/亮点</p></div>
+    </button>
+    <button class="mode-btn" onclick="selectMode(this,1)">
+      <span class="badge" style="background:#dbeafe;color:#1e40af">分析报告</span>
+      <div class="txt"><h4>多字段结论输出</h4><p>结论/原因/建议/置信度</p></div>
+    </button>
   </div>
-  <div class="body">
-    <!-- 左栏 -->
-    <div class="left">
-      <p class="desc">LLM 是<b>逐 Token 输出</b>的。同一个响应内容，格式不同，流式体验完全不同。</p>
 
-      <div class="mode-label">选择演示场景</div>
-      <div class="mode-tabs">
-        <button class="mode-btn active" onclick="selectMode(this,0)">
-          <span class="badge" style="background:#ede9fe;color:#6d28d9">工具推荐</span>
-          <div class="txt"><h4>结构化列表输出</h4><p>3 个工具，包含名称/类型/亮点</p></div>
-        </button>
-        <button class="mode-btn" onclick="selectMode(this,1)">
-          <span class="badge" style="background:#dbeafe;color:#1e40af">分析报告</span>
-          <div class="txt"><h4>多字段结论输出</h4><p>结论/原因/建议/置信度</p></div>
-        </button>
+  <div class="ctrl-btns">
+    <button class="ctrl-btn" id="playBtn" onclick="startStream()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+      开始播放流式输出
+    </button>
+    <button class="ctrl-btn" id="resetBtn" onclick="resetAll()" style="background:var(--card);color:var(--text);border:1.5px solid var(--border)">重置</button>
+  </div>
+
+  <div class="sec-label">三种格式实时对比</div>
+
+  <div class="compare-cols">
+    <!-- JSON 列 -->
+    <div class="col-panel" id="panelJson">
+      <div class="col-header">
+        <span class="fmt-badge" style="background:#fef3c7;color:#92400e">JSON</span>
+        <span class="status" id="statusJson" style="color:var(--muted)">等待中</span>
       </div>
-
-      <button class="ctrl-btn" id="playBtn" onclick="startStream()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-        开始播放流式输出
-      </button>
-      <button class="ctrl-btn" id="resetBtn" onclick="resetAll()" style="background:var(--surface2);color:var(--text);border:1.5px solid var(--border)">重置</button>
-
-      <div class="insight-row">
-        <b>核心结论：</b><br>
-        XML 捕获标签 → 立刻渲染字段<br>
-        JSON 等全文 → 解析一次<br>
-        MD 逐字显示 → 无法提取字段
+      <div class="col-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">原始流 Token（逐字累积）</div>
+        <div class="raw-stream" id="rawJson"></div>
+        <div class="wait-card" id="waitJson">
+          ⏳ 等待完整 JSON 到达后才能解析…<br>
+          流式过程中 JSON 是"残缺"的，<br>
+          无法中途解析渲染
+        </div>
+        <div class="parsed-card" id="parsedJson">
+          <div class="pc-label">✓ JSON 解析完成（全文到达后）</div>
+          <div id="parsedJsonContent"></div>
+        </div>
       </div>
     </div>
 
-    <!-- 右栏：三列对比 -->
-    <div class="right">
-      <div class="compare-cols">
-        <!-- JSON 列 -->
-        <div class="col-panel" id="panelJson">
-          <div class="col-header">
-            <span class="fmt-badge" style="background:#fef3c7;color:#92400e">JSON</span>
-            <span class="status" id="statusJson" style="color:var(--muted)">等待中</span>
-          </div>
-          <div class="col-body">
-            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">原始流 Token（逐字累积）</div>
-            <div class="raw-stream" id="rawJson"></div>
-            <div class="wait-card" id="waitJson">
-              ⏳ 等待完整 JSON 到达后才能解析…<br>
-              流式过程中 JSON 是"残缺"的，<br>
-              无法中途解析渲染
-            </div>
-            <div class="parsed-card" id="parsedJson">
-              <div class="pc-label">✓ JSON 解析完成（全文到达后）</div>
-              <div id="parsedJsonContent"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Markdown 列 -->
-        <div class="col-panel" id="panelMd">
-          <div class="col-header">
-            <span class="fmt-badge" style="background:#ede9fe;color:#6d28d9">Markdown</span>
-            <span class="status" id="statusMd" style="color:var(--muted)">等待中</span>
-          </div>
-          <div class="col-body">
-            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">渲染区域（逐字显示）</div>
-            <div class="render-area cursor" id="renderMd"></div>
-            <div class="wait-card" id="waitMd" style="background:rgba(234,88,12,.05);border-color:rgba(234,88,12,.2);color:var(--orange)">
-              ⚠️ 虽然逐字显示流畅，<br>
-              但无法从 Markdown 中<br>
-              可靠提取结构化字段
-            </div>
-          </div>
-        </div>
-
-        <!-- XML 列 -->
-        <div class="col-panel" id="panelXml">
-          <div class="col-header">
-            <span class="fmt-badge" style="background:#dbeafe;color:#1e40af">XML 自定义标签</span>
-            <span class="status" id="statusXml" style="color:var(--muted)">等待中</span>
-          </div>
-          <div class="col-body">
-            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">增量解析渲染（捕获到 &lt;/tag&gt; 即渲染）</div>
-            <div id="xmlCards"></div>
-          </div>
+    <!-- Markdown 列 -->
+    <div class="col-panel" id="panelMd">
+      <div class="col-header">
+        <span class="fmt-badge" style="background:#ede9fe;color:#6d28d9">Markdown</span>
+        <span class="status" id="statusMd" style="color:var(--muted)">等待中</span>
+      </div>
+      <div class="col-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">渲染区域（逐字显示）</div>
+        <div class="render-area cursor" id="renderMd"></div>
+        <div class="wait-card" id="waitMd" style="background:rgba(234,88,12,.05);border-color:rgba(234,88,12,.2);color:var(--orange)">
+          ⚠️ 虽然逐字显示流畅，<br>
+          但无法从 Markdown 中<br>
+          可靠提取结构化字段
         </div>
       </div>
+    </div>
 
-      <!-- 底部说明 -->
-      <div class="bottom-bar">
-        <div class="insight-cell">
-          <b>JSON 流式</b><br>
-          后端友好但流式不佳：<br>
-          必须<b>等全文</b>才能解析，<br>
-          用户看到的是"loading"状态
-        </div>
-        <div class="insight-cell">
-          <b>Markdown 流式</b><br>
-          用户体验最流畅：<br>
-          逐字显示有"打字"感，<br>
-          但<b>无法提取字段</b>做程序处理
-        </div>
-        <div class="insight-cell">
-          <b>XML 流式</b><br>
-          <b>两全其美</b>：流式 + 结构化<br>
-          捕获到 <code style="background:var(--surface2);padding:0 4px;border-radius:3px">&lt;/name&gt;</code> 立刻渲染，<br>
-          Claude 原生推荐此方式
-        </div>
+    <!-- XML 列 -->
+    <div class="col-panel" id="panelXml">
+      <div class="col-header">
+        <span class="fmt-badge" style="background:#dbeafe;color:#1e40af">XML 自定义标签</span>
+        <span class="status" id="statusXml" style="color:var(--muted)">等待中</span>
+      </div>
+      <div class="col-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">增量解析渲染（捕获到 &lt;/tag&gt; 即渲染）</div>
+        <div id="xmlCards"></div>
       </div>
     </div>
   </div>
-</div>
-<script src="nav-inject.js?v=20260412dd"></script>
+
+  <div class="sec-label">核心结论</div>
+
+  <div class="bottom-bar">
+    <div class="insight-cell">
+      <b>JSON 流式</b><br>
+      后端友好但流式不佳：<br>
+      必须<b>等全文</b>才能解析，<br>
+      用户看到的是"loading"状态
+    </div>
+    <div class="insight-cell">
+      <b>Markdown 流式</b><br>
+      用户体验最流畅：<br>
+      逐字显示有"打字"感，<br>
+      但<b>无法提取字段</b>做程序处理
+    </div>
+    <div class="insight-cell">
+      <b>XML 流式</b><br>
+      <b>两全其美</b>：流式 + 结构化<br>
+      捕获到 <code>&lt;/name&gt;</code> 立刻渲染，<br>
+      Claude 原生推荐此方式
+    </div>
+  </div>
+
+  <div class="insight-row">
+    <b>核心结论：</b>
+    XML 捕获标签 → 立刻渲染字段；JSON 等全文 → 解析一次；MD 逐字显示 → 无法提取字段。
+  </div>
+
+</article>
+
 <script>
 // ── 两个场景的数据 ──
 const MODES = [
@@ -427,5 +475,6 @@ function streamXml(m) {
   timers.push(tf);
 }
 </script>
+<script src="nav-inject.js?v=20260703b"></script>
 </body>
 </html>

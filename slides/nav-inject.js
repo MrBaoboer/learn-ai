@@ -1,8 +1,8 @@
 // 页面顺序
 const SLIDE_ORDER = [
-  { file: 'index.html',                 title: '课程首页',               num: 0  },
   { file: 'llm-story.html',            title: '完整目录',               num: 0  },
   { file: '0-intro.html',               title: '我们在哪里',             num: 0  },
+  { file: '0-how.html',                 title: '怎样学才有效',           num: 0  },
   { file: '0-why.html',                 title: '为什么要打基础',          num: 0  },
   { file: 'training-data.html',         title: '训练数据规模',          num: 1  },
   { file: 'train-vs-infer.html',        title: '训练 vs 推理',          num: 2  },
@@ -67,7 +67,86 @@ const SLIDE_ORDER = [
   { file: 'engineering-philosophy.html', title: '大道至简',               num: 0  },
   { file: 'summary-2.html',            title: '第二篇章汇总（上）',      num: 0  },
   { file: 'summary-2b.html',           title: '第二篇章汇总（下）',      num: 0  },
+  { file: 'ai-tips-boundary.html',     title: '人机知识边界',            num: 0  },
+  { file: 'ai-tips-context.html',      title: '好提问 vs 坏提问',       num: 0  },
+  { file: 'ai-tips-verify.html',       title: 'AI 说的能信吗',          num: 0  },
+  { file: 'ai-tips-iterate.html',      title: '迭代的艺术',              num: 0  },
+  { file: 'ai-tips-scenarios.html',    title: '场景速查',                num: 0  },
+  { file: 'summary-final.html',        title: '课程总结',                num: 0  },
+  { file: 'summary-final-1.html',      title: '总结（上）',              num: 0  },
+  { file: 'summary-final-2.html',      title: '总结（下）',              num: 0  },
+  { file: '9-1.html',                  title: '文生图 vs 垫图',          num: 43 },
+  { file: '9-2.html',                  title: '用 AI 给 AI 写 Prompt',   num: 44 },
+  { file: '9-3.html',                  title: '角色一致性',              num: 45 },
+  { file: '9-4.html',                  title: '模型会挂，然后呢',        num: 46 },
+  { file: '9-5.html',                  title: '生图产品化清单',          num: 47 },
+  { file: '9-6.html',                  title: '教科书 vs 真实 N 步',     num: 48 },
+  { file: '9-7.html',                  title: 'Agent 为什么会卡死',      num: 49 },
+  { file: '9-8.html',                  title: '防呆设计',                num: 50 },
+  { file: '9-9.html',                  title: '流式体验',                num: 51 },
+  { file: '9-10.html',                 title: '一条消息的真实成本',      num: 52 },
+  { file: '9-11.html',                 title: '越长越贵越笨',            num: 53 },
+  { file: '9-12.html',                 title: '压缩的艺术',              num: 54 },
+  { file: '9-13.html',                 title: '用户的话能删吗',          num: 55 },
+  { file: '9-14.html',                 title: '本地 vs LLM 压缩',       num: 56 },
+  { file: '9-15.html',                 title: '上下文 ≠ 记忆',          num: 57 },
+  { file: '9-16.html',                 title: '什么值得记',              num: 58 },
+  { file: '9-17.html',                 title: '记忆冲突',                num: 59 },
+  { file: '9-18.html',                 title: '记忆注入的成本',          num: 60 },
+  { file: '9-19.html',                 title: 'System Prompt 分层',     num: 61 },
+  { file: '9-20.html',                 title: '按需加载',                num: 62 },
+  { file: '9-21.html',                 title: 'Skill 模块化',           num: 63 },
+  { file: '9-22.html',                 title: '提示词与缓存',            num: 64 },
+  { file: '9-23.html',                 title: '何时需要多 Agent',       num: 65 },
+  { file: '9-24.html',                 title: '并发的代价',              num: 66 },
+  { file: '9-25.html',                 title: '脑暴模式',                num: 67 },
+  { file: '9-26.html',                 title: '定时任务成本',            num: 68 },
+  { file: '9-27.html',                 title: 'AI 的自由度',            num: 69 },
+  { file: '9-28.html',                 title: '弹窗与安全平衡',          num: 70 },
+  { file: '9-29.html',                 title: '可观测性',                num: 71 },
+  { file: '9-30.html',                 title: 'MCP 双向协议',           num: 72 },
+  { file: '9-31.html',                 title: '懒连接',                  num: 73 },
+  { file: '9-32.html',                 title: 'AI 自加工具',            num: 74 },
+  { file: '9-summary.html',            title: '实战全景图',              num: 0  },
+  { file: '9-final.html',              title: '聊天套壳 vs Agent 产品', num: 0  },
+  { file: '10-1.html',                 title: 'Workflow vs Agent',      num: 75 },
+  { file: '10-2.html',                 title: '五种 Workflow 模式',     num: 76 },
+  { file: '10-3.html',                 title: '上下文工程方法论',        num: 77 },
+  { file: '10-4.html',                 title: '上下文三板斧',            num: 78 },
+  { file: '10-5.html',                 title: 'ACI 工具界面设计',       num: 79 },
+  { file: '10-6.html',                 title: 'Think Tool',             num: 80 },
+  { file: '10-7.html',                 title: '用 Agent 优化工具',      num: 81 },
+  { file: '10-8.html',                 title: '评测方法论',              num: 82 },
+  { file: '10-9.html',                 title: '三种 Grader',           num: 83 },
+  { file: '10-10.html',                title: '评测的坑',                num: 84 },
+  { file: '10-11.html',                title: '长任务失败模式',          num: 85 },
+  { file: '10-12.html',                title: '双角色 Harness',        num: 86 },
+  { file: '10-13.html',                title: 'Managed Agent',         num: 87 },
+  { file: '10-14.html',                title: 'Session vs Context',    num: 88 },
+  { file: '10-15.html',                title: '三类安全风险',            num: 89 },
+  { file: '10-16.html',                title: '沙箱与凭证隔离',          num: 90 },
+  { file: '10-17.html',                title: 'Contextual Retrieval',  num: 91 },
+  { file: '10-summary.html',           title: '进阶全景图',              num: 0  },
+  { file: '10-final.html',             title: 'Do the simplest thing', num: 0  },
+  { file: '11-1.html',                 title: '从脚手架到自我改进',      num: 92 },
+  { file: '11-2.html',                 title: 'Harness 三大设计模式',   num: 93 },
+  { file: '11-3.html',                 title: '上下文工程自动进化',      num: 94 },
+  { file: '11-4.html',                 title: '工作流自动搜索',          num: 95 },
+  { file: '11-5.html',                 title: '让 Harness 改进自己',    num: 96 },
+  { file: '11-6.html',                 title: '进化搜索',                num: 97 },
+  { file: '11-7.html',                 title: '未来挑战七道关',          num: 98 },
 ];
+
+// 嵌入模式：被 learn.html 的 iframe 加载时（?embed=1 或在 iframe 内），
+// 不注入顶部浮条 / 底部翻页条 / 拍脸图广告，避免与 Wiki 外层 UI 重复。
+// PV 统计仍照常上报。
+const EMBED_MODE = (function(){
+  try {
+    if (/[?&]embed=1\b/.test(location.search)) return true;
+    if (window.self !== window.top) return true; // 在 iframe 内
+  } catch (e) { return true; }
+  return false;
+})();
 
 (function() {
 
@@ -76,6 +155,11 @@ const SLIDE_ORDER = [
 
   // 无论是否在序列中，都注入顶部栏（请教作者 + PV）
   (function injectTopBar() {
+    if (EMBED_MODE) {
+      // 嵌入模式下仅静默上报 PV，不渲染浮条
+      fetch('/pv').catch(() => {});
+      return;
+    }
     const style = document.createElement('style');
     style.textContent = `
       #nav-top-bar {
@@ -110,17 +194,9 @@ const SLIDE_ORDER = [
       .nav-pv-num-today { color: #0066ff; font-weight: 800; }
       .nav-pv-sep { width:1px; height:12px; background:rgba(0,0,0,0.1); margin: 0 2px; }
       .nav-pv-num-total { color: #7c3aed; font-weight: 800; }
-      #nav-github-link {
-        display: flex; align-items: center; gap: 5px;
-        font-size: 12px; font-weight: 600; color: #6b6b70;
-        text-decoration: none; padding: 7px 16px;
-        transition: background 0.15s, color 0.15s;
-        white-space: nowrap;
-      }
-      #nav-github-link:hover { background: rgba(0,0,0,0.05); color: #1c1c1e; }
       @media (max-width: 768px) {
         #nav-top-bar { top: 8px; border-radius: 20px; }
-        #nav-author-link, #nav-pv-badge, #nav-github-link { padding: 6px 10px; font-size: 11px; }
+        #nav-author-link, #nav-pv-badge { padding: 6px 10px; font-size: 11px; }
         .nav-pv-sep { margin: 0; }
       }
     `;
@@ -138,11 +214,6 @@ const SLIDE_ORDER = [
         <span class="nav-pv-label">总学习</span>
         <span class="nav-pv-num-total" id="nav-pv-total">—</span>
       </div>
-      <div id="nav-top-sep"></div>
-      <a id="nav-github-link" href="https://github.com/itshen/learn-ai" target="_blank" title="GitHub 开源仓库">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-        GitHub
-      </a>
     `;
     document.body.appendChild(topBar);
 
@@ -150,9 +221,9 @@ const SLIDE_ORDER = [
       .then(r => r.json())
       .then(d => {
         function fmt(n) {
-          if (n >= 10000) return (n / 10000).toFixed(1) + 'w';
-          if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-          return n;
+          n = Number(n) || 0;
+          if (n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + ' 万';
+          return n.toLocaleString('en-US');
         }
         document.getElementById('nav-pv-today').textContent = fmt(d.today);
         document.getElementById('nav-pv-total').textContent = fmt(d.total);
@@ -160,8 +231,8 @@ const SLIDE_ORDER = [
       .catch(() => {});
   })();
 
-  // 不在序列中则不注入底部导航条
-  if (idx < 0) return;
+  // 嵌入模式 或 不在序列中：不注入底部翻页条（外层 Wiki 已有上一节/下一节）
+  if (EMBED_MODE || idx < 0) return;
 
   const total = SLIDE_ORDER.length;
   const prev  = idx > 0           ? SLIDE_ORDER[idx - 1] : null;
@@ -229,7 +300,7 @@ const SLIDE_ORDER = [
   const nav = document.createElement('div');
   nav.id = 'slide-nav';
   nav.innerHTML = `
-    <button class="snav-home" onclick="location.href='index.html'" title="返回首页 (Cmd+↑返回目录)">☰</button>
+    <button class="snav-home" onclick="location.href='home.html'" title="返回首页 (Cmd+↑返回目录)">☰</button>
     <div class="snav-sep"></div>
     <button class="snav-btn" id="snav-prev" onclick="location.href='${prev ? prev.file : ''}'" ${!prev ? 'disabled' : ''} title="上一页 (Cmd+←)">
       ← ${prev ? prev.title : ''}
@@ -280,12 +351,21 @@ const SLIDE_ORDER = [
     if (cmd && e.key === 'ArrowUp') {
       e.preventDefault();
       // 判断当前页属于哪个篇章
+      const base = cur.replace('.html','');
+      const ch4Files = ['10-1','10-2','10-3','10-4','10-5','10-6','10-7',
+        '10-8','10-9','10-10','10-11','10-12','10-13','10-14','10-15','10-16',
+        '10-17','10-summary','10-final'];
+      const ch3Files = ['9-1','9-2','9-3','9-4','9-5','9-6','9-7','9-8','9-9','9-10',
+        '9-11','9-12','9-13','9-14','9-15','9-16','9-17','9-18','9-19','9-20',
+        '9-21','9-22','9-23','9-24','9-25','9-26','9-27','9-28','9-29','9-30',
+        '9-31','9-32','9-summary','9-final'];
       const ch2Files = ['5-1','5-2','6-0a','6-0b','6-1','6-2','6-3','6-4',
         'prompt-attack','prompt-attack-cases','prompt-defense',
         '7-1','7-2','7-3','7-4','7-5','8-1','8-2','8-2b','8-3','8-4','8-5','8-5b',
         '8-6','8-7','8-8','cost-eval','engineering-philosophy','summary-2','summary-2b'];
-      const base = cur.replace('.html','');
-      location.href = ch2Files.includes(base) ? 'story-2.html' : 'llm-story.html';
+      if (ch4Files.includes(base)) { location.href = 'learn.html#10-1.html'; }
+      else if (ch3Files.includes(base)) { location.href = 'learn.html#9-1.html'; }
+      else { location.href = ch2Files.includes(base) ? 'story-2.html' : 'llm-story.html'; }
       return;
     }
 
@@ -528,3 +608,34 @@ const SLIDE_ORDER = [
   updateMaskState();
   applyCanvasScale();
 })();
+
+// ── 拍脸图广告（独立脚本，下架时删除此段及 interstitial-ad.js 即可） ──
+// 嵌入模式（Wiki iframe 内）不弹广告。
+(function () {
+  if (EMBED_MODE) return;
+  var s = document.createElement('script');
+  s.src = 'interstitial-ad.js';
+  s.async = true;
+  document.head.appendChild(s);
+})();
+
+// ── 访问上报（管理后台用户画像；带 xueai_sess Cookie 自动关联登录用户） ──
+(function () {
+  if (EMBED_MODE) return;
+  try {
+    var body = 'path=' + encodeURIComponent(location.pathname);
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/visit', new Blob([body], { type: 'application/x-www-form-urlencoded' }));
+    } else {
+      fetch('/api/visit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body,
+        credentials: 'same-origin',
+        keepalive: true,
+      }).catch(function () {});
+    }
+  } catch (e) {}
+})();
+
+// 付费墙已停用，课程全部免费开放。

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>沙箱与凭证隔离 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.desc{font-size:15px;color:var(--text);line-height:1.8;margin-bottom:8px}
+
+.core-principle{background:linear-gradient(135deg,rgba(220,38,38,.04) 0%,rgba(217,119,6,.04) 100%);border:2px solid rgba(220,38,38,.2);border-radius:var(--radius);padding:28px;margin-top:12px;text-align:center}
+.core-principle .cp-text{font-size:22px;font-weight:900;color:var(--danger);line-height:1.4}
+.core-principle .cp-sub{font-size:14px;color:var(--sub);margin-top:10px;line-height:1.7}
+
+.problem-panel{background:var(--card);border:1.5px solid rgba(220,38,38,.2);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:12px}
+.problem-panel h4{font-size:16px;font-weight:800;color:var(--danger);margin:0 0 16px;display:flex;align-items:center;gap:10px}
+.problem-panel h4 svg{color:var(--danger)}
+.problem-list{display:flex;flex-direction:column;gap:12px}
+.problem-item{display:flex;align-items:flex-start;gap:14px;padding:14px 16px;border-radius:var(--radius-sm);background:rgba(220,38,38,.03);border:1px solid rgba(220,38,38,.1)}
+.problem-item .pi-icon{flex-shrink:0;width:32px;height:32px;border-radius:8px;background:rgba(220,38,38,.08);display:flex;align-items:center;justify-content:center;color:var(--danger)}
+.problem-item .pi-body{flex:1}
+.problem-item .pi-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
+.problem-item .pi-desc{font-size:13px;color:var(--sub);line-height:1.7}
+
+.escalation-bar{background:rgba(217,119,6,.04);border:1.5px solid rgba(217,119,6,.2);border-radius:var(--radius);padding:18px 22px;margin-top:16px;display:flex;align-items:center;gap:14px}
+@media(max-width:768px){.escalation-bar{flex-direction:column;text-align:center}}
+.escalation-bar .eb-icon{width:40px;height:40px;border-radius:10px;background:rgba(217,119,6,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--amber)}
+.escalation-bar .eb-text{font-size:14px;color:var(--text);line-height:1.7}
+.escalation-bar .eb-text b{color:var(--amber)}
+
+.isolation-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:12px}
+@media(max-width:768px){.isolation-grid{grid-template-columns:1fr}}
+.iso-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:14px}
+.iso-card.bundle{border-color:rgba(0,102,255,.2)}
+.iso-card.vault{border-color:rgba(124,58,237,.2)}
+.iso-header{display:flex;align-items:center;gap:12px}
+.iso-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.iso-card.bundle .iso-icon{background:rgba(0,102,255,.08);color:var(--accent)}
+.iso-card.vault .iso-icon{background:rgba(124,58,237,.08);color:var(--purple)}
+.iso-card .iso-tag{font-size:11px;font-weight:700;letter-spacing:.5px;padding:3px 10px;border-radius:6px}
+.iso-card.bundle .iso-tag{background:rgba(0,102,255,.1);color:var(--accent)}
+.iso-card.vault .iso-tag{background:rgba(124,58,237,.1);color:var(--purple)}
+.iso-card .iso-title{font-size:17px;font-weight:800}
+.iso-card.bundle .iso-title{color:var(--accent)}
+.iso-card.vault .iso-title{color:var(--purple)}
+.iso-desc{font-size:14px;color:var(--text);line-height:1.7}
+.iso-example{background:rgba(0,0,0,.03);border:1px dashed var(--border);border-radius:var(--radius-sm);padding:14px 16px}
+.iso-example .ie-label{font-size:12px;font-weight:800;color:var(--sub);margin-bottom:8px;letter-spacing:.5px}
+.iso-example .ie-desc{font-size:13px;color:var(--text);line-height:1.7}
+.iso-example .ie-desc b{color:var(--accent)}
+.iso-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px;padding:12px;background:var(--bg);border-radius:var(--radius-sm)}
+.iso-flow .if-node{background:rgba(0,102,255,.06);border:1.5px solid rgba(0,102,255,.2);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;color:var(--accent);text-align:center}
+.iso-flow .if-node.purple{background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:var(--purple)}
+.iso-flow .if-node.green{background:rgba(22,163,74,.06);border-color:rgba(22,163,74,.2);color:var(--success)}
+.iso-flow .if-arrow{color:var(--sub);display:flex;align-items:center}
+
+.sandbox-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:12px}
+.sandbox-panel h4{font-size:16px;font-weight:800;color:var(--text);margin:0 0 16px;display:flex;align-items:center;gap:10px}
+.sandbox-panel h4 svg{color:var(--success)}
+.sandbox-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:768px){.sandbox-grid{grid-template-columns:1fr}}
+.sb-item{background:var(--bg);border-radius:var(--radius-sm);padding:18px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px}
+.sb-item .sbi-icon{width:40px;height:40px;border-radius:10px;background:rgba(22,163,74,.08);display:flex;align-items:center;justify-content:center;color:var(--success)}
+.sb-item .sbi-title{font-size:14px;font-weight:800;color:var(--text)}
+.sb-item .sbi-desc{font-size:12px;color:var(--sub);line-height:1.6}
+
+.trust-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:12px}
+.trust-panel h4{font-size:16px;font-weight:800;color:var(--text);margin:0 0 16px;display:flex;align-items:center;gap:10px}
+.trust-panel h4 svg{color:var(--amber)}
+.trust-layers{display:flex;flex-direction:column;gap:12px}
+.trust-layer{display:flex;align-items:flex-start;gap:14px;padding:16px 18px;border-radius:var(--radius-sm);border:1.5px solid var(--border)}
+.trust-layer .tl-level{flex-shrink:0;width:64px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;letter-spacing:.5px;color:#fff}
+.trust-layer:nth-child(1) .tl-level{background:var(--success)}
+.trust-layer:nth-child(2) .tl-level{background:var(--accent)}
+.trust-layer:nth-child(3) .tl-level{background:var(--purple)}
+.trust-layer .tl-body{flex:1}
+.trust-layer .tl-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px}
+.trust-layer .tl-desc{font-size:13px;color:var(--sub);line-height:1.7}
+
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:18px 22px;font-size:15px;color:var(--text);display:flex;gap:12px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--accent)}
+</style>
+<meta name="description" content="深入理解 Agent 的沙箱隔离与凭证管理——为什么生成的代码和密钥永远不能在同一个地方。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/10-16.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">安全与容器化</div>
+    <h1>沙箱与凭证隔离</h1>
+    <p class="subtitle">Agent 生成的代码和用户的密钥永远不能在同一个地方——这不是最佳实践的建议，而是安全架构的硬性要求。</p>
+  </header>
+
+  <!-- ===== 核心原则 ===== -->
+  <div class="sec-label">核心原则</div>
+
+  <div class="core-principle reveal">
+    <div class="cp-text">生成的代码和密钥<br>永远不能在同一个地方</div>
+    <div class="cp-sub">这是管理 Agent 安全的第一原则——凭证与执行环境的物理隔离。</div>
+  </div>
+
+  <!-- ===== 旧方案的问题 ===== -->
+  <div class="sec-label">旧方案出了什么问题</div>
+
+  <div class="problem-panel reveal">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      传统架构：一个容器装所有东西
+    </h4>
+    <div class="problem-list">
+      <div class="problem-item">
+        <div class="pi-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        </div>
+        <div class="pi-body">
+          <div class="pi-title">所有东西在一个容器里</div>
+          <div class="pi-desc">代码执行、API 密钥、OAuth Token、会话凭证——全部共存在同一个运行环境中。Agent 能看到的一切，恶意代码也能看到。</div>
+        </div>
+      </div>
+      <div class="problem-item">
+        <div class="pi-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </div>
+        <div class="pi-body">
+          <div class="pi-title">Prompt Injection 一步偷走密钥</div>
+          <div class="pi-desc">攻击者只需通过 Prompt Injection 说服 Agent 执行一行代码——<code>echo $API_KEY</code>——就能窃取环境变量中的所有密钥。整个攻击链极短，防不胜防。</div>
+        </div>
+      </div>
+      <div class="problem-item">
+        <div class="pi-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+        </div>
+        <div class="pi-body">
+          <div class="pi-title">Agent 越聪明，问题越严重</div>
+          <div class="pi-desc">能力更强的 Agent 意味着更强大的工具调用能力——而在旧架构下，这也意味着更大的攻击面。模型的进步不会自动解决这个问题，反而会让它恶化。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="escalation-bar reveal">
+    <div class="eb-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    </div>
+    <div class="eb-text"><b>模型能力越强，安全问题越严重。</b>这意味着安全架构不能依赖"模型自觉"——必须通过结构性设计来保证，即使模型被完全控制，攻击者也拿不到凭证。</div>
+  </div>
+
+  <!-- ===== 两种凭证隔离模式 ===== -->
+  <div class="sec-label">两种凭证隔离模式</div>
+
+  <div class="isolation-grid">
+    <div class="iso-card bundle reveal">
+      <div class="iso-header">
+        <div class="iso-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        </div>
+        <div>
+          <div class="iso-tag">MODE 1</div>
+          <div class="iso-title">绑定到资源</div>
+        </div>
+      </div>
+      <div class="iso-desc">Token 不作为独立变量存在，而是在使用时被嵌入到资源的访问路径中——Agent 能用它，但看不到它。</div>
+      <div class="iso-example">
+        <div class="ie-label">GIT 克隆场景</div>
+        <div class="ie-desc">Token 在克隆时注入到 remote URL 中：<br><b>https://token@github.com/repo.git</b><br>沙箱内的 Agent 可以正常执行 push/pull 操作，但无法直接读取或提取 Token——它被嵌入在 Git 配置的深层，不是一个可读的环境变量。</div>
+      </div>
+      <div class="iso-flow">
+        <div class="if-node">Token</div>
+        <div class="if-arrow"><svg width="24" height="14" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="2"><line x1="0" y1="7" x2="20" y2="7"/><polyline points="16 3 20 7 16 11"/></svg></div>
+        <div class="if-node">注入 Remote URL</div>
+        <div class="if-arrow"><svg width="24" height="14" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="2"><line x1="0" y1="7" x2="20" y2="7"/><polyline points="16 3 20 7 16 11"/></svg></div>
+        <div class="if-node green">Agent 可用不可见</div>
+      </div>
+    </div>
+    <div class="iso-card vault reveal">
+      <div class="iso-header">
+        <div class="iso-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div>
+          <div class="iso-tag">MODE 2</div>
+          <div class="iso-title">Vault 代理模式</div>
+        </div>
+      </div>
+      <div class="iso-desc">Token 存在安全的 Vault 服务中，Agent 的每次 API 调用都通过代理转发。代理根据 Session ID 查找对应凭证并注入请求——Agent 永远接触不到原始 Token。</div>
+      <div class="iso-example">
+        <div class="ie-label">MCP OAUTH 场景</div>
+        <div class="ie-desc">Agent 发起 MCP 调用时，请求先到达代理服务。代理根据当前 <b>Session ID</b> 从 Vault 中查找对应的 OAuth Token，将 Token 注入请求头后转发到目标 MCP 服务器。Agent 全程只知道"调用成功了"，但从未见过 Token 的任何一个字符。</div>
+      </div>
+      <div class="iso-flow">
+        <div class="if-node purple">Agent 发请求</div>
+        <div class="if-arrow"><svg width="24" height="14" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="2"><line x1="0" y1="7" x2="20" y2="7"/><polyline points="16 3 20 7 16 11"/></svg></div>
+        <div class="if-node purple">代理注入 Token</div>
+        <div class="if-arrow"><svg width="24" height="14" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="2"><line x1="0" y1="7" x2="20" y2="7"/><polyline points="16 3 20 7 16 11"/></svg></div>
+        <div class="if-node green">目标服务</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== OS 级沙箱 ===== -->
+  <div class="sec-label">OS 级沙箱隔离</div>
+
+  <div class="sandbox-panel reveal">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      三重隔离屏障
+    </h4>
+    <div class="sandbox-grid">
+      <div class="sb-item">
+        <div class="sbi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div class="sbi-title">文件系统隔离</div>
+        <div class="sbi-desc">Agent 只能访问工作目录下的文件，无法读取宿主机的其他文件系统路径。凭证、配置、系统文件全部不可见。</div>
+      </div>
+      <div class="sb-item">
+        <div class="sbi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+        </div>
+        <div class="sbi-title">网络隔离</div>
+        <div class="sbi-desc">沙箱限制网络访问范围，Agent 无法向任意外部服务发送数据。即使获取了凭证，也无法外传。</div>
+      </div>
+      <div class="sb-item">
+        <div class="sbi-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+        </div>
+        <div class="sbi-title">进程隔离</div>
+        <div class="sbi-desc">Agent 的代码执行在独立进程空间中，无法访问宿主机的其他进程。既不能读取其他进程的内存，也不能发送信号。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 信任层级 ===== -->
+  <div class="sec-label">三层信任层级</div>
+
+  <div class="trust-panel reveal">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      从工具到组织的分层权限控制
+    </h4>
+    <div class="trust-layers">
+      <div class="trust-layer">
+        <div class="tl-level">TOOL</div>
+        <div class="tl-body">
+          <div class="tl-title">工具级信任</div>
+          <div class="tl-desc">最细粒度的控制。某些特定工具需要每次使用都经过人工审批——比如文件删除、数据库写入、发送邮件等高危操作。对于安全的只读操作（如搜索代码、读取文件），可以设为自动放行。</div>
+        </div>
+      </div>
+      <div class="trust-layer">
+        <div class="tl-level">SESSION</div>
+        <div class="tl-body">
+          <div class="tl-title">会话级信任</div>
+          <div class="tl-desc">某次对话的权限范围。用户在开始会话时授予 Agent 特定范围的权限（如"可以读写 /src 目录但不能改 /config"），整个会话期间权限范围保持不变。会话结束后权限自动回收。</div>
+        </div>
+      </div>
+      <div class="trust-layer">
+        <div class="tl-level">GLOBAL</div>
+        <div class="tl-body">
+          <div class="tl-title">全局级策略</div>
+          <div class="tl-desc">组织级的安全策略限制。无论用户在会话中授予什么权限，Agent 都不能违反全局策略——比如"永远不能访问生产数据库"、"不能向外部域名发送请求"。这是安全的兜底防线。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Takeaway ===== -->
+  <div class="takeaway reveal">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+    <span><b>结构性安全 > 提示词安全。</b>设计上让攻击不可能，而不是靠模型"自觉"。凭证和执行环境物理隔离、多层信任控制、OS 级沙箱——这些是让 Agent 在生产环境安全运行的基石。</span>
+  </div>
+
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){
+  var ob = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); ob.unobserve(e.target); }});
+  }, {threshold:0.15});
+  ob.observe(el);
+});
+</script>
+</body>
+</html>

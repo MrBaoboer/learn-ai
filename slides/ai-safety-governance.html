@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>风险分级与责任：谁来管、怎么管 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root { --accent2: var(--danger); --green: var(--success); --red: var(--danger); --amber: #d97706; --blue: #2563eb; --muted: var(--sub); --surface: var(--card); }
+
+/* ── 筛选按钮 ── */
+.filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.filter-row .fl-lbl { font-size: 13px; color: var(--sub); font-weight: 600; }
+.filter-btn {
+  padding: 9px 16px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: var(--card);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: all 0.15s; color: var(--sub); font-family: inherit; min-height: 40px;
+}
+.filter-btn.active { color: white; }
+.filter-btn.f-all.active { background: var(--danger); border-color: var(--danger); }
+.filter-btn.f-tier.active { background: var(--amber); border-color: var(--amber); }
+.filter-btn.f-role.active { background: var(--blue); border-color: var(--blue); }
+
+/* ── 主从布局 ── */
+.gov-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.card-list { display: flex; flex-direction: column; gap: 10px; }
+
+.scene-card {
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px; cursor: pointer;
+  transition: all 0.2s; display: flex; gap: 12px; align-items: flex-start;
+  box-shadow: var(--shadow-card);
+}
+.scene-card:hover { transform: translateX(3px); box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.scene-card.active { border-color: var(--danger); background: rgba(220,38,38,0.03); }
+.scene-card.hidden { display: none; }
+.sc-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800; flex-shrink: 0; }
+.sc-body { flex: 1; min-width: 0; }
+.sc-title { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 2px; }
+.sc-desc { font-size: 13px; color: var(--sub); line-height: 1.45; }
+.sc-risk { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 800; margin-top: 6px; }
+
+/* ── 详情面板 ── */
+.detail-panel { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 20px; }
+.detail-hd { display: flex; align-items: center; gap: 12px; }
+.detail-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; flex-shrink: 0; }
+.detail-title { font-size: 19px; font-weight: 800; color: var(--text); }
+.detail-risk { font-size: 12px; font-weight: 700; margin-top: 2px; }
+
+.info-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-card);
+}
+.ic-label { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 8px; }
+.ic-body { font-size: 14px; color: var(--sub); line-height: 1.7; }
+.ic-body strong { color: var(--text); }
+.ic-body em { font-style: normal; font-weight: 700; }
+.ic-list { display: flex; flex-direction: column; gap: 6px; }
+.ic-item { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.55; color: var(--sub); }
+.ic-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; }
+
+.do-dont { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dd-col { border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13px; line-height: 1.65; }
+.dd-col strong { display: block; font-size: 11px; letter-spacing: 0.3px; margin-bottom: 5px; }
+.dd-do { background: rgba(22,163,74,0.06); border: 1px solid rgba(22,163,74,0.15); color: #14532d; }
+.dd-do strong { color: var(--success); }
+.dd-dont { background: rgba(220,38,38,0.06); border: 1px solid rgba(220,38,38,0.15); color: #7c2d12; }
+.dd-dont strong { color: var(--danger); }
+
+.tip-strip { border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; line-height: 1.65; }
+
+@media (max-width: 768px) {
+  .gov-cols { grid-template-columns: 1fr; }
+  .detail-panel { position: static; }
+  .do-dont { grid-template-columns: 1fr; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="AI 使用的风险分级（L1/L2/L3）与责任链（使用者/审批人/管理者）：不同风险等级对应不同管控要求，每个角色都要为自己的 AI 使用行为负责。">
+<meta name="keywords" content="AI风险分级,AI责任链,AI治理,AI合规,风险管控,AI管理制度">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ai-safety-governance.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="风险分级与责任：谁来管、怎么管">
+<meta property="og:description" content="AI 使用的风险分级（L1/L2/L3）与责任链（使用者/审批人/管理者）：不同风险等级对应不同管控要求，每个角色都要为自己的 AI 使用行为负责。">
+<meta property="og:url" content="https://xueai.app/slides/ai-safety-governance.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_CN">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="风险分级与责任：谁来管、怎么管">
+<meta name="twitter:description" content="AI 使用的风险分级（L1/L2/L3）与责任链（使用者/审批人/管理者）：不同风险等级对应不同管控要求，每个角色都要为自己的 AI 使用行为负责。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt 安全</div>
+    <h1>风险分级与责任</h1>
+    <p class="subtitle">AI 使用不是"能用就行"——按风险分级（L1/L2/L3）匹配管控强度，按责任链（使用者/审批人/管理者）明确谁担责。点击左侧任意条目查看详情。</p>
+  </header>
+
+  <div class="sec-label">
+    筛选查看
+  </div>
+
+  <div class="filter-row">
+    <span class="fl-lbl">查看：</span>
+    <button class="filter-btn f-all active" onclick="filterBy('all',this)">全部</button>
+    <button class="filter-btn f-tier" onclick="filterBy('tier',this)">风险分级</button>
+    <button class="filter-btn f-role" onclick="filterBy('role',this)">责任链</button>
+  </div>
+
+  <div class="gov-cols" style="margin-top:16px">
+    <div class="card-list" id="cardList"></div>
+    <div class="detail-panel" id="detailPanel"></div>
+  </div>
+
+</article>
+
+<script>
+const ITEMS = [
+  {
+    cat:'tier', icon:'L1', iconBg:'rgba(22,163,74,.1)', iconColor:'var(--green)',
+    title:'L1 · 低风险 — 日常辅助', desc:'写邮件、做总结、翻译、头脑风暴',
+    riskText:'低风险', riskBg:'rgba(22,163,74,.1)', riskColor:'var(--green)',
+    detail:{
+      titleColor:'var(--green)',
+      desc:'AI 输出仅供内部参考，不直接影响外部客户或关键业务决策。<strong>大多数日常 AI 使用都属于 L1。</strong>',
+      controls:[
+        {color:'#16a34a',text:'使用企业授权的 AI 工具'},
+        {color:'#16a34a',text:'不输入敏感数据（客户信息、财务数据等）'},
+        {color:'#16a34a',text:'对 AI 输出做基本合理性检查'},
+      ],
+      doList:['用 AI 起草邮件、总结、翻译','用 AI 做头脑风暴和方案发散','用 AI 整理公开资料和学习笔记'],
+      dontList:['把内部数据不脱敏就粘给 AI','AI 输出不看就直接发出去','以为 L1 就不用检查输出'],
+      tip:{bg:'rgba(22,163,74,.06)',color:'#14532d',text:'<strong>审批要求：</strong>无需额外审批，使用者自主判断。<strong>记住：</strong>低风险不等于零风险，输出仍需过眼。'}
+    }
+  },
+  {
+    cat:'tier', icon:'L2', iconBg:'rgba(217,119,6,.1)', iconColor:'var(--amber)',
+    title:'L2 · 中风险 — 业务决策辅助', desc:'生成对外文案、辅助分析报告、AI 代码上线',
+    riskText:'中风险', riskBg:'rgba(217,119,6,.1)', riskColor:'var(--amber)',
+    detail:{
+      titleColor:'var(--amber)',
+      desc:'AI 输出将影响外部客户、业务流程或对外发布的内容。<strong>关键词：人工审核 — AI 干活，人来把关。</strong>',
+      controls:[
+        {color:'#d97706',text:'AI 输出须经人工审核后方可使用'},
+        {color:'#d97706',text:'对外发布内容须标注"AI 辅助生成"'},
+        {color:'#d97706',text:'AI 生成代码须通过安全扫描（SAST / SCA）'},
+        {color:'#d97706',text:'保留 AI 交互记录，便于审计追溯'},
+      ],
+      doList:['AI 出稿 → 人工审核 → 再使用','对外内容标注 AI 标识','代码跑完安全扫描再上线'],
+      dontList:['AI 写的文案直接发公众号','AI 代码不测试就上生产','跳过审核流程图省事'],
+      tip:{bg:'rgba(217,119,6,.06)',color:'#78350f',text:'<strong>审批要求：</strong>须经主管审批。<strong>数据规则：</strong>内部业务数据须脱敏后输入；客户数据须使用内部 AI 平台。'}
+    }
+  },
+  {
+    cat:'tier', icon:'L3', iconBg:'rgba(220,38,38,.1)', iconColor:'var(--red)',
+    title:'L3 · 高风险 — 自主执行与关键决策', desc:'Agent 操作生产系统、自动化审批、涉及资金',
+    riskText:'高风险', riskBg:'rgba(220,38,38,.1)', riskColor:'var(--red)',
+    detail:{
+      titleColor:'var(--red)',
+      desc:'AI 的输出直接影响关键业务、资金流转或法律合规，<strong>错误代价极高。关键词：可控可回退 — 出了问题能立刻停。</strong>',
+      controls:[
+        {color:'#dc2626',text:'必须在沙箱环境中运行和测试'},
+        {color:'#dc2626',text:'设置执行步数上限，超限触发人工确认'},
+        {color:'#dc2626',text:'具备一键终止（kill switch）能力'},
+        {color:'#dc2626',text:'审计日志保留不少于 180 天'},
+        {color:'#dc2626',text:'定期进行红队测试和安全评估'},
+      ],
+      doList:['沙箱环境充分测试再上生产','每步关键操作插入人工确认','保留完整审计日志'],
+      dontList:['Agent 直接操作生产数据库','不设步数上限让 AI 自由执行','没有 kill switch 就上线'],
+      tip:{bg:'rgba(220,38,38,.06)',color:'#7c2d12',text:'<strong>审批要求：</strong>须经安全委员会审批 + 上线前安全评估。<strong>就高原则：</strong>涉及多个风险维度时，按最高等级管控。'}
+    }
+  },
+  {
+    cat:'role', icon:'U', iconBg:'rgba(37,99,235,.1)', iconColor:'var(--blue)',
+    title:'使用者 — 对自己的行为负责', desc:'每一个使用 AI 的人都是第一责任人',
+    riskText:'直接责任', riskBg:'rgba(37,99,235,.1)', riskColor:'var(--blue)',
+    detail:{
+      titleColor:'var(--blue)',
+      desc:'<em style="color:var(--blue)">AI 不替代责任主体。</em>用 AI 写的报告出了错，责任在你，不在 AI。用 AI 泄露了数据，后果由你承担。',
+      controls:[
+        {color:'#2563eb',text:'使用前确认场景风险等级，遵守对应管控要求'},
+        {color:'#2563eb',text:'对 AI 输出进行合理性审查，不盲目采信'},
+        {color:'#2563eb',text:'输入数据前做脱敏处理（默认脱敏原则）'},
+        {color:'#2563eb',text:'发现异常及时上报，不隐瞒不回避'},
+      ],
+      doList:['判断风险等级再使用','检查 AI 输出是否准确','数据脱敏后再输入'],
+      dontList:['"AI 写的不是我写的"试图推责','"大家都这么用"当借口','输入敏感数据后假装没发生'],
+      tip:{bg:'rgba(37,99,235,.06)',color:'#1e40af',text:'<strong>核心原则：</strong>"默认脱敏" — 所有输入 AI 的数据默认应脱敏处理，除非数据所有者明确授权。不确定？那就脱敏。'}
+    }
+  },
+  {
+    cat:'role', icon:'A', iconBg:'rgba(217,119,6,.1)', iconColor:'var(--amber)',
+    title:'审批人 — 签字即担责', desc:'L2/L3 场景的审批负责人',
+    riskText:'连带责任', riskBg:'rgba(217,119,6,.1)', riskColor:'var(--amber)',
+    detail:{
+      titleColor:'var(--amber)',
+      desc:'须对审批事项进行<em style="color:var(--amber)">实质性审核</em>。"我只是走个流程签个字"<strong style="color:var(--red)">不能免责</strong>。未尽审核义务的，承担连带责任。',
+      controls:[
+        {color:'#d97706',text:'审查 AI 使用场景的风险分级是否准确'},
+        {color:'#d97706',text:'确认已落实对应等级的管控措施'},
+        {color:'#d97706',text:'审核数据安全和合规性'},
+        {color:'#d97706',text:'理解审批内容的实质，不做橡皮图章'},
+      ],
+      doList:['了解审批事项的具体内容','确认管控措施已到位','对不确定的事项追问清楚'],
+      dontList:['不看内容就签字','假设"下面的人应该处理好了"','审批后就不再关注后续执行'],
+      tip:{bg:'rgba(217,119,6,.06)',color:'#78350f',text:'<strong>记住：</strong>审批人的责任不会因为"当时不知情"而免除。你签字的那一刻，就对这件事负有连带责任。'}
+    }
+  },
+  {
+    cat:'role', icon:'M', iconBg:'rgba(220,38,38,.1)', iconColor:'var(--red)',
+    title:'管理者 — 确保团队整体合规', desc:'部门/团队负责人的管理责任',
+    riskText:'管理责任', riskBg:'rgba(220,38,38,.1)', riskColor:'var(--red)',
+    detail:{
+      titleColor:'var(--red)',
+      desc:'"我不知道下属在用 AI 做什么"<strong style="color:var(--red)">不是免责理由</strong>。管理者有义务确保团队了解规范、遵守规范。',
+      controls:[
+        {color:'#dc2626',text:'确保团队成员了解并遵守 AI 安全规范'},
+        {color:'#dc2626',text:'建立部门级 AI 使用管理制度'},
+        {color:'#dc2626',text:'定期组织 AI 安全培训（如本课程）'},
+        {color:'#dc2626',text:'对部门内的 AI 安全事件承担管理责任'},
+      ],
+      doList:['组织团队学习 AI 安全规范','建立部门 AI 使用登记制度','主动了解团队的 AI 使用情况'],
+      dontList:['对团队 AI 使用放任不管','把安全责任全部推给安全部门','出了事才开始关注'],
+      tip:{bg:'rgba(220,38,38,.06)',color:'#7c2d12',text:'<strong>违规后果（所有角色）：</strong>视情节轻重，包括撤销 AI 使用权限、纪律处分、连带赔偿，严重者追究法律责任。'}
+    }
+  }
+];
+
+function renderCards(filter) {
+  const list = document.getElementById('cardList');
+  list.innerHTML = '';
+  ITEMS.forEach((s,i) => {
+    const card = document.createElement('div');
+    card.className = 'scene-card' + (i===0?' active':'');
+    card.dataset.cat = s.cat;
+    if (filter !== 'all' && s.cat !== filter) card.classList.add('hidden');
+    card.innerHTML = `
+      <div class="sc-icon" style="background:${s.iconBg};color:${s.iconColor};font-weight:800">${s.icon}</div>
+      <div class="sc-body">
+        <div class="sc-title">${s.title}</div>
+        <div class="sc-desc">${s.desc}</div>
+        <span class="sc-risk" style="background:${s.riskBg};color:${s.riskColor}">${s.riskText}</span>
+      </div>
+    `;
+    card.onclick = () => {
+      document.querySelectorAll('.scene-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      showDetail(i);
+    };
+    list.appendChild(card);
+  });
+}
+
+function showDetail(idx) {
+  const s = ITEMS[idx];
+  const d = s.detail;
+  const panel = document.getElementById('detailPanel');
+  panel.innerHTML = `
+    <div class="detail-hd">
+      <div class="detail-icon" style="background:${s.iconBg};color:${s.iconColor};font-weight:800;font-size:18px">${s.icon}</div>
+      <div>
+        <div class="detail-title">${s.title.split(' — ')[0]}</div>
+        <div class="detail-risk" style="color:${d.titleColor}">${s.riskText}</div>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="ic-label" style="color:${d.titleColor}">核心说明</div>
+      <div class="ic-body">${d.desc}</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-label" style="color:${d.titleColor}">${s.cat==='tier'?'管控要求':'核心职责'}</div>
+      <div class="ic-list">${d.controls.map(c=>`<div class="ic-item"><div class="ic-dot" style="background:${c.color}"></div><span>${c.text}</span></div>`).join('')}</div>
+    </div>
+    <div class="do-dont">
+      <div class="dd-col dd-do">
+        <strong>应该这样做</strong>
+        ${d.doList.map(x => '· ' + x).join('<br>')}
+      </div>
+      <div class="dd-col dd-dont">
+        <strong>不要这样做</strong>
+        ${d.dontList.map(x => '· ' + x).join('<br>')}
+      </div>
+    </div>
+    <div class="tip-strip" style="background:${d.tip.bg};border:1px solid ${d.tip.bg.replace('.06','.15')};color:${d.tip.color}">
+      ${d.tip.text}
+    </div>
+  `;
+}
+
+function filterBy(cat, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.scene-card').forEach(card => {
+    if (cat === 'all' || card.dataset.cat === cat) {
+      card.classList.remove('hidden');
+    } else {
+      card.classList.add('hidden');
+    }
+  });
+  const firstVisible = document.querySelector('.scene-card:not(.hidden)');
+  if (firstVisible) firstVisible.click();
+}
+
+renderCards('all');
+showDetail(0);
+</script>
+<script src="nav-inject.js?v=20260703b"></script>
+</body>
+</html>

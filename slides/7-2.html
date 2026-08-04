@@ -4,83 +4,65 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>工具调用：Function Calling 的本质是什么 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
 <style>
-:root{--bg:#f7f5f0;--text:#1c1c1e;--sub:#6b6b70;--border:rgba(0,0,0,0.07);--surface:white;--surface2:#f0ede6;--orange:#ea580c;--green:#16a34a;--red:#dc2626;--cyan:#0891b2;--purple:#7c3aed;--muted:#8e8e93;--amber:#d97706}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;opacity:0;animation:si .15s ease .08s forwards;-webkit-font-smoothing:antialiased}
-@keyframes si{to{opacity:1}}
-.slide{width:94vw;max-width:1440px;aspect-ratio:16/9;background:var(--bg);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.08);display:flex;flex-direction:column;overflow:hidden}
-.hd{padding:12px 36px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);flex-shrink:0}
-.hd-tag{font-size:14px;font-weight:800;color:var(--orange)}
-.hd-title{font-size:24px;font-weight:800;color:var(--text)}
-.hd-title em{font-style:normal;color:var(--orange)}
-.body{flex:1;display:grid;grid-template-columns:260px 1fr;min-height:0;overflow:hidden}
-
-/* ====== 左栏 ====== */
-.left{padding:16px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:12px;overflow:hidden}
-.l-desc{font-size:15px;color:var(--sub);line-height:1.65}
-.l-desc strong{color:var(--text)}
+/* ── 布局：进度条 + 消息流 ── */
+.fc-layout{display:grid;grid-template-columns:250px 1fr;gap:20px;align-items:start}
 
 /* 进度步骤条 */
-.prog-list{display:flex;flex-direction:column;gap:0;flex:1}
+.prog-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px;position:sticky;top:16px}
+.prog-list{display:flex;flex-direction:column}
 .prog-item{display:flex;gap:12px;align-items:flex-start;opacity:.3;transition:opacity .35s}
 .prog-item.done{opacity:1}
 .prog-item.cur{opacity:1}
-.prog-dot-col{display:flex;flex-direction:column;align-items:center;width:28px;flex-shrink:0}
-.prog-dot{width:28px;height:28px;border-radius:50%;background:var(--surface2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .35s}
-.prog-item.done .prog-dot{background:var(--green);border-color:var(--green);color:white}
-.prog-item.cur .prog-dot{background:var(--orange);border-color:var(--orange);color:white}
+.prog-dot-col{display:flex;flex-direction:column;align-items:center;width:28px;flex-shrink:0;align-self:stretch}
+.prog-dot{width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.04);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--sub);flex-shrink:0;transition:all .35s}
+.prog-item.done .prog-dot{background:var(--success);border-color:var(--success);color:white}
+.prog-item.cur .prog-dot{background:var(--accent);border-color:var(--accent);color:white}
 .prog-line{width:2px;flex:1;min-height:10px;background:var(--border);margin:3px 0;transition:background .35s}
-.prog-item.done + .prog-item .prog-line,.prog-item.done .prog-line{background:var(--green)}
+.prog-item.done .prog-line{background:var(--success)}
 .prog-content{padding-bottom:14px}
 .prog-role{font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px}
-.prog-item.cur .prog-role{color:var(--orange)}
-.prog-desc{font-size:12px;color:var(--muted);line-height:1.45}
+.prog-item.cur .prog-role{color:var(--accent)}
+.prog-desc{font-size:12px;color:var(--sub);line-height:1.45}
 
-/* 底部关键结论 */
-.insight{background:rgba(234,88,12,.06);border:1.5px solid rgba(234,88,12,.2);border-radius:10px;padding:10px 14px;font-size:14px;color:var(--text);line-height:1.6;flex-shrink:0}
-.insight b{color:var(--orange)}
+/* 消息流 */
+.msg-panel{min-width:0}
+.r-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.r-label{font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.3px}
+.r-hint{font-size:13px;color:var(--sub);font-weight:600}
+.btn-reset{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--sub);cursor:pointer;font-family:inherit;min-height:32px}
+.msg-area{display:flex;flex-direction:column}
 
-/* ====== 右栏：消息流 ====== */
-.right{display:flex;flex-direction:column;overflow:hidden}
-.r-top{padding:10px 20px 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.r-hint{font-size:13px;color:var(--muted);font-weight:600}
-
-/* 消息区 */
-.msg-area{flex:1;overflow-y:auto;padding:12px 20px;display:flex;flex-direction:column;gap:0}
-
-/* 单条消息 */
-.msg{display:flex;gap:10px;opacity:0;transform:translateY(10px);transition:opacity .35s ease,transform .35s ease;margin-bottom:10px}
+.msg{display:flex;gap:10px;opacity:0;transform:translateY(10px);transition:opacity .35s ease,transform .35s ease;margin-bottom:12px}
 .msg.show{opacity:1;transform:translateY(0)}
 .msg-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;margin-top:2px}
 .msg-body{flex:1;min-width:0}
 .msg-role{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
-.msg-bubble{border-radius:10px;padding:10px 14px;font-size:14px;line-height:1.65}
+.msg-bubble{border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.65;background:var(--card)}
 .msg-note{font-size:12px;margin-top:5px;padding:5px 10px;border-radius:6px;font-weight:600;display:inline-block}
 
 /* 分隔线（框架执行） */
-.divider{display:flex;align-items:center;gap:10px;margin:4px 0 10px;opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.divider{display:flex;align-items:center;gap:10px;margin:4px 0 12px;opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
 .divider.show{opacity:1;transform:translateY(0)}
 .divider-line{flex:1;height:1px;background:var(--border)}
-.divider-label{font-size:11px;font-weight:800;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;white-space:nowrap}
+.divider-label{font-size:11px;font-weight:800;letter-spacing:.5px;color:var(--sub);text-transform:uppercase;white-space:nowrap}
 
 /* 代码 inline */
-.code{font-family:'Cascadia Code','Fira Code','SF Mono',monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
-.hl-o{background:rgba(234,88,12,.15);border-radius:3px;padding:0 3px;color:#c2410c;font-weight:700}
-.hl-g{background:rgba(22,163,74,.12);border-radius:3px;padding:0 3px;color:#15803d;font-weight:700}
-.kw{color:#7c3aed}.str{color:#16a34a}.com{color:#9ca3af;font-style:italic}.fn{color:#0891b2}.num{color:#d97706}
-
-/* 控制栏 */
-.ctrl{padding:10px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-shrink:0;background:var(--surface)}
-.btn{padding:8px 22px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s}
-.btn-p{background:var(--orange);color:white}
-.btn-p:hover{filter:brightness(1.1)}
-.btn-p:disabled{opacity:.3;cursor:not-allowed}
-.btn-r{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
-.ctrl-hint{font-size:13px;color:var(--muted);margin-left:4px}
+.code{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.hl-o{background:rgba(217,119,6,.15);border-radius:3px;padding:0 3px;color:var(--amber);font-weight:700}
+.hl-g{background:rgba(22,163,74,.12);border-radius:3px;padding:0 3px;color:var(--success);font-weight:700}
+.kw{color:var(--purple)}.str{color:var(--success)}.com{color:#9ca3af;font-style:italic}.fn{color:var(--cyan)}.num{color:var(--amber)}
 
 @keyframes pop{0%{transform:scale(.95)}60%{transform:scale(1.02)}100%{transform:scale(1)}}
 .pop{animation:pop .3s ease}
+
+@media (max-width:768px){
+  .fc-layout{grid-template-columns:1fr}
+  .prog-panel{position:static}
+  .prog-content{padding-bottom:10px}
+}
 </style>
 <!-- SEO Start -->
 <meta name="description" content="Function Calling（工具调用）是 Agent 的核心能力。深入解析 OpenAI Function Calling 的协议格式、工具描述的写法、模型如何决定调用哪个工具，以及工具返回结果的处理。">
@@ -106,19 +88,16 @@ body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang S
 <!-- SEO End -->
 </head>
 <body>
-<div class="slide">
-  <div class="hd">
-    <div>
-      <div class="hd-tag">模块七 · Agent 工程 · 第 2 页</div>
-      <div class="hd-title">工具调用的<em>秘密</em></div>
-    </div>
-    <div style="font-size:14px;color:var(--muted)">点击「下一步」追踪完整调用链路 →</div>
-  </div>
-  <div class="body">
-    <!-- 左栏 -->
-    <div class="left">
-      <p class="l-desc">模型<strong>不会真的执行代码</strong>——它只是输出一段结构化文字，框架代码负责解析并执行。</p>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 工程</div>
+    <h1>工具调用的秘密</h1>
+    <p class="subtitle">模型不会真的执行代码——它只是输出一段结构化文字，框架代码负责解析并执行。向下滚动，自动追踪完整调用链路。</p>
+  </header>
 
+  <div class="fc-layout reveal" id="fcDemo">
+    <!-- 左：进度步骤条 -->
+    <aside class="prog-panel">
       <div class="prog-list" id="progList">
         <div class="prog-item" id="pi0">
           <div class="prog-dot-col">
@@ -181,28 +160,28 @@ body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang S
         </div>
       </div>
 
-      <div class="insight">
+      <div class="l-callout" style="margin-top:8px;padding:12px 14px;font-size:14px">
         <b>核心：</b>模型始终只在预测文字。<br>
         工具调用 = 文字 → 代码解析 → API → 文字
       </div>
-    </div>
+    </aside>
 
-    <!-- 右栏 -->
-    <div class="right">
+    <!-- 右：消息流 -->
+    <div class="msg-panel">
       <div class="r-top">
-        <div style="font-size:13px;font-weight:800;color:var(--muted);letter-spacing:.3px">MESSAGE LIST 实时追踪</div>
-        <div class="r-hint" id="rHint">点击「下一步」开始</div>
+        <div class="r-label">MESSAGE LIST 实时追踪</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="r-hint" id="rHint">滚动到这里自动播放</div>
+          <button class="btn-reset" onclick="resetAll()">↺ 重播</button>
+        </div>
       </div>
       <div class="msg-area" id="msgArea"></div>
-      <div class="ctrl">
-        <button class="btn btn-p" id="btnNext" onclick="nextStep()">▶ 下一步</button>
-        <button class="btn btn-r" onclick="resetAll()">重置</button>
-        <span class="ctrl-hint" id="ctrlHint"></span>
-      </div>
+      <p class="r-hint" id="ctrlHint" style="margin-top:4px"></p>
     </div>
   </div>
-</div>
-<script src="nav-inject.js?v=20260412dd"></script>
+</article>
+
+<script src="lesson.js"></script>
 <script>
 const STEPS = [
   {
@@ -211,7 +190,7 @@ const STEPS = [
     render() {
       addMsg({
         avatar:'SYS', avatarBg:'#5b4fcf',
-        role:'SYSTEM PROMPT',roleColor:'#7c3aed',
+        role:'SYSTEM PROMPT',roleColor:'var(--purple)',
         bubbleCls:'',bubbleBg:'rgba(124,58,237,.06)',bubbleBorder:'rgba(124,58,237,.2)',
         html:`<div class="code"><span class="com"># 你是一个智能助手，可以调用以下工具：</span>
 
@@ -228,7 +207,7 @@ tools:
       query: string  <span class="com"># 搜索关键词</span>
 
 <span class="com"># 需要工具时，输出 JSON 格式的调用请求。</span></div>`,
-        note:'📌 工具定义写在 System Prompt 里，模型"知道"有什么工具可以用',noteCls:'rgba(124,58,237,.08)',noteColor:'#7c3aed'
+        note:'📌 工具定义写在 System Prompt 里，模型"知道"有什么工具可以用',noteCls:'rgba(124,58,237,.08)',noteColor:'var(--purple)'
       });
     }
   },
@@ -238,7 +217,7 @@ tools:
     render() {
       addMsg({
         avatar:'👤', avatarBg:'#0891b2',
-        role:'USER',roleColor:'#0891b2',
+        role:'USER',roleColor:'var(--cyan)',
         bubbleBg:'rgba(8,145,178,.06)',bubbleBorder:'rgba(8,145,178,.2)',
         html:`北京明天天气怎么样？`,
         note:null
@@ -251,7 +230,7 @@ tools:
     render() {
       addMsg({
         avatar:'🤖', avatarBg:'#16a34a',
-        role:'MODEL OUTPUT',roleColor:'#16a34a',
+        role:'MODEL OUTPUT',roleColor:'var(--success)',
         bubbleBg:'rgba(22,163,74,.05)',bubbleBorder:'rgba(22,163,74,.2)',
         html:`<div class="code"><span class="com"># 模型推断需要查天气，输出：</span>
 
@@ -260,7 +239,7 @@ tools:
   params:
     city: <span class="str">"北京"</span>
     date: <span class="str">"2026-04-11"</span></div>`,
-        note:'⚠️ 这只是一段文字预测！模型自己什么都没执行，它在等框架处理',noteCls:'rgba(234,88,12,.08)',noteColor:'#ea580c'
+        note:'⚠️ 这只是一段文字预测！模型自己什么都没执行，它在等框架处理',noteCls:'rgba(217,119,6,.08)',noteColor:'var(--amber)'
       });
     }
   },
@@ -270,9 +249,9 @@ tools:
     render() {
       addDivider('↓ 框架代码接管 · 以下不是 LLM 的工作');
       addMsg({
-        avatar:'⚙️', avatarBg:'#ea580c',
-        role:'FRAMEWORK（你写的代码）',roleColor:'#ea580c',
-        bubbleBg:'rgba(234,88,12,.05)',bubbleBorder:'rgba(234,88,12,.25)',
+        avatar:'⚙️', avatarBg:'#d97706',
+        role:'FRAMEWORK（你写的代码）',roleColor:'var(--amber)',
+        bubbleBg:'rgba(217,119,6,.05)',bubbleBorder:'rgba(217,119,6,.25)',
         html:`<div class="code"><span class="com"># 1. 解析模型输出的 JSON</span>
 call = parse(model_output)  <span class="com"># → { name, params }</span>
 
@@ -284,7 +263,7 @@ call = parse(model_output)  <span class="com"># → { name, params }</span>
 result = <span class="fn">weather_api.get</span>(
     city=<span class="str">"北京"</span>, date=<span class="str">"2026-04-11"</span>
 )</div>`,
-        note:'✅ 参数校验、权限控制、错误处理——安全逻辑全在框架，不依赖模型',noteCls:'rgba(22,163,74,.08)',noteColor:'#16a34a'
+        note:'✅ 参数校验、权限控制、错误处理——安全逻辑全在框架，不依赖模型',noteCls:'rgba(22,163,74,.08)',noteColor:'var(--success)'
       });
     }
   },
@@ -295,7 +274,7 @@ result = <span class="fn">weather_api.get</span>(
       addDivider('↓ 框架把结果追加到对话，模型重新看到全部上下文');
       addMsg({
         avatar:'📡', avatarBg:'#0891b2',
-        role:'TOOL RESULT（框架注入）',roleColor:'#0891b2',
+        role:'TOOL RESULT（框架注入）',roleColor:'var(--cyan)',
         bubbleBg:'rgba(8,145,178,.05)',bubbleBorder:'rgba(8,145,178,.2)',
         html:`<div class="code">tool_result:
   name: <span class="str">"get_weather"</span>
@@ -303,7 +282,7 @@ result = <span class="fn">weather_api.get</span>(
     weather: <span class="str">"小雨转多云"</span>
     temp:    <span class="num">12°C ~ 20°C</span>
     wind:    <span class="str">"北风 3 级"</span></div>`,
-        note:'📌 这条消息追加到 Message List，模型下次调用时能看到它',noteCls:'rgba(8,145,178,.08)',noteColor:'#0891b2'
+        note:'📌 这条消息追加到 Message List，模型下次调用时能看到它',noteCls:'rgba(8,145,178,.08)',noteColor:'var(--cyan)'
       });
     }
   },
@@ -314,13 +293,13 @@ result = <span class="fn">weather_api.get</span>(
       addDivider('↓ LLM 重新接管，基于完整上下文预测最终回答');
       addMsg({
         avatar:'🤖', avatarBg:'#16a34a',
-        role:'MODEL FINAL ANSWER',roleColor:'#16a34a',
+        role:'MODEL FINAL ANSWER',roleColor:'var(--success)',
         bubbleBg:'rgba(22,163,74,.05)',bubbleBorder:'rgba(22,163,74,.25)',
         html:`明天北京小雨转多云，气温 12–20°C，北风 3 级，建议带把伞出门。
 
 <div class="code" style="margin-top:8px"><span class="com"># 模型始终只是在"预测下一个 Token"</span>
 <span class="com"># 完整链路：文字 → 框架解析 → API → 注回 → 文字</span></div>`,
-        note:'🎯 用户看到的自然语言回答，本质是模型再次预测文字的结果',noteCls:'rgba(22,163,74,.08)',noteColor:'#16a34a'
+        note:'🎯 用户看到的自然语言回答，本质是模型再次预测文字的结果',noteCls:'rgba(22,163,74,.08)',noteColor:'var(--success)'
       });
     }
   }
@@ -340,10 +319,9 @@ function addMsg({avatar,avatarBg,role,roleColor,bubbleBg,bubbleBorder,html,note,
       ${note ? `<div class="msg-note" style="background:${noteCls};color:${noteColor}">${note}</div>` : ''}
     </div>`;
   area.appendChild(el);
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  setTimeout(() => {
     el.classList.add('show');
-    area.scrollTop = area.scrollHeight;
-  }));
+  }, 60);
 }
 
 function addDivider(label) {
@@ -364,7 +342,9 @@ function updateProg(idx) {
   }
 }
 
-function nextStep() {
+let playTimer = null;
+
+function playStep() {
   if (cur >= STEPS.length) return;
   const s = STEPS[cur];
   updateProg(s.progIdx);
@@ -372,32 +352,43 @@ function nextStep() {
   document.getElementById('rHint').textContent = s.hint;
   cur++;
   if (cur >= STEPS.length) {
-    document.getElementById('btnNext').disabled = true;
-    document.getElementById('btnNext').textContent = '✓ 链路完整';
     document.getElementById('ctrlHint').textContent = '模型调用工具的完整流程就是这样';
-    // mark all done
     for (let i = 0; i < 6; i++) {
       const el = document.getElementById('pi'+i);
       el.classList.remove('cur');
       el.classList.add('done');
     }
+    playTimer = null;
   } else {
     document.getElementById('ctrlHint').textContent = `还有 ${STEPS.length - cur} 步`;
+    playTimer = setTimeout(playStep, 850);
   }
 }
 
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
 function resetAll() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
   cur = 0;
   document.getElementById('msgArea').innerHTML = '';
-  document.getElementById('rHint').textContent = '点击「下一步」开始';
+  document.getElementById('rHint').textContent = '自动播放中…';
   document.getElementById('ctrlHint').textContent = '';
-  document.getElementById('btnNext').disabled = false;
-  document.getElementById('btnNext').textContent = '▶ 下一步';
   for (let i = 0; i < 6; i++) {
     const el = document.getElementById('pi'+i);
     el.classList.remove('done','cur');
   }
+  startPlay();
 }
+
+lessonOnView(document.getElementById('fcDemo'), function() {
+  document.getElementById('rHint').textContent = '自动播放中…';
+  startPlay();
+}, 0.2);
 </script>
+<script src="nav-inject.js?v=20260703b"></script>
 </body>
 </html>

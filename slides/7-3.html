@@ -4,76 +4,69 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ReAct 实战：Agent 卡住时的推理与行动循环 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
 <style>
-:root{--bg:#f7f5f0;--text:#1c1c1e;--sub:#6b6b70;--border:rgba(0,0,0,0.08);--surface:white;--surface2:#f0ede6;--orange:#ea580c;--green:#16a34a;--red:#dc2626;--muted:#8e8e93;--cyan:#0891b2;--purple:#7c3aed;--amber:#d97706}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;opacity:0;animation:_si .15s ease .08s forwards;-webkit-font-smoothing:antialiased}
-@keyframes _si{to{opacity:1}}
-.slide{width:94vw;max-width:1440px;aspect-ratio:16/9;background:var(--bg);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.08);display:flex;flex-direction:column;overflow:hidden}
-.hd{padding:12px 32px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);flex-shrink:0}
-.hd-tag{font-size:14px;font-weight:800;color:var(--orange)}
-.hd-title{font-size:24px;font-weight:800;color:var(--text)}
-.hd-title em{font-style:normal;color:var(--orange)}
-.body{flex:1;display:grid;grid-template-columns:300px 1fr;min-height:0;overflow:hidden}
+/* ── 布局：状态侧栏 + 执行日志 ── */
+.react-layout{display:grid;grid-template-columns:290px 1fr;gap:20px;align-items:start}
 
-/* 左栏 */
-.left{padding:14px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:10px;overflow:hidden}
-.l-desc{font-size:15px;color:var(--sub);line-height:1.65}
-.l-desc strong{color:var(--text)}
+/* 左侧状态面板 */
+.side-panel{display:flex;flex-direction:column;gap:12px;position:sticky;top:16px}
 
 /* 循环计数器 */
-.loop-counter{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.loop-counter{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-card)}
 .lc-row{display:flex;justify-content:space-between;align-items:center}
-.lc-label{font-size:13px;color:var(--muted);font-weight:600}
+.lc-label{font-size:13px;color:var(--sub);font-weight:600}
 .lc-val{font-size:22px;font-weight:900;color:var(--text);transition:color .3s}
 .lc-val.warn{color:var(--amber)}
-.lc-val.danger{color:var(--red)}
-.lc-bar{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
-.lc-fill{height:100%;background:var(--green);border-radius:3px;transition:width .4s ease,background .4s}
+.lc-val.danger{color:var(--danger)}
+.lc-bar{height:6px;background:rgba(0,0,0,.05);border-radius:3px;overflow:hidden}
+.lc-fill{height:100%;background:var(--success);border-radius:3px;transition:width .4s ease,background .4s}
 .lc-fill.warn{background:var(--amber)}
-.lc-fill.danger{background:var(--red)}
+.lc-fill.danger{background:var(--danger)}
 
-.status-badge{padding:5px 12px;border-radius:7px;font-size:13px;font-weight:700;text-align:center;flex-shrink:0;transition:all .3s}
+.status-badge{padding:6px 12px;border-radius:7px;font-size:13px;font-weight:700;text-align:center;transition:all .3s}
 
 /* 进度控制 */
-.ctrl-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
-.btn-next{padding:7px 18px;border-radius:8px;background:var(--orange);color:white;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:opacity .2s}
-.btn-next:disabled{opacity:.35;cursor:not-allowed}
-.btn-reset{padding:7px 12px;border-radius:8px;background:var(--surface2);color:var(--sub);font-size:14px;border:1px solid var(--border);cursor:pointer;font-family:inherit}
-.prog-bar{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
-.prog-fill{height:100%;background:var(--orange);border-radius:2px;transition:width .35s}
+.ctrl-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-card)}
+.btn-reset{padding:9px 12px;border-radius:8px;background:rgba(0,0,0,.04);color:var(--sub);font-size:14px;border:1px solid var(--border);cursor:pointer;font-family:inherit;min-height:40px}
+.prog-bar{height:4px;background:rgba(0,0,0,.05);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .35s}
 
-.insight{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.18);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);line-height:1.6;flex-shrink:0}
-.insight b{color:var(--red)}
+.insight{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.18);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text);line-height:1.6}
+.insight b{color:var(--danger)}
 .insight.ok{background:rgba(22,163,74,.05);border-color:rgba(22,163,74,.2)}
-.insight.ok b{color:var(--green)}
+.insight.ok b{color:var(--success)}
 
-/* 右栏 */
-.right{display:flex;flex-direction:column;overflow:hidden}
-.r-hd{padding:8px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--surface)}
-.r-hd-label{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--muted);text-transform:uppercase}
+/* 右侧执行日志 */
+.log-panel{min-width:0}
+.r-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.r-hd-label{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--sub);text-transform:uppercase}
 .r-hd-task{font-size:14px;font-weight:700;color:var(--text)}
 
 /* 消息流 */
-.msg-area{flex:1;overflow-y:auto;padding:10px 16px;display:flex;flex-direction:column;gap:6px}
+.msg-area{display:flex;flex-direction:column;gap:8px}
 
 .msg{display:flex;gap:10px;opacity:0;transform:translateY(8px);transition:opacity .3s ease,transform .3s ease}
 .msg.show{opacity:1;transform:translateY(0)}
 .msg-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
 .msg-body{flex:1;min-width:0}
 .msg-role{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;margin-bottom:3px}
-.msg-bubble{border-radius:9px;padding:8px 12px;font-size:13.5px;line-height:1.65}
+.msg-bubble{border-radius:9px;padding:10px 14px;font-size:13.5px;line-height:1.65}
 
 /* 错误shake */
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
 .shake{animation:shake .4s ease}
 
-.code{font-family:'Cascadia Code','Fira Code',monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
-.k{color:#7c3aed}.s{color:#16a34a}.c{color:#9ca3af;font-style:italic}.fn{color:#0891b2}.err{color:#dc2626;font-weight:700}
+.code{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.k{color:var(--purple)}.s{color:var(--success)}.c{color:#9ca3af;font-style:italic}.fn{color:var(--cyan)}.err{color:var(--danger);font-weight:700}
 
-/* 底栏 */
-.r-ft{padding:8px 16px;border-top:1px solid var(--border);flex-shrink:0;background:var(--surface)}
-.ft-msg{font-size:13px;color:var(--muted);font-weight:600;transition:color .3s}
+.ft-msg{font-size:13px;color:var(--sub);font-weight:600;transition:color .3s;margin-top:10px;display:block;min-height:20px}
+
+@media (max-width:768px){
+  .react-layout{grid-template-columns:1fr}
+  .side-panel{position:static}
+}
 </style>
 <!-- SEO Start -->
 <meta name="description" content="ReAct（Reasoning + Acting）框架让 Agent 在执行中边推理边行动。通过真实案例解析 ReAct 的迭代循环：Thought、Action、Observation，以及 Agent 卡死的常见原因与解决方案。">
@@ -99,19 +92,16 @@ body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang S
 <!-- SEO End -->
 </head>
 <body>
-<div class="slide">
-  <div class="hd">
-    <div>
-      <div class="hd-tag">模块七 · Agent 工程 · 第 3 页</div>
-      <div class="hd-title">ReAct 实战：<em>当 Agent 卡住了</em></div>
-    </div>
-    <div style="font-size:14px;color:var(--muted)">点击「下一步」追踪真实失败过程 →</div>
-  </div>
-  <div class="body">
-    <!-- 左栏 -->
-    <div class="left">
-      <p class="l-desc">ReAct 循环：<strong>思考 → 行动 → 观察</strong>，循环往复。<br>但如果模型对参数格式不了解，它会反复猜测，<strong>卡在同一个地方打转。</strong></p>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 工程</div>
+    <h1>ReAct 实战：当 Agent 卡住了</h1>
+    <p class="subtitle">ReAct 循环：思考 → 行动 → 观察，循环往复。但如果模型对参数格式不了解，它会反复猜测，卡在同一个地方打转。向下滚动，自动追踪真实失败过程。</p>
+  </header>
 
+  <div class="react-layout reveal" id="reactDemo">
+    <!-- 左：状态面板 -->
+    <aside class="side-panel">
       <div class="loop-counter">
         <div class="lc-row">
           <span class="lc-label">ReAct 循环次数</span>
@@ -124,40 +114,38 @@ body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang S
         </div>
         <div class="lc-row">
           <span class="lc-label">失败次数</span>
-          <span class="lc-val" id="failCount" style="font-size:16px;color:var(--red)">0 次</span>
+          <span class="lc-val" id="failCount" style="font-size:16px;color:var(--danger)">0 次</span>
         </div>
-        <div class="status-badge" id="statusBadge" style="background:var(--surface2);color:var(--muted)">等待开始</div>
+        <div class="status-badge" id="statusBadge" style="background:rgba(0,0,0,.04);color:var(--sub)">等待开始</div>
       </div>
 
       <div class="ctrl-box">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:13px;color:var(--muted);font-weight:600" id="stepText">共 10 步</span>
+          <span style="font-size:13px;color:var(--sub);font-weight:600" id="stepText">共 10 步</span>
           <span style="font-size:13px;font-weight:700;color:var(--text)" id="stepNum">0 / 10</span>
         </div>
         <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn-next" id="btnNext" onclick="nextStep()">▶ 下一步</button>
-          <button class="btn-reset" onclick="resetAll()">重置</button>
-        </div>
+        <button class="btn-reset" onclick="resetAll()">↺ 重播</button>
       </div>
 
       <div class="insight" id="insightBox">
         <b>问题根源：</b>模型不知道 API 要求的具体格式，只能靠猜测——每次失败就换一种写法重试。没有脚手架的 Agent，这个循环可能永远不会停。
       </div>
-    </div>
+    </aside>
 
-    <!-- 右栏 -->
-    <div class="right">
+    <!-- 右：执行日志 -->
+    <div class="log-panel">
       <div class="r-hd">
         <span class="r-hd-label">ReAct 执行日志</span>
         <span class="r-hd-task">任务：帮我预订上海外滩附近的酒店，明天入住，住两晚</span>
       </div>
       <div class="msg-area" id="msgArea"></div>
-      <div class="r-ft"><span class="ft-msg" id="ftMsg">点击「下一步」开始演示</span></div>
+      <span class="ft-msg" id="ftMsg">滚动到这里自动播放演示</span>
     </div>
   </div>
-</div>
-<script src="nav-inject.js?v=20260412dd"></script>
+</article>
+
+<script src="lesson.js"></script>
 <script>
 // 每步数据
 const STEPS = [
@@ -311,8 +299,9 @@ status:      <span class="fn">CONFIRMED</span></div>`
 ];
 
 let cur = 0;
+let playTimer = null;
 
-function nextStep() {
+function playStep() {
   if (cur >= STEPS.length) return;
   const s = STEPS[cur];
 
@@ -349,11 +338,10 @@ function nextStep() {
           <div class="msg-bubble" style="background:${m.bg};border:1.5px solid ${m.border}">${m.html}</div>
         </div>`;
       area.appendChild(el);
-      requestAnimationFrame(() => requestAnimationFrame(() => {
+      setTimeout(() => {
         el.classList.add('show');
         if (m.shake) setTimeout(() => el.querySelector('.msg-bubble').classList.add('shake'), 350);
-        area.scrollTop = area.scrollHeight;
-      }));
+      }, 60);
     }, mi * 180);
   });
 
@@ -361,16 +349,24 @@ function nextStep() {
 
   // 最后一步
   if (cur >= STEPS.length) {
-    document.getElementById('btnNext').disabled = true;
-    document.getElementById('btnNext').textContent = '✓ 完成';
     document.getElementById('stepText').textContent = '演示结束';
     const ib = document.getElementById('insightBox');
     ib.className = 'insight ok';
     ib.innerHTML = '<b>这正是脚手架的价值：</b>加入参数验证、格式说明、最大重试次数限制，Agent 就不会无限打转。下一页介绍如何用脚手架解决这个问题。';
+    playTimer = null;
+  } else {
+    playTimer = setTimeout(playStep, 850);
   }
 }
 
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
 function resetAll() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
   cur = 0;
   document.getElementById('msgArea').innerHTML = '';
   document.getElementById('loopCount').textContent = '0';
@@ -380,18 +376,23 @@ function resetAll() {
   document.getElementById('callCount').textContent = '0 次';
   document.getElementById('failCount').textContent = '0 次';
   document.getElementById('statusBadge').textContent = '等待开始';
-  document.getElementById('statusBadge').style.background = 'var(--surface2)';
-  document.getElementById('statusBadge').style.color = 'var(--muted)';
+  document.getElementById('statusBadge').style.background = 'rgba(0,0,0,.04)';
+  document.getElementById('statusBadge').style.color = 'var(--sub)';
   document.getElementById('progFill').style.width = '0%';
   document.getElementById('stepNum').textContent = '0 / 10';
   document.getElementById('stepText').textContent = '共 10 步';
-  document.getElementById('ftMsg').textContent = '点击「下一步」开始演示';
-  document.getElementById('btnNext').disabled = false;
-  document.getElementById('btnNext').textContent = '▶ 下一步';
+  document.getElementById('ftMsg').textContent = '自动播放中…';
   const ib = document.getElementById('insightBox');
   ib.className = 'insight';
   ib.innerHTML = '<b>问题根源：</b>模型不知道 API 要求的具体格式，只能靠猜测——每次失败就换一种写法重试。没有脚手架的 Agent，这个循环可能永远不会停。';
+  startPlay();
 }
+
+lessonOnView(document.getElementById('reactDemo'), function() {
+  document.getElementById('ftMsg').textContent = '自动播放中…';
+  startPlay();
+}, 0.2);
 </script>
+<script src="nav-inject.js?v=20260703b"></script>
 </body>
 </html>

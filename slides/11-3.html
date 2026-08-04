@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>上下文工程：从手写 Prompt 到自动进化 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.evolution-bar{display:flex;align-items:stretch;gap:0;margin:28px 0;border-radius:var(--radius);overflow:hidden;border:1.5px solid var(--border);box-shadow:var(--shadow-card)}
+.evo-step{flex:1;padding:16px 14px;text-align:center;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--card)}
+.evo-step:not(:last-child)::after{content:'→';position:absolute;right:-6px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--accent);font-weight:700;z-index:1}
+.evo-step .evo-num{font-size:11px;font-weight:800;color:var(--accent);letter-spacing:.5px}
+.evo-step .evo-label{font-size:13px;font-weight:700;color:var(--text);line-height:1.4}
+.evo-step.active{background:rgba(0,102,255,.06)}
+@media(max-width:768px){.evolution-bar{flex-direction:column}.evo-step:not(:last-child)::after{content:'↓';right:50%;top:auto;bottom:-8px;transform:translateX(50%)}}
+
+.concept-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px 28px;margin:20px 0;box-shadow:var(--shadow-card)}
+.concept-card .cc-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.concept-card .cc-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.concept-card .cc-title{font-size:17px;font-weight:800;color:var(--text)}
+.concept-card .cc-body{font-size:14px;color:var(--sub);line-height:1.8}
+.concept-card .cc-body b{color:var(--text)}
+
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}
+@media(max-width:768px){.three-col{grid-template-columns:1fr}}
+.col-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.col-card .col-badge{font-size:11px;font-weight:800;letter-spacing:.5px;padding:3px 10px;border-radius:6px;display:inline-block;margin-bottom:10px}
+.col-card .col-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:8px}
+.col-card .col-desc{font-size:13px;color:var(--sub);line-height:1.7}
+
+.fig-wrap{margin:28px 0;text-align:center}
+.fig-wrap img{max-width:100%;border-radius:var(--radius);border:1.5px solid var(--border);box-shadow:var(--shadow-card)}
+.fig-wrap .fig-cap{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.6}
+
+.formula-box{background:#1e1e2e;border-radius:var(--radius);padding:20px 24px;margin:16px 0;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;line-height:1.8;color:#cdd6f4;box-shadow:var(--shadow-card);overflow-x:auto}
+.formula-box .fk{color:#89b4fa}
+.formula-box .fs{color:#a6e3a1}
+.formula-box .fp{color:#f9e2af}
+
+.highlight-box{border-radius:var(--radius);padding:18px 22px;margin:16px 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start}
+.highlight-box.blue{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);color:var(--text)}
+.highlight-box.purple{background:rgba(124,58,237,.04);border:1.5px solid rgba(124,58,237,.18);color:var(--text)}
+.highlight-box b{color:var(--accent)}
+.highlight-box svg{flex-shrink:0;margin-top:2px}
+
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:20px 24px;font-size:15px;color:var(--text);line-height:1.7;margin-top:28px;display:flex;gap:12px;align-items:flex-start}
+.takeaway b{color:var(--accent)}
+.takeaway svg{flex-shrink:0;margin-top:2px;color:var(--accent)}
+
+.sim-controls{display:flex;gap:10px;align-items:center;padding:16px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--shadow-card)}
+.sim-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;font-family:inherit}
+.sim-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sim-btn.playing{background:var(--accent);color:#fff;border-color:var(--accent);pointer-events:none}
+.sim-status{font-size:13px;color:var(--sub);font-weight:600;margin-left:auto;font-variant-numeric:tabular-nums}
+
+.ctx-compare{margin:24px 0}
+.compare-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:768px){.compare-row{grid-template-columns:1fr}}
+.compare-card{border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-card)}
+.bad-card{background:#fef2f2;border:1.5px solid #fecaca}
+.good-card{background:#eff6ff;border:1.5px solid #bfdbfe}
+.best-card{background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1.5px solid #c4b5fd}
+.cmp-badge{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:6px;margin-bottom:14px}
+.bad-badge{background:rgba(239,68,68,.1);color:#dc2626}
+.ace-badge{background:rgba(59,130,246,.1);color:#2563eb}
+.mce-badge{background:rgba(139,92,246,.1);color:#7c3aed}
+.cmp-bar-label{font-size:11px;font-weight:600;color:var(--sub);margin-bottom:4px}
+.cmp-bar-track{height:8px;background:rgba(0,0,0,.06);border-radius:99px;overflow:hidden;margin-bottom:4px}
+.cmp-bar-fill{height:100%;border-radius:99px;transition:width .6s ease}
+.cmp-bar-val{font-size:13px;font-weight:800}
+.bad-val{color:#dc2626}
+.ace-val{color:#2563eb}
+.mce-val{color:#7c3aed}
+.cmp-verdict{margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,.06);font-size:12px;color:var(--sub);line-height:1.6}
+.compare-insight{margin-top:16px;padding:14px 18px;background:rgba(0,102,255,.04);border:1px solid rgba(0,102,255,.12);border-radius:10px;font-size:13px;color:var(--text);line-height:1.7}
+.compare-insight b{color:var(--accent)}
+
+.plain-talk{background:linear-gradient(135deg,#fffbeb,#fef9c3);border:1.5px dashed #fbbf24;border-radius:var(--radius);padding:16px 20px;margin:14px 0 28px;font-size:14px;color:#713f12;line-height:1.85;display:flex;gap:12px;align-items:flex-start}
+.plain-talk .pt-icon{flex-shrink:0;font-size:18px;line-height:1.5}
+.plain-talk b{color:#92400e}
+.plain-talk .pt-tag{font-weight:800;color:#b45309}
+
+/* 每轮实时更新的进度条 */
+.cmp-bar-fill{transition:width .35s ease}
+.cmp-round-tag{font-weight:800;color:var(--accent)}
+.compare-card.overflow-flash{animation:overflowFlash .5s ease 2}
+@keyframes overflowFlash{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 3px rgba(239,68,68,.4)}}
+.compare-card.running{box-shadow:0 0 0 2px rgba(0,102,255,.12)}
+.three-col.reveal .col-card{opacity:0;transform:translateY(16px);transition:all .4s ease}
+.three-col.show .col-card{opacity:1;transform:translateY(0)}
+.three-col.show .col-card:nth-child(1){transition-delay:.1s}
+.three-col.show .col-card:nth-child(2){transition-delay:.25s}
+.three-col.show .col-card:nth-child(3){transition-delay:.4s}
+</style>
+<meta name="description" content="从 ACE 到 MCE 再到 Meta-Harness：上下文管理的优化目标正在从手写 prompt 演进到自动进化的代码系统。">
+<meta name="author" content="洛小山">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">PART 5 · Harness 与自我改进</div>
+    <h1>上下文工程：从手写 Prompt 到<em>自动进化</em></h1>
+    <p class="subtitle">随着 Agent 任务变长，上下文管理不再是可选项——它正在成为 Harness 优化的核心战场。</p>
+  </header>
+
+  <!-- ===== 优化对象的演进 ===== -->
+  <div class="sec-label">优化对象的演进</div>
+
+  <div class="evolution-bar reveal">
+    <div class="evo-step">
+      <div class="evo-num">Level 1</div>
+      <div class="evo-label">指令 Prompt</div>
+    </div>
+    <div class="evo-step">
+      <div class="evo-num">Level 2</div>
+      <div class="evo-label">结构化上下文</div>
+    </div>
+    <div class="evo-step">
+      <div class="evo-num">Level 3</div>
+      <div class="evo-label">工作流</div>
+    </div>
+    <div class="evo-step active">
+      <div class="evo-num">Level 4</div>
+      <div class="evo-label">Harness 代码</div>
+    </div>
+    <div class="evo-step">
+      <div class="evo-num">Level 5</div>
+      <div class="evo-label">优化器代码</div>
+    </div>
+  </div>
+
+  <div class="highlight-box blue reveal">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    <span>模型越智能、越强大，我们能优化的目标就越复杂、方法越通用。这条演进线从"调 prompt"一路到"优化写优化器的代码"。</span>
+  </div>
+
+  <!-- ===== 问题 ===== -->
+  <div class="sec-label">问题：上下文膨胀</div>
+
+  <div class="concept-card reveal">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(220,38,38,.08);color:var(--danger)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="cc-title">简单追加 = 失控</div>
+    </div>
+    <div class="cc-body">
+      把所有工具响应和模型生成<b>简单追加</b>到上下文中，随着 Agent 任务时长增加会迅速失控。<br><br>
+      长上下文研究会持续进步，但目前<b>长上下文智能</b>和<b>上下文工程</b>往往交织在一起——上下文管理是在 LLM 有限注意力下构建更结构化、简洁上下文的关键层。
+    </div>
+  </div>
+
+  <!-- ===== ACE ===== -->
+  <div class="sec-label">ACE：Agentic Context Engineering</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">说人话：</span>"上下文"就是 AI 的<b>工作记忆</b>——它眼前能看到的所有资料。ACE 的思路是：别让记忆变成一锅粥，而是维护一本<b>条理清晰的"工作手册"</b>。干活的人（Generator）照手册干活，复盘的人（Reflector）总结经验教训，管手册的人（Curator）把教训一条条整理进手册。手册越用越精，而不是越用越厚。</span>
+  </div>
+
+  <div class="concept-card reveal">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(0,102,255,.08);color:var(--accent)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </div>
+      <div class="cc-title">上下文是"不断演进的剧本"，而非"不断增长的 Prompt"</div>
+    </div>
+    <div class="cc-body">
+      ACE（Zhang et al. 2025）维护一份<b>结构化的 bullet point 剧本</b>，每条包含 identifier 和 description。三个组件协作维护这份剧本：
+    </div>
+  </div>
+
+  <div class="three-col reveal">
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(59,130,246,.1);color:#2563eb">组件 1</div>
+      <div class="col-title">Generator 生成器</div>
+      <div class="col-desc">执行任务、生成轨迹，参考剧本中的 bullet points 作为指引。</div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(245,158,11,.1);color:#d97706">组件 2</div>
+      <div class="col-title">Reflector 反思器</div>
+      <div class="col-desc">从成功和失败的轨迹中提炼洞察，萃取经验教训。</div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(16,185,129,.1);color:#059669">组件 3</div>
+      <div class="col-title">Curator 策展器</div>
+      <div class="col-desc">用增量的、条目化的 entries 更新结构化上下文，定期精炼去重。</div>
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/ace.png" alt="ACE Framework" loading="lazy">
+    <div class="fig-cap">ACE 框架：Generator 生成轨迹 → Reflector 提炼洞察 → Curator 增量更新上下文剧本。（来源：Zhang et al. 2025）</div>
+  </div>
+
+  <div class="highlight-box purple reveal">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+    <span><b>关键设计：</b>Curator 不重写整块 prompt blob——而是输出结构化的 (identifier, description) 条目，用<b>确定性逻辑</b>合并进剧本。这避免了迭代重写时的"上下文坍缩"和"简洁偏差"。</span>
+  </div>
+
+  <!-- ===== MCE ===== -->
+  <div class="sec-label">MCE：Meta Context Engineering</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">说人话：</span>ACE 是"把手册整理好"，MCE 追问了一个更深的问题：<b>"整理手册的方法"本身是不是也能优化？</b>比如按时间排还是按主题排？记大纲还是记细节？MCE 把"记什么"（内容）和"怎么记"（方法）分开，两头一起进化——不仅笔记越来越好，<b>记笔记的方法也越来越聪明</b>。</span>
+  </div>
+
+  <div class="concept-card reveal">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(124,58,237,.08);color:var(--purple)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="cc-title">分离"机制"与"内容"，双层优化</div>
+    </div>
+    <div class="cc-body">
+      MCE（Ye et al. 2026）在 ACE 基础上更进一步：将<b>如何管理上下文</b>（机制/Skill）与<b>上下文中有什么</b>（内容）分离，在两个层面同时优化。<br><br>
+      一个 MCE Skill 定义了上下文函数 <code>c = F(x; ρ)</code>：<br>
+      • <b>ρ</b> = 静态组件（prompts、知识库、代码库）<br>
+      • <b>F</b> = 动态算子（搜索、选择、过滤、格式化）
+    </div>
+  </div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">下面的公式在说啥：</span>就两句话——内层：用当前的记笔记方法，把笔记写到最好；外层：比较不同的记笔记方法，选出最好的那套方法。<b>先优化"内容"，再优化"方法"，轮流来</b>。</span>
+  </div>
+
+  <div class="formula-box reveal">
+<span class="fk">双层优化：</span>
+<span class="fs">内层</span>: c* = argmax J_train(c; s)     <span class="fp">← 给定 skill s，找最优上下文</span>
+<span class="fs">外层</span>: s* = argmax J_val(c*)         <span class="fp">← 找最优 skill（在验证集上）</span>
+
+<span class="fk">Skill 数据库：</span> H = {(s_i, c_i, J_train_i, J_val_i)} 跟踪历史
+
+<span class="fk">技能进化：</span> s_new = crossover(task, H)   <span class="fp">← Meta-agent 执行 agentic crossover</span>
+<span class="fk">上下文优化：</span> c_new = engineer(task, s_new; c_prev, Rollouts)
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/mce.png" alt="MCE Framework" loading="lazy">
+    <div class="fig-cap">MCE 框架：meta-level 技能进化搜索上下文管理机制，base-level 优化任务上下文。（来源：Ye et al. 2026）</div>
+  </div>
+
+  <div class="concept-card reveal">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(8,145,178,.08);color:var(--cyan)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div class="cc-title">实现：上下文函数 = 文件系统中的目录</div>
+    </div>
+    <div class="cc-body">
+      MCE 中一个 context function 被实例化为专用目录中的文件集合：<br><br>
+      • <b>静态文件</b>：<code>skill.md</code>（存储任务最重要的知识）<br>
+      • <b>动态文件</b>：上下文数据和 rollout 记录<br><br>
+      meta-level 和 base-level 优化都在标准编码环境中执行，使用工具集：<code>Read, Write, Edit, Bash, Glob, Grep, TodoWrite</code>
+    </div>
+  </div>
+
+  <!-- ===== Meta-Harness ===== -->
+  <div class="sec-label">Meta-Harness：优化 Harness 的 Harness</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">说人话：</span>这是套娃的最外层。ACE 优化笔记内容，MCE 优化记笔记的方法，Meta-Harness 直接优化<b>整个工作台的源代码</b>——相当于不只换工具、换方法，而是让 AI 重新装修整个车间。威力最大，但也最烧算力（每改一版都要完整试运行打分）。</span>
+  </div>
+
+  <div class="concept-card reveal">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(217,119,6,.08);color:var(--amber)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <div class="cc-title">优化对象：决定信息存储、检索和呈现的代码</div>
+    </div>
+    <div class="cc-body">
+      Meta-Harness（Lee et al. 2026）更深一层：被优化的不是上下文内容，而是<b>决定什么信息应该被存储、检索和呈现给模型的代码本身</b>。它是"优化 Harness 的 Harness"。<br><br>
+      • <b>Proposer</b> 本身是一个编码 Agent<br>
+      • 输出是 Pareto 前沿上的 <b>Harness 候选集合</b><br>
+      • 执行历史通过文件系统访问——coding agent 用 <code>grep</code>/<code>cat</code> 读取，而非全塞进 prompt<br>
+      • 每个提出的 harness 是文件系统中的字典：包含源码、分数、轨迹和状态更新
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/meta-harness-outer-loop.png" alt="Meta-Harness Outer Loop" loading="lazy">
+    <div class="fig-cap">Meta-Harness 外循环优化算法：迭代创建新 harness，只保留合格者。（来源：Lee et al. 2026）</div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/meta-harness.png" alt="Meta-Harness Performance" loading="lazy">
+    <div class="fig-cap">Meta-Harness 在文本分类和 TerminalBench-2 上的表现。注意 TerminalBench-2 实验从已有强 harness 初始化。（来源：Lee et al. 2026）</div>
+  </div>
+
+  <!-- ===== 对比总结 ===== -->
+  <div class="sec-label">三种方法对比</div>
+
+  <div class="three-col reveal">
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(59,130,246,.1);color:#2563eb">ACE</div>
+      <div class="col-title">从轨迹中学习</div>
+      <div class="col-desc">用规则化的 Generator→Reflector→Curator 管线维护结构化 bullet points。<b>更新规则仍手工设计。</b></div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(124,58,237,.1);color:#7c3aed">MCE</div>
+      <div class="col-title">进化管理机制</div>
+      <div class="col-desc">不固定上下文格式，用 free-form skills 存储知识，双层迭代进化 skill 和 context。<b>机制本身可变。</b></div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(217,119,6,.1);color:#d97706">Meta-Harness</div>
+      <div class="col-title">优化整个系统代码</div>
+      <div class="col-desc">Proposer 是编码 Agent，优化对象是 harness 源码本身，输出 Pareto 前沿候选集。<b>最通用但计算最重。</b></div>
+    </div>
+  </div>
+
+  <!-- ===== 交互：上下文策略对比 ===== -->
+  <div class="sec-label">直观对比：看三种策略逐轮变化</div>
+
+  <div class="sim-controls" style="margin-bottom: 16px;">
+    <button id="btn-play-ctx" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      运行 10 轮对比
+    </button>
+    <button id="btn-reset-ctx" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      重置
+    </button>
+    <span id="ctx-status" class="sim-status">就绪</span>
+  </div>
+
+  <div class="ctx-compare interactive" id="ctx-container">
+    <div class="compare-row">
+      <div class="compare-card bad-card" id="card-naive">
+        <div class="cmp-badge bad-badge">朴素追加</div>
+        <div class="cmp-bar-label">上下文占用 <span class="cmp-round-tag" data-round-tag>（第 0 轮）</span></div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-ctx-fill style="width:0%;background:linear-gradient(90deg,#f59e0b,#ef4444)"></div></div>
+        <div class="cmp-bar-val bad-val" data-ctx-val>—</div>
+        <div class="cmp-bar-label" style="margin-top:12px">任务成功率</div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-suc-fill style="width:0%;background:#ef4444"></div></div>
+        <div class="cmp-bar-val bad-val" data-suc-val>—</div>
+        <div class="cmp-verdict" data-verdict>每轮把所有历史全部塞进上下文…</div>
+      </div>
+      <div class="compare-card good-card" id="card-ace">
+        <div class="cmp-badge ace-badge">ACE 结构化</div>
+        <div class="cmp-bar-label">上下文占用 <span class="cmp-round-tag" data-round-tag>（第 0 轮）</span></div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-ctx-fill style="width:0%;background:linear-gradient(90deg,#3b82f6,#60a5fa)"></div></div>
+        <div class="cmp-bar-val ace-val" data-ctx-val>—</div>
+        <div class="cmp-bar-label" style="margin-top:12px">任务成功率</div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-suc-fill style="width:0%;background:#3b82f6"></div></div>
+        <div class="cmp-bar-val ace-val" data-suc-val>—</div>
+        <div class="cmp-verdict" data-verdict>Curator 只增量写入结构化条目…</div>
+      </div>
+      <div class="compare-card best-card" id="card-mce">
+        <div class="cmp-badge mce-badge">MCE 元进化</div>
+        <div class="cmp-bar-label">上下文占用 <span class="cmp-round-tag" data-round-tag>（第 0 轮）</span></div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-ctx-fill style="width:0%;background:linear-gradient(90deg,#8b5cf6,#a78bfa)"></div></div>
+        <div class="cmp-bar-val mce-val" data-ctx-val>—</div>
+        <div class="cmp-bar-label" style="margin-top:12px">任务成功率</div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-suc-fill style="width:0%;background:#8b5cf6"></div></div>
+        <div class="cmp-bar-val mce-val" data-suc-val>—</div>
+        <div class="cmp-verdict" data-verdict>Skill 与内容双层同时进化…</div>
+      </div>
+    </div>
+    <div class="compare-insight" id="ctx-insight">
+      点击上方 <b>运行 10 轮对比</b>，观察三种策略随轮次推进的实时变化：谁在膨胀、谁保持稳定、谁越跑越强。
+    </div>
+  </div>
+
+  <!-- ===== Takeaway ===== -->
+  <div class="takeaway reveal">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+    <span><b>核心教训：</b>一旦 harness 设计变成可执行的搜索空间，强编码 Agent 就能利用人类工程师使用的同一设计空间。上下文工程的未来不是更聪明的手写 prompt，而是让系统自动学会"什么时候存什么、怎么检索、怎么呈现"。</span>
+  </div>
+
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){
+  var ob = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); ob.unobserve(e.target); }});
+  }, {threshold:0.15});
+  ob.observe(el);
+});
+// ═══════ 上下文对比交互演示：逐轮更新 ═══════
+(function(){
+  var btnPlay = document.getElementById('btn-play-ctx');
+  var btnReset = document.getElementById('btn-reset-ctx');
+  var statusTxt = document.getElementById('ctx-status');
+  var insight = document.getElementById('ctx-insight');
+  
+  var isPlaying = false;
+  var timer = null;
+
+  // 每一轮三种策略的数据：[上下文占用%, 成功率%, 备注]
+  var DATA = {
+    naive: [
+      [10, 90, '前几轮很正常，看不出问题'],
+      [22, 88, '历史越堆越多'],
+      [35, 85, '上下文持续膨胀'],
+      [48, 80, '开始出现遗忘'],
+      [62, 68, '早期信息被挤出窗口'],
+      [78, 45, '接近溢出，质量骤降'],
+      [92, 25, '⚠ 窗口打满，大量丢失'],
+      [100, 12, '✗ 溢出！回答开始胡编'],
+      [100, 8, '✗ 完全失效'],
+      [100, 5, '✗ 连简单问题都答错']
+    ],
+    ace: [
+      [18, 62, '首轮建立剧本框架'],
+      [24, 68, 'Reflector 提炼首批经验'],
+      [30, 72, '剧本条目逐步充实'],
+      [35, 75, 'Curator 增量合并、去重'],
+      [38, 77, '上下文趋于稳定'],
+      [40, 78, '增长明显放缓'],
+      [41, 79, '剧本收敛'],
+      [42, 80, '稳定在 42% 左右'],
+      [42, 80, '人工规则的天花板显现'],
+      [42, 80, '✓ 恒定但不再提升']
+    ],
+    mce: [
+      [20, 58, '初始 skill 还很笨拙'],
+      [26, 66, '第一次 skill 进化'],
+      [29, 72, '记忆机制自我调整'],
+      [31, 78, '检索策略变聪明了'],
+      [32, 83, 'skill 与内容双层进化'],
+      [31, 86, '上下文反而更精简'],
+      [30, 89, '机制持续变好'],
+      [30, 92, '越跑越聪明'],
+      [30, 94, '仍在上升'],
+      [30, 95, '★ 95% 且还在上升']
+    ]
+  };
+
+  var cards = {
+    naive: document.getElementById('card-naive'),
+    ace: document.getElementById('card-ace'),
+    mce: document.getElementById('card-mce')
+  };
+
+  function updateCard(key, round) {
+    var card = cards[key];
+    var d = DATA[key][round - 1];
+    card.querySelector('[data-round-tag]').textContent = '（第 ' + round + ' 轮）';
+    card.querySelector('[data-ctx-fill]').style.width = d[0] + '%';
+    card.querySelector('[data-ctx-val]').textContent = d[0] + '%';
+    card.querySelector('[data-suc-fill]').style.width = d[1] + '%';
+    card.querySelector('[data-suc-val]').textContent = d[1] + '%';
+    card.querySelector('[data-verdict]').textContent = d[2];
+  }
+
+  function resetSim() {
+    clearTimeout(timer);
+    isPlaying = false;
+    btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> 运行 10 轮对比';
+    btnPlay.classList.remove('playing');
+    statusTxt.textContent = '就绪';
+    
+    Object.keys(cards).forEach(function(key){
+      var card = cards[key];
+      card.classList.remove('overflow-flash', 'running');
+      card.querySelector('[data-round-tag]').textContent = '（第 0 轮）';
+      card.querySelector('[data-ctx-fill]').style.width = '0%';
+      card.querySelector('[data-ctx-val]').textContent = '—';
+      card.querySelector('[data-suc-fill]').style.width = '0%';
+      card.querySelector('[data-suc-val]').textContent = '—';
+    });
+    cards.naive.querySelector('[data-verdict]').textContent = '每轮把所有历史全部塞进上下文…';
+    cards.ace.querySelector('[data-verdict]').textContent = 'Curator 只增量写入结构化条目…';
+    cards.mce.querySelector('[data-verdict]').textContent = 'Skill 与内容双层同时进化…';
+    insight.innerHTML = '点击上方 <b>运行 10 轮对比</b>，观察三种策略随轮次推进的实时变化：谁在膨胀、谁保持稳定、谁越跑越强。';
+  }
+
+  function playSim() {
+    if(isPlaying) return;
+    resetSim();
+    isPlaying = true;
+    btnPlay.innerHTML = '运行中...';
+    btnPlay.classList.add('playing');
+    Object.values(cards).forEach(function(c){ c.classList.add('running'); });
+    
+    var round = 1;
+    function step() {
+      if(round > 10) {
+        statusTxt.textContent = '模拟结束：第 10 轮结果';
+        btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> 重新运行';
+        btnPlay.classList.remove('playing');
+        isPlaying = false;
+        Object.values(cards).forEach(function(c){ c.classList.remove('running'); });
+        cards.naive.querySelector('[data-ctx-val]').textContent = '100% 溢出';
+        cards.ace.querySelector('[data-ctx-val]').textContent = '42% 稳定';
+        cards.mce.querySelector('[data-ctx-val]').textContent = '30% 最优';
+        insight.innerHTML = '关键差异：朴素追加是<b>线性增长</b>（注定溢出），ACE 是<b>恒定但静态</b>（人工规则天花板），MCE 是<b>恒定且自适应</b>（机制在持续自动改进）。';
+        return;
+      }
+      statusTxt.textContent = '第 ' + round + ' / 10 轮';
+      updateCard('naive', round);
+      updateCard('ace', round);
+      updateCard('mce', round);
+      
+      if(round === 8) cards.naive.classList.add('overflow-flash');
+      
+      round++;
+      timer = setTimeout(step, 900);
+    }
+    
+    timer = setTimeout(step, 300);
+  }
+
+  btnPlay.addEventListener('click', playSim);
+  btnReset.addEventListener('click', resetSim);
+  
+  resetSim();
+})();
+</script>
+</body>
+</html>

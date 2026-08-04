@@ -192,6 +192,14 @@ window.COURSE = {
             { file: 'summary-final-2.html', title: '总结（下）· 实战 + 成本', desc: '安全防御 / 成本优化 / 用 AI 的正确姿势 / 下一步学习路径', tag: '汇总' },
           ],
         },
+        {
+          id: 't-exam',
+          title: '阶段自测',
+          desc: '学完基础，来一场 100 分制摸底考',
+          lessons: [
+            { file: 'exam.html', title: 'AI 基础掌握度自测', desc: '22 个考点、43 道技术题：模拟考试随机抽 20 题 + 全量顺序刷题，附错题回顾', tag: '交互' },
+          ],
+        },
       ],
     },
     {
@@ -503,6 +511,147 @@ window.COURSE = {
         },
       ],
     },
+    {
+      id: 'p7',
+      num: '第七篇章',
+      title: 'Vibe Coding 方法论',
+      desc: '基于作者开源的 xs_vibe_rules 仓库，把多个真实项目沉淀出的 AI 协作规范拆成课程：流程控制、质量底线、文档沉淀、安全闸门与写作风格，让 AI 写得快也写得稳。',
+      color: '#0d9488',
+      topics: [
+        {
+          id: 't-vibe-why',
+          title: '理念与入门',
+          desc: '为什么 AI 写得快反而容易搞砸，Rules 为什么是最稳的约束方式',
+          lessons: [
+            { file: 'vibe-1.html', title: '为什么要给 AI 立规矩', desc: 'Vibe Coding 的四类典型事故，以及 Rule 是最稳上下文注入方式的原理', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-vibe-flow',
+          title: '流程控制',
+          desc: '在 AI 动手之前设好人工断点',
+          lessons: [
+            { file: 'vibe-2.html', title: '四步流程：复述、PRD、确认、编码', desc: '把需求确认环节搬进人机协作，批量修改先列计划，新功能先查重', tag: '交互' },
+            { file: 'vibe-3.html', title: 'PlayGround：组件的试衣间', desc: '简化版 Storybook 思路：先做独立 demo 调好再集成，demo 只增不删', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-vibe-quality',
+          title: '质量底线',
+          desc: '注释、调试与完整实现的硬性要求',
+          lessons: [
+            { file: 'vibe-4.html', title: '注释三要素与代码保护', desc: '背景、设计意图、关键约束缺一不可；禁止静默删除代码与依赖', tag: '交互' },
+            { file: 'vibe-5.html', title: '调试铁律：先 Log 再改码', desc: '禁止猜测性修复，修复前回答三个问题，改完声明影响范围', tag: '交互' },
+            { file: 'vibe-6.html', title: '不接受分期交付', desc: 'AI 爱做「先上简版」的真实原因，以及为什么要打破这个模式', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-vibe-docs',
+          title: '文档与沉淀',
+          desc: '让决策跨越对话和时间留存下来',
+          lessons: [
+            { file: 'vibe-7.html', title: '三份文档与方法论沉淀', desc: 'FEATURES / CHANGELOG / RELEASE_NOTES 各管一个维度，METHODOLOGY 沉淀产品品味', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-vibe-env',
+          title: '环境与安全',
+          desc: '把环境事实写死，给破坏性操作上闸',
+          lessons: [
+            { file: 'vibe-8.html', title: '把环境事实写进 Rule', desc: '模型配置、技术栈锁定、数据格式三分法与 isComposing 这类必踩的坑', tag: '交互' },
+            { file: 'vibe-9.html', title: '破坏性操作的三道闸', desc: '数据库先备份、不可逆操作先给回退方案、发版前做 diff 审查', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-vibe-comm',
+          title: '沟通与写作',
+          desc: '对抗上下文漂移，消灭 AI 腔',
+          lessons: [
+            { file: 'vibe-10.html', title: '长对话锚定与写作规范', desc: '超过 10 轮强制复述目标；违禁句式清单让文案摆脱 AI 腔', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-vibe-final',
+          title: '专题收官',
+          desc: '把这套规则改造成你自己的',
+          lessons: [
+            { file: 'vibe-final.html', title: '规则的价值：每条解决一个真实问题', desc: '全景图回顾 + 使用方法 + 适配自己项目的四个动作', tag: '收官' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p8',
+      num: '第八篇章',
+      title: '雷军创业课',
+      desc: '整理自雷军的创业公开课口述：从「谁适合创业」到七字诀、找钱、估值、股权与现金流。学 AI 的一人公司（OPC）不只要会做产品，也要会做生意——这一章补上创业的底层逻辑。',
+      color: '#f97316',
+      topics: [
+        {
+          id: 't-lei-mind',
+          title: '创业者的自我修养',
+          desc: '决心、勇气与向死而生的心理建设',
+          lessons: [
+            { file: 'lei-1.html', title: '谁适合创业：莫名其妙的自信', desc: '创业不是人干的事：面对困难的勇气、描绘蓝图的能力，与金山对抗微软十六年的信念', tag: '开篇' },
+            { file: 'lei-2.html', title: '心理准备：第一天就想好怎么死', desc: '90% 的创业公司都会死；静悄悄地干、早死早超生、只给自己四年——危机感才是护身符', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-lei-dir',
+          title: '方向与起点',
+          desc: '喜欢的、能干的、市场足够大的',
+          lessons: [
+            { file: 'lei-3.html', title: '选方向：Go Big Market', desc: '兴趣是第一驱动力，但天花板由市场决定：毒霸与词霸、多玩与 YY 的两次教训', tag: '交互' },
+            { file: 'lei-4.html', title: '起名：赢在起跑线', desc: '有商标、有域名、含义不错、朗朗上口；从大米到小米的取名全过程', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-lei-product',
+          title: '产品与口碑',
+          desc: '专注、极致、口碑、快',
+          lessons: [
+            { file: 'lei-5.html', title: '互联网七字诀', desc: '一年只出一款手机的自信、把自己逼疯的极致，与一夜应战价格战的快', tag: '交互' },
+            { file: 'lei-6.html', title: '口碑的本质是超出预期', desc: '金碧辉煌的帆船酒店为什么输给海底捞：预期管理，与用心可以被用户感知', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-lei-money',
+          title: '找钱与融资',
+          desc: '信用是融资的全部前提',
+          lessons: [
+            { file: 'lei-7.html', title: '第一笔钱：从身边人开始', desc: '天使投资的本质是熟人信用；商业计划书没那么重要，一句话说清生意才重要', tag: '交互' },
+            { file: 'lei-8.html', title: '融资时机：有钱才能融到钱', desc: '钱花掉一半就启动融资；让投资人来找你；VC 凭什么要赚十倍', tag: '交互' },
+            { file: 'lei-9.html', title: '估值的艺术：融资卖的是信心', desc: '先找不可能投你的人问价、从中间价往上走；做价过高的三种副作用', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-lei-equity',
+          title: '股权与合伙人',
+          desc: '创业是一场分享 100% 梦想的拼图',
+          lessons: [
+            { file: 'lei-10.html', title: '股权就是拼图：切忌均分', desc: '50/50 的隐患、三人各 1/3 的死局；极左极右都不行，团队里必须有权威', tag: '交互' },
+            { file: 'lei-11.html', title: '合伙人：先分梦想，再分股份', desc: '股份锁定四年、退出机制提前谈；换合伙人的概率高达三分之一', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-lei-ops',
+          title: '经营基本功',
+          desc: '现金流和人是公司的命',
+          lessons: [
+            { file: 'lei-12.html', title: '现金流与报酬包', desc: '没有收入你能活几个月；工资股票自选的 package 制度让报酬不再攀比', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-lei-final',
+          title: '专题收官',
+          desc: '把雷军的课变成 OPC 的行动清单',
+          lessons: [
+            { file: 'lei-final.html', title: '写给 AI 时代的一人公司', desc: '22 段口述的全景回顾，映射成 OPC 创业自查清单：方向、口碑、现金、股权', tag: '收官' },
+            { file: 'lei-test.html', title: '测一测你的 AI 创业成功率', desc: '12 道题综合全篇章的核心判断，算出成功率、六维雷达画像和回炉处方', tag: '交互' },
+          ],
+        },
+      ],
+    },
   ],
 };
 
@@ -529,6 +678,7 @@ window.TAG_STYLE = {
   '技巧':   { bg: '#ecfdf5', fg: '#065f46' },
   '设计模式':{ bg: '#fef2f2', fg: '#dc2626' },
   '方法论': { bg: '#fff7ed', fg: '#c2410c' },
+  '规范':   { bg: '#ccfbf1', fg: '#0f766e' },
   '前沿':   { bg: '#f3e8ff', fg: '#7c3aed' },
 };
 

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>不用的东西别给 AI 看 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.compare-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+@media(max-width:768px){.compare-wrap{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);display:flex;flex-direction:column}
+.panel-head{padding:12px 16px;font-size:15px;font-weight:800;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.panel.bad .panel-head{background:rgba(220,38,38,.05);color:var(--danger)}
+.panel.good .panel-head{background:rgba(22,163,74,.05);color:var(--success)}
+.panel-body{padding:16px;flex:1;display:flex;flex-direction:column;gap:12px}
+
+.token-bar{display:flex;align-items:center;gap:10px}
+.token-bar .bar-track{flex:1;height:18px;background:var(--bg);border-radius:9px;overflow:hidden;position:relative}
+.token-bar .bar-fill{height:100%;border-radius:9px;transition:width .8s ease}
+.panel.bad .bar-fill{background:linear-gradient(90deg,var(--danger),#f87171)}
+.panel.good .bar-fill{background:linear-gradient(90deg,var(--success),#4ade80)}
+.token-bar .bar-label{font-size:13px;font-weight:700;color:var(--text);min-width:70px;text-align:right}
+
+.tool-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+.tool-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:13px;background:var(--bg);transition:all .3s}
+.tool-row .t-name{font-weight:700;color:var(--text);flex:1}
+.tool-row .t-tokens{font-size:12px;color:var(--sub);font-family:'SF Mono',Menlo,monospace}
+.tool-row.expanded{background:rgba(0,102,255,.06);border:1px solid rgba(0,102,255,.15)}
+.tool-row.expanded .t-name{color:var(--accent)}
+.tool-row.collapsed{opacity:.6}
+.tool-row .t-status{font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px}
+.tool-row .t-status.full{background:rgba(220,38,38,.1);color:var(--danger)}
+.tool-row .t-status.compact{background:rgba(22,163,74,.1);color:var(--success)}
+
+.slider-section{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;box-shadow:var(--shadow-card)}
+.slider-section h4{font-size:15px;font-weight:800;color:var(--text);margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.slider-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.slider-row label{font-size:14px;font-weight:600;color:var(--sub)}
+.slider-row input[type=range]{flex:1;min-width:200px;accent-color:var(--accent)}
+.slider-row .slider-val{font-size:20px;font-weight:900;color:var(--accent);min-width:40px}
+.result-row{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap}
+.result-box{flex:1;min-width:120px;text-align:center;padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border)}
+.result-box .rv{font-size:22px;font-weight:900}
+.result-box .rl{font-size:12px;color:var(--sub);font-weight:600;margin-top:2px}
+.result-box.bad-r .rv{color:var(--danger)}
+.result-box.good-r .rv{color:var(--success)}
+
+.l-callout{margin-top:16px}
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:20px}
+.takeaway b{color:var(--accent)}
+</style>
+<meta name="description" content="100 个工具全塞进 system prompt 会占几万 token。按需加载：首轮只给名字，用到再展开描述。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-20.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="不用的东西别给 AI 看">
+<meta property="og:url" content="https://xueai.app/slides/9-20.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt Harness</div>
+    <h1>不用的东西别给 AI 看</h1>
+    <p class="subtitle">如果你有 100 个工具，全部描述塞进 System Prompt，光工具描述就占几万 token。AI 和人一样——给太多信息反而找不到重点。</p>
+  </header>
+
+  <div class="sec-label">全量加载 vs 按需加载</div>
+
+  <div class="compare-wrap">
+    <div class="panel bad reveal">
+      <div class="panel-head"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> 全量加载</div>
+      <div class="panel-body">
+        <div class="token-bar">
+          <div class="bar-track"><div class="bar-fill" id="badBar" style="width:85%"></div></div>
+          <div class="bar-label" id="badTokenLabel">~34,000 tk</div>
+        </div>
+        <div class="tool-list" id="badToolList"></div>
+      </div>
+    </div>
+    <div class="panel good reveal">
+      <div class="panel-head"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> 按需加载</div>
+      <div class="panel-body">
+        <div class="token-bar">
+          <div class="bar-track"><div class="bar-fill" id="goodBar" style="width:15%"></div></div>
+          <div class="bar-label" id="goodTokenLabel">~2,800 tk</div>
+        </div>
+        <div class="tool-list" id="goodToolList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">拖动看差异</div>
+
+  <div class="slider-section reveal">
+    <h4><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg> 调整工具数量，看 Token 开销变化</h4>
+    <div class="slider-row">
+      <label>工具数量：</label>
+      <input type="range" id="toolSlider" min="5" max="120" value="50" oninput="updateSlider()">
+      <span class="slider-val" id="toolCount">50</span>
+    </div>
+    <div class="result-row">
+      <div class="result-box bad-r">
+        <div class="rv" id="fullTokens">17,500</div>
+        <div class="rl">全量加载 Token</div>
+      </div>
+      <div class="result-box good-r">
+        <div class="rv" id="lazyTokens">1,550</div>
+        <div class="rl">按需加载 Token</div>
+      </div>
+      <div class="result-box">
+        <div class="rv" id="savedPct" style="color:var(--accent)">91%</div>
+        <div class="rl">节省比例</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">按需加载怎么做</div>
+
+  <div class="l-card reveal">
+    <p style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px">三步走：</p>
+    <p style="font-size:14px;color:var(--sub);line-height:1.8;margin:0">
+      <b style="color:var(--accent)">① 首轮只给名字列表</b><br>
+      System Prompt 里只放工具名 + 一句话说明，AI 知道"有这个能力"就行。<br><br>
+      <b style="color:var(--accent)">② 用到时再展开</b><br>
+      AI 决定调用某个工具时，系统动态注入该工具的完整描述和参数格式。<br><br>
+      <b style="color:var(--accent)">③ 用完就收回</b><br>
+      工具用完后，下一轮对话不再带完整描述，回到只有名字的状态。
+    </p>
+  </div>
+
+  <div class="l-callout reveal">
+    <b>类比：</b>就像公司通讯录——你不需要每个人的完整简历，只需要名字和职位。真要找谁合作时，再去看详细资料。
+  </div>
+
+  <div class="takeaway reveal">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>AI 和人一样——给太多信息反而找不到重点，按需给、用到再展开。</b>工具描述的按需加载，既省 Token 又提高准确率。</span>
+  </div>
+
+</article>
+<script>
+(function(){
+  var TOOLS = ['web_search','file_read','file_write','send_email','calendar_create','note_search','image_generate','code_execute','translate','summarize','weather_query','stock_price','database_query','pdf_parse','audio_transcribe','video_analyze','map_navigate','reminder_set','contact_lookup','payment_process'];
+
+  function renderLists(count) {
+    var badList = document.getElementById('badToolList');
+    var goodList = document.getElementById('goodToolList');
+    var badHtml = '', goodHtml = '';
+    for (var i = 0; i < Math.min(count, 8); i++) {
+      var name = TOOLS[i % TOOLS.length];
+      badHtml += '<div class="tool-row expanded"><span class="t-name">' + name + '</span><span class="t-tokens">~350 tk</span><span class="t-status full">完整描述</span></div>';
+      goodHtml += '<div class="tool-row collapsed"><span class="t-name">' + name + '</span><span class="t-tokens">~28 tk</span><span class="t-status compact">仅名称</span></div>';
+    }
+    if (count > 8) {
+      badHtml += '<div class="tool-row" style="justify-content:center;color:var(--sub);font-size:12px">… 还有 ' + (count - 8) + ' 个工具的完整描述 …</div>';
+      goodHtml += '<div class="tool-row" style="justify-content:center;color:var(--sub);font-size:12px">… 还有 ' + (count - 8) + ' 个工具名称 …</div>';
+    }
+    badList.innerHTML = badHtml;
+    goodList.innerHTML = goodHtml;
+  }
+  renderLists(50);
+  window.renderLists = renderLists;
+})();
+
+function updateSlider() {
+  var count = parseInt(document.getElementById('toolSlider').value);
+  document.getElementById('toolCount').textContent = count;
+  var fullTk = count * 350;
+  var lazyTk = count * 28 + 200;
+  var saved = Math.round((1 - lazyTk / fullTk) * 100);
+  document.getElementById('fullTokens').textContent = fullTk.toLocaleString();
+  document.getElementById('lazyTokens').textContent = lazyTk.toLocaleString();
+  document.getElementById('savedPct').textContent = saved + '%';
+  document.getElementById('badBar').style.width = Math.min(95, fullTk / 42000 * 100) + '%';
+  document.getElementById('goodBar').style.width = Math.max(5, lazyTk / 42000 * 100) + '%';
+  document.getElementById('badTokenLabel').textContent = '~' + fullTk.toLocaleString() + ' tk';
+  document.getElementById('goodTokenLabel').textContent = '~' + lazyTk.toLocaleString() + ' tk';
+  window.renderLists(count);
+}
+</script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260703b"></script>
+</body>
+</html>

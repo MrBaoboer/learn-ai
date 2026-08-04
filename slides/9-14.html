@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>本地压缩 vs LLM 压缩 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.compare-table{width:100%;border-collapse:separate;border-spacing:0;margin-top:8px;background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);border:1.5px solid var(--border)}
+.compare-table th,.compare-table td{padding:14px 18px;text-align:left;font-size:13px;border-bottom:1px solid var(--border)}
+.compare-table th{background:var(--bg);font-weight:800;color:var(--text);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+.compare-table td{color:var(--text);line-height:1.6}
+.compare-table tr:last-child td{border-bottom:none}
+.col-local{color:var(--success)}
+.col-llm{color:var(--purple)}
+
+.demo-wrap{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:16px}
+@media(max-width:768px){.demo-wrap{grid-template-columns:1fr}}
+.demo-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.demo-header{padding:12px 18px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.demo-header.local{background:rgba(22,163,74,.05);color:var(--success);border-bottom:1.5px solid rgba(22,163,74,.15)}
+.demo-header.llm{background:rgba(124,58,237,.05);color:var(--purple);border-bottom:1.5px solid rgba(124,58,237,.15)}
+.demo-body{padding:16px 18px}
+.demo-body .original{font-size:12px;color:var(--sub);line-height:1.7;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:12px}
+.demo-body .result{font-size:13px;color:var(--text);line-height:1.7;padding:12px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);min-height:60px}
+.demo-body .result.local-result{border-color:rgba(22,163,74,.25);background:rgba(22,163,74,.02)}
+.demo-body .result.llm-result{border-color:rgba(124,58,237,.25);background:rgba(124,58,237,.02)}
+.demo-meta{display:flex;gap:14px;margin-top:10px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+.demo-meta span{display:flex;align-items:center;gap:4px}
+.demo-meta b{font-weight:800}
+.arrow-label{font-size:12px;font-weight:700;color:var(--sub);margin:8px 0;display:flex;align-items:center;gap:6px}
+.arrow-label::before{content:'';width:16px;height:1.5px;background:var(--sub)}
+
+.order-card{background:var(--card);border:2px solid rgba(0,102,255,.2);border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow-card);margin-top:16px}
+.order-title{font-size:16px;font-weight:900;color:var(--text);margin-bottom:14px;text-align:center}
+.order-steps{display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap}
+.order-step{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 16px}
+.order-step .step-num{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#fff}
+.order-step .step-label{font-size:12px;font-weight:700;text-align:center;max-width:90px}
+.order-step .step-desc{font-size:11px;color:var(--sub);text-align:center;max-width:100px}
+.order-arrow{font-size:20px;color:var(--sub);flex-shrink:0;margin:0 4px}
+
+.run-btn{display:block;margin:16px auto 0;background:var(--accent);color:#fff;border:none;padding:10px 28px;border-radius:999px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(0,102,255,.25);transition:transform .15s,box-shadow .15s}
+.run-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,102,255,.35)}
+.run-btn:active{transform:translateY(0)}
+
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--accent)}
+</style>
+<meta name="description" content="先用免费的方法尽量压，实在压不下去了再花钱请AI帮忙——两种压缩方式的取舍。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-14.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="本地压缩 vs LLM 压缩">
+<meta property="og:url" content="https://xueai.app/slides/9-14.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">上下文管理</div>
+    <h1>本地压缩 vs LLM 压缩</h1>
+    <p class="subtitle">压缩上下文有两条路——本地处理（正则替换、截断）零成本但粗糙，LLM 摘要有成本但精准。该怎么选？答案是：都用，但有先后顺序。</p>
+  </header>
+
+  <div class="sec-label">两种方式对比</div>
+
+  <table class="compare-table reveal">
+    <thead>
+      <tr><th style="width:20%">维度</th><th style="width:40%"><span class="col-local"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> 本地压缩</span></th><th style="width:40%"><span class="col-llm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg> LLM 压缩</span></th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>原理</b></td><td>正则匹配、字符截断、模板替换</td><td>让另一个 LLM 读一遍后写摘要</td></tr>
+      <tr><td><b>成本</b></td><td style="color:var(--success)">零（纯本地计算）</td><td style="color:var(--amber)">要花钱（调用一次 API）</td></tr>
+      <tr><td><b>延迟</b></td><td style="color:var(--success)">&lt;1ms</td><td style="color:var(--amber)">1~5 秒</td></tr>
+      <tr><td><b>效果</b></td><td style="color:var(--amber)">粗糙，可能丢关键信息</td><td style="color:var(--success)">精准，能保留核心语义</td></tr>
+      <tr><td><b>适合场景</b></td><td>工具输出、JSON 结果、重复内容</td><td>多轮对话摘要、复杂上下文浓缩</td></tr>
+    </tbody>
+  </table>
+
+  <div class="sec-label">案例对比：同一段对话的两种压缩</div>
+
+  <button class="run-btn reveal" onclick="runDemo()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-1px;margin-right:3px"><polygon points="5 3 19 12 5 21 5 3"/></svg> 运行对比演示</button>
+
+  <div class="demo-wrap reveal">
+    <div class="demo-panel">
+      <div class="demo-header local"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> 本地压缩</div>
+      <div class="demo-body">
+        <div class="original" id="originalLeft">
+          <b>原始对话（10 轮 · 4200 tokens）：</b><br>
+          用户：帮我查北京到上海的高铁<br>
+          AI：好的，为您查询…（200字详细回复）<br>
+          [工具] 12306查询结果：G1次07:00-11:28¥553、G3次08:00-12:35¥553、G7次09:00-13:28¥553…（共15条结果，800字）<br>
+          AI：共找到15个车次，推荐G1次…（300字分析）<br>
+          用户：G1次不错，帮我看看有没有商务座<br>
+          [工具] 座位查询结果：{json数据500字}<br>
+          AI：G1次商务座余票3张，¥1748…（200字）<br>
+          用户：好，就商务座，再帮我查一下酒店<br>
+          [工具] 酒店搜索结果…（600字）<br>
+          AI：推荐浦东香格里拉…（400字）<br>
+          用户：定这个酒店，帮我做个出行清单
+        </div>
+        <div class="arrow-label">压缩结果 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></div>
+        <div class="result local-result" id="localResult">点击上方按钮查看</div>
+        <div class="demo-meta" id="localMeta"></div>
+      </div>
+    </div>
+    <div class="demo-panel">
+      <div class="demo-header llm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg> LLM 压缩</div>
+      <div class="demo-body">
+        <div class="original" id="originalRight">
+          <b>原始对话（10 轮 · 4200 tokens）：</b><br>
+          （同左边完全一样的原始对话）
+        </div>
+        <div class="arrow-label">压缩结果 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></div>
+        <div class="result llm-result" id="llmResult">点击上方按钮查看</div>
+        <div class="demo-meta" id="llmMeta"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">正确顺序：先免费后花钱</div>
+
+  <div class="order-card reveal">
+    <div class="order-title">上下文压缩的推荐流程</div>
+    <div class="order-steps">
+      <div class="order-step">
+        <div class="step-num" style="background:var(--success)">1</div>
+        <div class="step-label" style="color:var(--success)">本地截断</div>
+        <div class="step-desc">删掉工具输出<br>截断超长JSON</div>
+      </div>
+      <div class="order-arrow">→</div>
+      <div class="order-step">
+        <div class="step-num" style="background:var(--success)">2</div>
+        <div class="step-label" style="color:var(--success)">模板替换</div>
+        <div class="step-desc">把重复结构<br>替换为占位符</div>
+      </div>
+      <div class="order-arrow">→</div>
+      <div class="order-step">
+        <div class="step-num" style="background:var(--amber)">3</div>
+        <div class="step-label" style="color:var(--amber)">检查是否够</div>
+        <div class="step-desc">还超窗口？<br>进入下一步</div>
+      </div>
+      <div class="order-arrow">→</div>
+      <div class="order-step">
+        <div class="step-num" style="background:var(--purple)">4</div>
+        <div class="step-label" style="color:var(--purple)">LLM 摘要</div>
+        <div class="step-desc">花钱让 AI<br>精炼上下文</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaway reveal">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>先用免费的方法尽量压，实在压不下去了再花钱请 AI 帮忙——这个顺序不能反。</b>本地压缩和 LLM 压缩不是二选一，而是流水线上的先后环节。</span>
+  </div>
+
+</article>
+<script src="lesson.js"></script>
+<script>
+function runDemo() {
+  var localEl = document.getElementById('localResult');
+  var llmEl = document.getElementById('llmResult');
+  var localMeta = document.getElementById('localMeta');
+  var llmMeta = document.getElementById('llmMeta');
+
+  localEl.innerHTML = '<span style="color:var(--sub);font-style:italic">处理中…</span>';
+  llmEl.innerHTML = '<span style="color:var(--sub);font-style:italic">处理中…</span>';
+
+  setTimeout(function() {
+    localEl.innerHTML = ''
+      + '用户：帮我查北京到上海的高铁<br>'
+      + 'AI：好的，为您查询…（200字详细回复）<br>'
+      + '<span style="color:var(--danger);text-decoration:line-through">[工具] 12306查询结果…（已截断）</span><br>'
+      + 'AI：共找到15个车次，推荐G1次…（300字分析）<br>'
+      + '用户：G1次不错，帮我看看有没有商务座<br>'
+      + '<span style="color:var(--danger);text-decoration:line-through">[工具] 座位查询结果…（已截断）</span><br>'
+      + 'AI：G1次商务座余票3张，¥1748…（200字）<br>'
+      + '用户：好，就商务座，再帮我查一下酒店<br>'
+      + '<span style="color:var(--danger);text-decoration:line-through">[工具] 酒店搜索…（已截断）</span><br>'
+      + 'AI：推荐浦东香格里拉…（400字）<br>'
+      + '用户：定这个酒店，帮我做个出行清单';
+    localMeta.innerHTML = '<span>压缩后: <b style="color:var(--success)">2300 tokens</b></span>'
+      + '<span>节省: <b style="color:var(--success)">45%</b></span>'
+      + '<span>耗时: <b>&lt;1ms</b></span>'
+      + '<span>费用: <b style="color:var(--success)">¥0</b></span>';
+  }, 300);
+
+  setTimeout(function() {
+    llmEl.innerHTML = ''
+      + '<b>对话摘要：</b><br>'
+      + '用户计划北京→上海出行。已确定：<br>'
+      + '• 高铁 G1 次（07:00-11:28），<b>商务座</b>，¥1748，余票3张<br>'
+      + '• 酒店选定<b>浦东香格里拉</b><br>'
+      + '• 当前需求：整理出行清单<br><br>'
+      + '<span style="color:var(--sub);font-size:12px">（用户所有原始消息已完整保留）</span>';
+    llmMeta.innerHTML = '<span>压缩后: <b style="color:var(--purple)">680 tokens</b></span>'
+      + '<span>节省: <b style="color:var(--purple)">84%</b></span>'
+      + '<span>耗时: <b>~2.5s</b></span>'
+      + '<span>费用: <b style="color:var(--amber)">¥0.008</b></span>';
+  }, 1800);
+}
+</script>
+<script src="nav-inject.js?v=20260703b"></script>
+</body>
+</html>

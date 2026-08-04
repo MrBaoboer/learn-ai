@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>工作流设计：从手工到自动搜索 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.hero-banner{background:linear-gradient(135deg,#0f172a 0%,#1a2e1a 60%,#1e3a2e 100%);border-radius:var(--radius);padding:48px 36px;margin-bottom:32px;color:#fff;position:relative;overflow:hidden}
+.hero-banner::after{content:'';position:absolute;top:-50%;right:-20%;width:60%;height:200%;background:radial-gradient(ellipse,rgba(16,185,129,.15) 0%,transparent 70%);pointer-events:none}
+.hero-banner .hb-kicker{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(167,243,208,.8);margin-bottom:12px}
+.hero-banner h2{font-size:26px;font-weight:900;line-height:1.4;margin-bottom:14px}
+@media(max-width:768px){.hero-banner h2{font-size:20px}}
+.hero-banner .hb-sub{font-size:15px;color:rgba(255,255,255,.7);line-height:1.7;max-width:640px}
+
+.method-section{margin:40px 0}
+.method-section .sec-label{margin-bottom:20px}
+
+.method-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:28px 28px 24px;margin:20px 0;box-shadow:var(--shadow-card);position:relative;overflow:hidden}
+.method-card .mc-badge{position:absolute;top:0;right:0;background:var(--accent);color:#fff;font-size:11px;font-weight:800;padding:6px 14px;border-radius:0 0 0 12px;letter-spacing:.5px}
+.method-card .mc-head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.method-card .mc-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px}
+.method-card .mc-title{font-size:18px;font-weight:800;color:var(--text)}
+.method-card .mc-subtitle{font-size:13px;color:var(--sub);font-weight:500;margin-top:2px}
+.method-card .mc-body{font-size:14.5px;color:var(--sub);line-height:1.8}
+.method-card .mc-body b{color:var(--text)}
+
+.pipeline-list{list-style:none;padding:0;margin:16px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pipeline-list li{background:rgba(0,102,255,.06);border:1px solid rgba(0,102,255,.15);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--accent)}
+.pipeline-list .arrow{background:none;border:none;padding:0 4px;color:var(--sub);font-size:16px}
+
+.role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0}
+.role-chip{background:var(--bg-dim,#f8f9fa);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;font-size:13px;font-weight:700;color:var(--text)}
+.role-chip span{display:block;font-size:11px;font-weight:400;color:var(--sub);margin-top:4px}
+
+.fig-wrap{margin:28px 0;text-align:center}
+.fig-wrap img{max-width:100%;border-radius:var(--radius);border:1.5px solid var(--border);box-shadow:var(--shadow-card)}
+.fig-wrap .fig-cap{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.6}
+
+.mcts-steps{list-style:none;padding:0;margin:20px 0;counter-reset:mcts}
+.mcts-steps li{position:relative;padding:14px 18px 14px 54px;margin-bottom:10px;background:var(--bg-dim,#f8f9fa);border-radius:10px;font-size:14px;line-height:1.7;color:var(--text);counter-increment:mcts}
+.mcts-steps li::before{content:counter(mcts);position:absolute;left:16px;top:14px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.mcts-steps li b{color:var(--accent)}
+
+.compare-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);margin:24px 0;font-size:13.5px}
+.compare-table th{padding:12px 16px;font-weight:700;text-align:left;background:var(--bg-dim,#f8f9fa);color:var(--sub)}
+.compare-table td{padding:11px 16px;border-top:1px solid var(--border);line-height:1.6;color:var(--text)}
+.compare-table tr:hover td{background:rgba(0,102,255,.02)}
+
+.insight-box{background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1.5px solid #a7f3d0;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.insight-box h3{font-size:17px;font-weight:800;color:#065f46;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.insight-box ul{list-style:none;padding:0;margin:0}
+.insight-box li{font-size:14.5px;color:#1e3a2e;line-height:1.8;padding:6px 0 6px 22px;position:relative}
+.insight-box li::before{content:'';position:absolute;left:0;top:14px;width:8px;height:8px;border-radius:50%;background:#10b981}
+.insight-box li b{color:#065f46}
+
+.mcts-steps{margin:24px 0}
+.mcts-step-card{display:flex;gap:16px;align-items:flex-start;padding:18px 20px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:12px;box-shadow:var(--shadow-card);transition:border-color .2s}
+.mcts-step-card:hover{border-color:rgba(0,102,255,.2)}
+.msc-num{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.msc-body{flex:1;min-width:0}
+.msc-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:8px}
+.msc-flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.flow-chip{padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap}
+.flow-chip.root{background:rgba(100,116,139,.1);color:#475569;border:1px solid rgba(100,116,139,.2)}
+.flow-chip.c1{background:rgba(59,130,246,.08);color:#2563eb;border:1px solid rgba(59,130,246,.2)}
+.flow-chip.c2{background:rgba(139,92,246,.08);color:#7c3aed;border:1px solid rgba(139,92,246,.2)}
+.flow-chip.c3{background:rgba(245,158,11,.08);color:#d97706;border:1px solid rgba(245,158,11,.2)}
+.flow-chip.c4{background:rgba(59,130,246,.08);color:#2563eb;border:1px solid rgba(59,130,246,.2)}
+.flow-chip.selected{background:rgba(59,130,246,.15);border:1.5px solid #3b82f6;box-shadow:0 0 8px rgba(59,130,246,.15)}
+.flow-chip.best{background:rgba(16,185,129,.1);color:#059669;border:1.5px solid #10b981;box-shadow:0 0 8px rgba(16,185,129,.15)}
+.flow-chip.pruned{background:rgba(0,0,0,.04);color:#9ca3af;border:1px solid rgba(0,0,0,.08);text-decoration:line-through}
+.flow-score{font-size:12px;font-weight:800;color:var(--sub)}
+.flow-score.best-score{color:#059669}
+.msc-desc{font-size:13px;color:var(--sub);line-height:1.7}
+
+.plain-talk{background:linear-gradient(135deg,#fffbeb,#fef9c3);border:1.5px dashed #fbbf24;border-radius:var(--radius);padding:16px 20px;margin:14px 0 28px;font-size:14px;color:#713f12;line-height:1.85;display:flex;gap:12px;align-items:flex-start}
+.plain-talk .pt-icon{flex-shrink:0;font-size:18px;line-height:1.5}
+.plain-talk b{color:#92400e}
+.plain-talk .pt-tag{font-weight:800;color:#b45309}
+
+.sim-controls{display:flex;gap:10px;align-items:center;padding:16px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--shadow-card)}
+.sim-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;font-family:inherit}
+.sim-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sim-btn.playing{background:var(--accent);color:#fff;border-color:var(--accent);pointer-events:none}
+.sim-status{font-size:13px;color:var(--sub);font-weight:600;margin-left:auto;font-variant-numeric:tabular-nums}
+
+/* 默认全部可见；仅在动画模式下通过 .sim-running 隐藏后逐步展示 */
+.mcts-steps.interactive .mcts-step-card{transition:all .4s cubic-bezier(.23,1,.32,1)}
+.mcts-steps.interactive .flow-chip{transition:all .3s ease}
+/* 动画模式 */
+.mcts-steps.interactive.sim-running .mcts-step-card{opacity:0;transform:translateX(-20px);display:none}
+.mcts-steps.interactive.sim-running .mcts-step-card.sim-show{opacity:1;transform:translateX(0);display:flex}
+.mcts-steps.interactive.sim-running .flow-chip{opacity:0;transform:scale(.8)}
+.mcts-steps.interactive.sim-running .flow-chip.sim-show{opacity:1;transform:scale(1)}
+
+/* best 流片动态呼吸 */
+.flow-chip.best{animation:bestGlow 2s ease-in-out infinite alternate !important}
+@keyframes bestGlow{from{box-shadow:0 0 8px rgba(16,185,129,.15)}to{box-shadow:0 0 16px rgba(16,185,129,.35)}}
+
+@media(max-width:600px){
+  .method-card{padding:20px 18px}
+  .pipeline-list{flex-direction:column;align-items:flex-start}
+  .pipeline-list .arrow{transform:rotate(90deg)}
+  .role-grid{grid-template-columns:1fr 1fr}
+  .mcts-sim{padding:18px}
+  .mcts-tree{min-height:180px;padding:14px}
+}
+</style>
+<meta name="description" content="从 AI Scientist 到 AFlow：工作流设计不再是手工活，而是可以被搜索和优化的空间。">
+<meta name="author" content="洛小山">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">PART 5 · Harness 与自我改进</div>
+    <h1>工作流设计：从手工到<em>自动搜索</em></h1>
+    <p class="subtitle">工作流的设计空间巨大——我们应该用算法去搜索，而不只是手动设计。</p>
+  </header>
+
+  <div class="hero-banner reveal">
+    <div class="hb-kicker">Workflow Design &amp; Automated Search</div>
+    <h2>当工作流本身成为搜索空间，设计就不再是艺术，而是工程</h2>
+    <div class="hb-sub">从完全手工的管线设计，到用 MCTS 自动发现最优工作流——Agent 系统的设计范式正在发生根本转变。代码是定义 Harness 的通用语言。</div>
+  </div>
+
+  <!-- Section 1: Hand-Designed Workflows -->
+  <div class="sec-label reveal">手工设计的工作流</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">说人话：</span>"工作流"就是给 AI 安排的<b>做事流程表</b>。就像新员工入职，你得告诉他"先做 A，再做 B，出问题找 C 核对"。以前这张流程表全靠人一步步写，下面这两个例子就是人手工写出来的"最强流程表"。</span>
+  </div>
+
+  <div class="method-card reveal">
+    <div class="mc-badge">Lu et al. 2026</div>
+    <div class="mc-head">
+      <div class="mc-icon" style="background:rgba(99,102,241,.1);color:#6366f1">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </div>
+      <div>
+        <div class="mc-title">AI Scientist</div>
+        <div class="mc-subtitle">构建完整的科研自动化管线</div>
+      </div>
+    </div>
+    <div class="mc-body">
+      <b>核心思想：</b>将科学研究的完整流程交给一个 Agent 系统自动完成——从零开始执行一轮完整的研究循环。<br><br>
+      <b>管线流程：</b>
+    </div>
+    <ul class="pipeline-list">
+      <li>提出研究想法</li>
+      <li class="arrow">→</li>
+      <li>写代码</li>
+      <li class="arrow">→</li>
+      <li>跑实验</li>
+      <li class="arrow">→</li>
+      <li>分析结果</li>
+      <li class="arrow">→</li>
+      <li>写论文</li>
+      <li class="arrow">→</li>
+      <li>同行评审</li>
+    </ul>
+    <div class="mc-body">
+      <b>关键创新：</b>每一步都由 LLM 驱动，形成端到端的自动化科研系统。评审环节引入 LLM-as-judge 进行质量把关。
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/ai-scientist.png" alt="AI Scientist Pipeline" loading="lazy">
+    <div class="fig-cap">AI Scientist 的完整管线：从研究构思到论文写作与同行评审，全部由 Agent 自动化执行。（Lu et al. 2026）</div>
+  </div>
+
+  <div class="method-card reveal">
+    <div class="mc-badge">Kulikov et al. 2026</div>
+    <div class="mc-head">
+      <div class="mc-icon" style="background:rgba(245,158,11,.1);color:#d97706">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+      </div>
+      <div>
+        <div class="mc-title">Autodata</div>
+        <div class="mc-subtitle">数据科学家 Agent——合成"恰到好处"难度的数据</div>
+      </div>
+    </div>
+    <div class="mc-body">
+      <b>核心思想：</b>通过多角色协作，自动合成训练数据，使数据难度精确可控——<b>strong solver 能做出，weak solver 做不出</b>。<br><br>
+      <b>角色体系：</b>
+    </div>
+    <div class="role-grid">
+      <div class="role-chip">Challenger<span>出题者</span></div>
+      <div class="role-chip">Weak Solver<span>弱解题者</span></div>
+      <div class="role-chip">Strong Solver<span>强解题者</span></div>
+      <div class="role-chip">Verifier / Judge<span>验证裁判</span></div>
+    </div>
+    <div class="mc-body">
+      <b>关键创新：</b>用"难度差"作为数据质量信号——只有同时满足"强者能解"和"弱者不能解"的题目才被保留，确保合成数据对提升模型有最大价值。
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/autodata.png" alt="Autodata System" loading="lazy">
+    <div class="fig-cap">Autodata 的多角色协作体系：Challenger 出题，Strong/Weak Solver 试解，Verifier 仲裁数据质量。（Kulikov et al. 2026）</div>
+  </div>
+
+  <!-- Section 2: ADAS -->
+  <div class="sec-label reveal">ADAS: 自动化 Agent 系统设计</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">说人话：</span>手写流程表太累，那能不能<b>让 AI 自己给 AI 设计流程表</b>？ADAS 就是这个思路：雇一个"设计师 AI"，让它不停画新的流程表、试跑、打分，把好用的留下来。相当于让老师傅带徒弟的工作也自动化了。</span>
+  </div>
+
+  <div class="method-card reveal">
+    <div class="mc-badge">Hu et al. 2025</div>
+    <div class="mc-head">
+      <div class="mc-icon" style="background:rgba(139,92,246,.1);color:#7c3aed">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <div>
+        <div class="mc-title">ADAS — Automated Design of Agentic Systems</div>
+        <div class="mc-subtitle">将 Agent 设计本身视为优化问题</div>
+      </div>
+    </div>
+    <div class="mc-body">
+      <b>核心思想：</b>不是手工设计 Agent 架构，而是让一个 <b>"Meta-Agent"</b> 在 Agent 设计空间中自动搜索最优方案。这就是 <b>"meta-agent search"</b>。<br><br>
+      <b>工作机制：</b><br>
+      1. Meta-Agent 先生成一个<b>高层描述</b>（Agent 的架构、工具使用、推理策略）<br>
+      2. 将高层描述<b>实现为可执行代码</b><br>
+      3. 通过 <b>self-refine</b> 检查新颖性——确保不是简单重复已有方案<br>
+      4. 在基准任务上评估，保留表现最好的设计<br><br>
+      <b>关键创新：</b>用代码作为 Agent 设计的搜索空间表示，使设计可以被自动生成、修改和评估。
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/adas.png" alt="ADAS Meta-Agent Search" loading="lazy">
+    <div class="fig-cap">ADAS 的 Meta-Agent Search：Meta-Agent 生成候选 Agent 设计→实现为代码→评估→迭代优化。（Hu et al. 2025）</div>
+  </div>
+
+  <!-- Section 3: AFlow -->
+  <div class="sec-label reveal">AFlow：基于 MCTS 的工作流搜索</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">说人话：</span>ADAS 是让 AI 随便发挥想新方案，AFlow 则更进一步——用下棋 AI 同款的<b>"棋盘推演法"（MCTS，蒙特卡洛树搜索）</b>来找最优流程。就像 AlphaGo 下棋前会在脑子里推演几百步"如果我走这里，对方会怎样"，AFlow 也是在脑子里推演几百种流程改法，哪条路线得分高就往哪边深挖。</span>
+  </div>
+
+  <div class="method-card reveal">
+    <div class="mc-badge">Zhang et al. 2025</div>
+    <div class="mc-head">
+      <div class="mc-icon" style="background:rgba(16,185,129,.1);color:#059669">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div>
+        <div class="mc-title">AFlow</div>
+        <div class="mc-subtitle">将 Agent 工作流表示为图，用 MCTS 自动优化</div>
+      </div>
+    </div>
+    <div class="mc-body">
+      <b>核心思想：</b>把工作流表示为<b>有向图</b>——节点是 LLM 调用动作，边是代码中的逻辑操作（条件分支、循环、数据传递）。然后用<b>蒙特卡洛树搜索（MCTS）</b>在这个图空间中自动寻找最优工作流。<br><br>
+      <b>MCTS 优化流程：</b>
+    </div>
+    <ol class="mcts-steps">
+      <li><b>初始化</b>起始工作流作为搜索树的根节点</li>
+      <li>用 <b>soft mixture of score and uniform exploration</b> 选择待扩展节点（平衡利用与探索）</li>
+      <li>让 LLM <b>生成修改后的工作流</b>变体（添加/删除/修改节点和边）</li>
+      <li>在目标任务上<b>执行并评估</b>新工作流的表现</li>
+      <li>如果有改进，<b>加回搜索树</b>中作为新的候选</li>
+      <li><b>重复</b>直到 top-k 平均分稳定或达到计算预算</li>
+    </ol>
+    <div class="mc-body">
+      <b>关键创新：</b>将工作流设计问题转化为树搜索问题，让 MCTS 的探索-利用平衡机制自动发现好的工作流结构——无需人类手工设计。
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/aflow.png" alt="AFlow Architecture" loading="lazy">
+    <div class="fig-cap">AFlow 的图表示与 MCTS 搜索：工作流被表示为节点（LLM 动作）和边（逻辑操作）的有向图。（Zhang et al. 2025）</div>
+  </div>
+
+  <div class="sec-label reveal">AFlow 实验结果</div>
+
+  <table class="compare-table reveal">
+    <thead>
+      <tr>
+        <th>方法</th>
+        <th>设计方式</th>
+        <th>搜索策略</th>
+        <th>核心优势</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>手工设计</b></td>
+        <td>人类专家迭代</td>
+        <td>无（凭经验）</td>
+        <td>可解释性强</td>
+      </tr>
+      <tr>
+        <td><b>ADAS</b></td>
+        <td>Meta-Agent + 代码</td>
+        <td>Self-refine</td>
+        <td>自动化设计</td>
+      </tr>
+      <tr>
+        <td><b>AFlow</b></td>
+        <td>图表示 + MCTS</td>
+        <td>蒙特卡洛树搜索</td>
+        <td>系统化搜索 + 稳定收敛</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/aflow-exp.png" alt="AFlow Experimental Results" loading="lazy">
+    <div class="fig-cap">AFlow 在 QA、代码生成、数学推理等任务上的表现对比：系统化搜索优于手工设计和 ADAS。（Zhang et al. 2025）</div>
+  </div>
+
+  <!-- 交互：MCTS 搜索步骤展示 -->
+  <div class="sec-label">逐步体验：AFlow 的 MCTS 搜索过程</div>
+
+  <div class="sim-controls" style="margin-bottom: 16px;">
+    <button id="btn-play-mcts" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      逐步演示 MCTS
+    </button>
+    <button id="btn-reset-mcts" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      重置
+    </button>
+    <span id="mcts-status" class="sim-status">就绪</span>
+  </div>
+
+  <div class="mcts-steps interactive" id="mcts-container">
+    <div class="mcts-step-card">
+      <div class="msc-num">1</div>
+      <div class="msc-body">
+        <div class="msc-title">初始化</div>
+        <div class="msc-flow">
+          <span class="flow-chip root">W₀: Plan → Execute</span>
+          <span class="flow-score">得分 52</span>
+        </div>
+        <div class="msc-desc">从最简单的单步工作流开始。没有反思、没有验证、没有并行。</div>
+      </div>
+    </div>
+    <div class="mcts-step-card">
+      <div class="msc-num">2</div>
+      <div class="msc-body">
+        <div class="msc-title">扩展：LLM 提出变体</div>
+        <div class="msc-flow">
+          <span class="flow-chip c1">W₁: +Reflect</span><span class="flow-score">61</span>
+          <span class="flow-chip c2">W₂: +Verify</span><span class="flow-score">58</span>
+          <span class="flow-chip c3">W₃: +Decompose</span><span class="flow-score">55</span>
+        </div>
+        <div class="msc-desc">让 LLM 基于 W₀ 生成三个修改方案，分别加入反思、验证、任务分解。</div>
+      </div>
+    </div>
+    <div class="mcts-step-card">
+      <div class="msc-num">3</div>
+      <div class="msc-body">
+        <div class="msc-title">评估 &amp; 选择父节点</div>
+        <div class="msc-flow">
+          <span class="flow-chip c1 selected">W₁: 61 ← 选中</span>
+        </div>
+        <div class="msc-desc">W₁ 得分最高（61 > 58 > 55），选它作为下一轮扩展的父节点。</div>
+      </div>
+    </div>
+    <div class="mcts-step-card">
+      <div class="msc-num">4</div>
+      <div class="msc-body">
+        <div class="msc-title">再次扩展</div>
+        <div class="msc-flow">
+          <span class="flow-chip c4">W₄: Reflect×2</span><span class="flow-score">65</span>
+          <span class="flow-chip best">W₅: Reflect+Verify</span><span class="flow-score best-score">78 🏆</span>
+        </div>
+        <div class="msc-desc">从 W₁ 扩展两个方案：双重反思 vs 反思+验证组合。后者大幅领先！</div>
+      </div>
+    </div>
+    <div class="mcts-step-card">
+      <div class="msc-num">5</div>
+      <div class="msc-body">
+        <div class="msc-title">剪枝 &amp; 收敛</div>
+        <div class="msc-flow">
+          <span class="flow-chip pruned">W₃: 55 ✗</span>
+          <span class="flow-chip pruned">W₆: 56 ✗</span>
+          <span class="flow-chip best">W₅: 78 ✓ 最优</span>
+        </div>
+        <div class="msc-desc">分数低于阈值的工作流被剪枝。W₅（Plan → Execute → Reflect → Verify → Output）确认为搜索到的最优方案。比手工设计高出 50%！</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core Insights -->
+  <div class="insight-box reveal">
+    <h3>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+      核心洞见
+    </h3>
+    <ul>
+      <li><b>搜索空间巨大</b>——工作流的组合可能性远超人类手动探索的能力范围，手工设计只能触及冰山一角</li>
+      <li><b>设计即搜索</b>——把工作流设计当作搜索问题，用算法（如 MCTS）而非直觉寻找好的解决方案</li>
+      <li><b>代码是通用语言</b>——Harness 本质上就是编排 prompt、工具调用、子 Agent、控制流、记忆和工作流逻辑的代码</li>
+      <li><b>从 ADAS 到 AFlow 的进化</b>——Agent 设计的自动化程度在不断提升，从"让 LLM 设计"进化到"让算法系统化搜索"</li>
+    </ul>
+  </div>
+
+</article>
+<script src="lesson.js"></script>
+<script src="nav-inject.js"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){
+  var ob = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); ob.unobserve(e.target); }});
+  }, {threshold:0.15});
+  ob.observe(el);
+});
+
+// ═══════ MCTS 交互演示 ═══════
+(function(){
+  var btnPlay = document.getElementById('btn-play-mcts');
+  var btnReset = document.getElementById('btn-reset-mcts');
+  var statusTxt = document.getElementById('mcts-status');
+  var container = document.getElementById('mcts-container');
+  var cards = container.querySelectorAll('.mcts-step-card');
+  
+  var isPlaying = false;
+  var timer = null;
+
+  function resetSim() {
+    clearTimeout(timer);
+    isPlaying = false;
+    btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> 逐步演示 MCTS';
+    btnPlay.classList.remove('playing');
+    statusTxt.textContent = '点击按钮查看逐步搜索过程';
+    // 恢复静态预览：移除 sim-running，所有卡片自动可见
+    container.classList.remove('sim-running');
+    cards.forEach(function(card){
+      card.classList.remove('sim-show');
+      card.querySelectorAll('.flow-chip').forEach(function(chip){
+        chip.classList.remove('sim-show');
+      });
+    });
+  }
+
+  function playSim() {
+    if(isPlaying) return;
+    isPlaying = true;
+    btnPlay.innerHTML = '演示中...';
+    btnPlay.classList.add('playing');
+    
+    // 进入动画模式：隐藏所有卡片
+    container.classList.add('sim-running');
+    cards.forEach(function(card){
+      card.classList.remove('sim-show');
+      card.querySelectorAll('.flow-chip').forEach(function(chip){
+        chip.classList.remove('sim-show');
+      });
+    });
+
+    var stepIdx = 0;
+    
+    function nextStep() {
+      if(stepIdx >= cards.length) {
+        statusTxt.textContent = '搜索完成：找到最优工作流 W₅';
+        btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> 重新演示';
+        btnPlay.classList.remove('playing');
+        isPlaying = false;
+        container.classList.remove('sim-running');
+        return;
+      }
+      
+      var card = cards[stepIdx];
+      card.classList.add('sim-show');
+      var title = card.querySelector('.msc-title').textContent;
+      statusTxt.textContent = '步骤 ' + (stepIdx+1) + ': ' + title;
+      
+      var chips = card.querySelectorAll('.flow-chip');
+      var chipIdx = 0;
+      
+      function nextChip() {
+        if(chipIdx < chips.length) {
+          chips[chipIdx].classList.add('sim-show');
+          chipIdx++;
+          timer = setTimeout(nextChip, 400);
+        } else {
+          stepIdx++;
+          timer = setTimeout(nextStep, 1000);
+        }
+      }
+      
+      // 稍微延迟后开始显示 chip
+      timer = setTimeout(nextChip, 300);
+    }
+    
+    nextStep();
+  }
+
+  btnPlay.addEventListener('click', playSim);
+  btnReset.addEventListener('click', resetSim);
+  
+  resetSim();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>为什么 Agent 会卡死 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.pattern-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+@media(max-width:768px){.pattern-grid{grid-template-columns:1fr}}
+.pattern-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card);cursor:pointer;transition:all .25s ease}
+.pattern-card:hover{border-color:var(--danger);box-shadow:0 4px 20px rgba(220,38,38,.1)}
+.pattern-card .head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.pattern-card .icon{width:36px;height:36px;border-radius:10px;background:rgba(220,38,38,.08);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.pattern-card .name{font-size:16px;font-weight:800;color:var(--text)}
+.pattern-card .brief{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:12px}
+.pattern-card .detail{overflow:hidden;max-height:0;transition:max-height .4s ease;font-size:14px;line-height:1.7;color:var(--text)}
+.pattern-card.open .detail{max-height:400px}
+.detail-inner{padding-top:12px;border-top:1px solid var(--border)}
+.detail-inner .scene{background:rgba(220,38,38,.04);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px}
+.detail-inner .scene-title{font-size:12px;font-weight:700;color:var(--danger);margin-bottom:4px}
+.detail-inner .user-says{font-size:13px;color:var(--sub);font-style:italic}
+.expand-hint{font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:4px;transition:all .2s}
+.pattern-card.open .expand-hint{color:var(--sub)}
+.pattern-card.open .expand-hint .arrow{transform:rotate(180deg)}
+.expand-hint .arrow{transition:transform .3s;display:inline-block}
+.sim-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:8px;box-shadow:var(--shadow-card)}
+.sim-box h3{font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px}
+.sim-log{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12px;line-height:1.8;background:rgba(0,0,0,.03);border-radius:var(--radius-sm);padding:14px 16px;max-height:200px;overflow-y:auto}
+.sim-log .line{opacity:0;transition:opacity .3s}
+.sim-log .line.show{opacity:1}
+.sim-log .line.warn{color:var(--amber)}
+.sim-log .line.err{color:var(--danger)}
+.sim-log .line.dim{color:var(--sub)}
+.sim-btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.sim-btn{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;color:var(--text)}
+.sim-btn:hover{border-color:var(--danger);background:rgba(220,38,38,.04)}
+.sim-btn.active{border-color:var(--danger);background:rgba(220,38,38,.08);color:var(--danger)}
+.takeaway{background:rgba(220,38,38,.04);border:1.5px solid rgba(220,38,38,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--danger)}
+</style>
+<meta name="description" content="在真实产品中，Agent 循环挂掉的几种典型生产环境模式，以及用户会看到什么表现。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="为什么 Agent 会卡死">
+<meta property="og:url" content="https://xueai.app/slides/9-7.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Agent 实战</div>
+    <h1>为什么 Agent 会卡死</h1>
+    <p class="subtitle">实验室里的 Agent 死循环很好发现——控制台一刷就看到了。但生产环境的"卡死"更隐蔽：用户不会说"你的 Agent 死循环了"，他只会说"你的 AI 怎么这么慢"或者"它是不是傻了"。</p>
+  </header>
+
+  <div class="sec-label">四种生产环境特有的卡死模式</div>
+
+  <div class="pattern-grid" id="patternGrid">
+    <div class="pattern-card reveal" onclick="toggleCard(this)">
+      <div class="head">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
+        <div class="name">同参数死循环</div>
+      </div>
+      <div class="brief">Agent 连续 3 次用完全相同的参数调用同一个工具</div>
+      <div class="expand-hint"><span class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span> 点击查看详情</div>
+      <div class="detail">
+        <div class="detail-inner">
+          <p style="margin-bottom:10px">模型"忘了"上次已经做过这件事，或者认为上次没成功所以要重试——但参数一模一样，结果也一模一样。</p>
+          <div class="scene">
+            <div class="scene-title">用户看到的表现</div>
+            <div class="user-says">"它转了好久都没反应""怎么一直在加载"</div>
+          </div>
+          <p style="font-size:13px;color:var(--sub)">典型场景：反复读取同一个文件、反复搜索同一个关键词、反复调用同一个 API</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pattern-card reveal" onclick="toggleCard(this)">
+      <div class="head">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg></div>
+        <div class="name">收益递减</div>
+      </div>
+      <div class="brief">跑了 50 轮循环，但几乎没产出有价值的内容</div>
+      <div class="expand-hint"><span class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span> 点击查看详情</div>
+      <div class="detail">
+        <div class="detail-inner">
+          <p style="margin-bottom:10px">Agent 在"忙"，但每一轮只做边缘操作——整理格式、反复确认、做无关搜索。看起来在工作，实际没有推进核心目标。</p>
+          <div class="scene">
+            <div class="scene-title">用户看到的表现</div>
+            <div class="user-says">"等了两分钟，结果就给我这？""AI 是不是在划水"</div>
+          </div>
+          <p style="font-size:13px;color:var(--sub)">典型场景：Agent 在复杂任务中迷失方向，不断做"安全但无用"的小动作</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pattern-card reveal" onclick="toggleCard(this)">
+      <div class="head">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg></div>
+        <div class="name">文本复读</div>
+      </div>
+      <div class="brief">模型开始重复自己说过的话，一段内容反复出现</div>
+      <div class="expand-hint"><span class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span> 点击查看详情</div>
+      <div class="detail">
+        <div class="detail-inner">
+          <p style="margin-bottom:10px">当上下文过长或模型困惑时，它会退化为复读模式——把之前的输出再生成一遍。这不是"卡"住了，而是模型已经"迷路"了。</p>
+          <div class="scene">
+            <div class="scene-title">用户看到的表现</div>
+            <div class="user-says">"它在说车轱辘话""怎么又是这段"</div>
+          </div>
+          <p style="font-size:13px;color:var(--sub)">典型场景：长对话后期、上下文接近窗口上限、任务描述模糊</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pattern-card reveal" onclick="toggleCard(this)">
+      <div class="head">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+        <div class="name">工具连续失败雪崩</div>
+      </div>
+      <div class="brief">一个工具挂了，Agent 疯狂重试，拖垮整条链路</div>
+      <div class="expand-hint"><span class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span> 点击查看详情</div>
+      <div class="detail">
+        <div class="detail-inner">
+          <p style="margin-bottom:10px">工具 A 超时 → Agent 重试 → 还是超时 → 换个方式调 → 还是不行 → 试工具 B 来绕过 → B 依赖 A 的结果也挂了 → 雪崩。</p>
+          <div class="scene">
+            <div class="scene-title">用户看到的表现</div>
+            <div class="user-says">"它好像卡住了""等了好久突然说失败了"</div>
+          </div>
+          <p style="font-size:13px;color:var(--sub)">典型场景：外部 API 限流、数据库连接池耗尽、第三方服务临时宕机</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">模拟：卡死现场</div>
+
+  <div class="sim-box reveal">
+    <h3>选择一种模式，看后台日志长什么样</h3>
+    <div class="sim-btns">
+      <button class="sim-btn" onclick="simulate('loop')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>同参数循环</button>
+      <button class="sim-btn" onclick="simulate('diminish')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>收益递减</button>
+      <button class="sim-btn" onclick="simulate('repeat')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg>文本复读</button>
+      <button class="sim-btn" onclick="simulate('cascade')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>工具雪崩</button>
+    </div>
+    <div class="sim-log" id="simLog">
+      <div class="line show dim">← 选择一种模式开始模拟</div>
+    </div>
+  </div>
+
+  <div class="takeaway reveal">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+    <span><b>生产环境的 Agent 挂法和实验室里不一样——用户不会告诉你"Agent 死循环了"，他只会说"你的 AI 怎么这么慢/这么蠢"。</b>识别这些模式，是做防护的前提。</span>
+  </div>
+
+</article>
+
+<script>
+function toggleCard(el){
+  el.classList.toggle('open');
+}
+
+var SIM_DATA = {
+  loop: [
+    {t:'dim', s:'[轮次 1] 用户: "帮我查一下项目进度"'},
+    {t:'', s:'[轮次 1] → tool_call: read_file("status.md")'},
+    {t:'', s:'[轮次 1] ← 返回: 文件内容 (234 tokens)'},
+    {t:'', s:'[轮次 2] → tool_call: read_file("status.md")'},
+    {t:'warn', s:'[轮次 2] <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:2px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 相同参数重复调用'},
+    {t:'', s:'[轮次 3] → tool_call: read_file("status.md")'},
+    {t:'err', s:'[轮次 3] ✗ 连续 3 次相同调用！死循环确认'},
+    {t:'err', s:'[系统] Agent 已空转 45 秒，用户正在等待...'}
+  ],
+  diminish: [
+    {t:'dim', s:'[轮次 1] 用户: "帮我写一份竞品分析报告"'},
+    {t:'', s:'[轮次 1-5] 搜索竞品信息... 找到 3 条结果'},
+    {t:'', s:'[轮次 6-12] 整理搜索结果格式...'},
+    {t:'', s:'[轮次 13-20] 再搜索一些补充信息...'},
+    {t:'warn', s:'[轮次 21-35] 反复调整措辞和排版...'},
+    {t:'warn', s:'[轮次 36-48] 检查拼写... 微调格式... 再检查...'},
+    {t:'err', s:'[统计] 48 轮循环，有效内容产出仅 3 段'},
+    {t:'err', s:'[系统] 2 分钟过去了，收益率 < 5%'}
+  ],
+  repeat: [
+    {t:'dim', s:'[轮次 1] 用户: "总结今天的会议要点"'},
+    {t:'', s:'[轮次 1] 输出: "今天会议主要讨论了三个方面..."'},
+    {t:'', s:'[轮次 2] 输出: "会议要点如下：第一..."'},
+    {t:'warn', s:'[轮次 3] 输出: "今天会议主要讨论了三个方面..."'},
+    {t:'warn', s:'[检测] 与轮次 1 输出相似度: 94%'},
+    {t:'err', s:'[轮次 4] 输出: "今天会议主要讨论了三个方面..."'},
+    {t:'err', s:'[检测] 文本复读确认，模型已进入退化状态'},
+    {t:'err', s:'[系统] 上下文长度: 127,453 tokens (接近上限)'}
+  ],
+  cascade: [
+    {t:'dim', s:'[轮次 1] 用户: "帮我查库存数据并生成报表"'},
+    {t:'', s:'[轮次 1] → tool_call: query_database("inventory")'},
+    {t:'err', s:'[轮次 1] ← Error: Connection timeout (5000ms)'},
+    {t:'', s:'[轮次 2] → tool_call: query_database("inventory")  [重试]'},
+    {t:'err', s:'[轮次 2] ← Error: Connection timeout (5000ms)'},
+    {t:'warn', s:'[轮次 3] → tool_call: export_report("inventory")'},
+    {t:'err', s:'[轮次 3] ← Error: 依赖数据为空，无法生成'},
+    {t:'err', s:'[轮次 4-8] 连续 5 次工具调用全部失败'},
+    {t:'err', s:'[系统] 工具失败雪崩，链路已不可用'}
+  ]
+};
+
+function simulate(type){
+  var btns = document.querySelectorAll('.sim-btn');
+  btns.forEach(function(b){b.classList.remove('active');});
+  event.target.classList.add('active');
+
+  var log = document.getElementById('simLog');
+  log.innerHTML = '';
+  var lines = SIM_DATA[type];
+  lines.forEach(function(l, i){
+    var div = document.createElement('div');
+    div.className = 'line ' + l.t;
+    div.textContent = l.s;
+    log.appendChild(div);
+    setTimeout(function(){ div.classList.add('show'); }, i * 400);
+  });
+}
+</script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260703b"></script>
+</body>
+</html>

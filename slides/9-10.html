@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>一条消息背后的真实成本 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.input-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card);margin-top:8px}
+.input-box .label{font-size:13px;font-weight:700;color:var(--sub);margin-bottom:10px}
+.example-btns{display:flex;flex-wrap:wrap;gap:8px}
+.example-btn{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;color:var(--text)}
+.example-btn:hover{border-color:var(--accent);background:rgba(0,102,255,.04)}
+.example-btn.active{border-color:var(--accent);background:rgba(0,102,255,.08);color:var(--accent)}
+.msg-chain{margin-top:16px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-card);max-height:420px;overflow-y:auto}
+.msg-item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);margin-bottom:6px;font-size:13px;line-height:1.6;transition:all .3s;opacity:0;transform:translateX(-8px)}
+.msg-item.show{opacity:1;transform:translateX(0)}
+.msg-item .role{font-weight:800;font-size:11px;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.msg-item .content{flex:1;color:var(--text)}
+.msg-item .tokens{font-size:11px;font-weight:700;color:var(--sub);white-space:nowrap;flex-shrink:0}
+.msg-item.system{background:rgba(124,58,237,.04)}
+.msg-item.system .role{background:rgba(124,58,237,.12);color:var(--purple)}
+.msg-item.user-msg{background:rgba(0,102,255,.04)}
+.msg-item.user-msg .role{background:rgba(0,102,255,.12);color:var(--accent)}
+.msg-item.assistant{background:rgba(22,163,74,.04)}
+.msg-item.assistant .role{background:rgba(22,163,74,.12);color:var(--success)}
+.msg-item.tool-call{background:rgba(217,119,6,.04)}
+.msg-item.tool-call .role{background:rgba(217,119,6,.12);color:var(--amber)}
+.msg-item.tool-result{background:rgba(8,145,178,.04)}
+.msg-item.tool-result .role{background:rgba(8,145,178,.12);color:var(--cyan)}
+.summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+@media(max-width:768px){.summary-bar{grid-template-columns:repeat(2,1fr)}}
+.summary-item{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center;box-shadow:var(--shadow-card)}
+.summary-item .s-val{font-size:24px;font-weight:900;color:var(--text);letter-spacing:-1px}
+.summary-item .s-label{font-size:12px;color:var(--sub);font-weight:600;margin-top:4px}
+.summary-item.cost .s-val{color:var(--danger)}
+.slider-wrap{margin-top:20px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card)}
+.slider-wrap h3{font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px}
+.slider-row{display:flex;align-items:center;gap:16px}
+.slider-row label{font-size:13px;font-weight:600;color:var(--sub);white-space:nowrap}
+.slider-row input[type=range]{flex:1;accent-color:var(--accent)}
+.slider-row .val{font-size:15px;font-weight:800;color:var(--accent);min-width:60px;text-align:right}
+.cost-chart{display:flex;align-items:flex-end;gap:6px;height:120px;margin-top:16px;padding:16px 0}
+.cost-bar{flex:1;border-radius:6px 6px 0 0;background:linear-gradient(to top,rgba(0,102,255,.6),rgba(0,102,255,.2));transition:height .4s ease;position:relative;min-width:20px}
+.cost-bar .bar-label{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--sub);white-space:nowrap;font-weight:600}
+.cost-bar .bar-val{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--accent);white-space:nowrap;font-weight:700}
+.takeaway{background:rgba(217,119,6,.04);border:1.5px solid rgba(217,119,6,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--amber)}
+</style>
+<meta name="description" content="用户发一句话，底层可能跑 10+ 轮循环、产生几十条 API 消息。可视化展示真实的 token 消耗和成本。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-10.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="一条消息背后的真实成本">
+<meta property="og:url" content="https://xueai.app/slides/9-10.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Agent 实战</div>
+    <h1>一条消息背后的真实成本</h1>
+    <p class="subtitle">用户只发了一句话，但底层可能跑了 10+ 轮循环、产生几十条 API 消息。当你打开账单，可能会吓一跳。</p>
+  </header>
+
+  <div class="sec-label">选一个用户消息，看背后发生了什么</div>
+
+  <div class="input-box reveal">
+    <div class="label">模拟用户发送的消息：</div>
+    <div class="example-btns" id="exampleBtns">
+      <button class="example-btn" onclick="selectExample(0)">帮我查一下天气</button>
+      <button class="example-btn" onclick="selectExample(1)">分析这份 PDF 报告</button>
+      <button class="example-btn" onclick="selectExample(2)">帮我重构这个模块的代码</button>
+    </div>
+  </div>
+
+  <div class="msg-chain" id="msgChain" style="display:none"></div>
+
+  <div class="summary-bar" id="summaryBar" style="display:none">
+    <div class="summary-item"><div class="s-val" id="sRounds">-</div><div class="s-label">循环轮次</div></div>
+    <div class="summary-item"><div class="s-val" id="sMsgs">-</div><div class="s-label">API 消息数</div></div>
+    <div class="summary-item"><div class="s-val" id="sTokens">-</div><div class="s-label">总 Tokens</div></div>
+    <div class="summary-item cost"><div class="s-val" id="sCost">-</div><div class="s-label">预估成本</div></div>
+  </div>
+
+  <div class="sec-label">成本随复杂度指数增长</div>
+
+  <div class="slider-wrap reveal">
+    <h3>拖动滑块：任务复杂度 vs 成本</h3>
+    <div class="slider-row">
+      <label>复杂度</label>
+      <input type="range" min="1" max="5" value="1" id="complexSlider" oninput="updateChart()">
+      <div class="val" id="complexVal">简单</div>
+    </div>
+    <div class="cost-chart" id="costChart"></div>
+    <div style="text-align:center;margin-top:28px;font-size:13px;color:var(--sub)">
+      横轴：成本组成 ｜ 纵轴：token 消耗量
+    </div>
+  </div>
+
+  <div class="l-callout reveal" style="margin-top:20px;font-size:14px;line-height:1.8">
+    <b>成本的大头在哪里？</b><br>
+    • <b>System Prompt</b> — 每轮都要重复发送，轮次越多重复消耗越大<br>
+    • <b>Tool Results</b> — 工具返回的文本通常很长（整个文件内容、搜索结果...）<br>
+    • <b>上下文累积</b> — 后面的轮次要带上前面所有消息，滚雪球式增长
+  </div>
+
+  <div class="takeaway reveal">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>你的用户每说一句话，你的账单上可能多了 10 美分——知道成本在哪里，才能控制成本。</b>Agent 的成本不是线性的，而是随轮次指数增长：因为每一轮都要把之前所有内容重新发送给模型。</span>
+  </div>
+
+</article>
+
+<script>
+(function(){
+  var EXAMPLES = [
+    {
+      name: '帮我查一下天气',
+      rounds: 2,
+      msgs: [
+        {role:'system', label:'System', content:'你是一个有工具调用能力的助手...（系统提示词 + 工具定义）', tokens:850},
+        {role:'user-msg', label:'User', content:'帮我查一下天气', tokens:12},
+        {role:'assistant', label:'Assistant', content:'我来帮你查询天气信息。', tokens:18},
+        {role:'tool-call', label:'Tool Call', content:'get_weather(location="用户当前城市")', tokens:24},
+        {role:'tool-result', label:'Tool Result', content:'{"city":"上海","temp":"28°C","weather":"多云"...}', tokens:86},
+        {role:'assistant', label:'Assistant', content:'上海今天 28°C，多云，建议带把伞...', tokens:45}
+      ],
+      totalTokens: 1035,
+      cost: '$0.003'
+    },
+    {
+      name: '分析这份 PDF 报告',
+      rounds: 6,
+      msgs: [
+        {role:'system', label:'System', content:'你是一个有工具调用能力的助手...（系统提示词 + 工具定义）', tokens:850},
+        {role:'user-msg', label:'User', content:'分析这份 PDF 报告，给我关键结论', tokens:18},
+        {role:'assistant', label:'Assistant', content:'我来读取并分析这份报告。', tokens:15},
+        {role:'tool-call', label:'Tool Call', content:'read_pdf(file="report.pdf", pages="1-5")', tokens:28},
+        {role:'tool-result', label:'Tool Result', content:'[PDF 第 1-5 页内容...共 3200 字]', tokens:1600},
+        {role:'assistant', label:'Assistant', content:'已读取前 5 页，继续读取剩余部分...', tokens:22},
+        {role:'tool-call', label:'Tool Call', content:'read_pdf(file="report.pdf", pages="6-12")', tokens:30},
+        {role:'tool-result', label:'Tool Result', content:'[PDF 第 6-12 页内容...共 4100 字]', tokens:2050},
+        {role:'assistant', label:'Assistant', content:'全文已读完，开始提取关键信息...', tokens:20},
+        {role:'tool-call', label:'Tool Call', content:'search_in_text(query="结论,建议,关键发现")', tokens:32},
+        {role:'tool-result', label:'Tool Result', content:'[匹配到 8 处关键段落...]', tokens:680},
+        {role:'assistant', label:'Assistant', content:'报告的三个核心结论：\n1. 市场增速放缓...\n2. 用户留存率...\n3. 建议策略调整...', tokens:320}
+      ],
+      totalTokens: 5665,
+      cost: '$0.02'
+    },
+    {
+      name: '帮我重构这个模块的代码',
+      rounds: 12,
+      msgs: [
+        {role:'system', label:'System', content:'你是一个专业的编程助手...（系统提示词 + 工具定义 + 项目规范）', tokens:1200},
+        {role:'user-msg', label:'User', content:'帮我重构 src/utils/parser.ts 这个模块', tokens:22},
+        {role:'assistant', label:'Assistant', content:'我先看看这个文件的当前代码。', tokens:14},
+        {role:'tool-call', label:'Tool Call', content:'read_file("src/utils/parser.ts")', tokens:26},
+        {role:'tool-result', label:'Tool Result', content:'[文件内容 280 行...]', tokens:1800},
+        {role:'assistant', label:'Assistant', content:'代码有几个问题，让我看看相关文件...', tokens:35},
+        {role:'tool-call', label:'Tool Call', content:'read_file("src/types/index.ts")', tokens:28},
+        {role:'tool-result', label:'Tool Result', content:'[类型定义文件...]', tokens:640},
+        {role:'tool-call', label:'Tool Call', content:'search_code("import.*parser")', tokens:24},
+        {role:'tool-result', label:'Tool Result', content:'[找到 6 个引用位置...]', tokens:420},
+        {role:'assistant', label:'Assistant', content:'分析完毕，开始重构。主要改动：...', tokens:180},
+        {role:'tool-call', label:'Tool Call', content:'write_file("src/utils/parser.ts", [新代码])', tokens:2200},
+        {role:'tool-result', label:'Tool Result', content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> 文件已写入', tokens:8},
+        {role:'assistant', label:'Assistant', content:'主文件重构完成，更新相关引用...', tokens:24},
+        {role:'tool-call', label:'Tool Call', content:'write_file("src/services/data.ts", [修改引用])', tokens:480},
+        {role:'tool-result', label:'Tool Result', content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> 文件已写入', tokens:8},
+        {role:'tool-call', label:'Tool Call', content:'run_tests("src/utils/parser.test.ts")', tokens:32},
+        {role:'tool-result', label:'Tool Result', content:'3 passed, 1 failed: expect(...).toBe(...)', tokens:120},
+        {role:'assistant', label:'Assistant', content:'有一个测试失败了，修复中...', tokens:16},
+        {role:'tool-call', label:'Tool Call', content:'write_file("src/utils/parser.ts", [修复])', tokens:340},
+        {role:'tool-result', label:'Tool Result', content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> 文件已写入', tokens:8},
+        {role:'tool-call', label:'Tool Call', content:'run_tests("src/utils/parser.test.ts")', tokens:32},
+        {role:'tool-result', label:'Tool Result', content:'4 passed, 0 failed <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg>', tokens:14},
+        {role:'assistant', label:'Assistant', content:'重构完成！主要改动：\n1. 拆分了过长的 parse 函数...\n2. 提取了公共类型...\n3. 所有测试通过 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg>', tokens:280}
+      ],
+      totalTokens: 7971,
+      cost: '$0.08'
+    }
+  ];
+
+  window.selectExample = function(idx){
+    var btns = document.querySelectorAll('.example-btn');
+    btns.forEach(function(b,i){ b.classList.toggle('active', i===idx); });
+
+    var ex = EXAMPLES[idx];
+    var chain = document.getElementById('msgChain');
+    var summary = document.getElementById('summaryBar');
+    chain.style.display = 'block';
+    summary.style.display = 'grid';
+    chain.innerHTML = '';
+
+    ex.msgs.forEach(function(m, i){
+      var div = document.createElement('div');
+      div.className = 'msg-item ' + m.role;
+      div.innerHTML = '<span class="role">' + m.label + '</span>'
+                    + '<span class="content">' + m.content + '</span>'
+                    + '<span class="tokens">' + m.tokens + ' tk</span>';
+      chain.appendChild(div);
+      setTimeout(function(){ div.classList.add('show'); }, i * 120);
+    });
+
+    document.getElementById('sRounds').textContent = ex.rounds;
+    document.getElementById('sMsgs').textContent = ex.msgs.length;
+    document.getElementById('sTokens').textContent = ex.totalTokens.toLocaleString();
+    document.getElementById('sCost').textContent = ex.cost;
+  };
+
+  var COMPLEXITY_LABELS = ['简单','中等','复杂','很复杂','极复杂'];
+  var COST_DATA = [
+    {system:[850,850,1200,1200,1500], tool_result:[86,1800,3700,6400,12000], assistant:[63,400,900,1800,3500], context_repeat:[0,1200,4800,14000,38000]},
+  ];
+
+  window.updateChart = function(){
+    var slider = document.getElementById('complexSlider');
+    var val = parseInt(slider.value) - 1;
+    document.getElementById('complexVal').textContent = COMPLEXITY_LABELS[val];
+
+    var chart = document.getElementById('costChart');
+    var categories = ['System\nPrompt','工具返回','Assistant\n输出','上下文\n累积'];
+    var data = [
+      COST_DATA[0].system[val],
+      COST_DATA[0].tool_result[val],
+      COST_DATA[0].assistant[val],
+      COST_DATA[0].context_repeat[val]
+    ];
+    var max = Math.max.apply(null, data) || 1;
+
+    var html = '';
+    data.forEach(function(d, i){
+      var h = Math.max((d / max) * 100, 4);
+      html += '<div class="cost-bar" style="height:'+h+'%">'
+            + '<div class="bar-val">'+d.toLocaleString()+' tk</div>'
+            + '<div class="bar-label">'+categories[i].replace('\n','<br>')+'</div>'
+            + '</div>';
+    });
+    chart.innerHTML = html;
+  };
+
+  updateChart();
+})();
+</script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260703b"></script>
+</body>
+</html>

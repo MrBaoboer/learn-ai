@@ -4,96 +4,136 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>输出格式选择：JSON / Markdown / 纯文本的取舍 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
 <style>
-:root{--bg:#f7f5f0;--text:#1c1c1e;--sub:#6b6b70;--border:rgba(0,0,0,0.07);--surface:white;--surface2:#f0ede6;--purple:#9333ea;--green:#16a34a;--red:#dc2626;--orange:#ea580c;--cyan:#0891b2;--amber:#d97706;--muted:#8e8e93}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;opacity:0;animation:si .15s ease .08s forwards;-webkit-font-smoothing:antialiased}
-@keyframes si{to{opacity:1}}
-.slide{width:94vw;max-width:1440px;aspect-ratio:16/9;background:var(--bg);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.08);display:flex;flex-direction:column;overflow:hidden}
-.hd{padding:14px 36px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);flex-shrink:0}
-.hd-tag{font-size:14px;font-weight:800;color:var(--purple)}
-.hd-title{font-size:24px;font-weight:800;color:var(--text)}
-.hd-title em{font-style:normal;color:var(--purple)}
-.body{flex:1;display:grid;grid-template-columns:340px 1fr;min-height:0}
+/* 页面局部别名 —— 全部映射到设计系统变量（JS 渲染函数中引用了这些名字） */
+:root {
+  --surface2: #f0ede6;
+  --muted: var(--sub);
+  --green: var(--success);
+  --red: var(--danger);
+}
 
-/* 左栏 */
-.left{padding:14px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:8px;overflow:hidden}
-.desc{font-size:15px;color:var(--sub);line-height:1.6;flex-shrink:0}
+/* ── 格式选择列表 ── */
+.fmt-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fmt-btn {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--card);
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+  text-align: left; width: 100%; min-height: 44px;
+  box-shadow: var(--shadow-card);
+}
+.fmt-btn:hover { border-color: rgba(0,0,0,0.15); }
+.fmt-btn.active { border-color: var(--purple); background: rgba(124,58,237,0.04); }
+.badge {
+  padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800;
+  flex-shrink: 0; min-width: 48px; text-align: center;
+  font-family: "SF Mono", Menlo, monospace;
+}
+.ft h4 { font-size: 15px; font-weight: 700; color: var(--text); transition: color 0.2s; }
+.fmt-btn.active .ft h4 { color: var(--purple); }
+.ft p { font-size: 12px; color: var(--sub); margin-top: 2px; line-height: 1.5; }
 
-.fmt-list{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
-.fmt-btn{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;transition:all .2s;font-family:inherit;text-align:left;width:100%}
-.fmt-btn:hover{border-color:rgba(0,0,0,.15)}
-.fmt-btn.active{border-color:var(--purple)}
-.badge{padding:3px 9px;border-radius:6px;font-size:12px;font-weight:800;flex-shrink:0;min-width:44px;text-align:center;font-family:monospace}
-.ft h4{font-size:15px;font-weight:700;color:var(--text);transition:color .2s}
-.fmt-btn.active .ft h4{color:var(--purple)}
-.ft p{font-size:12px;color:var(--muted);margin-top:1px}
+/* ── 评分格 ── */
+.score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sc {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 8px; text-align: center;
+}
+.sc .sl { font-size: 11px; color: var(--sub); font-weight: 600; margin-bottom: 4px; }
+.sc .sv { font-size: 15px; font-weight: 800; }
+.sv.good { color: var(--success); }
+.sv.mid { color: var(--amber); }
+.sv.bad { color: var(--danger); }
 
-/* 评分格 */
-.score-section{flex-shrink:0}
-.score-title{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin-bottom:6px}
-.score-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
-.sc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px;text-align:center}
-.sc .sl{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:3px}
-.sc .sv{font-size:14px;font-weight:800}
-.sv.good{color:var(--green)}.sv.mid{color:var(--amber)}.sv.bad{color:var(--red)}
+/* ── 取舍说明 ── */
+.tradeoff-box {
+  background: rgba(124,58,237,0.05); border: 1.5px solid rgba(124,58,237,0.15);
+  border-radius: var(--radius); padding: 14px 18px;
+  font-size: 14px; color: var(--text); line-height: 1.8; margin-top: 12px;
+}
+.tradeoff-box b { color: var(--purple); }
+.warn-tag {
+  background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.2);
+  color: var(--danger); padding: 1px 7px; border-radius: 4px;
+  font-size: 12px; font-weight: 600;
+}
+.good-tag {
+  background: rgba(22,163,74,0.08); border: 1px solid rgba(22,163,74,0.2);
+  color: var(--success); padding: 1px 7px; border-radius: 4px;
+  font-size: 12px; font-weight: 600;
+}
 
-/* 取舍说明 */
-.tradeoff-box{background:rgba(147,51,234,.05);border:1px solid rgba(147,51,234,.15);border-radius:10px;padding:9px 12px;font-size:14px;color:var(--text);line-height:1.6;flex:1;overflow-y:auto}
-.tradeoff-box b{color:var(--purple)}
-.warn-tag{background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);color:var(--red);padding:1px 7px;border-radius:4px;font-size:12px;font-weight:600}
-.good-tag{background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.2);color:var(--green);padding:1px 7px;border-radius:4px;font-size:12px;font-weight:600}
-
-/* 右栏 */
-.right{padding:14px 20px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
-.demo-hd{font-size:13px;font-weight:800;color:var(--muted);letter-spacing:.4px;flex-shrink:0}
-
-/* 流式演示区 */
-.stream-area{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0}
-.stream-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
-.sp-hd{padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface2);font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
-.sp-body{flex:1;overflow-y:auto;position:relative}
+/* ── 流式演示区 ── */
+.demo-hd { font-size: 14px; font-weight: 800; color: var(--sub); letter-spacing: 0.4px; margin-bottom: 12px; }
+.stream-area { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.stream-panel {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sp-hd {
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: var(--surface2); font-size: 13px; font-weight: 700;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.sp-body { height: 320px; overflow-y: auto; position: relative; }
 
 /* 普通代码视图 */
-.code-view{padding:12px 14px;font-size:13px;font-family:'Cascadia Code','Fira Code',monospace;line-height:1.7;color:#cdd6f4;background:#1e1b2e;height:100%;white-space:pre-wrap;word-break:break-word}
+.code-view {
+  padding: 12px 14px; font-size: 13px;
+  font-family: "SF Mono", "Fira Code", Menlo, monospace;
+  line-height: 1.7; color: #cdd6f4; background: #1e1b2e;
+  min-height: 100%; white-space: pre-wrap; word-break: break-word;
+}
 /* 渲染视图 */
-.render-view{padding:12px 14px;font-size:14px;line-height:1.75;color:var(--text)}
+.render-view { padding: 12px 14px; font-size: 14px; line-height: 1.75; color: var(--text); }
 
 /* token 流动的字符 */
-.tk{display:inline;opacity:0;animation:tkIn .08s ease forwards}
-@keyframes tkIn{to{opacity:1}}
+.tk { display: inline; opacity: 0; animation: tkIn 0.08s ease forwards; }
+@keyframes tkIn { to { opacity: 1; } }
 
 /* 进度条 */
-.prog-row{display:flex;gap:8px;align-items:center;flex-shrink:0}
-.prog-track{flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden}
-.prog-fill{height:100%;border-radius:3px;width:0%;transition:width .2s}
-.prog-pct{font-size:12px;color:var(--muted);min-width:32px}
+.prog-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.prog-track { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 0.2s; }
+.prog-pct { font-size: 12px; color: var(--sub); min-width: 36px; }
 
-.ctrl-row{display:flex;gap:10px;align-items:center;flex-shrink:0}
-.btn{padding:8px 20px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s}
-.btn-play{background:var(--purple);color:white}
-.btn-play:hover{filter:brightness(1.1)}
-.btn-play:disabled{opacity:.3;cursor:not-allowed}
-.btn-rst{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
-.hint{font-size:13px;color:var(--muted)}
-
-/* syntax highlight */
-.k{color:#cba6f7}.s{color:#a6e3a1}.n{color:#fab387}.c{color:#6c7086;font-style:italic}
-.tag-r{color:#f38ba8}.attr-r{color:#89dceb}.val-r{color:#a6e3a1}
+.ctrl-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.btn {
+  padding: 11px 24px; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700; border: none; cursor: pointer;
+  font-family: inherit; transition: all 0.15s; min-height: 44px;
+}
+.btn-play { background: var(--purple); color: white; }
+.btn-play:hover { filter: brightness(1.1); }
+.btn-play:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-rst { background: var(--card); color: var(--sub); border: 1.5px solid var(--border); }
+.hint { font-size: 13px; color: var(--sub); }
 
 /* rendered MD styles */
-.r-h2{font-size:17px;font-weight:800;color:var(--text);margin:6px 0 4px}
-.r-h3{font-size:15px;font-weight:700;color:#5b4fcf;margin:4px 0 2px}
-.r-li::before{content:"•";color:var(--purple);margin-right:5px}
-.r-li{padding-left:10px;margin:2px 0;font-size:14px}
-.r-bq{border-left:3px solid #cba6f7;padding-left:10px;color:var(--sub);font-style:italic;margin:4px 0;font-size:13px}
-.r-strong{font-weight:800;color:var(--text)}
+.r-h2 { font-size: 17px; font-weight: 800; color: var(--text); margin: 6px 0 4px; }
+.r-h3 { font-size: 15px; font-weight: 700; color: #5b4fcf; margin: 4px 0 2px; }
+.r-li::before { content: "•"; color: var(--purple); margin-right: 5px; }
+.r-li { padding-left: 10px; margin: 2px 0; font-size: 14px; }
+.r-bq { padding-left: 10px; color: var(--sub); font-style: italic; margin: 4px 0; font-size: 13px; }
+.r-strong { font-weight: 800; color: var(--text); }
 
 /* streaming status badge */
-.status{font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px}
-.status.live{background:#fef3c7;color:#92400e;animation:pulse 1.2s ease infinite}
-.status.done{background:#d1fae5;color:#065f46}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.status.live { background: #fef3c7; color: #92400e; animation: pulse 1.2s ease infinite; }
+.status.done { background: #d1fae5; color: #065f46; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+@media (max-width: 768px) {
+  .fmt-list { grid-template-columns: 1fr; }
+  .score-grid { grid-template-columns: repeat(2, 1fr); }
+  .stream-area { grid-template-columns: 1fr; }
+  .sp-body { height: 240px; }
+}
 </style>
 <!-- SEO Start -->
 <meta name="description" content="不同场景应该让模型输出什么格式？对比 JSON（程序解析）、Markdown（用户展示）、纯文本（语音/简单场景）的优缺点，以及强制结构化输出的工程方案。">
@@ -119,86 +159,79 @@ body{background:#e5e2da;font-family:-apple-system,BlinkMacSystemFont,"PingFang S
 <!-- SEO End -->
 </head>
 <body>
-<div class="slide">
-  <div class="hd">
-    <div>
-      <div class="hd-tag">模块六 · Prompt Engineering · 第 5 页</div>
-      <div class="hd-title">输出格式：<em>根据场景做取舍</em></div>
-    </div>
-    <div style="font-size:14px;color:var(--muted)">选格式 → 演示流式 Token 生成体验差异</div>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt 工程</div>
+    <h1>输出格式取舍</h1>
+    <p class="subtitle">没有最好的格式，只有最适合场景的格式。流式返回时，格式选择的影响格外明显。选一个格式，点击"开始流式演示"，观察 Token 生成的体验差异。</p>
+  </header>
+
+  <div class="sec-label">五种输出格式</div>
+
+  <div class="fmt-list">
+    <button class="fmt-btn active" onclick="pickFmt(this,0)">
+      <span class="badge" style="background:#f0ede6;color:#6b6b70">TXT</span>
+      <div class="ft"><h4>纯文本</h4><p>流式直接呈现，最稳定</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,1)">
+      <span class="badge" style="background:#fef3c7;color:#92400e">JSON</span>
+      <div class="ft"><h4>JSON 结构化</h4><p>流式时残缺，无法实时解析</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,2)">
+      <span class="badge" style="background:#ede9fe;color:#6d28d9">MD</span>
+      <div class="ft"><h4>Markdown</h4><p>流式可渲染，结构提取难</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,3)">
+      <span class="badge" style="background:#d1fae5;color:#065f46">YAML</span>
+      <div class="ft"><h4>YAML</h4><p>省 Token，流式同样残缺</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,4)">
+      <span class="badge" style="background:#dbeafe;color:#1e40af">XML</span>
+      <div class="ft"><h4>XML / 自定义标签</h4><p>流式可增量解析，最友好</p></div>
+    </button>
   </div>
-  <div class="body">
-    <!-- 左栏 -->
-    <div class="left">
-      <p class="desc">没有最好的格式，只有最适合场景的格式。流式返回时，格式选择的影响格外明显。</p>
 
-      <div class="fmt-list">
-        <button class="fmt-btn active" onclick="pickFmt(this,0)">
-          <span class="badge" style="background:#f0ede6;color:#6b6b70">TXT</span>
-          <div class="ft"><h4>纯文本</h4><p>流式直接呈现，最稳定</p></div>
-        </button>
-        <button class="fmt-btn" onclick="pickFmt(this,1)">
-          <span class="badge" style="background:#fef3c7;color:#92400e">JSON</span>
-          <div class="ft"><h4>JSON 结构化</h4><p>流式时残缺，无法实时解析</p></div>
-        </button>
-        <button class="fmt-btn" onclick="pickFmt(this,2)">
-          <span class="badge" style="background:#ede9fe;color:#6d28d9">MD</span>
-          <div class="ft"><h4>Markdown</h4><p>流式可渲染，结构提取难</p></div>
-        </button>
-        <button class="fmt-btn" onclick="pickFmt(this,3)">
-          <span class="badge" style="background:#d1fae5;color:#065f46">YAML</span>
-          <div class="ft"><h4>YAML</h4><p>省 Token，流式同样残缺</p></div>
-        </button>
-        <button class="fmt-btn" onclick="pickFmt(this,4)">
-          <span class="badge" style="background:#dbeafe;color:#1e40af">XML</span>
-          <div class="ft"><h4>XML / 自定义标签</h4><p>流式可增量解析，最友好</p></div>
-        </button>
+  <div class="sec-label">场景适配度</div>
+
+  <div class="score-grid" id="scoreGrid"></div>
+  <div class="tradeoff-box" id="tradeoffBox"></div>
+
+  <div class="sec-label">流式演示</div>
+
+  <div class="demo-hd" id="demoHd">演示：纯文本 — 流式 Token 体验</div>
+  <div class="stream-area">
+    <div class="stream-panel">
+      <div class="sp-hd">
+        <span id="rawTitle">原始 Token 流</span>
+        <span class="status live" id="rawStatus">等待</span>
       </div>
-
-      <div class="score-section">
-        <div class="score-title">场景适配度</div>
-        <div class="score-grid" id="scoreGrid"></div>
+      <div class="sp-body">
+        <div class="code-view" id="rawView"></div>
       </div>
-
-      <div class="tradeoff-box" id="tradeoffBox"></div>
     </div>
-
-    <!-- 右栏 -->
-    <div class="right">
-      <div class="demo-hd" id="demoHd">演示：纯文本 — 流式 Token 体验</div>
-      <div class="stream-area">
-        <div class="stream-panel">
-          <div class="sp-hd">
-            <span id="rawTitle">原始 Token 流</span>
-            <span class="status live" id="rawStatus">等待</span>
-          </div>
-          <div class="sp-body">
-            <div class="code-view" id="rawView"></div>
-          </div>
-        </div>
-        <div class="stream-panel">
-          <div class="sp-hd">
-            <span id="rendTitle">前端呈现效果</span>
-            <span class="status live" id="rendStatus">等待</span>
-          </div>
-          <div class="sp-body" id="rendBody">
-            <div class="render-view" id="rendView"></div>
-          </div>
-        </div>
+    <div class="stream-panel">
+      <div class="sp-hd">
+        <span id="rendTitle">前端呈现效果</span>
+        <span class="status live" id="rendStatus">等待</span>
       </div>
-      <div class="prog-row">
-        <div class="prog-track"><div class="prog-fill" id="progFill" style="background:var(--purple)"></div></div>
-        <span class="prog-pct" id="progPct">0%</span>
-      </div>
-      <div class="ctrl-row">
-        <button class="btn btn-play" id="btnPlay" onclick="playDemo()">▶ 开始流式演示</button>
-        <button class="btn btn-rst" onclick="resetDemo()">重置</button>
-        <span class="hint" id="playHint"></span>
+      <div class="sp-body" id="rendBody">
+        <div class="render-view" id="rendView"></div>
       </div>
     </div>
   </div>
-</div>
-<script src="nav-inject.js?v=20260412dd"></script>
+  <div class="prog-row">
+    <div class="prog-track"><div class="prog-fill" id="progFill" style="background:var(--purple)"></div></div>
+    <span class="prog-pct" id="progPct">0%</span>
+  </div>
+  <div class="ctrl-row">
+    <button class="btn btn-play" id="btnPlay" onclick="playDemo()">▶ 开始流式演示</button>
+    <button class="btn btn-rst" onclick="resetDemo()">重置</button>
+    <span class="hint" id="playHint"></span>
+  </div>
+
+</article>
+
 <script>
 const FMTS = [
   {
@@ -401,7 +434,7 @@ function playDemo() {
     else span.style.color='#cdd6f4';
     span.textContent = ch;
     rawEl.appendChild(span);
-    rawEl.scrollTop = rawEl.scrollHeight;
+    rawEl.parentElement.scrollTop = rawEl.parentElement.scrollHeight;
 
     const pct = Math.round(i / chars.length * 100);
     prog.style.width = pct + '%'; progPct.textContent = pct + '%';
@@ -437,5 +470,6 @@ function resetDemo() {
 // 初始化
 pickFmt(document.querySelector('.fmt-btn.active'), 0);
 </script>
+<script src="nav-inject.js?v=20260703b"></script>
 </body>
 </html>
