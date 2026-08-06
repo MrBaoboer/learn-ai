@@ -159,13 +159,22 @@
 
     /* 郑重声明：与登录邀请同款「左图右内容」骨架。
        配图自带深色背景，用 cover 铺满；图下三分之一是留白的暗区，正好压文字。
-       整体加宽 40px 全给左栏，右侧正文宽度保持不变。 */
-    + '.xa-notice{display:flex;max-width:820px;max-height:88vh;padding:0;overflow:hidden;}'
-    + '.xa-notice-art{width:290px;flex-shrink:0;position:relative;background:'
-    + 'url("assets/notice-guard.webp") center/cover no-repeat,#1a1040;}'
+       正文宽度按最长那句「本站从未授权任何机构…任何形式的销售。」定：窄一点
+       就会甩出「式的销售。」这种两三个字的孤行，所以整体给到 920px。 */
+    + '.xa-notice{display:flex;max-width:920px;max-height:88vh;padding:0;overflow:hidden;}'
+    + '.xa-notice-art{width:300px;flex-shrink:0;position:relative;background:'
+    + 'url("assets/notice-guard.webp") center/cover no-repeat,#fef9f0;}'
+    /* 配图是奶油浅底（底部实测 #fef9f0），所以这里反过来：浅色蒙版压深色字。
+       两个字色都取自图里的赤陶／暖棕，对比度 4.7:1 与 6.5:1，够 WCAG。 */
     + '.xa-notice-art-overlay{position:absolute;bottom:0;left:0;right:0;padding:18px 20px 16px;'
-    + 'background:linear-gradient(to top,rgba(0,0,0,0.7) 0%,rgba(0,0,0,0.3) 60%,transparent 100%);}'
-    + '.xa-notice-art-overlay p{color:#fff;font-size:12.5px;font-weight:600;line-height:1.55;margin:0;text-shadow:0 1px 4px rgba(0,0,0,0.5);}'
+    + 'background:linear-gradient(to top,rgba(254,249,240,0.96) 0%,rgba(254,249,240,0.7) 60%,rgba(254,249,240,0) 100%);}'
+    + '.xa-notice-art-overlay p{font-size:12.5px;font-weight:600;line-height:1.55;margin:0;}'
+    /* 配图不跟随主题，所以字色两套主题都写死；否则暗色下会被 .xa-notice p
+       的白字规则（选择器权重更高）盖掉，浅底白字直接消失 */
+    + '.xa-notice .xa-notice-art-overlay p,'
+    + '[data-theme="dark"] .xa-notice .xa-notice-art-overlay p{color:#7a5236;}'
+    + '.xa-notice .xa-notice-art-overlay .xa-left-big,'
+    + '[data-theme="dark"] .xa-notice .xa-notice-art-overlay .xa-left-big{color:#b5551a;}'
     + '.xa-notice-main{flex:1;min-width:0;padding:28px 30px 24px;overflow-y:auto;}'
     + '.xa-notice-head{display:flex;align-items:center;gap:10px;margin-bottom:16px;}'
     + '.xa-notice-head svg{width:22px;height:22px;color:#b91c1c;flex-shrink:0;}'
@@ -181,6 +190,7 @@
     + '[data-theme="dark"] .xa-notice .xa-refund{background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3);}'
     + '.xa-refund a{color:#b91c1c;font-weight:700;text-decoration:underline;}'
     + '[data-theme="dark"] .xa-refund a{color:#f87171;}'
+    + '.xa-nb{white-space:nowrap;}'
     + '.xa-notice .xa-vision{font-size:13px;color:var(--text-f,#64748b);border-top:1px solid var(--card-border,rgba(0,0,0,0.07));padding-top:13px;margin-top:3px;}'
     + '[data-theme="dark"] .xa-notice .xa-vision{color:rgba(255,255,255,0.5);border-color:rgba(255,255,255,0.1);}'
     + '.xa-notice .xa-actions{margin-top:18px;}'
@@ -348,7 +358,9 @@
       + '<p class="xa-refund"><strong>如果你是在培训机构、付费课程或课包里拿到本网站的，'
       + '说明你为免费内容付了钱。<br>请尽快向对方申请退款，并保留付款凭证。</strong><br>'
       + '你也可以访问米羊官网 <a href="https://miyang.cn" target="_blank" rel="noopener">miyang.cn</a>，'
-      + '或发邮件至 <a href="mailto:connect@miyang.cn">connect@miyang.cn</a> 向我们举报。</p>'
+      + '或邮件 <a href="mailto:connect@miyang.cn">connect@miyang.cn</a> '
+      /* 末尾整句不许断开，否则窄一点就甩出「报。」这种两字孤行 */
+      + '<span class="xa-nb">向我们举报。</span></p>'
       + '<p>本站要求登录，仅用于同步学习进度与防止内容被恶意贩卖，不收取任何费用。<br>'
       + '欢迎关注公众号「小山学 AI」，我们也会录制教学视频，免费开放给你学习！</p>'
       + '<p class="xa-vision">米羊科技的愿景，是让<span class="xa-red">更多人享受到 AI 的便利</span>。<br>'
