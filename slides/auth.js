@@ -107,6 +107,12 @@
     + '.xa-btn.ghost{background:transparent;color:var(--text-s,#475569);border:1px solid var(--card-border,rgba(0,0,0,0.12));flex:0 0 auto;padding:12px 20px;}'
     + '[data-theme="dark"] .xa-btn.ghost{color:rgba(255,255,255,0.65);border-color:rgba(255,255,255,0.15);}'
     + '.xa-btn.ghost:hover{background:rgba(0,0,0,0.04);}'
+    /* X 按钮沿用 X 自己的黑白配色，暗色主题下反色才有对比 */
+    + '.xa-btn.xa-x{flex:0 0 auto;padding:12px 16px;background:#0f1419;color:#fff;}'
+    + '.xa-btn.xa-x:hover{background:#000;}'
+    + '.xa-btn.xa-x svg{width:15px;height:15px;flex-shrink:0;}'
+    + '[data-theme="dark"] .xa-btn.xa-x{background:#fff;color:#0f1419;}'
+    + '[data-theme="dark"] .xa-btn.xa-x:hover{background:#e2e8f0;}'
 
     /* 移动端 */
     + '@media(max-width:640px){.xa-wide{max-width:420px;}.xa-wide-left{display:none;}.xa-wide-right{padding:28px 24px 22px;}}'
@@ -318,7 +324,7 @@
   });
 
   /* ── 郑重声明：首次打开站点弹一次 ──
-     本站被人打包进付费课卖过。声明必须点「我已知晓」才能关（不给点遮罩
+     本站被人打包进付费课卖过。声明必须点「我明白了」才能关（不给点遮罩
      糊弄过去），确认记在 localStorage，之后不再打扰。 */
   var NOTICE_KEY = 'xa_notice_v1';
   var SVG_SHIELD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>';
@@ -348,7 +354,9 @@
       + '我们愿意做一件不那么聪明的事：把我们掌握的知识开源出来。<br>'
       + '但开源精神，绝不是商业化倒卖的理由。</p>'
       + '<div class="xa-actions">'
-      + '<button class="xa-btn primary" data-xa="ack">我已知晓</button>'
+      + '<a class="xa-btn xa-x" href="' + X_URL + '" target="_blank" rel="noopener noreferrer">'
+      + X_ICON + '到 X 支持一下小山！</a>'
+      + '<button class="xa-btn primary" data-xa="ack">我明白了！</button>'
       + '</div></div></div>';
     document.body.appendChild(scrim);
     scrim.addEventListener('click', function(e){
