@@ -157,11 +157,12 @@
     + '.xa-chan-item img{width:96px;max-width:96px;flex-shrink:0;}'
     + '.xa-chan-txt{align-items:flex-start;}}'
 
-    /* 郑重声明：与登录邀请同款「左图右内容」骨架，左栏是深底上的洛小山 */
-    + '.xa-notice{display:flex;max-width:780px;max-height:88vh;padding:0;overflow:hidden;}'
-    + '.xa-notice-art{width:250px;flex-shrink:0;position:relative;'
-    + 'background:url("assets/notice-fox.webp") center 36%/74% auto no-repeat,'
-    + 'linear-gradient(178deg,#241a55 0%,#150d33 100%);}'
+    /* 郑重声明：与登录邀请同款「左图右内容」骨架。
+       配图自带深色背景，用 cover 铺满；图下三分之一是留白的暗区，正好压文字。
+       整体加宽 40px 全给左栏，右侧正文宽度保持不变。 */
+    + '.xa-notice{display:flex;max-width:820px;max-height:88vh;padding:0;overflow:hidden;}'
+    + '.xa-notice-art{width:290px;flex-shrink:0;position:relative;background:'
+    + 'url("assets/notice-guard.webp") center/cover no-repeat,#1a1040;}'
     + '.xa-notice-art-overlay{position:absolute;bottom:0;left:0;right:0;padding:18px 20px 16px;'
     + 'background:linear-gradient(to top,rgba(0,0,0,0.7) 0%,rgba(0,0,0,0.3) 60%,transparent 100%);}'
     + '.xa-notice-art-overlay p{color:#fff;font-size:12.5px;font-weight:600;line-height:1.55;margin:0;text-shadow:0 1px 4px rgba(0,0,0,0.5);}'
