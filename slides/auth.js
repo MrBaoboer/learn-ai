@@ -7,21 +7,34 @@
  * 对外暴露 window.XueaiAuth：
  *   ready        Promise<state>，state = {loggedIn, nickname}
  *   state        最近一次获取的登录状态
- *   isFree(file) 该课程文件是否免登录（每个主题前 2 节）
+ *   isFree(file) 该课程文件是否免登录（每个篇章前 2 节，雷军创业课整章）
  *   openLoginModal(next) 弹出登录告知弹窗，确认后跳米羊登录
  *   mount(slotEl) 在指定节点渲染 登录按钮 / 昵称+退出
  */
 (function(){
-  var FREE_PER_TOPIC = 2;
+  /* 免登录规则要和服务端保持一致，否则侧边栏的锁
+     和实际能不能打开会对不上：每个篇章前 2 节，外加雷军创业课整章放开 */
+  var FREE_PER_PART = 2;
+  var FREE_ALL_PREFIX = 'lei-';
+  /* 三个联系渠道。二维码都放本地 assets，不走 CDN，弹窗才不会因为外域挂掉而开天窗 */
   var GROUP_QR = 'assets/group-qrcode.png';
+  var GZH_QR = 'assets/qrcode.jpg';
+  var X_QR = 'assets/x-qrcode.png';
+  var X_URL = 'https://x.com/luoxiaoshan_ai';
+  var X_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+    + '<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68'
+    + 'l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>';
 
   var freeSet = {};
   if(window.COURSE && window.COURSE.parts){
     window.COURSE.parts.forEach(function(part){
+      var files = [];
       part.topics.forEach(function(topic){
-        topic.lessons.slice(0, FREE_PER_TOPIC).forEach(function(ls){
-          freeSet[ls.file] = 1;
-        });
+        topic.lessons.forEach(function(ls){ files.push(ls.file); });
+      });
+      files.slice(0, FREE_PER_PART).forEach(function(f){ freeSet[f] = 1; });
+      files.forEach(function(f){
+        if(f.indexOf(FREE_ALL_PREFIX) === 0) freeSet[f] = 1;
       });
     });
   }
@@ -60,6 +73,8 @@
     + '.xa-wide-right h3{margin-bottom:6px;}'
     + '.xa-wide-sub{font-size:12.5px;color:var(--text-f,#94a3b8);margin-bottom:18px;}'
     + '[data-theme="dark"] .xa-wide-sub{color:rgba(255,255,255,0.4);}'
+    + '.xa-wide-foot{font-size:11.5px;color:var(--text-f,#94a3b8);line-height:1.6;margin-top:12px;text-align:center;}'
+    + '[data-theme="dark"] .xa-wide-foot{color:rgba(255,255,255,0.4);}'
 
     /* 权益列表 */
     + '.xa-benefits{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}'
@@ -113,10 +128,58 @@
     + '.xa-group svg{width:14px;height:14px;}'
     + '@media(max-width:600px){.xa-group .xa-group-txt{display:none;}.xa-group{padding:7px 9px;}}'
     /* 交流群二维码弹窗 */
-    + '.xa-qr-modal{text-align:center;}'
-    + '.xa-qr-modal img{width:220px;height:220px;border-radius:14px;background:#fff;padding:10px;border:1px solid var(--card-border,rgba(0,0,0,0.08));box-shadow:0 4px 20px rgba(0,0,0,0.08);}'
-    + '.xa-qr-hint{font-size:13.5px;color:var(--text-s,#475569);line-height:1.7;margin:16px 0 20px;}'
-    + '[data-theme="dark"] .xa-qr-hint{color:rgba(255,255,255,0.65);}';
+    + '.xa-qr-modal{text-align:center;max-width:580px;max-height:88vh;overflow-y:auto;}'
+    + '.xa-qr-hint{font-size:13.5px;color:var(--text-s,#475569);line-height:1.7;margin:2px 0 18px;}'
+    + '[data-theme="dark"] .xa-qr-hint{color:rgba(255,255,255,0.65);}'
+
+    /* 三个渠道并排：交流群 / 公众号 / X。二维码统一白底，暗色下也扫得出 */
+    + '.xa-chan{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}'
+    + '.xa-chan-item{display:flex;flex-direction:column;align-items:center;gap:9px;padding:14px 10px;border-radius:14px;background:var(--pill-bg,#f8fafc);border:1px solid var(--pill-border,#e2e8f0);text-decoration:none;}'
+    + '[data-theme="dark"] .xa-chan-item{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1);}'
+    + 'a.xa-chan-item{transition:background .2s,border-color .2s,transform .2s;}'
+    + 'a.xa-chan-item:hover{background:rgba(79,123,255,0.08);border-color:rgba(79,123,255,0.3);transform:translateY(-2px);}'
+    + '.xa-chan-item img{width:100%;max-width:140px;aspect-ratio:1;border-radius:10px;background:#fff;padding:6px;box-sizing:border-box;border:1px solid rgba(0,0,0,0.06);}'
+    + '.xa-chan-txt{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;}'
+    + '.xa-chan-name{display:flex;align-items:center;gap:5px;font-size:13.5px;font-weight:700;color:var(--text-h,#0f1729);}'
+    + '[data-theme="dark"] .xa-chan-name{color:#fff;}'
+    + '.xa-chan-name svg{width:13px;height:13px;}'
+    + '.xa-chan-desc{font-size:11.5px;color:var(--text-s,#475569);line-height:1.45;overflow-wrap:break-word;}'
+    + '[data-theme="dark"] .xa-chan-desc{color:rgba(255,255,255,0.55);}'
+    /* 窄屏改横向单列：二维码要留够尺寸才能长按识别，宁可让弹窗滚动 */
+    + '@media(max-width:560px){.xa-chan{grid-template-columns:1fr;gap:10px;}'
+    + '.xa-chan-item{flex-direction:row;text-align:left;gap:14px;padding:12px;}'
+    + '.xa-chan-item img{width:96px;max-width:96px;flex-shrink:0;}'
+    + '.xa-chan-txt{align-items:flex-start;}}'
+
+    /* 郑重声明：与登录邀请同款「左图右内容」骨架，左栏是深底上的洛小山 */
+    + '.xa-notice{display:flex;max-width:780px;max-height:88vh;padding:0;overflow:hidden;}'
+    + '.xa-notice-art{width:250px;flex-shrink:0;position:relative;'
+    + 'background:url("assets/notice-fox.webp") center 36%/74% auto no-repeat,'
+    + 'linear-gradient(178deg,#241a55 0%,#150d33 100%);}'
+    + '.xa-notice-art-overlay{position:absolute;bottom:0;left:0;right:0;padding:18px 20px 16px;'
+    + 'background:linear-gradient(to top,rgba(0,0,0,0.7) 0%,rgba(0,0,0,0.3) 60%,transparent 100%);}'
+    + '.xa-notice-art-overlay p{color:#fff;font-size:12.5px;font-weight:600;line-height:1.55;margin:0;text-shadow:0 1px 4px rgba(0,0,0,0.5);}'
+    + '.xa-notice-main{flex:1;min-width:0;padding:28px 30px 24px;overflow-y:auto;}'
+    + '.xa-notice-head{display:flex;align-items:center;gap:10px;margin-bottom:16px;}'
+    + '.xa-notice-head svg{width:22px;height:22px;color:#b91c1c;flex-shrink:0;}'
+    + '.xa-notice-head h3{margin:0;font-size:20px;}'
+    /* 不用 justify：段里有 <br> 强制断行时，两端对齐会把断行前的整行字距拉开 */
+    + '.xa-notice p{font-size:14px;line-height:1.85;color:var(--text-s,#334155);margin:0 0 13px;}'
+    + '[data-theme="dark"] .xa-notice p{color:rgba(255,255,255,0.72);}'
+    + '.xa-notice p strong{color:var(--text-h,#0f1729);font-weight:700;}'
+    + '[data-theme="dark"] .xa-notice p strong{color:#fff;}'
+    + '.xa-red{color:#dc2626;font-weight:700;}'
+    + '[data-theme="dark"] .xa-red{color:#f87171;}'
+    + '.xa-notice .xa-refund{padding:12px 14px;border-radius:10px;background:rgba(185,28,28,0.06);border:1px solid rgba(185,28,28,0.18);}'
+    + '[data-theme="dark"] .xa-notice .xa-refund{background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3);}'
+    + '.xa-refund a{color:#b91c1c;font-weight:700;text-decoration:underline;}'
+    + '[data-theme="dark"] .xa-refund a{color:#f87171;}'
+    + '.xa-notice .xa-vision{font-size:13px;color:var(--text-f,#64748b);border-top:1px solid var(--card-border,rgba(0,0,0,0.07));padding-top:13px;margin-top:3px;}'
+    + '[data-theme="dark"] .xa-notice .xa-vision{color:rgba(255,255,255,0.5);border-color:rgba(255,255,255,0.1);}'
+    + '.xa-notice .xa-actions{margin-top:18px;}'
+    /* 窄屏与登录邀请同策略：收掉左图，内容独立成窄卡 */
+    + '@media(max-width:640px){.xa-notice{max-width:440px;}.xa-notice-art{display:none;}'
+    + '.xa-notice-main{padding:26px 24px 22px;}}';
   var style = document.createElement('style');
   style.textContent = css;
   document.head.appendChild(style);
@@ -185,6 +248,9 @@
       + '<a class="xa-btn primary" href="' + loginUrl + '">快速登录，免费学习</a>'
       + '</div>'
 
+      + '<div class="xa-wide-foot">要求登录也是为了防止内容被恶意贩卖。本站永久免费，'
+      + '若你在任何付费课程里买到过它，请向对方申请退款。</div>'
+
       + '</div></div>';
 
     document.body.appendChild(scrim);
@@ -195,15 +261,42 @@
     });
   }
 
+  /* 一个渠道卡片。给了 href 就渲染成可点的 a（X 在电脑上扫码不方便，直接点开） */
+  function channel(opts){
+    var tag = opts.href ? 'a' : 'div';
+    var attrs = opts.href
+      ? ' href="' + opts.href + '" target="_blank" rel="noopener noreferrer"'
+      : '';
+    return '<' + tag + ' class="xa-chan-item"' + attrs + '>'
+      + '<img src="' + opts.img + '" alt="' + opts.alt + '" loading="lazy">'
+      + '<div class="xa-chan-txt">'
+      + '<div class="xa-chan-name">' + (opts.icon || '') + opts.name + '</div>'
+      + '<div class="xa-chan-desc">' + opts.desc + '</div>'
+      + '</div></' + tag + '>';
+  }
+
   function openGroupModal(){
     if(document.querySelector('.xa-scrim')) return;
     var scrim = document.createElement('div');
     scrim.className = 'xa-scrim';
     scrim.innerHTML =
       '<div class="xa-modal xa-qr-modal" role="dialog" aria-modal="true">'
-      + '<h3>欢迎加入交流群</h3>'
-      + '<img src="' + GROUP_QR + '" alt="小山学 AI 交流群二维码">'
-      + '<div class="xa-qr-hint">微信扫一扫，加入「小山学 AI」交流群<br>一起讨论课程与 AI 实战</div>'
+      + '<h3>欢迎交流与关注</h3>'
+      + '<div class="xa-qr-hint">微信扫一扫入群，或关注公众号与 X 获取更新</div>'
+      + '<div class="xa-chan">'
+      + channel({
+          img: GROUP_QR, alt: '小山学 AI 交流群二维码',
+          name: '交流群', desc: '微信扫码入群<br>聊课程与 AI 实战'
+        })
+      + channel({
+          img: GZH_QR, alt: '小山学 AI 公众号二维码',
+          name: '公众号', desc: '小山学 AI<br>文章与课程更新'
+        })
+      + channel({
+          href: X_URL, img: X_QR, alt: 'X 主页二维码',
+          name: '推特', icon: X_ICON, desc: '@luoxiaoshan_ai<br>点击直达主页'
+        })
+      + '</div>'
       + '<div class="xa-actions">'
       + '<button class="xa-btn ghost" data-xa="cancel">关闭</button>'
       + '</div></div>';
@@ -223,6 +316,48 @@
       openGroupModal();
     }
   });
+
+  /* ── 郑重声明：首次打开站点弹一次 ──
+     本站被人打包进付费课卖过。声明必须点「我已知晓」才能关（不给点遮罩
+     糊弄过去），确认记在 localStorage，之后不再打扰。 */
+  var NOTICE_KEY = 'xa_notice_v1';
+  var SVG_SHIELD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>';
+
+  function maybeShowNotice(){
+    try{ if(localStorage.getItem(NOTICE_KEY)) return; }catch(e){ return; }
+    if(document.querySelector('.xa-scrim')) return;
+    var scrim = document.createElement('div');
+    scrim.className = 'xa-scrim';
+    scrim.innerHTML =
+      '<div class="xa-modal xa-notice" role="dialog" aria-modal="true" aria-label="郑重声明">'
+      + '<div class="xa-notice-art"><div class="xa-notice-art-overlay">'
+      + '<p class="xa-left-big">免费公益</p>'
+      + '<p>知识应该被更多人看到</p>'
+      + '</div></div>'
+      + '<div class="xa-notice-main">'
+      + '<div class="xa-notice-head">' + SVG_SHIELD + '<h3>郑重声明</h3></div>'
+      + '<p>xueai.app 是免费公益的 AI 学习网站，全部内容<span class="xa-red">永久免费</span>。<br>'
+      + '本站从未授权任何机构或个人将站内内容用于收费课程、付费社群或任何形式的销售。</p>'
+      + '<p class="xa-refund"><strong>如果你是在培训机构、付费课程或课包里拿到本网站的，'
+      + '说明你为免费内容付了钱。<br>请尽快向对方申请退款，并保留付款凭证。</strong><br>'
+      + '你也可以访问米羊官网 <a href="https://miyang.cn" target="_blank" rel="noopener">miyang.cn</a>，'
+      + '或发邮件至 <a href="mailto:connect@miyang.cn">connect@miyang.cn</a> 向我们举报。</p>'
+      + '<p>本站要求登录，仅用于同步学习进度与防止内容被恶意贩卖，不收取任何费用。</p>'
+      + '<p class="xa-vision">米羊科技的愿景，是让<span class="xa-red">更多人享受到 AI 的便利</span>。<br>'
+      + '我们愿意做一件不那么聪明的事：把我们掌握的知识开源出来。<br>'
+      + '但开源精神，绝不是商业化倒卖的理由。</p>'
+      + '<div class="xa-actions">'
+      + '<button class="xa-btn primary" data-xa="ack">我已知晓</button>'
+      + '</div></div></div>';
+    document.body.appendChild(scrim);
+    scrim.addEventListener('click', function(e){
+      if(e.target.getAttribute && e.target.getAttribute('data-xa') === 'ack'){
+        try{ localStorage.setItem(NOTICE_KEY, String(Date.now())); }catch(err){}
+        scrim.remove();
+      }
+    });
+  }
+  maybeShowNotice();
 
   function renderSlot(el){
     if(state.loggedIn){
