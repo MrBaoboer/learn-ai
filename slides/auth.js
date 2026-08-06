@@ -306,8 +306,8 @@
           name: '交流群', desc: '微信扫码入群<br>聊课程与 AI 实战'
         })
       + channel({
-          img: GZH_QR, alt: '小山学 AI 公众号二维码',
-          name: '公众号', desc: '小山学 AI<br>文章与课程更新'
+          img: GZH_QR, alt: '洛小山公众号二维码',
+          name: '公众号', desc: '洛小山<br>文章与课程更新'
         })
       + channel({
           href: X_URL, img: X_QR, alt: 'X 主页二维码',
@@ -348,7 +348,7 @@
     scrim.innerHTML =
       '<div class="xa-modal xa-notice" role="dialog" aria-modal="true" aria-label="郑重声明">'
       + '<div class="xa-notice-art"><div class="xa-notice-art-overlay">'
-      + '<p class="xa-left-big">免费公益</p>'
+      + '<p class="xa-left-big">永久免费</p>'
       + '<p>知识应该被更多人看到</p>'
       + '</div></div>'
       + '<div class="xa-notice-main">'
@@ -362,7 +362,7 @@
       /* 末尾整句不许断开，否则窄一点就甩出「报。」这种两字孤行 */
       + '<span class="xa-nb">向我们举报。</span></p>'
       + '<p>本站要求登录，仅用于同步学习进度与防止内容被恶意贩卖，不收取任何费用。<br>'
-      + '欢迎关注公众号「小山学 AI」，我们也会录制教学视频，免费开放给你学习！</p>'
+      + '欢迎关注公众号「洛小山」，我们也会录制教学视频，免费开放给你学习！</p>'
       + '<p class="xa-vision">米羊科技的愿景，是让<span class="xa-red">更多人享受到 AI 的便利</span>。<br>'
       + '我们愿意做一件不那么聪明的事：把我们掌握的知识开源出来。<br>'
       + '但开源精神，绝不是商业化倒卖的理由。</p>'
