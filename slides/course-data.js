@@ -66,7 +66,7 @@ window.COURSE = {
             { file: '1-2-mitigation-rag.html', title: '应对 2：RAG 检索增强生成', desc: '真实文档注入上下文，5 步交互流程动画，对比有无 RAG 的差异', tag: '交互' },
             { file: 'rag-advanced.html', title: 'RAG 的代价与优化策略', desc: '成本分析表 + 关键词触发 / 模型路由 / 语义缓存 / 精准切块四种策略', tag: 'PM 进阶' },
             { file: '1-2-mitigation-temp.html', title: '应对 3：Temperature & Top-P', desc: '拖动滑块，实时看概率分布和输出变化', tag: '交互' },
-            { file: '1-2-mitigation-eval.html', title: '应对 4：评测 + 人工审核', desc: '外部纠错层，冷启动阶段兜底策略（HILT）', tag: '概念' },
+            { file: '1-2-mitigation-eval.html', title: '应对 4：评测 + 人工审核', desc: '外部纠错层，冷启动阶段兜底策略（HITL）', tag: '概念' },
           ],
         },
         {
