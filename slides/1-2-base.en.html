@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Base Model: The Token-by-Token Prediction Machine | xueai.app</title>
+<script src="../global-attn.js"></script>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── Key claim ── */
+.big-claim {
+  font-size: 26px; font-weight: 800; color: var(--text);
+  line-height: 1.5;
+}
+.big-claim .em { color: var(--accent); }
+.desc-text {
+  font-size: 16px; color: var(--sub); line-height: 1.8; margin-top: 14px;
+}
+.desc-text strong { color: var(--text); }
+
+.pill-row {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  margin-top: 18px;
+}
+.pill {
+  padding: 8px 16px; border-radius: 100px;
+  font-size: 14px; font-weight: 700;
+}
+.pill-blue { background: rgba(0,102,255,0.1); color: var(--accent); border: 1px solid rgba(0,102,255,0.2); }
+.pill-amber { background: rgba(217,119,6,0.1); color: var(--amber); border: 1px solid rgba(217,119,6,0.2); }
+.pill-green { background: rgba(22,163,74,0.1); color: var(--success); border: 1px solid rgba(22,163,74,0.2); }
+.arrow-sep { font-size: 20px; color: #ccc; }
+
+.info-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 16px 18px;
+  border: 1px solid var(--border);
+  margin-top: 14px;
+}
+.info-card .label { font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 6px; }
+.info-card .val { font-size: 14px; color: var(--text); line-height: 1.7; }
+
+/* ── Token generation animation area ── */
+.token-chain-area {
+  background: var(--card); border-radius: var(--radius); padding: 24px 26px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 20px;
+  box-shadow: var(--shadow-card);
+}
+.chain-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.tk {
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 16px; font-weight: 700; font-family: 'SF Mono', Menlo, monospace;
+  transition: all 0.4s ease;
+}
+.tk-generated {
+  background: rgba(22,163,74,0.08); color: var(--success);
+  border: 1px solid rgba(22,163,74,0.2);
+  opacity: 0; transform: translateY(6px);
+}
+.tk-generated.show {
+  opacity: 1; transform: translateY(0);
+}
+.tk-arrow {
+  font-size: 18px; color: #ccc;
+}
+.prob-bar-wrap {
+  background: rgba(0,0,0,0.03); border-radius: 10px; padding: 14px 16px;
+  display: none;
+}
+.prob-bar-wrap.show { display: block; }
+.prob-title { font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 10px; letter-spacing: 0.4px; }
+.prob-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 7px;
+  transition: opacity 0.3s ease;
+}
+.prob-word {
+  width: 60px; font-size: 13px; font-weight: 700; font-family: 'SF Mono', Menlo, monospace;
+  color: var(--text); flex-shrink: 0;
+}
+.prob-bar-track {
+  flex: 1; height: 10px; background: rgba(0,0,0,0.07); border-radius: 5px; overflow: hidden;
+}
+.prob-bar-fill {
+  height: 100%; border-radius: 5px; width: 0;
+  transition: width 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+  background: var(--accent);
+}
+.prob-bar-fill.top { background: var(--success); }
+.prob-pct {
+  width: 38px; font-size: 12px; color: var(--sub); text-align: right; flex-shrink: 0;
+}
+
+/* Context tokens appear one by one */
+.tk-context {
+  background: rgba(0,102,255,0.08); color: var(--accent);
+  border: 1px solid rgba(0,102,255,0.2);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.tk-context.show { opacity: 1; transform: translateY(0); }
+.tk-arrow-ctx {
+  font-size: 18px; color: #ccc;
+  opacity: 0; transition: opacity 0.2s;
+}
+.tk-arrow-ctx.show { opacity: 1; }
+
+.conclusion-card {
+  background: rgba(0,102,255,0.04); border-radius: var(--radius-sm); padding: 16px 20px;
+  border: 1px solid rgba(0,102,255,0.12);
+  display: none;
+}
+.conclusion-card.show { display: block; }
+.conclusion-card p {
+  font-size: 15px; color: var(--text); line-height: 1.8;
+}
+.conclusion-card b { color: var(--accent); }
+
+.btn-replay {
+  background: var(--card); color: var(--text); border: 1px solid rgba(0,0,0,0.12);
+  padding: 12px 24px; border-radius: 12px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  display: none;
+  margin-top: 16px;
+}
+.btn-replay:hover { background: rgba(0,0,0,0.05); }
+
+@media (max-width: 768px) {
+  .big-claim { font-size: 21px; }
+  .tk { font-size: 14px; padding: 8px 11px; }
+  .token-chain-area { padding: 16px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="What is the core of large language models? The Base model learns statistical patterns of Token sequences from massive corpora. Each generation does one thing: predict the most probable next Token. Understanding this mechanism is where everything begins.">
+<meta name="keywords" content="Base model,LLM fundamentals,Token prediction,autoregressive language model,GPT pretraining">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-base.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-base.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-base.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-base.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-base.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Base Model: The Token-by-Token Prediction Machine">
+<meta property="og:description" content="What is the core of large language models? The Base model learns statistical patterns of Token sequences from massive corpora. Each generation does one thing: predict the most probable next Token. Understanding this mechanism is where everything begins.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-base.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Base Model: The Token-by-Token Prediction Machine">
+<meta name="twitter:description" content="What is the core of large language models? The Base model learns statistical patterns of Token sequences from massive corpora. Each generation does one thing: predict the most probable next Token. Understanding this mechanism is where everything begins.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Base Model: The Token-by-Token Prediction Machine","name":"Base Model: The Token-by-Token Prediction Machine","url":"https://xueai.app/slides/1-2-base.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Fundamentals","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"What is the core of large language models? The Base model learns statistical patterns of Token sequences from massive corpora. Each generation does one thing: predict the most probable next Token. Understanding this mechanism is where everything begins.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Fundamentals</div>
+    <h1>Base Model: The Token-by-Token Prediction Machine</h1>
+    <p class="subtitle">The raw model you get after training does exactly one thing.</p>
+  </header>
+
+  <div class="sec-label">After Training</div>
+
+  <div class="big-claim">
+    What you get is a
+    <span class="em">relentless</span> Token-by-Token prediction machine
+  </div>
+
+  <div class="desc-text" id="leftDesc">
+    It knows exactly one thing:<br>
+    <strong>Given all preceding Tokens, predict the single most probable next Token.</strong>
+  </div>
+
+  <div class="pill-row reveal" id="pillRow">
+    <span class="pill pill-blue">Context Tokens</span>
+    <span class="arrow-sep">→</span>
+    <span class="pill pill-amber">Probability Distribution</span>
+    <span class="arrow-sep">→</span>
+    <span class="pill pill-green">Sampling</span>
+    <span class="arrow-sep">→</span>
+    <span class="pill pill-blue">New Token</span>
+    <span class="arrow-sep">→</span>
+    <span class="pill pill-blue">Repeat</span>
+  </div>
+
+  <div class="info-card reveal" id="card1">
+    <div class="label">It does NOT</div>
+    <div class="val">
+      Understand questions · Reason through answers · Look up knowledge<br>
+      <span style="color:var(--danger);font-weight:600;">It only sees probabilities, only emits Tokens.</span>
+    </div>
+  </div>
+
+  <div class="info-card reveal paywall-locked xa-peek" id="card2">
+    <div class="label">What this means</div>
+    <div class="val">
+      Feed it <strong>「紫霞捧着月光宝盒，轻声问：哥哥」</strong>（"Zixia cradled the Moonlight Treasure Box and softly asked: Brother…"）,<br>
+      it will predict the statistically most likely next word,<br>
+      but it does not <em>know</em> what it is writing.
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked" id="rightTitle">Token Generation Demo</div>
+
+  <div class="token-chain-area paywall-locked">
+    <!-- Token sequence (context + live generation) -->
+    <div>
+      <div style="font-size:12px;font-weight:700;color:var(--sub);margin-bottom:10px;letter-spacing:0.3px;" id="chainLabel">Context (Preceding Tokens)</div>
+      <div class="chain-row" id="contextRow">
+        <span class="tk tk-context" id="ctx0">紫霞</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA0">→</span>
+        <span class="tk tk-context" id="ctx1">捧着</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA1">→</span>
+        <span class="tk tk-context" id="ctx2">月光</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA2">→</span>
+        <span class="tk tk-context" id="ctx3">宝盒</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA3">→</span>
+        <span class="tk tk-context" id="ctx4">，</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA4">→</span>
+        <span class="tk tk-context" id="ctx5">轻声</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA5">→</span>
+        <span class="tk tk-context" id="ctx6">问</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA6">→</span>
+        <span class="tk tk-context" id="ctx7">：</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA7">→</span>
+        <span class="tk tk-context" id="ctx8">哥哥</span>
+        <!-- Generated Tokens are appended here dynamically -->
+      </div>
+    </div>
+
+    <!-- Probability distribution (updated in real-time) -->
+    <div class="prob-bar-wrap" id="probWrap">
+      <div class="prob-title" id="probTitle">Model is predicting the next Token…</div>
+      <div class="prob-row" id="pb0">
+        <div class="prob-word" id="pw0"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf0"></div></div>
+        <div class="prob-pct" id="pp0"></div>
+      </div>
+      <div class="prob-row" id="pb1">
+        <div class="prob-word" id="pw1"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf1"></div></div>
+        <div class="prob-pct" id="pp1"></div>
+      </div>
+      <div class="prob-row" id="pb2">
+        <div class="prob-word" id="pw2"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf2"></div></div>
+        <div class="prob-pct" id="pp2"></div>
+      </div>
+      <div class="prob-row" id="pb3">
+        <div class="prob-word" id="pw3"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf3"></div></div>
+        <div class="prob-pct" id="pp3"></div>
+      </div>
+      <div class="prob-row" id="pb4">
+        <div class="prob-word" id="pw4"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf4"></div></div>
+        <div class="prob-pct" id="pp4"></div>
+      </div>
+    </div>
+
+    <!-- Conclusion -->
+    <div class="conclusion-card" id="conclusionCard">
+      <p>
+        This is everything the Base model does: <b>keep appending the highest-probability word to the sequence</b> until a stop token is generated.<br>
+        No intent, no memory, no common-sense reasoning — only probabilities, only Tokens.<br>
+        <strong>Yet this simple loop is the underlying engine behind every capability of large language models.</strong>
+      </p>
+    </div>
+  </div>
+
+  <button class="btn-replay paywall-locked" id="replayBtn" onclick="replayAll()">↺ Replay</button>
+
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+let genInterval = null;
+const CTX_COUNT = 9;
+
+// Probability table before each step: candidate words + probability for each Token
+// index 0 = distribution just before generating the 0th Token ("，"), and so on
+const PROB_FRAMES = [
+  // Context: …哥哥 → next?
+  { title: 'Context ends with「哥哥」→ Next Token probability', chosen: '，',
+    rows: [['，', 62, true], ['你', 18, false], ['啊', 9, false], ['呀', 5, false], ['…', 6, false]] },
+  // Context: …哥哥， → next?
+  { title: 'Context ends with「，」→ Next Token probability', chosen: '你',
+    rows: [['你', 55, true], ['我', 20, false], ['说', 12, false], ['的', 7, false], ['可', 6, false]] },
+  // Context: …你 → next?
+  { title: 'Context ends with「你」→ Next Token probability', chosen: '说',
+    rows: [['说', 48, true], ['知', 22, false], ['爱', 15, false], ['懂', 9, false], ['走', 6, false]] },
+  // Context: …说 → next?
+  { title: 'Context ends with「说」→ Next Token probability', chosen: '你',
+    rows: [['你', 61, true], ['她', 18, false], ['过', 11, false], ['不', 7, false], ['的', 3, false]] },
+  // Context: …你 → next?
+  { title: 'Context ends with「你」→ Next Token probability', chosen: '喜',
+    rows: [['喜', 52, true], ['爱', 25, false], ['不', 13, false], ['已', 6, false], ['的', 4, false]] },
+  // Context: …喜 → next?
+  { title: 'Context ends with「喜」→ Next Token probability', chosen: '欢',
+    rows: [['欢', 88, true], ['爱', 8, false], ['好', 3, false], ['悦', 1, false]] },
+  // Context: …欢 → next?
+  { title: 'Context ends with「欢」→ Next Token probability', chosen: '我',
+    rows: [['我', 71, true], ['你', 14, false], ['他', 9, false], ['她', 4, false], ['它', 2, false]] },
+];
+
+const GENERATED = PROB_FRAMES.map(f => f.chosen);
+
+function updateProbPanel(frameIdx) {
+  const frame = PROB_FRAMES[frameIdx];
+  document.getElementById('probTitle').textContent = frame.title;
+
+  // Reset all bar widths to zero (triggers animation)
+  for (let i = 0; i < 5; i++) {
+    const fill = document.getElementById('pf' + i);
+    fill.style.transition = 'none';
+    fill.style.width = '0';
+  }
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    frame.rows.forEach((row, i) => {
+      const [word, pct, isTop] = row;
+      document.getElementById('pw' + i).textContent = word;
+      document.getElementById('pp' + i).textContent = pct + '%';
+      const fill = document.getElementById('pf' + i);
+      fill.className = 'prob-bar-fill' + (isTop ? ' top' : '');
+      fill.style.transition = 'width 0.55s cubic-bezier(0.25,1,0.5,1)';
+      fill.style.width = pct + '%';
+
+      const pbRow = document.getElementById('pb' + i);
+      pbRow.style.opacity = i < frame.rows.length ? '1' : '0';
+    });
+    // Hide extra rows
+    for (let i = frame.rows.length; i < 5; i++) {
+      document.getElementById('pb' + i).style.opacity = '0';
+    }
+  }));
+}
+
+function showCtxTokens(cb) {
+  let i = 0;
+  const timer = setInterval(() => {
+    document.getElementById('ctx' + i).classList.add('show');
+    if (i > 0) document.getElementById('ctxA' + (i - 1)).classList.add('show');
+    i++;
+    if (i >= CTX_COUNT) { clearInterval(timer); setTimeout(cb, 150); }
+  }, 110);
+}
+
+function showProbBars() {
+  const wrap = document.getElementById('probWrap');
+  wrap.classList.add('show');
+  // Initially show frame 0 (just before the first Token is generated)
+  [0,1,2,3,4].forEach(i => {
+    document.getElementById('pb' + i).classList.add('show');
+  });
+  updateProbPanel(0);
+}
+
+function runGeneration() {
+  document.getElementById('chainLabel').textContent = 'Context + Live Generation';
+
+  const row = document.getElementById('contextRow');
+  let count = 0;
+
+  genInterval = setInterval(() => {
+    if (count >= GENERATED.length) {
+      clearInterval(genInterval);
+      setTimeout(() => {
+        document.getElementById('conclusionCard').classList.add('show');
+        document.getElementById('replayBtn').style.display = 'inline-block';
+      }, 700);
+      return;
+    }
+
+    // Append arrow + new Token to end of contextRow (continues in-place)
+    const arrow = document.createElement('span');
+    arrow.className = 'tk-arrow';
+    arrow.textContent = '→';
+    row.appendChild(arrow);
+
+    const tk = document.createElement('span');
+    tk.className = 'tk tk-generated';
+    tk.textContent = GENERATED[count];
+    row.appendChild(tk);
+    requestAnimationFrame(() => requestAnimationFrame(() => tk.classList.add('show')));
+
+    count++;
+
+    // Advance probability distribution to next frame (if any)
+    if (count < PROB_FRAMES.length) {
+      setTimeout(() => updateProbPanel(count), 200);
+    } else {
+      // Generation complete, collapse probability panel
+      setTimeout(() => {
+        document.getElementById('probTitle').textContent = 'Generation complete';
+        for (let i = 0; i < 5; i++) {
+          const fill = document.getElementById('pf' + i);
+          fill.style.transition = 'width 0.4s ease';
+          fill.style.width = '0';
+          document.getElementById('pb' + i).style.opacity = '0';
+        }
+      }, 200);
+    }
+  }, 800);
+}
+
+// Auto-play when demo scrolls into view: context tokens appear → probability panel → token-by-token generation
+function playDemo() {
+  showCtxTokens(() => {
+    showProbBars();
+    setTimeout(runGeneration, 900);
+  });
+}
+
+lessonOnView(document.getElementById('contextRow'), playDemo);
+
+function replayAll() {
+  if (genInterval) clearInterval(genInterval);
+
+  document.getElementById('replayBtn').style.display = 'none';
+  document.getElementById('chainLabel').textContent = 'Context (Preceding Tokens)';
+
+  // Reset context tokens
+  for (let i = 0; i < CTX_COUNT; i++) {
+    document.getElementById('ctx' + i).classList.remove('show');
+    if (i < CTX_COUNT - 1) document.getElementById('ctxA' + i).classList.remove('show');
+  }
+  // Remove generated tokens (nodes after ctx8)
+  const row = document.getElementById('contextRow');
+  const ctx8 = document.getElementById('ctx8');
+  while (row.lastChild && row.lastChild !== ctx8) row.removeChild(row.lastChild);
+
+  // Reset probability panel
+  const wrap = document.getElementById('probWrap');
+  wrap.classList.remove('show');
+  for (let i = 0; i < 5; i++) {
+    document.getElementById('pb' + i).classList.remove('show');
+    document.getElementById('pb' + i).style.opacity = '';
+    const fill = document.getElementById('pf' + i);
+    fill.style.transition = 'none';
+    fill.style.width = '0';
+    document.getElementById('pw' + i).textContent = '';
+    document.getElementById('pp' + i).textContent = '';
+  }
+  document.getElementById('probTitle').textContent = 'Model is predicting the next Token…';
+
+  document.getElementById('conclusionCard').classList.remove('show');
+
+  setTimeout(playDemo, 300);
+}
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

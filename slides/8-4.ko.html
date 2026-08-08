@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>종합 비용 최적화: 시스템 관점에서 전면적으로 비용 절감하기 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+/* ── 비용 시뮬레이터 ── */
+.sim-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-card)}
+.sim-title{font-size:14px;font-weight:700;color:var(--sub)}
+
+.cost-state{display:flex;flex-direction:column;gap:8px}
+.cost-row{display:flex;align-items:center;gap:8px}
+.cost-row-label{font-size:13px;font-weight:700;color:var(--sub);width:52px;flex-shrink:0;text-align:right}
+.cost-bar-wrap{flex:1;height:28px;background:var(--bg);border-radius:6px;overflow:hidden;position:relative}
+.cost-bar-inner{height:100%;display:flex;gap:1px;transition:all .6s ease}
+.cost-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:rgba(255,255,255,.95);overflow:hidden;white-space:nowrap;padding:0 4px;transition:flex .6s ease,opacity .5s ease,min-width .6s ease;border-radius:3px}
+.cost-seg.gone{flex:0 !important;min-width:0 !important;opacity:0;padding:0}
+.cost-pct{font-size:13px;font-weight:800;min-width:40px;text-align:right;transition:color .4s}
+
+/* 절감 표시 */
+.save-labels{display:flex;flex-wrap:wrap;gap:6px}
+.save-tag{padding:4px 11px;border-radius:5px;font-size:13px;font-weight:700;border:1.5px solid transparent;transition:all .3s;opacity:.35}
+.save-tag.active{opacity:1}
+.save-tag.s1{background:rgba(22,163,74,.1);border-color:rgba(22,163,74,.3);color:var(--success)}
+.save-tag.s2{background:rgba(8,145,178,.1);border-color:rgba(8,145,178,.3);color:var(--cyan)}
+.save-tag.s3{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.25);color:var(--danger)}
+.save-tag.s4{background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.3);color:var(--purple)}
+.save-tag.s5{background:rgba(217,119,6,.1);border-color:rgba(217,119,6,.3);color:var(--amber)}
+
+.total-save{text-align:center;padding:6px 0}
+.total-save .big{font-size:44px;font-weight:900;transition:all .5s}
+.total-save .lbl{font-size:14px;color:var(--sub);font-weight:600;margin-top:2px}
+
+/* 실행 경로 단계 */
+.path-steps{display:flex;flex-direction:column;gap:6px;min-height:20px}
+.path-step{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--sub);line-height:1.6;padding:3px 0;opacity:0;transform:translateX(-8px);transition:all .35s ease}
+.path-step.show{opacity:1;transform:translateX(0)}
+.path-step .step-num{width:20px;height:20px;border-radius:50%;background:var(--success);color:white;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+
+/* ── 전략 카드 ── */
+.strat-list{display:flex;flex-direction:column;gap:8px}
+.strat-item{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:13px 16px;cursor:pointer;transition:all .2s;font-family:inherit;width:100%;text-align:left;box-shadow:var(--shadow-card);min-height:44px}
+.strat-item:hover{border-color:rgba(22,163,74,.3);background:rgba(22,163,74,.02)}
+.strat-item.active{border-color:var(--success);background:rgba(22,163,74,.04);box-shadow:0 2px 12px rgba(22,163,74,.1)}
+.strat-badge{padding:3px 9px;border-radius:5px;font-size:12px;font-weight:800;white-space:nowrap}
+.p1{background:rgba(22,163,74,.12);color:var(--success)}
+.p2{background:rgba(8,145,178,.12);color:var(--cyan)}
+.p3{background:rgba(220,38,38,.1);color:var(--danger)}
+.p4{background:rgba(124,58,237,.12);color:var(--purple)}
+.p5{background:rgba(217,119,6,.12);color:var(--amber)}
+.strat-name{font-size:15px;font-weight:700;color:var(--text)}
+.strat-sub{font-size:13px;color:var(--sub);margin-top:1px}
+.strat-saving{font-size:13px;font-weight:800;white-space:nowrap}
+
+/* ── 상세 펼침 영역 ── */
+.detail-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 20px;min-height:90px;overflow:hidden;position:relative;box-shadow:var(--shadow-card)}
+.detail-inner{font-size:14px;color:var(--sub);line-height:1.7;animation:fade-in .25s ease}
+@keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.detail-inner b{color:var(--text)}
+.detail-inner .flow{display:flex;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap}
+.detail-inner .flow-step{padding:3px 10px;border-radius:5px;font-size:13px;font-weight:700;background:var(--bg)}
+.detail-inner .flow-arrow{color:var(--sub);font-size:14px;font-weight:700}
+.detail-inner .flow-step.hit{background:rgba(22,163,74,.1);color:var(--success)}
+.detail-inner .flow-step.skip{background:rgba(8,145,178,.1);color:var(--cyan)}
+.detail-inner .flow-step.flag{background:rgba(220,38,38,.1);color:var(--danger)}
+
+.takeaway{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.2);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.takeaway b{color:var(--success)}
+
+@media (max-width:768px){
+  .strat-item{grid-template-columns:1fr;gap:6px}
+  .strat-saving{justify-self:start}
+  .cost-row-label{width:44px;font-size:12px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="AI 시스템 비용 최적화는 단순히 Prompt 압축이 아닙니다. 모델 선택부터 요청 병합, 캐시 전략, 출력 절단, 배치 처리, 트래픽 제어까지 5계층 종합 최적화 프레임워크를 제공하여 AI PM이 데이터 기반 비용 결정을 내릴 수 있도록 도와드립니다.">
+<meta name="keywords" content="AI 비용 최적화,대규모 모델 비용,모델 선택,배치 처리,API 비용 제어,AI 비용 절감">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-4.ko.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-4.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-4.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="종합 비용 최적화: 시스템 관점에서 전면적으로 비용 절감하기">
+<meta property="og:description" content="AI 시스템 비용 최적화는 단순히 Prompt 압축이 아닙니다. 모델 선택부터 요청 병합, 캐시 전략, 출력 절단, 배치 처리, 트래픽 제어까지 5계층 종합 최적화 프레임워크를 제공하여 AI PM이 데이터 기반 비용 결정을 내릴 수 있도록 도와드립니다.">
+<meta property="og:url" content="https://xueai.app/slides/8-4.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="종합 비용 최적화: 시스템 관점에서 전면적으로 비용 절감하기">
+<meta name="twitter:description" content="AI 시스템 비용 최적화는 단순히 Prompt 압축이 아닙니다. 모델 선택부터 요청 병합, 캐시 전략, 출력 절단, 배치 처리, 트래픽 제어까지 5계층 종합 최적화 프레임워크를 제공하여 AI PM이 데이터 기반 비용 결정을 내릴 수 있도록 도와드립니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"종합 비용 최적화: 시스템 관점에서 전면적으로 비용 절감하기","name":"종합 비용 최적화: 시스템 관점에서 전면적으로 비용 절감하기","url":"https://xueai.app/slides/8-4.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI 실전 과정 · 비용 최적화 및 모델 선택","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"AI 시스템 비용 최적화는 단순히 Prompt 압축이 아닙니다. 5계층 종합 최적화 프레임워크가 AI PM의 데이터 기반 비용 결정을 도와드립니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">비용 최적화</div>
+    <h1>종합 비용 최적화</h1>
+    <p class="subtitle">단일 최적화의 효과는 제한적입니다. 계층형 복합 전략으로 AI 비용을 70–90% 절감할 수 있습니다. 아래 전략 카드를 클릭하여 비용 바의 변화를 실시간으로 확인해 보세요.</p>
+  </header>
+
+  <div class="sec-label">5계층 최적화 전략</div>
+
+  <div style="font-size:13px;color:var(--sub);margin-bottom:10px">순서대로 클릭하여 효과를 누적하세요 (다시 클릭하면 취소됩니다)</div>
+  <div class="strat-list" id="stratList">
+
+    <button class="strat-item" onclick="pickStrat(this,0)">
+      <span class="strat-badge p1">우선순위 1</span>
+      <div>
+        <div class="strat-name">KV Cache + 고정 System Prompt</div>
+        <div class="strat-sub">가장 간단하면서 효과가 가장 큽니다. 히스토리가 캐시에 히트되어 재계산이 0으로 줄어듭니다</div>
+      </div>
+      <div class="strat-saving" style="color:var(--success)">30–50% 절감</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,1)">
+      <span class="strat-badge p2">우선순위 2</span>
+      <div>
+        <div class="strat-name">의도 인식 → 모델 라우팅</div>
+        <div class="strat-sub">단순 질문 80%는 소형 모델로 처리, 복잡한 질문만 플래그십 모델 사용</div>
+      </div>
+      <div class="strat-saving" style="color:var(--cyan)">40–60% 절감</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,2)">
+      <span class="strat-badge p3">우선순위 3</span>
+      <div>
+        <div class="strat-name">RAG 트리거 필터링</div>
+        <div class="strat-sub">"RAG가 필요한가?" 판단 단계를 추가하여 불필요한 벡터 검색을 건너뜁니다</div>
+      </div>
+      <div class="strat-saving" style="color:var(--danger)">20–40% 절감</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,3)">
+      <span class="strat-badge p4">우선순위 4</span>
+      <div>
+        <div class="strat-name">대화 히스토리 압축 (요약 전략)</div>
+        <div class="strat-sub">N 턴 초과 시 ~2,000 Token 히스토리를 ~200 Token 요약으로 대체합니다</div>
+      </div>
+      <div class="strat-saving" style="color:var(--purple)">장대화 60–80% 절감</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,4)">
+      <span class="strat-badge p5">우선순위 5</span>
+      <div>
+        <div class="strat-name">Semantic Cache (의미 캐시)</div>
+        <div class="strat-sub">의미적으로 유사한 질문은 동일한 답변을 재사용하여 FAQ에서 LLM을 호출하지 않습니다</div>
+      </div>
+      <div class="strat-saving" style="color:var(--amber)">FAQ 70–90% 절감</div>
+    </button>
+
+  </div>
+
+  <div class="sec-label">비용 시뮬레이터</div>
+
+  <div class="sim-box paywall-locked xa-peek">
+    <div class="sim-title">하루 10만 건 대화 · 위의 전략을 클릭하여 최적화 효과를 누적하세요</div>
+
+    <div class="cost-state">
+      <div class="cost-row">
+        <div class="cost-row-label">최적화 전</div>
+        <div class="cost-bar-wrap">
+          <div class="cost-bar-inner">
+            <div class="cost-seg" style="flex:35;background:#dc2626" id="seg-before-hist">반복 히스토리 35%</div>
+            <div class="cost-seg" style="flex:25;background:#d97706" id="seg-before-rag">불필요 RAG 25%</div>
+            <div class="cost-seg" style="flex:20;background:#7c3aed" id="seg-before-model">플래그십 모델 20%</div>
+            <div class="cost-seg" style="flex:20;background:#0891b2" id="seg-before-real">필수 연산 20%</div>
+          </div>
+        </div>
+        <div class="cost-pct" style="color:var(--danger)">100%</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-row-label">현재</div>
+        <div class="cost-bar-wrap">
+          <div class="cost-bar-inner" id="afterBar">
+            <div class="cost-seg" style="flex:35;background:#dc2626" id="seg-hist">반복 히스토리</div>
+            <div class="cost-seg" style="flex:25;background:#d97706" id="seg-rag">불필요 RAG</div>
+            <div class="cost-seg" style="flex:20;background:#7c3aed" id="seg-model">플래그십 모델</div>
+            <div class="cost-seg" style="flex:20;background:#0891b2" id="seg-real">필수 20%</div>
+            <div class="cost-seg" style="flex:0;background:rgba(22,163,74,.35);color:#16a34a;min-width:0" id="seg-saved">절감됨</div>
+          </div>
+        </div>
+        <div class="cost-pct" id="afterPct" style="color:var(--text)">100%</div>
+      </div>
+    </div>
+
+    <div class="save-labels">
+      <span class="save-tag s1" id="tag1">KV Cache −35%</span>
+      <span class="save-tag s2" id="tag2">모델 라우팅 −12%</span>
+      <span class="save-tag s3" id="tag3">RAG 필터링 −18%</span>
+      <span class="save-tag s4" id="tag4">히스토리 압축 −8%</span>
+      <span class="save-tag s5" id="tag5">Semantic Cache −7%</span>
+    </div>
+
+    <div class="total-save">
+      <div class="big" id="totalBig" style="color:var(--sub)">0%</div>
+      <div class="lbl">누적 절감액</div>
+    </div>
+
+    <div class="path-steps" id="pathSteps"></div>
+  </div>
+
+  <div class="sec-label paywall-locked">실행 세부 사항</div>
+
+  <div class="detail-panel paywall-locked" id="detailPanel">
+    <div class="detail-inner" style="color:var(--sub);font-size:14px;text-align:center;padding-top:18px">
+      ↑ 위의 임의 전략을 클릭하여 실행 흐름을 확인하세요
+    </div>
+  </div>
+
+  <div class="takeaway paywall-locked" style="margin-top:20px">
+    <b>비용 최적화 = 아키텍처 설계이며, 사후 보완이 아닙니다.</b> 시스템 설계 초기에 이 5계층을 고려하면, 출시 후 최적화하는 것보다 10배 더 쉽습니다.
+  </div>
+
+</article>
+
+<script>
+// 각 전략이 제거하는 비용 세그먼트 및 누적 후 잔존 비율
+const STRATS = [
+  {
+    segId: 'seg-hist',
+    tagId: 'tag1',
+    savePct: 35,   // 반복 히스토리 35% 제거
+    tagCls: 's1',
+    steps: [
+      'System Prompt에서 모든 동적 콘텐츠(타임스탬프, 사용자 ID, 무작위 내용)를 제거하세요',
+      'System Prompt를 완전히 고정 → 플랫폼이 자동으로 프리픽스 캐시에 히트합니다',
+      '모든 동적 정보를 User 메시지로 이동 → 매 턴마다 새로 추가된 Token만 계산합니다',
+      'OpenAI / Claude / Gemini 모두 기본 지원 — 추가 설정 불필요'
+    ],
+    flow: ['요청 수신','SYS 고정?','✓ 캐시 히트','새 Token만 계산'],
+    detail: `<b>KV Cache 원리:</b> System Prompt 불변 → 플랫폼이 K/V 매트릭스를 캐시 → 이후 대화는 재계산 불필요.<br><br>
+      <div class="flow">
+        <span class="flow-step">새 요청</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">SYS 캐시 히트</span><span class="flow-arrow">→</span>
+        <span class="flow-step skip">이번 턴 추가분만 계산</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">결과 반환</span>
+      </div>
+      <b>핵심:</b> System Prompt 한 글자만 바뀌어도 캐시가 완전히 무효화됩니다.\`
+  },
+  {
+    segId: 'seg-model',
+    tagId: 'tag2',
+    savePct: 12,
+    tagCls: 's2',
+    steps: [
+      '요청 입구에 의도 분류기를 추가하세요 (저렴한 소형 모델 사용, 예: gpt-4o-mini)',
+      '"단순 Q&A/잡담" → 소형 모델로 직접 답변 (비용 약 1/10)',
+      '"전문 분석/창작" → 플래그십 모델로 라우팅',
+      '소형 모델의 분류 비용은 무시 가능 수준, 플래그십 모델 비용 40–60% 절감'
+    ],
+    detail: `<b>모델 라우팅 흐름:</b> 저렴한 모델로 복잡도를 먼저 판단한 후, 어느 모델로 답변할지 결정합니다.<br><br>
+      <div class="flow">
+        <span class="flow-step">사용자 요청</span><span class="flow-arrow">→</span>
+        <span class="flow-step">소형 모델 분류</span><span class="flow-arrow">→</span>
+        <span class="flow-step skip">단순: 소형 모델 답변</span>
+      </div>
+      <div class="flow" style="margin-top:2px">
+        <span style="width:80px;display:inline-block"></span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step flag">복잡: 플래그십 모델</span>
+      </div>
+      <b>실측:</b> 대화의 80%를 소형 모델로 처리, 플래그십 모델 사용률이 20%로 감소합니다.\`
+  },
+  {
+    segId: 'seg-rag',
+    tagId: 'tag3',
+    savePct: 18,
+    tagCls: 's3',
+    steps: [
+      'RAG 흐름 맨 앞에 판단 단계 추가: 이 질문은 문서 검색이 필요한가요?',
+      '"일반 지식" (예: "Python이란?") → RAG 건너뛰고 직접 답변',
+      '"제품 특정 질문" (예: "환불 정책이 어떻게 되나요?") → 벡터 검색 실행',
+      '규칙 기반 판단(키워드 매칭) 또는 소형 모델 분류를 사용할 수 있습니다'
+    ],
+    detail: `<b>RAG 트리거 필터:</b> 모든 질문에 검색이 필요한 것은 아닙니다 — 일반 지식 질문을 필터링하세요.<br><br>
+      <div class="flow">
+        <span class="flow-step">사용자 질문</span><span class="flow-arrow">→</span>
+        <span class="flow-step">RAG 필요?</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">불필요: 직접 답변</span>
+      </div>
+      <div class="flow" style="margin-top:2px">
+        <span style="width:80px;display:inline-block"></span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step flag">필요: 벡터 검색 → 컨텍스트 주입</span>
+      </div>
+      <b>효과:</b> 프로덕션 환경에서 약 40–70%의 질문이 RAG를 건너뛸 수 있습니다.\`
+  },
+  {
+    segId: null,  // hist 잔존 부분 감소
+    tagId: 'tag4',
+    savePct: 8,
+    tagCls: 's4',
+    steps: [
+      '임계값 설정: 대화가 20턴을 초과하거나 히스토리 Token이 3,000을 초과할 때 실행',
+      'LLM을 한 번 호출하여 초기 N턴을 ~200 Token 요약으로 압축합니다',
+      '원본 히스토리를 요약으로 대체 → Context 사용량이 크게 감소합니다',
+      '오버플로 직전에 압축하세요, 오버플로 후 처리가 아닙니다'
+    ],
+    detail: `<b>압축 타이밍:</b> Context가 가득 차기 전에 능동적으로 압축하세요, 수동적으로 잘라내는 것이 아닙니다.<br><br>
+      <div class="flow">
+        <span class="flow-step">N번째 대화 턴</span><span class="flow-arrow">→</span>
+        <span class="flow-step flag">히스토리 > 3000T?</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">요약 압축 실행</span>
+      </div>
+      <div class="flow" style="margin-top:4px">
+        <span class="flow-step">~2000T 히스토리</span><span class="flow-arrow">압축</span>
+        <span class="flow-step hit">~200T 요약</span><span class="flow-arrow">절감</span>
+        <span class="flow-step hit">90%</span>
+      </div>`
+  },
+  {
+    segId: null,
+    tagId: 'tag5',
+    savePct: 7,
+    tagCls: 's5',
+    steps: [
+      '벡터 데이터베이스를 유지 관리하여 과거 고품질 Q-A 쌍의 Embedding을 저장합니다',
+      '새 요청은 먼저 Embedding을 계산하고, 유사도 > 임계값(예: 0.92)인 기존 답변을 검색합니다',
+      '히트 → 캐시된 답변을 직접 반환, LLM 호출 없음 (지연 ~10ms)',
+      '미스 → 정상적으로 LLM 호출, 새 Q-A를 캐시에 저장'
+    ],
+    detail: `<b>Semantic Cache vs 정확 캐시:</b> "환불 방법은?" 과 "환불 절차가 어떻게 되나요?" → 의미 유사 → 동일한 답변 재사용.<br><br>
+      <div class="flow">
+        <span class="flow-step">새 질문 Embedding</span><span class="flow-arrow">→</span>
+        <span class="flow-step">벡터 검색</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">유사도 > 0.92: HIT</span>
+      </div>
+      <div class="flow" style="margin-top:2px">
+        <span style="width:140px;display:inline-block"></span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step flag">미스: LLM 호출 + 캐시 저장</span>
+      </div>
+      <b>적합한 시나리오:</b> 고객 서비스 FAQ, 고빈도 유사 질문 시스템 (히트율 60–80% 달성 가능).\`
+  }
+];
+
+// 현재 활성화된 전략 집합
+let activeSet = new Set();
+// 각 세그먼트의 현재 flex 값 (동적)
+let segFlex = { hist: 35, rag: 25, model: 20, real: 20, saved: 0 };
+
+function pickStrat(btn, idx) {
+  const s = STRATS[idx];
+  const isOn = activeSet.has(idx);
+
+  if (isOn) {
+    // 비활성화
+    activeSet.delete(idx);
+    btn.classList.remove('active');
+    document.getElementById(s.tagId).classList.remove('active');
+  } else {
+    // 활성화
+    activeSet.add(idx);
+    btn.classList.add('active');
+    document.getElementById(s.tagId).classList.add('active');
+  }
+
+  // 바 재계산
+  recalcBar();
+  // 상세 정보 업데이트
+  renderDetail(idx, !isOn);
+  // 단계 목록 업데이트 (마지막 활성화 전략 표시)
+  renderSteps(idx, !isOn);
+}
+
+function recalcBar() {
+  // 초기화
+  let hist = 35, rag = 25, model = 20, real = 20;
+  let saved = 0;
+
+  if (activeSet.has(0)) { saved += 35; hist = 0; }       // KV Cache가 반복 히스토리 제거
+  if (activeSet.has(1)) { saved += 12; model = 8; }      // 라우팅: 플래그십 20→8
+  if (activeSet.has(2)) { saved += 18; rag = 7; }        // RAG 필터: 25→7
+  if (activeSet.has(3)) { saved += 8; hist = Math.max(0, hist - 8); }  // 히스토리 압축
+  if (activeSet.has(4)) { saved += 7; }                  // Semantic Cache
+
+  const total = hist + rag + model + real + saved;
+  const remaining = 100 - saved;
+
+  // flex 적용
+  const apply = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.flex = val;
+    if (val === 0) { el.classList.add('gone'); el.textContent = ''; }
+    else { el.classList.remove('gone'); }
+  };
+  apply('seg-hist',  hist);
+  apply('seg-rag',   rag);
+  apply('seg-model', model);
+  apply('seg-real',  real);
+
+  const savedEl = document.getElementById('seg-saved');
+  savedEl.style.flex = saved;
+  savedEl.style.minWidth = saved > 0 ? '40px' : '0';
+  savedEl.textContent = saved > 0 ? `${saved}% 절감` : '';
+
+  // 퍼센트 숫자 업데이트
+  const pctEl = document.getElementById('afterPct');
+  pctEl.textContent = remaining + '%';
+  pctEl.style.color = saved > 50 ? 'var(--success)' : saved > 20 ? 'var(--amber)' : 'var(--text)';
+
+  // 큰 숫자
+  const bigEl = document.getElementById('totalBig');
+  bigEl.textContent = saved + '%';
+  bigEl.style.color = saved > 60 ? 'var(--success)' : saved > 30 ? 'var(--amber)' : 'var(--sub)';
+}
+
+function renderDetail(idx, isActivating) {
+  const s = STRATS[idx];
+  const panel = document.getElementById('detailPanel');
+  if (!isActivating) {
+    panel.innerHTML = '<div class="detail-inner" style="color:var(--sub);font-size:14px;text-align:center;padding-top:18px">↑ 위의 임의 전략을 클릭하여 실행 흐름을 확인하세요</div>';
+    return;
+  }
+  panel.innerHTML = `<div class="detail-inner">${s.detail}</div>`;
+}
+
+function renderSteps(idx, isActivating) {
+  const s = STRATS[idx];
+  const el = document.getElementById('pathSteps');
+  el.innerHTML = '';
+  if (!isActivating) return;
+  s.steps.forEach((text, i) => {
+    const div = document.createElement('div');
+    div.className = 'path-step';
+    div.innerHTML = `<div class="step-num">${i+1}</div><div>${text}</div>`;
+    el.appendChild(div);
+    setTimeout(() => div.classList.add('show'), i * 80);
+  });
+}
+
+// 초기화
+recalcBar();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

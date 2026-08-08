@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Training Data Scale: How LLMs Are Actually Fed | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.big-num {
+  font-size: 64px; font-weight: 900; color: var(--accent);
+  line-height: 1; letter-spacing: -3px;
+  transition: transform 0.2s;
+}
+.big-num.pop { transform: scale(1.06); }
+.big-label { font-size: 15px; font-weight: 700; color: var(--sub); margin-top: 6px; }
+
+/* corpus bars */
+.corpus-list { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.corpus-row  { display: flex; align-items: center; gap: 10px; }
+.corpus-name { width: 70px; font-size: 13px; font-weight: 700; color: var(--sub); text-align: right; flex-shrink: 0; }
+.corpus-track { flex: 1; height: 24px; background: rgba(0,0,0,0.05); border-radius: 7px; overflow: hidden; }
+.corpus-fill {
+  height: 100%; border-radius: 7px; width: 0;
+  display: flex; align-items: center; padding-left: 10px;
+  transition: width 0.9s cubic-bezier(0.25,1,0.5,1);
+}
+.corpus-fill span { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.95); }
+.corpus-pct { width: 38px; font-size: 13px; font-weight: 800; text-align: right; flex-shrink: 0; }
+
+.insight {
+  background: rgba(217,119,6,0.06); border: 1.5px solid rgba(217,119,6,0.2);
+  border-radius: var(--radius); padding: 16px 20px;
+  font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.7;
+  margin-top: 18px;
+}
+.insight span { font-size: 13px; font-weight: 400; color: var(--sub); }
+
+/* slider */
+.slider-wrap {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px;
+  box-shadow: var(--shadow-card);
+}
+.slider-val { font-size: 18px; font-weight: 900; color: var(--accent); min-width: 72px; }
+.slider-mode-badge {
+  font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 8px;
+  white-space: nowrap; transition: all 0.3s;
+}
+input[type=range] {
+  flex: 1; accent-color: var(--accent); cursor: pointer; height: 28px;
+  min-width: 0;
+}
+
+.right-panels {
+  display: flex; flex-direction: column; gap: 14px; margin-top: 14px;
+}
+
+/* 规模感受卡 */
+.vis-box {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: var(--shadow-card);
+}
+.vis-analogy {
+  font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.5;
+}
+.vis-analogy b { color: var(--accent); }
+.vis-analogy .sub { font-size: 12px; font-weight: 400; color: var(--sub); margin-top: 2px; }
+
+/* icon grid */
+.icon-grid {
+  display: flex; flex-wrap: wrap;
+  align-content: flex-start; gap: 3px;
+  max-height: 60px; overflow: hidden;
+}
+.icon-unit {
+  font-size: 17px; line-height: 1;
+  opacity: 0; transform: scale(0.5);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.icon-unit.in { opacity: 1; transform: scale(1); }
+
+/* scale bar */
+.scale-bar-track {
+  height: 8px; background: rgba(0,0,0,0.06); border-radius: 8px; overflow: hidden;
+}
+.scale-bar-fill {
+  height: 100%; border-radius: 8px; background: var(--accent);
+  transition: width 0.5s cubic-bezier(0.25,1,0.5,1);
+}
+.scale-bar-labels {
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: var(--sub); margin-top: 3px; font-weight: 600;
+}
+
+/* ── 实测卡片 ── */
+.model-card {
+  border-radius: var(--radius); border: 2px solid var(--border);
+  padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;
+  transition: border-color 0.3s, background 0.3s;
+  background: var(--card);
+}
+.model-card.is-hallucination { border-color: rgba(229,62,62,0.45); background: rgba(229,62,62,0.03); }
+.model-card.is-unknown       { border-color: rgba(217,119,6,0.45);  background: rgba(217,119,6,0.03); }
+.model-card.is-correct       { border-color: rgba(22,163,74,0.5);   background: rgba(22,163,74,0.04); }
+
+.model-card-header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.model-size-big {
+  font-size: 28px; font-weight: 900; line-height: 1;
+  transition: color 0.3s;
+}
+.is-hallucination .model-size-big { color: var(--danger); }
+.is-unknown       .model-size-big { color: var(--amber); }
+.is-correct       .model-size-big { color: var(--success); }
+
+.model-card-meta { flex: 1; }
+.model-card-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.model-card-tag  { font-size: 11px; color: var(--sub); margin-top: 1px; }
+
+.verdict-badge {
+  font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 8px;
+  flex-shrink: 0;
+}
+.is-hallucination .verdict-badge { background: var(--danger); color: white; }
+.is-unknown       .verdict-badge { background: var(--amber);  color: white; }
+.is-correct       .verdict-badge { background: var(--success); color: white; }
+
+.model-card-q {
+  font-size: 12px; font-weight: 700; color: var(--sub);
+}
+.model-card-answer {
+  font-size: 14px; color: var(--text); line-height: 1.7;
+  border-radius: 10px; padding: 12px 16px;
+  transition: background 0.3s;
+}
+.is-hallucination .model-card-answer { background: rgba(229,62,62,0.05); }
+.is-unknown       .model-card-answer { background: rgba(217,119,6,0.05); }
+.is-correct       .model-card-answer { background: rgba(22,163,74,0.05); }
+
+.model-card-answer .wrong { color: var(--danger); font-weight: 700; }
+.model-card-answer .right { color: var(--success); font-weight: 700; }
+.model-card-answer b { color: var(--success); font-weight: 700; }
+
+.model-card-tip {
+  font-size: 13px; color: var(--sub); line-height: 1.6;
+}
+.model-card-tip b { color: var(--text); }
+
+@media (max-width: 768px) {
+  .big-num { font-size: 48px; letter-spacing: -2px; }
+  .slider-wrap { flex-wrap: wrap; }
+  .slider-val { min-width: 60px; }
+  .scale-bar-labels { font-size: 8px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Explore the scale and quality of LLM training data: trillion-Token corpora, data cleaning pipelines, Common Crawl / Books / code composition ratios — and how data scale determines a model's knowledge ceiling.">
+<meta name="keywords" content="LLM training data,Token,corpus scale,Common Crawl,pre-training data">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/training-data.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/training-data.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/training-data.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/training-data.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/training-data.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Training Data Scale: How LLMs Are Actually Fed">
+<meta property="og:description" content="Explore the scale and quality of LLM training data: trillion-Token corpora, data cleaning pipelines, Common Crawl / Books / code composition ratios — and how data scale determines a model's knowledge ceiling.">
+<meta property="og:url" content="https://xueai.app/slides/training-data.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Training Data Scale: How LLMs Are Actually Fed">
+<meta name="twitter:description" content="Explore the scale and quality of LLM training data: trillion-Token corpora, data cleaning pipelines, Common Crawl / Books / code composition ratios — and how data scale determines a model's knowledge ceiling.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"AI's Food: Training Data","name":"AI's Food: Training Data","url":"https://xueai.app/slides/training-data.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI in Action · Foundational Principles","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Explore the scale and quality of LLM training data: trillion-Token corpora, data cleaning pipelines, Common Crawl / Books / code composition ratios — and how data scale determines a model's knowledge ceiling.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Foundational Principles</div>
+    <h1>AI's Food: Training Data</h1>
+    <p class="subtitle">To teach an AI to speak, you first have to feed it trillions of words. It has read the vast majority of everything humanity has ever written.</p>
+  </header>
+
+  <div class="sec-label">Data Scale &amp; Composition</div>
+
+  <div class="l-card">
+    <div class="big-num" id="bigNum">~1B</div>
+    <div class="big-label" id="bigSubLabel">Tokens · Training data scale for a very small model</div>
+
+    <div class="corpus-list" id="corpusList"></div>
+  </div>
+
+  <div class="insight paywall-locked xa-peek" id="insight">
+    What a model has read is the ceiling of what it can say.<br>
+    <span>The quality and diversity of training data set the upper bound of a model's worldview.</span>
+  </div>
+
+  <div class="sec-label paywall-locked">Drag the slider · Feel the capability gap across model sizes</div>
+
+  <div class="slider-wrap paywall-locked">
+    <span class="slider-val" id="sliderVal">270M</span>
+    <input type="range" min="0" max="8" step="1" value="0" id="scaleSlider" oninput="updateScale(this.value)" style="flex:1">
+    <span class="slider-mode-badge" id="modeBadge">Hallucination</span>
+  </div>
+
+  <div class="right-panels paywall-locked">
+
+    <!-- 上：规模感受小卡 -->
+    <div class="vis-box">
+      <div class="vis-analogy" id="visAnalogy"></div>
+      <div class="icon-grid" id="iconGrid"></div>
+      <div class="scale-bar-wrap">
+        <div class="scale-bar-track">
+          <div class="scale-bar-fill" id="scaleBarFill" style="width:2%"></div>
+        </div>
+      <div class="scale-bar-labels">
+        <span>270M</span><span>0.6B</span><span>1.8B</span><span>30B</span><span>70B</span><span>120B</span><span>235B</span><span>1T</span><span>5T+</span>
+      </div>
+      </div>
+    </div>
+
+    <!-- 下：实测大卡（随 slider 切换） -->
+    <div class="model-card" id="modelCard">
+      <div class="model-card-header">
+        <div class="model-size-big" id="cardSize">270M</div>
+        <div class="model-card-meta">
+          <div class="model-card-name" id="cardName">Gemma-4-e2b</div>
+          <div class="model-card-tag" id="cardTag">Google · Local inference</div>
+        </div>
+        <div class="verdict-badge" id="cardVerdict">Hallucination</div>
+      </div>
+      <div class="model-card-q">Q: Who is Lee Ji-eun (IU)? Please describe her life and key works.</div>
+      <div class="model-card-answer" id="cardAnswer"></div>
+      <div class="model-card-tip" id="cardTip"></div>
+    </div>
+
+  </div>
+
+</article>
+
+<script>
+// ── Corpus bars ──
+const CORPUS = [
+  { name:'Web text', pct:70, color:'#0066ff' },
+  { name:'Books',    pct:12, color:'#7c3aed' },
+  { name:'Code',     pct:8,  color:'#16a34a' },
+  { name:'Papers',   pct:5,  color:'#d97706' },
+  { name:'Dialogue', pct:5,  color:'#e53e3e' },
+];
+const list = document.getElementById('corpusList');
+CORPUS.forEach(c => {
+  list.innerHTML += `
+    <div class="corpus-row">
+      <div class="corpus-name">${c.name}</div>
+      <div class="corpus-track">
+        <div class="corpus-fill" style="background:${c.color}" data-w="${c.pct}">
+          <span>${c.pct}%</span>
+        </div>
+      </div>
+      <div class="corpus-pct" style="color:${c.color}">${c.pct}%</div>
+    </div>`;
+});
+setTimeout(() => {
+  list.querySelectorAll('.corpus-fill').forEach(el => el.style.width = el.dataset.w + '%');
+}, 200);
+
+// ── Model tier data (parameter count + live test results) ──
+const SCALES = [
+  {
+    // slider left
+    num: '270M',
+    sublabel: 'Tokens · Very small model, trained on ~1B Tokens',
+    // scale visualization (top right)
+    analogy: 'Training data ≈ <b>750,000</b> average novels',
+    sub: 'About the size of a small city library collection',
+    icon: '📚', count: 8, pct: 2,
+    // test result card
+    verdict: 'hallucination',
+    verdictLabel: 'Hallucination',
+    modelName: 'Gemma-4-e2b (270M)',
+    modelTag: 'Google · LMStudio local test',
+    answer: 'Lee Ji-eun is a famous <b class="wrong">Chinese educólogo</b> and <b class="wrong">educator</b>. Although no public information is currently available, based on some records it can be inferred that she is a <b class="wrong">Chinese educational educator</b>. Key works: <b class="wrong">Educator, Education and Educators</b>, describing the life and work of Chinese educational educators.',
+    tip: '270M has no idea who Lee Ji-eun is. It fabricated a "Chinese educator" identity on the spot and misspelled "educólogo." This is what happens when parameters are too few and training data too sparse: random confabulation, zero grounding.',
+  },
+  {
+    num: '0.6B',
+    sublabel: 'Tokens · Very small model, trained on ~1B Tokens',
+    analogy: 'Training data ≈ <b>750,000</b> average novels',
+    sub: 'Knowledge coverage extremely sparse — only retains common-sense-level facts',
+    icon: '📚', count: 8, pct: 5,
+    verdict: 'hallucination',
+    verdictLabel: 'Hallucination',
+    modelName: 'Qwen3-0.6B',
+    modelTag: 'Alibaba · LMStudio local test',
+    answer: 'Lee Ji-eun (<b class="wrong">Lee Ji-hoon</b>) is a famous South Korean actress born in 1993, currently serving as <b class="wrong">editorial board member of the Korean National Encyclopedia</b>. Her career began in the Korean entertainment industry, where she demonstrated a unique charm across multiple film and television productions. Early life: Lee Ji-eun showed a passion for performing during adolescence before entering the entertainment world.',
+    tip: '0.6B gets the general direction right (Korean female celebrity), but misspells the stage name as Lee Ji-hoon and fabricates an "encyclopedia editorial board" role that never existed. Right ballpark, completely wrong details.',
+  },
+  {
+    num: '1.8B',
+    sublabel: 'Tokens · Small model, trained on ~2B Tokens',
+    analogy: 'Training data ≈ <b>1.5 million</b> books',
+    sub: 'Basic popular knowledge, but niche facts easily go blank',
+    icon: '📖', count: 12, pct: 12,
+    verdict: 'unknown',
+    verdictLabel: 'Refuses to answer',
+    modelName: 'HunYuan-1.8B',
+    modelTag: 'Tencent · LMStudio local test',
+    answer: 'Regarding the name "Lee Ji-eun," there is currently <b class="wrong">no widely known or publicly authoritative source</b> documenting her life and key works. She may be a practitioner in a specific field or a non-public figure. If you are referring to an individual in a specific region or circle, please provide more background information (such as field, achievements, or related events) for further verification.',
+    tip: '1.8B is slightly better than outright hallucination — at least it didn\'t invent an identity — but it still doesn\'t know who Lee Ji-eun is and punts back to the user with "please provide more context." Equivalent to: "I never read that book."',
+  },
+  {
+    num: '30B',
+    sublabel: 'Tokens · Large model, trained on ~15T Tokens',
+    analogy: 'Equivalent to reading the entire internet <b>two or three times</b>',
+    sub: 'Knowledge coverage quite comprehensive; mainstream facts basically accurate',
+    icon: '🚀', count: 26, pct: 56,
+    verdict: 'correct',
+    verdictLabel: 'Correct & detailed',
+    modelName: 'Qwen3-Coder-30B',
+    modelTag: 'Alibaba · LMStudio local test',
+    answer: 'Lee Ji-eun (stage name <b>IU</b>), born May 16, 1993, in Seoul, South Korea — a prominent singer-songwriter and actress. Debuted in 2008; gained widespread recognition with "Good Day" in 2010 and became known as "Nation\'s Little Sister." Key music: Good Day, Through the Night, Palette, LILAC. Key acting: My Mister, Goblin, Hotel Del Luna.',
+    tip: '30B can now deliver a complete, structured bio: stage name, birthday, debut year, key works — all accurate. At this scale, mainstream public figures are basically hallucination-free.',
+  },
+  {
+    num: '70B',
+    sublabel: 'Tokens · Large model, trained on ~15T Tokens',
+    analogy: 'Equivalent to reading the entire internet <b>two or three times</b>',
+    sub: 'Larger parameter count ≠ no hallucination; slightly niche facts still go wrong',
+    icon: '🚀', count: 32, pct: 65,
+    verdict: 'hallucination',
+    verdictLabel: 'Severe hallucination',
+    modelName: 'Llama-3.3-70B-Instruct',
+    modelTag: 'Meta · OpenRouter cloud test',
+    answer: 'Lee Ji-eun is a South Korean actress born <b class="wrong">February 9, 1987</b>. She rose to prominence in 2010 after starring in the drama <b class="wrong">Secret Garden</b>, where she played a character named <b class="wrong">Yoon Seul, a wealthy heir</b>. Her key works include Signal, Architecture 101, and When the Devil Calls Your Name.',
+    tip: '70B is completely wrong! It confused Lee Ji-eun (the singer/IU) with a different actress of the same name — off by 6 years on birth date, and every work listed belongs to someone else. Bigger parameters don\'t prevent hallucination. This is exactly how training data coverage determines knowledge boundaries.',
+  },
+  {
+    num: '120B',
+    sublabel: 'Tokens · Very large model, trained on ~15T+ Tokens',
+    analogy: 'Equivalent to <b>repeatedly digesting</b> the entire internet many times',
+    sub: 'Extremely dense knowledge; handles details, cross-language, and deep reasoning',
+    icon: '🤯', count: 38, pct: 78,
+    verdict: 'correct',
+    verdictLabel: 'Expert level',
+    modelName: 'GPT-OSS-120B',
+    modelTag: 'OpenAI · LMStudio local test',
+    answer: 'Lee Ji-eun, stage name <b>IU</b>, born May 16, 1993 in Gangnam, Seoul — father a music teacher, mother an art teacher. Officially debuted in 2008 with single "Lost Child," signed to LOEN (now Kakao M). Released album IU…I\'m IU in 2010; lead single "Marshmallow" won her first music show #1. "Good Day" that same year, with its three-register high notes, cemented her as "Nation\'s Little Sister." Key albums: Last Fantasy, Modern Times, Palette, Lilac. Key tracks: Through the Night, Eight, Coin. Dramas: My Mister, Hotel Del Luna, My Liberation Notes.',
+    tip: '120B reads almost like a Wikipedia article — even parents\' occupations, label name, and debut single are accurate. The leap from 70B\'s severe hallucination to this is striking.',
+  },
+  {
+    num: '235B',
+    sublabel: 'Tokens · MoE giant model, trained on ~20T Tokens',
+    analogy: 'Training data has surpassed <b>all of human written language combined</b>',
+    sub: '235B parameter pool, 22B dynamically activated — balances reasoning and knowledge',
+    icon: '🌌', count: 48, pct: 86,
+    verdict: 'correct',
+    verdictLabel: 'Encyclopedia level',
+    modelName: 'Qwen3-235B-A22B (MoE)',
+    modelTag: 'Alibaba · OpenRouter cloud test',
+    answer: 'Lee Ji-eun (born May 16, 1993–), South Korean singer-songwriter, music producer, and actress, known by her stage name <b>IU</b> (아이유). Failed an audition at age 13; later became a trainee at LOEN Entertainment (now Kakao Music). Official debut September 2008. "Good Day" in 2010, with its three-register high notes, swept the charts and established her as a national-level icon. Key albums: Last Fantasy, Modern Times, Palette, Lilac. Key tracks: Good Day, Through the Night, BBIBBI, Love Scenario. Film/TV: My Mister, Goblin, Hotel Del Luna.',
+    tip: '235B MoE fully correct: stage name, debut background, key works — all accurate, demonstrating that once the parameter pool is large enough, even moderately niche facts are covered correctly.',
+  },
+  {
+    num: '1T',
+    sublabel: 'Tokens · Trillion-parameter MoE, trained on ~20T Tokens',
+    analogy: '<b>Multiple times</b> the total volume of all human language',
+    sub: 'Trillion-parameter MoE; parallel expert activation; extreme knowledge density',
+    icon: '🛸', count: 58, pct: 95,
+    verdict: 'correct',
+    verdictLabel: 'Beyond encyclopedia',
+    modelName: 'Kimi K2 (~1T MoE)',
+    modelTag: 'Moonshot AI · OpenRouter cloud test',
+    answer: 'Lee Ji-eun (이지은, Lee Ji-eun), stage name <b>IU</b> (아이유, short for "I and You"), born May 16, 1993 — South Korean singer-songwriter, actress, lyricist, and producer. The first artist in K-Pop history to simultaneously achieve "Melon Daily / Weekly / Yearly All-Kill" and "100+ Perfect All-Kill (PAK) cumulative chart dominance." Signed to LOEN Entertainment at age 15 in 2007; debuted 2008. "좋은 날 (Good Day)" went viral in 2010 with its iconic triple high-note passage. Key albums: Real, Last Fantasy, Modern Times, Palette, Lilac, The Winning. Key tracks: Through the Night, Eight, Coin, Celebrity, Love wins all. Film/TV: My Mister, Hotel Del Luna, My Liberation Notes.',
+    tip: 'Kimi K2 has the Melon chart records, PAK count, and Korean track titles all correct. This is the knowledge density that trillion-parameter scale delivers — almost equivalent to a live-queryable specialist database.',
+  },
+  {
+    num: '5T+',
+    sublabel: 'Tokens · Top-tier closed-source flagship, trained on ~20T+ Tokens',
+    analogy: '<b>Tens of times</b> the equivalent coverage of all human text',
+    sub: 'Parameter count undisclosed; industry estimates 5T+; the industry ceiling',
+    icon: '🌠', count: 72, pct: 100,
+    verdict: 'correct',
+    verdictLabel: 'Industry ceiling',
+    modelName: 'Claude Opus 4.6',
+    modelTag: 'Anthropic · OpenRouter proxy test',
+    answer: 'Lee Ji-eun (이지은), stage name <b>IU</b> (아이유), born May 16, 1993 in Seoul. The name "IU" combines "I" and "You," symbolizing connection through music. Debuted at just 15 with the song "Mia," signed to LOEN Entertainment (later renamed Kakao Entertainment). "좋은 날 (Good Day)" in 2010 caused a sensation with three consecutive high notes, cementing the "Nation\'s Little Sister" status. Key albums: Modern Times, Palette (ft. G-Dragon), Lilac. Key tracks: Through the Night, BBIBBI, Celebrity, Love wins all (MV co-starring V). Film/TV: Dream High, My Mister (acting widely praised), Hotel Del Luna, Moon Lovers: Scarlet Heart Ryeo.',
+    tip: 'Claude Opus 4.6 delivers a structure as clear as Wikipedia — stage name etymology, childhood circumstances, trainee background, collaborator details, all fully recorded. This is the breadth of knowledge and expressive capability of a top-tier closed-source model.',
+  },
+];
+
+let currentScale = 0;
+
+// 类型 → 样式映射
+const VERDICT_CLASS = {
+  hallucination: 'is-hallucination',
+  unknown:       'is-unknown',
+  correct:       'is-correct',
+};
+const BADGE_COLORS = {
+  hallucination: { bg: 'var(--danger)', text: 'white' },
+  unknown:       { bg: 'var(--amber)',  text: 'white' },
+  correct:       { bg: 'var(--success)', text: 'white' },
+};
+
+function updateScale(v) {
+  const s = SCALES[+v];
+  currentScale = +v;
+
+  // 左侧大数字 pop 动画
+  const bigNum = document.getElementById('bigNum');
+  bigNum.textContent = s.num;
+  bigNum.classList.remove('pop');
+  void bigNum.offsetWidth;
+  bigNum.classList.add('pop');
+  setTimeout(() => bigNum.classList.remove('pop'), 300);
+
+  // 左侧副标签
+  document.getElementById('bigSubLabel').textContent = s.sublabel;
+
+  // slider val + mode badge
+  document.getElementById('sliderVal').textContent = s.num;
+  const badge = document.getElementById('modeBadge');
+  badge.textContent = s.verdictLabel;
+  const bc = BADGE_COLORS[s.verdict];
+  badge.style.background = bc.bg;
+  badge.style.color = bc.text;
+
+  // 规模感受（右上小卡）
+  document.getElementById('visAnalogy').innerHTML =
+    s.analogy + `<div class="sub">${s.sub}</div>`;
+  document.getElementById('scaleBarFill').style.width = s.pct + '%';
+
+  // 图标格
+  const grid = document.getElementById('iconGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < s.count; i++) {
+    const span = document.createElement('span');
+    span.className = 'icon-unit';
+    span.textContent = s.icon;
+    grid.appendChild(span);
+    setTimeout(() => span.classList.add('in'), i * 15);
+  }
+
+  // 实测大卡（右下）
+  const card = document.getElementById('modelCard');
+  card.className = 'model-card ' + VERDICT_CLASS[s.verdict];
+
+  document.getElementById('cardSize').textContent    = s.num;
+  document.getElementById('cardName').textContent    = s.modelName;
+  document.getElementById('cardTag').textContent     = s.modelTag;
+  document.getElementById('cardVerdict').textContent = s.verdictLabel;
+  document.getElementById('cardAnswer').innerHTML    = s.answer;
+  document.getElementById('cardTip').innerHTML       = s.tip;
+}
+
+// 初始化
+updateScale(0);
+document.getElementById('scaleSlider').value = 0;
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

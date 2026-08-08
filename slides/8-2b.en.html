@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Explicit KV Cache: One Line of Code to Guarantee Cache Hits | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── Problem card: distributed routing ── */
+.problem-card{background:rgba(220,38,38,.04);border:1.5px solid rgba(220,38,38,.2);border-radius:var(--radius);padding:16px 20px}
+.problem-card h4{font-size:15px;font-weight:800;color:var(--danger);margin-bottom:10px}
+.node{width:64px;height:44px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;transition:all .5s}
+.node.has-cache{background:rgba(22,163,74,.12);border:1.5px solid rgba(22,163,74,.3);color:var(--success)}
+.node.no-cache{background:rgba(220,38,38,.08);border:1.5px solid rgba(220,38,38,.2);color:var(--danger)}
+.node.active{box-shadow:0 0 0 3px rgba(0,102,255,.4);transform:scale(1.08)}
+.lb{padding:5px 10px;background:rgba(124,58,237,.1);border-radius:7px;font-size:12px;font-weight:800;color:var(--purple);text-align:center;flex-shrink:0;white-space:nowrap}
+.arrow{font-size:16px;color:var(--sub);flex-shrink:0}
+.problem-card p{font-size:14px;color:var(--sub);line-height:1.7}
+.problem-card p b{color:var(--text)}
+.dist-btn{padding:10px 18px;border-radius:8px;background:rgba(220,38,38,.08);border:1.5px solid rgba(220,38,38,.25);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px;min-height:44px}
+
+.solution-card{background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.2);border-radius:var(--radius);padding:16px 20px}
+.solution-card h4{font-size:15px;font-weight:800;color:var(--success);margin-bottom:6px}
+.solution-card p{font-size:14px;color:var(--sub);line-height:1.7}
+.solution-card p b{color:var(--text)}
+
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cmp-card{border-radius:var(--radius-sm);padding:14px 16px}
+.cmp-card.bad{background:rgba(220,38,38,.04);border:1px solid rgba(220,38,38,.18)}
+.cmp-card.good{background:rgba(22,163,74,.04);border:1px solid rgba(22,163,74,.18)}
+.cmp-card h5{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.cmp-card.bad h5{color:var(--danger)}
+.cmp-card.good h5{color:var(--success)}
+.cmp-card p{font-size:13px;color:var(--sub);line-height:1.7}
+.cmp-card p b{color:var(--text)}
+
+/* ── Platform switcher ── */
+.platform-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.ptab{padding:8px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-size:14px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s;min-height:40px}
+.ptab:hover{border-color:rgba(0,102,255,.3)}
+.ptab.active{border-color:var(--accent);background:rgba(0,102,255,.06);color:var(--accent)}
+
+/* ── Code block ── */
+.code-panel{background:#1e1b2e;border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden;margin-top:12px}
+.code-panel pre{font-family:'Fira Code','SF Mono',Menlo,monospace;font-size:13px;line-height:1.85;color:#cdd6f4;white-space:pre;overflow-x:auto;margin:0;background:transparent;padding:0}
+.code-panel .c{color:#6c7086;font-style:italic}
+.code-panel .s{color:#a6e3a1}
+.code-panel .k{color:#cba6f7}
+.code-panel .n{color:#89dceb}
+.code-panel .hl{background:rgba(203,166,247,.15);border-left:3px solid #cba6f7;display:block;margin:0 -18px;padding:1px 18px 1px 15px}
+.copy-btn{position:absolute;top:10px;right:12px;padding:5px 12px;border-radius:5px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#89b4fa;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;z-index:2}
+.copy-btn:hover{background:rgba(255,255,255,.12)}
+
+/* ── Parameter descriptions ── */
+.params-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.param-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center;box-shadow:var(--shadow-card)}
+.param-box .pv{font-size:18px;font-weight:900;color:var(--accent)}
+.param-box .pk{font-size:12px;color:var(--sub);font-weight:700;margin-top:2px}
+.param-box .pd{font-size:12px;color:var(--sub);margin-top:3px;line-height:1.4}
+
+/* ── Hit simulation ── */
+.sim-area{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-card)}
+.sim-head-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sim-title{font-size:14px;font-weight:800;color:var(--text)}
+.sim-body{display:flex;gap:12px}
+.sim-col{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.sim-col-head{font-size:12px;font-weight:800;text-align:center;padding:6px 8px;border-radius:6px}
+.sim-col-head.bad{background:rgba(220,38,38,.1);color:var(--danger)}
+.sim-col-head.good{background:rgba(22,163,74,.1);color:var(--success)}
+.req-log{height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.req-item{padding:6px 10px;border-radius:7px;font-size:12.5px;line-height:1.5;flex-shrink:0;transition:all .3s}
+.req-item.miss{background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.18);color:var(--text)}
+.req-item.hit{background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.18);color:var(--text)}
+.sim-stats{display:flex;gap:10px}
+.sim-stat{flex:1;text-align:center;padding:10px 6px;background:var(--bg);border-radius:8px}
+.sim-stat .ssv{font-size:18px;font-weight:900}
+.sim-stat .ssl{font-size:11px;color:var(--sub);font-weight:700}
+.sim-btn{padding:8px 18px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:40px}
+.sim-btn.primary{background:var(--accent);color:white}
+.sim-btn.primary:disabled{opacity:.4;cursor:not-allowed}
+
+.takeaway{background:rgba(22,163,74,.05);border:1.5px solid rgba(22,163,74,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.takeaway b{color:var(--success)}
+
+@media (max-width:768px){
+  .compare-grid{grid-template-columns:1fr}
+  .params-grid{grid-template-columns:1fr 1fr}
+  .sim-body{flex-direction:column}
+  .req-log{height:180px}
+  .sim-stats{flex-wrap:wrap}
+  .sim-stat{min-width:calc(50% - 5px)}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="How to use Anthropic's Prompt Caching and OpenAI's explicit cache API? By fixing the System Prompt prefix and ordering messages correctly, guarantee KV Cache hits on every request.">
+<meta name="keywords" content="Prompt Caching,explicit cache,KV Cache hit,Anthropic cache,OpenAI cache,AI cost optimization">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-2b.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/8-2b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-2b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-2b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-2b.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Explicit KV Cache: One Line of Code to Guarantee Cache Hits">
+<meta property="og:description" content="How to use Anthropic's Prompt Caching and OpenAI's explicit cache API? By fixing the System Prompt prefix and ordering messages correctly, guarantee KV Cache hits on every request.">
+<meta property="og:url" content="https://xueai.app/slides/8-2b.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Explicit KV Cache: One Line of Code to Guarantee Cache Hits">
+<meta name="twitter:description" content="How to use Anthropic's Prompt Caching and OpenAI's explicit cache API? By fixing the System Prompt prefix and ordering messages correctly, guarantee KV Cache hits on every request.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Explicit Cache: Practical Comparison","name":"Explicit Cache: Practical Comparison","url":"https://xueai.app/slides/8-2b.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Cost Optimization and Model Selection","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"How to use Anthropic's Prompt Caching and OpenAI's explicit cache API? By fixing the System Prompt prefix and ordering messages correctly, guarantee KV Cache hits on every request.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Cost Optimization</div>
+    <h1>Explicit Cache: Practical Comparison</h1>
+    <p class="subtitle">One line of code — guaranteed hits. In production, you must use explicit caching: implicit caching is unreliable in distributed architectures.</p>
+  </header>
+
+  <div class="sec-label">Why Implicit Caching Is Unreliable</div>
+
+  <div class="problem-card">
+    <h4>⚠️ Why is implicit caching unreliable in production?</h4>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="lb">Your Request</div>
+        <div class="arrow">→</div>
+        <div class="lb">Load Balancer</div>
+        <div class="arrow">→</div>
+        <span style="font-size:12px;color:var(--sub)">Randomly routed to one of these nodes:</span>
+      </div>
+      <div style="display:flex;gap:8px;padding-left:4px">
+        <div class="node has-cache" id="nodeA">Node A<br>cached</div>
+        <div class="node no-cache" id="nodeB">Node B<br>no cache</div>
+        <div class="node no-cache" id="nodeC">Node C<br>no cache</div>
+      </div>
+    </div>
+    <p>Cloud LLMs run on <b>multiple GPU nodes</b> and every request is randomly routed. Node A has your cache; B and C don't. Whether you get a hit is pure luck — <b>actual hit rate &lt;30%</b>.</p>
+    <button class="dist-btn" onclick="runDistSim()">Simulate distributed routing →</button>
+  </div>
+
+  <div class="solution-card" style="margin-top:14px">
+    <h4>✅ Explicit Cache: Mark Your Anchor Point</h4>
+    <p>Add one line of <code>cache_control</code> in the API request and the platform <b>guarantees routing to a node that has the cache</b>. No random routing dependency — hit rate approaches <b>100%</b>.</p>
+  </div>
+
+  <div class="compare-grid" style="margin-top:14px">
+    <div class="cmp-card bad">
+      <h5>Implicit Cache (automatic)</h5>
+      <p>No code changes needed<br>Hit not guaranteed<br>Discount: <b>20%</b> of standard price<br>High MISS rate in distributed environments</p>
+    </div>
+    <div class="cmp-card good">
+      <h5>Explicit Cache (recommended)</h5>
+      <p>Add one line of <code>cache_control</code><br>Platform guarantees routed hit<br>Discount: <b>10%</b> of standard price<br>Save <b>90%</b> on input costs</p>
+    </div>
+  </div>
+
+  <div class="sec-label">Code Examples for Three Platforms</div>
+
+  <div class="platform-tabs">
+    <button class="ptab active" onclick="switchPlatform('claude')">Anthropic Claude</button>
+    <button class="ptab" onclick="switchPlatform('qwen')">Alibaba Cloud Qwen</button>
+    <button class="ptab" onclick="switchPlatform('openai')">OpenAI</button>
+  </div>
+
+  <div class="code-panel paywall-locked xa-peek" id="codePanel">
+    <button class="copy-btn" onclick="copyCode()">Copy</button>
+    <div id="codeContent"></div>
+  </div>
+
+  <div class="params-grid paywall-locked" id="paramsGrid"></div>
+
+  <div class="sec-label paywall-locked">Hit Rate Simulation Comparison</div>
+
+  <div class="sim-area paywall-locked">
+    <div class="sim-head-row">
+      <div class="sim-title">Simulate 10 Requests: Implicit vs. Explicit Cache Hit Comparison</div>
+      <button class="sim-btn primary" id="btnSim" onclick="runHitSim()">▶ Simulate Hit Comparison</button>
+    </div>
+    <div class="sim-body">
+      <div class="sim-col">
+        <div class="sim-col-head bad">Implicit Cache (random routing)</div>
+        <div class="req-log" id="implicitLog"></div>
+      </div>
+      <div class="sim-col">
+        <div class="sim-col-head good">Explicit Cache (guaranteed routing)</div>
+        <div class="req-log" id="explicitLog"></div>
+      </div>
+    </div>
+    <div class="sim-stats">
+      <div class="sim-stat"><div class="ssv" id="implicitHits" style="color:var(--danger)">—</div><div class="ssl">Implicit Hit Count</div></div>
+      <div class="sim-stat"><div class="ssv" id="explicitHits" style="color:var(--success)">—</div><div class="ssl">Explicit Hit Count</div></div>
+      <div class="sim-stat"><div class="ssv" id="costSaved" style="color:var(--accent)">—</div><div class="ssl">Cost Saved (Explicit)</div></div>
+    </div>
+  </div>
+
+  <div class="takeaway paywall-locked" style="margin-top:20px"><b>Engineering Conclusion:</b> Explicit caching is a must in production. Relying on random routing to save money is like counting on luck — both unreliable and unprofessional.</div>
+
+</article>
+
+<script>
+// ── Platform code ──
+const PLATFORMS = {
+  claude: {
+    params: [
+      { v: '×1.25', k: 'Write cost', d: 'Additional charge on first cache write' },
+      { v: '×0.1',  k: 'Hit cost', d: 'Save 90% on input costs on cache hit' },
+      { v: '5 min', k: 'TTL', d: 'Automatically renewed on hit' },
+    ],
+    code: `<span class="c"># Anthropic Python SDK</span>
+response = client.messages.create(
+  model=<span class="s">"claude-sonnet-4-6"</span>,
+  system=[{
+    <span class="n">"type"</span>: <span class="s">"text"</span>,
+    <span class="n">"text"</span>: long_system_prompt,
+<span class="hl">    <span class="k">"cache_control"</span>: {<span class="n">"type"</span>: <span class="s">"ephemeral"</span>}  <span class="c"># ← explicit anchor</span>
+</span>  }],
+  messages=conversation_history
+)
+
+<span class="c"># Check hit (response.usage)</span>
+print(response.usage.cache_read_input_tokens)   <span class="c"># > 0 = hit</span>
+print(response.usage.cache_creation_input_tokens) <span class="c"># > 0 = write</span>`
+  },
+  qwen: {
+    params: [
+      { v: '×1.25', k: 'Write cost', d: 'Additional charge on first cache write' },
+      { v: '×0.1',  k: 'Hit cost', d: 'Save 90% on input costs on cache hit' },
+      { v: '1024T', k: 'Min threshold', d: 'At least 1024 Tokens required to cache' },
+    ],
+    code: `<span class="c"># DashScope / OpenAI-compatible endpoint</span>
+messages = [{
+  <span class="n">"role"</span>: <span class="s">"system"</span>,
+  <span class="n">"content"</span>: [{
+    <span class="n">"type"</span>: <span class="s">"text"</span>,
+    <span class="n">"text"</span>: long_system_prompt,
+<span class="hl">    <span class="k">"cache_control"</span>: {<span class="n">"type"</span>: <span class="s">"ephemeral"</span>}  <span class="c"># ← explicit anchor</span>
+</span>  }]
+}]
+client.chat.completions.create(
+  model=<span class="s">"qwen-plus"</span>, messages=messages
+)
+
+<span class="c"># Supported: qwen-plus · qwen-flash · qwen-turbo</span>
+<span class="c"># Check hit: usage.prompt_cache_hit_tokens > 0</span>`
+  },
+  openai: {
+    params: [
+      { v: '×1.0',  k: 'Write cost', d: 'No extra write charge (automatic)' },
+      { v: '×0.5',  k: 'Hit cost', d: 'Save 50% on input costs on cache hit' },
+      { v: 'Auto',  k: 'Trigger mode', d: 'Auto-cached when Prompt ≥ 1024T' },
+    ],
+    code: `<span class="c"># OpenAI Python SDK — Prompt Caching (automatic)</span>
+response = client.chat.completions.create(
+  model=<span class="s">"gpt-4o"</span>,
+  messages=[{
+    <span class="n">"role"</span>: <span class="s">"system"</span>,
+    <span class="c"># Keep System Prompt completely unchanged for automatic caching</span>
+    <span class="n">"content"</span>: long_system_prompt
+  }] + conversation_history
+)
+
+<span class="c"># OpenAI implicit caching — no cache_control needed</span>
+<span class="c"># Check hit: usage.prompt_tokens_details.cached_tokens</span>
+<span class="c">⚠️  Hit rate ~30-50% in distributed scenarios, less reliable than Claude/Qwen</span>`
+  }
+};
+
+let curPlatform = 'claude';
+
+function switchPlatform(p) {
+  curPlatform = p;
+  document.querySelectorAll('.ptab').forEach((btn, i) => {
+    const keys = ['claude','qwen','openai'];
+    btn.classList.toggle('active', keys[i] === p);
+  });
+  renderPlatform(p);
+  // reset simulation
+  resetSim();
+}
+
+function renderPlatform(p) {
+  const pl = PLATFORMS[p];
+  document.getElementById('codeContent').innerHTML = '<pre>' + pl.code + '</pre>';
+  document.getElementById('paramsGrid').innerHTML = pl.params.map(pm => `
+    <div class="param-box">
+      <div class="pv">${pm.v}</div>
+      <div class="pk">${pm.k}</div>
+      <div class="pd">${pm.d}</div>
+    </div>`).join('');
+}
+
+function copyCode() {
+  const text = document.getElementById('codeContent').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ Copied';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+// ── Distributed routing animation ──
+let distTimer = null;
+const NODES = ['nodeA','nodeB','nodeC'];
+function runDistSim() {
+  let count = 0;
+  if (distTimer) clearInterval(distTimer);
+  NODES.forEach(id => document.getElementById(id).classList.remove('active'));
+  distTimer = setInterval(() => {
+    NODES.forEach(id => document.getElementById(id).classList.remove('active'));
+    const picked = NODES[Math.floor(Math.random() * NODES.length)];
+    document.getElementById(picked).classList.add('active');
+    count++;
+    if (count >= 8) { clearInterval(distTimer); distTimer = null; }
+  }, 500);
+}
+
+// ── Hit simulation ──
+const IMPLICIT_HIT_RATE = 0.28; // implicit ~28% hit rate
+const COST_PER_TOK = 10; // unit cost (relative value)
+const CACHE_DISCOUNT = 0.1;
+
+let simRunning = false;
+
+function resetSim() {
+  ['implicitLog','explicitLog'].forEach(id => document.getElementById(id).innerHTML = '');
+  ['implicitHits','explicitHits','costSaved'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('btnSim').textContent = '▶ Simulate Hit Comparison';
+  document.getElementById('btnSim').disabled = false;
+  simRunning = false;
+}
+
+function runHitSim() {
+  if (simRunning) return;
+  resetSim();
+  simRunning = true;
+  document.getElementById('btnSim').disabled = true;
+    document.getElementById('btnSim').textContent = '▶ Simulate Hit Comparison';
+
+  const TOTAL = 10;
+  let implicitHits = 0, explicitHits = 0;
+  let step = 0;
+
+  const timer = setInterval(() => {
+    if (step >= TOTAL) {
+      clearInterval(timer);
+      const saved = Math.round((explicitHits - implicitHits) * COST_PER_TOK * (1 - CACHE_DISCOUNT));
+      document.getElementById('implicitHits').textContent = implicitHits + ' / ' + TOTAL;
+      document.getElementById('explicitHits').textContent = explicitHits + ' / ' + TOTAL;
+      document.getElementById('costSaved').textContent = 'Saved ' + saved + '%';
+      document.getElementById('btnSim').textContent = '▶ Re-simulate';
+      document.getElementById('btnSim').disabled = false;
+      simRunning = false;
+      return;
+    }
+
+    step++;
+    const req = 'Request #' + step;
+
+    // implicit: random hit
+    const iHit = Math.random() < IMPLICIT_HIT_RATE;
+    if (iHit) implicitHits++;
+    const iItem = document.createElement('div');
+    iItem.className = 'req-item ' + (iHit ? 'hit' : 'miss');
+    iItem.innerHTML = req + (iHit
+      ? ' <b style="color:var(--success)">✓ HIT</b> → save 90%'
+      : ` <b style="color:var(--danger)">✗ MISS</b> → full compute (routed to Node ${['B','C'][Math.floor(Math.random()*2)]})`);
+    document.getElementById('implicitLog').appendChild(iItem);
+    document.getElementById('implicitLog').scrollTop = 99999;
+    document.getElementById('implicitHits').textContent = implicitHits + ' / ' + step;
+
+    // explicit: guaranteed hit (write only on first request)
+    const eHit = step > 1;
+    if (eHit) explicitHits++;
+    const eItem = document.createElement('div');
+    eItem.className = 'req-item ' + (eHit ? 'hit' : 'miss');
+    eItem.innerHTML = req + (eHit
+      ? ' <b style="color:var(--success)">✓ HIT</b> → save 90% (platform guarantees routing)'
+      : ' <b style="color:var(--accent)">⚡ Cache written</b> → first write ×1.25');
+    document.getElementById('explicitLog').appendChild(eItem);
+    document.getElementById('explicitLog').scrollTop = 99999;
+    document.getElementById('explicitHits').textContent = explicitHits + ' / ' + step;
+
+  }, 400);
+}
+
+// initialize
+renderPlatform('claude');
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

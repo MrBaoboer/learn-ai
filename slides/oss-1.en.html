@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>What Are Weights? Everything a Model Knows | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<link rel="stylesheet" href="oss.css?v=20260808b">
+<style>
+/* Weight matrix: turns an abstract "pile of floating-point numbers" into something you can see */
+.w-matrix { margin: 16px 0; }
+.wm-grid {
+  display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px;
+  margin-bottom: 10px;
+}
+.wm-cell {
+  aspect-ratio: 1; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: rgba(255,255,255,.92);
+  font-family: "SF Mono", Menlo, monospace;
+  transition: transform .15s;
+}
+.wm-cell:hover { transform: scale(1.18); z-index: 2; }
+.wm-legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--sub); flex-wrap: wrap; }
+.wm-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+@media (max-width: 768px) { .wm-grid { grid-template-columns: repeat(8, 1fr); } }
+</style>
+<!-- SEO Start -->
+<meta name="description" content="What are weights? They are the pile of floating-point numbers left behind once training ends, and everything a model can do lives in them. Get the weight file and you can run exactly the same model on your own machine. Understand this and every later argument about open source makes sense.">
+<meta name="keywords" content="what are model weights,AI weight file,LLM parameter count,open weights,model file size,local deployment">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/oss-1.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/oss-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/oss-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/oss-1.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/oss-1.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="What Are Weights? Everything a Model Knows">
+<meta property="og:description" content="Weights are the pile of floating-point numbers left behind once training ends. Get the weight file and you can run exactly the same model on your own machine.">
+<meta property="og:url" content="https://xueai.app/slides/oss-1.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="What Are Weights? Everything a Model Knows">
+<meta name="twitter:description" content="Weights are the pile of floating-point numbers left behind once training ends. Get the weight file and you can run exactly the same model on your own machine.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "LearningResource"], "headline": "What Are Weights? Everything a Model Knows", "name": "What Are Weights? Everything a Model Knows", "url": "https://xueai.app/slides/oss-1.en.html", "inLanguage": "en", "author": {"@type": "Person", "name": "洛小山"}, "publisher": {"@type": "Organization", "name": "xueai.app", "url": "https://xueai.app"}, "learningResourceType": "Course", "educationalLevel": "Beginner to Intermediate", "isPartOf": {"@type": "Course", "name": "AI Hands-on Course · What Open Source Actually Opens", "url": "https://xueai.app/slides/learn.html"}, "isAccessibleForFree": true, "description": "What are weights? They are the pile of floating-point numbers left behind once training ends, and everything a model can do lives in them. Get the weight file and you can run exactly the same model on your own machine. Understand this and every later argument about open source makes sense."}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Open Source Series · What Open Source Actually Opens</div>
+    <h1>What Are Weights? Everything a Model Knows</h1>
+    <p class="subtitle">The news announces another open-sourced model every week. What exactly is being opened? The code? Mostly it is one file: <b>the weights</b>. Once you know what that file is, you can judge every open-source argument that follows on your own.</p>
+  </header>
+
+  <div class="sec-label">The short answer</div>
+
+  <div class="l-callout">
+    <b>Weights are the pile of numbers a model is left with after training.</b> The tens of millions of dollars and the months of compute all end up condensed into this one file. Get hold of it and you can run exactly the same model on your own machine — no network connection, no payment to anyone.
+  </div>
+
+  <div class="oss-why">
+    <p><b>Almost every example in this chapter comes from Qwen, so let us say why up front.</b></p>
+    <ul>
+      <li><b>It covers the size range most completely.</b> In the official Ollama library the Qwen3.5 generation runs from 0.8B all the way up to 122B, with 2B, 4B, 9B, 27B and 35B in between. Every hardware tier discussed later maps onto a file you can genuinely download, without switching brands to fill the gaps.</li>
+      <li><b>Other people build on top of it.</b> Four of the six distilled versions DeepSeek released for R1 use a Qwen base — that is a third party's choice, not a vendor's own marketing.</li>
+      <li><b>It also serves as its own cautionary tale.</b> During the Qwen2.5 era the 3B and 72B models shipped under a non-standard license, which makes it a useful illustration of how unreliable the word "open source" can be. That discussion is in <b>lesson 2</b>.</li>
+    </ul>
+    <p>In the Chinese-speaking community some people call it <b>"the god of open source"</b>. That is a nickname, not a rating, and it does not mean Qwen leads on every dimension. <b>This chapter uses it for examples because the material is complete and easy to work through, not because it is the best.</b> What you should walk away with is a set of criteria, not a brand name — the same criteria should work just as well applied to any other vendor.</p>
+  </div>
+
+  <div class="sec-label">What it looks like</div>
+
+  <p>There are no rules inside a model, no knowledge base, no if-else. There is only an enormous table of numbers. Every number in the cells below is one weight, and the darker the color, the larger its absolute value.</p>
+
+  <div class="w-matrix">
+    <div class="wm-grid" id="wmGrid"></div>
+    <div class="wm-legend">
+      <span><i style="background:rgba(79,70,229,.75)"></i>Positive</span>
+      <span><i style="background:rgba(220,38,38,.75)"></i>Negative</span>
+      <span>Darker means a larger absolute value</span>
+    </div>
+  </div>
+
+  <p>That is 36 numbers. A <code>Qwen3-8B</code> model has <b>8 billion</b> of them. The entire point of training is to nudge those billions of numbers from random values toward the right ones. Once that is done, the parameters are frozen and the model is fixed.</p>
+
+  <div class="oss-warn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    <div>This also explains something from Chapter One: a model learns nothing while it is chatting with you. Weights are fixed during training; during a conversation they are read-only. Whatever you tell it is gone by next time.</div>
+  </div>
+
+  <div class="sec-label">Parameter count determines file size</div>
+
+  <p>How many bytes each weight takes depends on the storage precision. Models are usually released in FP16, which means <b>2 bytes</b> per number. That gives you an easy estimate for file size:</p>
+
+  <div class="l-callout" style="margin:14px 0">
+    <b>Weight file size (GB) ≈ parameter count (B) × 2</b><br>
+    <span style="font-size:14px;color:var(--sub)">8 billion parameters × 2 bytes = 16 billion bytes ≈ 16 GB</span>
+  </div>
+
+  <p>You can memorize the formula, but what it means only lands once you drag it yourself. The slider below runs from 0.5B up to 2.4 trillion, and you can switch storage precision as you go to see the same model's file swell and shrink.</p>
+
+  <div class="oss-lab" data-lab="Try it">
+    <div class="lab-q">Drag the parameter count to 8B, then switch once between FP16 and INT4.</div>
+
+    <div class="lab-ctrl">
+      <div class="lab-row">
+        <span class="lab-label">Parameters</span>
+        <input type="range" class="lab-range" id="wSlider" min="0" max="1000" value="0" aria-label="Parameter count">
+        <span class="lab-val" id="wParams">8B</span>
+      </div>
+      <div class="lab-row">
+        <span class="lab-label">Precision</span>
+        <div class="lab-seg" id="wPrec" role="group" aria-label="Storage precision">
+          <button type="button" data-p="fp32">FP32</button>
+          <button type="button" data-p="fp16" class="is-on">FP16</button>
+          <button type="button" data-p="int8">INT8</button>
+          <button type="button" data-p="int4">INT4</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="lab-out">
+      <div class="lab-big"><span id="wSize">16 GB</span><small id="wFormula"></small></div>
+      <div class="lab-note" id="wNote"></div>
+      <div class="lab-lamps" id="wLamps"></div>
+      <div class="lab-verdict" id="wVerdict"></div>
+    </div>
+  </div>
+
+  <p>Here is the comparison across a set of real models. Qwen serves as the yardstick because its size lineup is currently the most complete — public releases run from 0.6B all the way to 2.4T — so comparing within one family keeps architectural differences out of the picture.</p>
+
+  <div class="oss-bars" id="sizeBars">
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3-0.6B</strong><span>about 1.2 GB</span></div>
+      <div class="ob-track"><i data-w="2"></i></div>
+    </div>
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3-8B</strong><span>about 16 GB</span></div>
+      <div class="ob-track"><i data-w="8"></i></div>
+    </div>
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3-32B</strong><span>about 64 GB</span></div>
+      <div class="ob-track"><i data-w="22"></i></div>
+    </div>
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3-235B-A22B</strong><span>about 470 GB</span></div>
+      <div class="ob-track"><i data-w="55" class="is-big"></i></div>
+    </div>
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3.8-Max (2.4T parameters)</strong><span>several TB</span></div>
+      <div class="ob-track"><i data-w="100" class="is-big"></i></div>
+    </div>
+  </div>
+
+  <div class="oss-src">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>Parameter counts come from each model's official release notes; sizes are theoretical FP16 estimates, and actual files differ slightly depending on how they are sharded and which config files ship alongside them. Qwen3.8-Max has 2.4T total parameters with 95B active, released 2026-08-03.</span>
+  </div>
+
+  <div class="sec-label">One thing people mix up</div>
+
+  <p>Storage size and runtime footprint are two different things. A 16 GB file does not mean 16 GB of VRAM will run it. At runtime the model also needs room to hold the intermediate state of the conversation — the KV Cache from Chapter Two. In practice, budget another 30% to 50% on top of the parameter size.</p>
+
+  <p>There is an interactive tool at the end of this chapter where you can pick your own GPU or Mac model and see what will run. For now, keep the conclusion: <b>estimating VRAM from file size will leave you short.</b></p>
+
+  <div class="sec-label">Why weights matter so much</div>
+
+  <p>Put all of that together and the significance of weights is clear. They are not just a file. They are <b>control</b>.</p>
+
+  <div class="oss-facts">
+    <div class="oss-fact">
+      <div class="of-num">Offline</div>
+      <div class="of-label">No dependence on any provider</div>
+      <div class="of-desc">It runs with the network cable unplugged. Price hikes, rate limits, and deprecations cannot touch you</div>
+    </div>
+    <div class="oss-fact">
+      <div class="of-num">Editable</div>
+      <div class="of-label">You can keep training on top of it</div>
+      <div class="of-desc">Fine-tune your own version on your own data, which is something an API call cannot do</div>
+    </div>
+    <div class="oss-fact">
+      <div class="of-num">Private</div>
+      <div class="of-label">Data never leaves your machine</div>
+      <div class="of-desc">For medical records, legal files, and internal code that cannot go out the door, this is the only path</div>
+    </div>
+  </div>
+
+  <p>Turn that around: with an API-only model, what you rent is the right to use it. Price, availability, and the retirement date are all decided by the other side. During technology selection that difference turns directly into risk, and it is what the next section takes apart: <b>"open source" means very different things depending on who is saying it.</b></p>
+
+</article>
+
+<script src="oss-interact.js?v=20260808"></script>
+<script>
+/**
+ * Background: weights are a purely abstract idea for beginners, and saying
+ * "a pile of floating-point numbers" builds no mental image on its own.
+ * Design intent: render a randomly generated set of values as a grid of color
+ * cells so the reader can see the physical form weights take.
+ * Random values are used instead of real weights because the distribution of
+ * real weights shows no visible pattern; what matters here pedagogically is the
+ * form, not the specific numbers.
+ * Constraint: sign is encoded by two hues and magnitude by opacity, matching
+ * the legend below the grid.
+ */
+(function () {
+  var grid = document.getElementById('wmGrid');
+  if (!grid) { return; }
+  var html = '';
+  for (var i = 0; i < 36; i++) {
+    var v = Math.random() * 2 - 1;
+    var pos = v > 0;
+    var alpha = Math.abs(v) * 0.68 + 0.22;
+    var rgb = pos ? '79,70,229' : '220,38,38';
+    html += '<div class="wm-cell" style="background:rgba(' + rgb + ',' + alpha.toFixed(2) + ')"'
+         +  ' title="Weight value ' + v.toFixed(4) + '">' + v.toFixed(1) + '</div>';
+  }
+  grid.innerHTML = html;
+
+  /* Only expand the size bars once they enter the viewport, so the animation
+     has not already finished by the time the reader scrolls down to them */
+  var bars = document.getElementById('sizeBars');
+  if (!bars) { return; }
+  var played = false;
+  var play = function () {
+    if (played) { return; }
+    played = true;
+    bars.querySelectorAll('.ob-track i').forEach(function (el) {
+      setTimeout(function () { el.style.width = el.dataset.w + '%'; }, 60);
+    });
+  };
+  if (!('IntersectionObserver' in window)) { play(); return; }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) { if (en.isIntersecting) { play(); io.disconnect(); } });
+  }, { threshold: 0.25 });
+  io.observe(bars);
+})();
+
+/* 体积换算实验台。
+   这一节的公式只有一条，但学员读完往往还是没有量感，不知道 16 GB 到底是
+   多还是少。让他自己拖到 8B 再切一次精度，「装不进 8GB 显卡，量化后就进去了」
+   这件事是他自己撞出来的，比读一句结论记得牢。 */
+(function () {
+  var C = window.OSSInteract;
+  var slider = document.getElementById('wSlider');
+  if (!C || !slider) { return; }
+
+  var t = C.dict();
+  var state = { precision: 'fp16' };
+
+  var elSize = document.getElementById('wSize');
+  var elParams = document.getElementById('wParams');
+  var elFormula = document.getElementById('wFormula');
+  var elNote = document.getElementById('wNote');
+  var elLamps = document.getElementById('wLamps');
+  var elVerdict = document.getElementById('wVerdict');
+
+  /* 滑块每动一格 render 都会跑，但真正值得提示的只有「某张卡从装得下变成
+     装不下」这一刻。记住上一次的判定结果，只给翻转的那张卡加动效，否则
+     整排灯会跟着滑块一路闪，反而看不出临界点在哪。 */
+  var lastFits = null;
+  var anim = {};
+
+  function render() {
+    var params = C.posToParams(slider.value);
+    var size = C.fileSize(params, state.precision);
+    var spec = C.BYTES[state.precision];
+    var cards = C.fitCards(size);
+
+    elParams.textContent = t.paramLabel(params);
+    elSize.textContent = t.fileOf(size);
+    elFormula.textContent = params + ' × ' + spec.bytes;
+    elNote.textContent = t.bytesNote(spec.bytes, spec.label);
+
+    elLamps.innerHTML = cards.map(function (c) {
+      return '<div class="lab-lamp ' + (c.fit ? 'is-yes' : 'is-no') + '">'
+        + '<div class="ll-name">' + t.cardLabel(c.vram) + '</div>'
+        + '<div class="ll-state">' + (c.fit ? t.fitYes : t.fitNo) + '</div>'
+        + '</div>';
+    }).join('');
+
+    if (lastFits) {
+      cards.forEach(function (c, i) {
+        if (lastFits[i] !== c.fit) { C.fire(elLamps.children[i]); }
+      });
+    }
+    lastFits = cards.map(function (c) { return c.fit; });
+
+    /* 结论跟着当前取值走，而不是写死一句话。学员拖到哪里，这里就说哪里的事。 */
+    var fitCount = cards.filter(function (c) { return c.fit; }).length;
+    var v = elVerdict;
+    v.classList.toggle('is-warn', fitCount === 0);
+    if (fitCount === 0) {
+      v.innerHTML = '<b>' + t.fileOf(size) + '</b> ' + LAB.none;
+    } else if (fitCount === 3) {
+      v.innerHTML = '<b>' + t.fileOf(size) + '</b> ' + LAB.all;
+    } else {
+      v.innerHTML = '<b>' + t.fileOf(size) + '</b> ' + LAB.some;
+    }
+
+    /* 体积数字每格都在变，跳一下会抖成一片，所以只在跨过整数量级时提示。
+       结论条则按文案是否换了来判断。 */
+    C.fireOnChange(elSize.parentNode, Math.floor(Math.log10(Math.max(size, 0.1))), anim, 'mag');
+    C.fireOnChange(v, fitCount, anim, 'fit');
+  }
+
+  /* 三句结论文案跟着页面语言走，与模块里的语言包同源 */
+  var LAB = (function () {
+    var lang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
+    if (lang.indexOf('ko') === 0) {
+      return {
+        none: '는 여기 있는 어떤 그래픽카드에도 들어가지 않습니다. 정밀도를 낮추거나 더 작은 모델을 고르는 수밖에 없습니다.',
+        some: '는 일부 카드에만 들어갑니다. 정밀도를 한 단계 낮추면 문턱이 바로 내려갑니다.',
+        all: '는 세 카드 모두에 들어갑니다. 다만 이건 파일 크기일 뿐이고, 실제로 돌릴 때는 여유가 더 필요합니다.',
+      };
+    }
+    if (lang.indexOf('en') === 0) {
+      return {
+        none: ' does not fit on any card here. Your options are a lower precision or a smaller model.',
+        some: ' fits on some of these cards. Dropping one precision level lowers the bar immediately.',
+        all: ' fits on all three. Keep in mind this is the file size, and actually running it needs more headroom.',
+      };
+    }
+    return {
+      none: '在这里的每一张卡上都放不下。你的选择是降精度，或者换更小的模型。',
+      some: '只放得进其中一部分卡。把精度降一档，门槛立刻就下来了。',
+      all: '三张卡都放得下。但记住这只是文件体积，真跑起来还要更多余量。',
+    };
+  })();
+
+  /* 初值让模块算，不在 HTML 里写死刻度位置。滑块刻度改过一次，硬编码的
+     初值当场失准（本该停在 8B 的滑块停到了 129B），交给 paramsToPos 就
+     不会再漂。 */
+  slider.max = C.SLIDER_STEPS;
+  slider.value = C.paramsToPos(8);
+
+  document.getElementById('wPrec').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-p]');
+    if (!btn) { return; }
+    state.precision = btn.dataset.p;
+    this.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('is-on', b === btn);
+    });
+    render();
+  });
+
+  C.bindRange(slider, render);
+})();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

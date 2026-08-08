@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI란 대체 무엇일까? 사실은 「이어 말하기」 놀이 중 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 接话茬卡片 ── */
+.phrase-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.phrase-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px;
+  cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow: var(--shadow-card);
+}
+.phrase-card:hover { border-color: rgba(0,102,255,0.35); transform: translateY(-1px); }
+.phrase-card.open { border-color: rgba(0,102,255,0.45); box-shadow: var(--shadow-pop); cursor: default; }
+.phrase-q {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 17px; font-weight: 800; color: var(--text);
+}
+.phrase-q .tap-hint {
+  margin-left: auto; font-size: 12px; font-weight: 700; color: var(--accent);
+  background: rgba(0,102,255,0.07); padding: 3px 12px; border-radius: 999px;
+  flex-shrink: 0; transition: opacity 0.3s;
+}
+.phrase-card.open .tap-hint { opacity: 0; }
+.phrase-answers { max-height: 0; overflow: hidden; transition: max-height 0.5s ease; }
+.phrase-card.open .phrase-answers { max-height: 300px; }
+.answer-list { display: flex; flex-direction: column; gap: 7px; padding-top: 16px; }
+.answer-row { display: flex; align-items: center; gap: 10px; }
+.answer-word {
+  width: 96px; font-size: 14px; font-weight: 700; color: var(--text);
+  text-align: right; flex-shrink: 0;
+}
+.answer-track { flex: 1; height: 22px; background: rgba(0,0,0,0.05); border-radius: 6px; overflow: hidden; }
+.answer-fill {
+  height: 100%; border-radius: 6px; width: 0;
+  transition: width 0.8s cubic-bezier(0.25,1,0.5,1);
+}
+.answer-pct { width: 44px; font-size: 13px; font-weight: 800; flex-shrink: 0; }
+.phrase-note { font-size: 13px; color: var(--sub); padding-top: 12px; line-height: 1.7; }
+.phrase-note b { color: var(--accent); }
+
+/* ── AI 续写演示 ── */
+.demo-box {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.demo-head {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.015);
+}
+.demo-head-label { font-size: 12px; font-weight: 800; color: var(--sub); margin-right: 4px; }
+.starter-chip {
+  border: 1.5px solid var(--border); background: var(--card);
+  border-radius: 999px; padding: 6px 16px;
+  font-size: 13px; font-weight: 700; color: var(--text);
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+}
+.starter-chip:hover { border-color: rgba(0,102,255,0.4); }
+.starter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.demo-body { padding: 22px 24px; min-height: 150px; }
+.demo-text { font-size: 17px; line-height: 2; color: var(--text); word-break: break-all; }
+.demo-text .starter-part { color: var(--sub); }
+.demo-text .ai-part { color: var(--text); font-weight: 600; }
+.demo-text .caret {
+  display: inline-block; width: 2px; height: 1.1em; background: var(--accent);
+  vertical-align: text-bottom; margin-left: 1px;
+  animation: blink 0.85s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* 决策点气泡 */
+.decision-pop {
+  margin: 14px 0 4px; padding: 14px 16px;
+  background: rgba(0,102,255,0.045); border: 1.5px dashed rgba(0,102,255,0.35);
+  border-radius: var(--radius-sm);
+  opacity: 0; transform: translateY(6px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.decision-pop.show { opacity: 1; transform: translateY(0); }
+.decision-title { font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 9px; letter-spacing: 0.3px; }
+.cand-list { display: flex; flex-direction: column; gap: 6px; }
+.cand-row { display: flex; align-items: center; gap: 9px; }
+.cand-word {
+  min-width: 68px; text-align: center; padding: 2px 10px;   /* 여러 음절 토큰도 들어가도록 */
+  font-size: 14px; font-weight: 800; border-radius: 7px;
+  background: rgba(0,0,0,0.05); color: var(--sub);
+  transition: background 0.13s, color 0.13s, transform 0.13s;
+}
+.cand-row.picked .cand-word { background: var(--accent); color: #fff; transform: scale(1.06); }
+.cand-track { flex: 1; height: 14px; background: rgba(0,0,0,0.05); border-radius: 5px; overflow: hidden; }
+/* 0.14s는 pace()의 최단 구간(300ms × 0.65 ≈ 195ms)에 맞춘 값. 더 느리면 막대가 끝까지 못 간다 */
+.cand-fill { height: 100%; border-radius: 5px; background: rgba(0,0,0,0.16); width: 0; transition: width 0.14s cubic-bezier(0.25,1,0.5,1); }
+.cand-row.picked .cand-fill { background: var(--accent); }
+.cand-pct { width: 44px; font-size: 12px; font-weight: 800; color: var(--sub); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.cand-row.picked .cand-pct { color: var(--accent); }
+
+.demo-foot {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px 18px; border-top: 1px solid var(--border);
+}
+.btn-run {
+  background: var(--accent); color: #fff; border: none;
+  padding: 10px 26px; border-radius: 999px;
+  font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
+  transition: filter 0.15s, transform 0.15s;
+}
+.btn-run:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-run:disabled { background: #c4c8cf; cursor: not-allowed; }
+.demo-status { font-size: 12.5px; color: var(--sub); font-weight: 600; }
+
+/* ── 对话真相图 ── */
+.chat-truth { display: flex; flex-direction: column; gap: 10px; }
+.chat-row { display: flex; gap: 10px; align-items: flex-start; }
+.chat-row.user { flex-direction: row-reverse; }
+.chat-avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff;
+}
+.chat-row.user .chat-avatar { background: #64748b; }
+.chat-row.ai .chat-avatar { background: var(--accent); }
+.chat-bubble {
+  max-width: 78%; padding: 10px 16px; border-radius: 14px;
+  font-size: 14px; line-height: 1.7;
+}
+.chat-row.user .chat-bubble { background: rgba(100,116,139,0.1); border-top-right-radius: 4px; }
+.chat-row.ai .chat-bubble { background: rgba(0,102,255,0.07); border-top-left-radius: 4px; }
+.chat-annotation {
+  text-align: center; font-size: 12.5px; font-weight: 700; color: var(--amber);
+  padding: 6px 0;
+}
+
+/* ── 三连卡 ── */
+.why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.why-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+}
+.why-card .why-icon { font-size: 26px; margin-bottom: 8px; }
+.why-card h4 { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+.why-card p { font-size: 13px; color: var(--sub); line-height: 1.75; }
+.why-card p b { color: var(--text); }
+
+/* ── 数学翻车实验 ── */
+.math-box {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 20px 24px;
+}
+.math-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.math-chip {
+  border: 1.5px solid var(--border); background: var(--card);
+  border-radius: 999px; padding: 8px 20px;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.math-chip:hover { border-color: rgba(0,102,255,0.4); }
+.math-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.math-stage { min-height: 170px; }
+.math-q { font-size: 17px; font-weight: 800; color: var(--text); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+.math-q .mq-hint { font-size: 12px; font-weight: 700; color: var(--sub); margin-left: 10px; }
+.math-cands { margin-bottom: 14px; }
+.math-cands .cand-word { min-width: 96px; font-variant-numeric: tabular-nums; }
+.math-verdict {
+  font-size: 13px; line-height: 1.85; color: var(--sub);
+  border-top: 1px dashed var(--border); padding-top: 12px;
+  opacity: 0; transition: opacity 0.4s;
+}
+.math-verdict.show { opacity: 1; }
+.math-verdict b { color: var(--text); }
+.math-verdict .mv-ok { color: var(--success); font-weight: 800; }
+.math-verdict .mv-bad { color: var(--danger); font-weight: 800; }
+
+/* ── takeaway ── */
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .why-grid { grid-template-columns: 1fr; }
+  .answer-word { width: 72px; font-size: 13px; }
+  .demo-text { font-size: 15px; }
+  .chat-bubble { max-width: 85%; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="AI란 대체 무엇일까요? ChatGPT, DeepSeek, Gemini는 어떻게 대화를 할 수 있을까요? 기초 지식 없이도 이해되는 쉬운 설명: AI는 진짜로 생각하는 게 아니라, 어마어마한 양의 글을 읽은 「슈퍼 이어 말하기 기계」입니다. 3분짜리 인터랙티브 데모로 AI에 대한 첫 번째 올바른 직관을 세워 보세요.">
+<meta name="keywords" content="AI란 무엇인가,ChatGPT 원리,인공지능 입문,대규모 언어 모델이란,AI 기초,AI 작동 방식">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/zero-1.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/zero-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/zero-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/zero-1.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/zero-1.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="AI란 대체 무엇일까? 사실은 「이어 말하기」 놀이 중">
+<meta property="og:description" content="AI는 진짜로 생각하는 게 아니라, 어마어마한 양의 글을 읽은 「슈퍼 이어 말하기 기계」입니다. 3분짜리 인터랙티브 데모로 AI에 대한 첫 번째 올바른 직관을 세워 보세요.">
+<meta property="og:url" content="https://xueai.app/slides/zero-1.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI란 대체 무엇일까? 사실은 「이어 말하기」 놀이 중">
+<meta name="twitter:description" content="AI는 진짜로 생각하는 게 아니라, 어마어마한 양의 글을 읽은 「슈퍼 이어 말하기 기계」입니다. 3분짜리 인터랙티브 데모로 AI에 대한 첫 번째 올바른 직관을 세워 보세요.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"사실은 「이어 말하기」 놀이 중","name":"사실은 「이어 말하기」 놀이 중","url":"https://xueai.app/slides/zero-1.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문~심화","isPartOf":{"@type":"Course","name":"AI 실전 강의 · AI란 대체 무엇인가","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":true,"description":"AI란 대체 무엇일까요? ChatGPT, DeepSeek, Gemini는 어떻게 대화를 할 수 있을까요? 기초 지식 없이도 이해되는 쉬운 설명: AI는 진짜로 생각하는 게 아니라, 어마어마한 양의 글을 읽은 「슈퍼 이어 말하기 기계」입니다. 3분짜리 인터랙티브 데모로 AI에 대한 첫 번째 올바른 직관을 세워 보세요."}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">제로 챕터 · AI란 대체 무엇인가</div>
+    <h1>AI란 대체 무엇일까? 사실은 「이어 말하기」 놀이 중</h1>
+    <p class="subtitle">「인공지능」이라는 네 글자에 겁먹지 마세요. ChatGPT, DeepSeek, Gemini…… 이름이 뭐든, 이들이 하는 일은 본질적으로 딱 하나예요. <b>지금 이 문장의 다음 낱말이 뭘지 맞히기.</b> 이 수업은 아무 배경지식도 필요 없어요. 작은 게임 두 개만 해 보면 바로 이해됩니다.</p>
+  </header>
+
+  <div class="sec-label">1단계 · 사실 우리는 태어날 때부터 이 게임을 할 줄 알아요</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">일단 AI는 잊어버리세요. 아래 세 문장은 전부 끝맺지 않은 문장이에요. <b style="color:var(--text)">각 문장을 눌러 보고</b>, 머릿속에 떠오른 뒷부분이 다른 사람들과 같은지 확인해 보세요.</p>
+
+  <div class="phrase-grid" id="phraseGrid"></div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>눈치채셨나요?</b> 어떤 문장은 잇는 방법이 딱 하나뿐이고(「생일 축하……」), 어떤 문장은 여러 가능성이 있어요(「오늘 날씨 참……」). 우리 뇌는 순식간에 한 번의 「객관식 문제」를 푼 거예요—<b>AI가 한 스텝 써 나갈 때마다 푸는 게 바로 이 문제</b>입니다. 차이가 있다면, AI는 우리보다 수백만 배 많은 글을 읽어서 유난히 잘 맞힌다는 것뿐이에요.
+  </div>
+
+  <div class="sec-label">2단계 · AI가 말을 잇는 모습을 직접 보기</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">시작 문장을 하나 고르고 「AI에게 이어 쓰게 하기」를 눌러 보세요. 아래 상자가 바로 AI가 <b style="color:var(--text)">한 스텝 써 나갈 때마다</b> 머릿속에서 푸는 객관식 문제예요. 슬로 모션으로 보여 드립니다. 두 가지를 봐 주세요. 하나, AI는 <b style="color:var(--text)">한 글자씩</b> 내뱉는 게 아니에요. 「먹었」+「는데」, 「기분」+「이었」+「다」처럼 어간과 어미가 각각 한 덩이로 나옵니다. 이 덩이를 <b style="color:var(--text)">토큰</b>(token)이라고 불러요—한 글자일 때도 있고 한 단어일 때도 있는데, 어떻게 쪼개는지는 뒤 수업에서 다룹니다. 둘, 막대 길이예요. 어떤 스텝은 앞 문맥이 거의 정답을 정해 주고, 어떤 스텝은 AI가 눈에 보이게 망설입니다. <b style="color:var(--text)">같은 시작 문장으로 몇 번 더 돌려 보세요</b>—막대가 비슷한 자리에서는 늘 가장 긴 것을 고르지는 않습니다.</p>
+
+  <div class="demo-box">
+    <div class="demo-head">
+      <span class="demo-head-label">시작 문장 고르기:</span>
+      <button class="starter-chip active" data-i="0">오늘 밤 10시까지 야근하고,</button>
+      <button class="starter-chip" data-i="1">존경하는 김 선생님, 안녕하세요!</button>
+      <button class="starter-chip" data-i="2">김치찌개 끓이는 법은:</button>
+    </div>
+    <div class="demo-body">
+      <div class="demo-text" id="demoText"><span class="starter-part">오늘 밤 10시까지 야근하고,</span><span class="caret"></span></div>
+      <div class="decision-pop" id="decisionPop">
+        <div class="decision-title" id="decisionTitle">다음 토큰을 고르는 중……</div>
+        <div class="cand-list" id="candList"></div>
+      </div>
+    </div>
+    <div class="demo-foot">
+      <button class="btn-run" id="btnRun">AI에게 이어 쓰게 하기 →</button>
+      <span class="demo-status" id="demoStatus">자료도 안 찾고, 인터넷도 안 씁니다. 오직 「읽어 본 글」에만 기대어 토큰 하나씩 이어 갑니다</span>
+    </div>
+  </div>
+
+  <div class="sec-label">3단계 · 그럼 「대화」는 어떻게 되는 걸까요?</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">이렇게 물으실지도 몰라요. 이어 말하기는 알겠는데, 나랑 AI는 <b style="color:var(--text)">묻고 답하며 대화</b>하고 있잖아요? 사실 대화는 이어 말하기의 포장만 바뀐 것이에요—</p>
+
+  <div class="l-card">
+    <div class="chat-truth">
+      <div class="chat-row user">
+        <div class="chat-avatar">나</div>
+        <div class="chat-bubble">주말에 어디 놀러 갈지 아이디어 좀 줘</div>
+      </div>
+      <div class="chat-annotation">↓ AI의 눈에는, 내 말이 「문장의 앞부분」이고 자기는 「뒷부분」을 잇는 담당 ↓</div>
+      <div class="chat-row ai">
+        <div class="chat-avatar">AI</div>
+        <div class="chat-bubble">교외로 등산을 가거나, 새로 열린 전시를 보러 가는 건 어때요? 조용한 곳이 좋으세요, 아니면 북적이는 곳이 좋으세요?</div>
+      </div>
+      <div class="chat-row user">
+        <div class="chat-avatar">나</div>
+        <div class="chat-bubble">조용한 곳</div>
+      </div>
+      <div class="chat-annotation">↓ AI는 앞의 「모든 대화」를 더 긴 앞부분으로 이어 붙이고, 계속 잇습니다 ↓</div>
+      <div class="chat-row ai">
+        <div class="chat-bubble" style="margin-left:44px;">그럼 식물원이나 미술관을 추천해요. 사람도 적고, 걷다 지치면 앉을 곳도 있고……</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    충분히 잘, 충분히 자연스럽게 이어 가니까 마치 「나를 이해하는 것」처럼 보이는 거예요. 이 수업에서 가장 나누고 싶은 한 문장은 이거예요. <b>AI에게는 생각이 없습니다. 있는 것은 인류의 수억 권의 책과 수십억 개의 웹페이지에서 통계 낸 「어떤 말 뒤에는 보통 어떤 말이 오는가」입니다.</b>
+  </div>
+
+  <div class="sec-label">이 직관 하나로, 앞으로의 모든 일이 설명됩니다</div>
+
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="why-icon">✍️</div>
+      <h4>왜 글을 쓸 수 있을까?</h4>
+      <p>이어 말하기를 길고 매끄럽게 하는 것뿐이에요. 시작(제목과 요구 사항)을 주면, 토큰 하나씩 이어 가서 한 편을 완성합니다.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🤥</div>
+      <h4>왜 헛소리를 할까?</h4>
+      <p>AI는 <b>그럴듯한지</b>만 신경 쓰고, <b>맞는지</b>는 신경 쓰지 않아요. 매끄러운 거짓말이 어눌한 진실보다 선택되기 쉽죠. 아주 중요한 이야기라서, <b>뒤에서 한 수업을 통째로 씁니다</b>.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🎲</div>
+      <h4>왜 같은 질문에 매번 답이 다를까?</h4>
+      <p>위 데모에서 AI가 늘 가장 긴 막대를 고르진 않았죠? 후보 몇 개의 가능성이 비슷한 자리에서는 그 비율대로 주사위를 굴려서, 문장이 다른 갈림길로 접어듭니다. 막대가 99%까지 찬 자리는 몇 번을 굴려도 결과가 같으니, 차이는 원래 망설이던 몇 군데에서만 생깁니다.</p>
+    </div>
+  </div>
+
+  <div class="sec-label">덤으로 오래된 수수께끼 하나 풀기 · 왜 수학을 잘 못할까?</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">「AI는 초등학교 수학도 틀린다」는 말, 들어 보셨을 거예요. 이어 말하기를 배웠으니 이 수수께끼는 이제 스스로 풀 수 있어요—<b style="color:var(--text)">AI는 애초에 「계산」하는 게 아니라, 이어 말하기를 하는 중</b>이거든요. 아래 두 문제를 각각 눌러서, 머릿속 후보가 어떻게 다른지 보세요.</p>
+
+  <div class="math-box">
+    <div class="math-chips">
+      <button class="math-chip active" data-i="0">물어보기: 1 + 1 =</button>
+      <button class="math-chip" data-i="1">물어보기: 3847 × 2963 =</button>
+    </div>
+    <div class="math-stage">
+      <div class="math-q" id="mathQ"></div>
+      <div class="cand-list math-cands" id="mathCands"></div>
+      <div class="math-verdict" id="mathVerdict"></div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    차이가 보이시나요? <b>「1+1=2」는 훈련 데이터에서 수백만 번 봐서 사실상 외운 것이고, 「3847×2963」이라는 문제 자체는 거의 본 적이 없어서</b> 「답처럼 생긴」 숫자를 고를 수밖에 없어요—자릿수도 맞고 앞뒤도 그럴듯하지만, 가운데 숫자는 찍은 거죠. 좋은 소식은, 요즘 많은 AI 제품이 수학 문제를 만나면 AI가 진짜 계산기를 호출하거나 코드를 짜서 계산하게 한다는 거예요. 「찍기」가 「계산」이 되는 거죠—이 영리한 분업은 뒤의 수업에서 다시 만나게 됩니다.
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 이 수업에서 나누고 싶은 것</h3>
+    <ul>
+      <li><b>AI = 슈퍼 이어 말하기 기계</b>: 하는 일은 쉬지 않고 「다음 토큰이 뭘까」를 맞히는 것</li>
+      <li><b>대화는 이어 말하기의 포장일 뿐</b>: 내 말이 앞부분, AI가 뒷부분을 잇는 담당</li>
+      <li><b>AI에게는 생각이 없어요</b>: 있는 것은 방대한 글에서 통계 낸 언어의 규칙</li>
+      <li><b>수학은 「계산」이 아니라 「암기」</b>: 흔한 문제는 줄줄 외우지만, 처음 보는 문제는 그럴듯한 숫자를 찍을 뿐</li>
+      <li><b>그럴듯하게 잇기 ≠ 맞게 잇기</b>: AI를 잘 쓰기 위한 가장 중요한 감각이에요. 다음 수업에서 풀어 봅니다</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 第一步：接话茬卡片 ── */
+const PHRASES = [
+  {
+    q: '「동해물과 백두산이……」',
+    answers: [
+      { w: '마르고 닳도록', pct: 99, color: '#0066ff' },
+      { w: '길이 보전하세', pct: 1,  color: '#94a3b8' },
+    ],
+    note: '거의 모든 사람이 「마르고 닳도록」을 잇습니다—이 가사를 <b>너무 많이 봤기</b> 때문이죠. AI도 똑같아요. 많이 볼수록, 정확하게 잇습니다.',
+  },
+  {
+    q: '「생일 축하……」',
+    answers: [
+      { w: '합니다', pct: 98, color: '#0066ff' },
+      { w: '해요', pct: 2,  color: '#94a3b8' },
+    ],
+    note: '이 문장은 아무도 따로 외운 적이 없는데도 <b>입에서 저절로 나오죠</b>. 잇는 방법이 하나뿐인 게 명구절만은 아니라는 뜻이에요—일상 대화에도 <b>거의 고민할 필요 없는 조합</b>이 가득하거든요.',
+  },
+  {
+    q: '「오늘 날씨 참……」',
+    answers: [
+      { w: '좋다',   pct: 42, color: '#0066ff' },
+      { w: '덥다',   pct: 26, color: '#7c3aed' },
+      { w: '춥다',   pct: 18, color: '#16a34a' },
+      { w: '별로다', pct: 14, color: '#d97706' },
+    ],
+    note: '이런 문장은 <b>그럴듯한 잇기가 여러 개</b> 있어요. AI는 이 후보들 중 하나를 고릅니다—같은 질문에 매번 답이 조금씩 다를 수 있는 이유가 바로 이거예요.',
+  },
+];
+
+const grid = document.getElementById('phraseGrid');
+PHRASES.forEach((p, i) => {
+  const card = document.createElement('div');
+  card.className = 'phrase-card';
+  card.innerHTML = `
+    <div class="phrase-q">${p.q}<span class="tap-hint">눌러서 다들 어떻게 잇는지 보기</span></div>
+    <div class="phrase-answers">
+      <div class="answer-list">
+        ${p.answers.map(a => `
+          <div class="answer-row">
+            <div class="answer-word">${a.w}</div>
+            <div class="answer-track"><div class="answer-fill" style="background:${a.color}" data-w="${a.pct}"></div></div>
+            <div class="answer-pct" style="color:${a.color}">${a.pct}%</div>
+          </div>`).join('')}
+      </div>
+      <div class="phrase-note">${p.note}</div>
+    </div>`;
+  card.addEventListener('click', () => {
+    if (card.classList.contains('open')) return;
+    card.classList.add('open');
+    setTimeout(() => {
+      card.querySelectorAll('.answer-fill').forEach(el => el.style.width = el.dataset.w + '%');
+    }, 250);
+  });
+  grid.appendChild(card);
+});
+
+/* ── 2단계: AI 이어쓰기 데모 ──
+   한 스텝이 곧 하나의 객관식 문제: ['선택된 토큰', 가능성, '후보', 가능성, ...],
+   첫 항목이 실제로 쓰이는 토큰이다. 본문은 steps에서 이어 붙여 만든다(아래 d.text).
+   본문을 따로 저장하면 문구만 고치고 steps를 안 고쳤을 때 화면에
+   「먼저 써 놓고 나서 그걸 고르는 중」이라는 한 칸 밀린 상태가 나온다.
+
+   음절 단위가 아니라 토큰 단위로 쪼갠 이유: 한국어 토큰은 보통 어간과 조사·어미로
+   끊긴다(「집」+「에」, 「먹었」+「는데」, 「기분」+「이었」+「다」). 한 칸에 한 글자씩
+   보여 주면 학습자가 토큰을 글자로 오해하게 되고, 뒤의 《토큰과 어휘 사전》 수업에서
+   다시 바로잡아야 한다. 스텝 수가 줄어드는 덕에 한 스텝을 더 오래 보여 줄 수도 있다.
+
+   몇 군데만 고르지 않고 매 스텝을 보여 주는 이유: 이 수업의 핵심이 「확신의 높낮이」다.
+   「끈한」은 「뜨」 뒤에 사실상 정해져 있지만, 「집에 가는 길에」 다음은 활짝 열려 있다.
+   몇 곳만 뽑으면 이 리듬이 보이지 않는다. 아래 pace()와 함께, 확신이 큰 스텝은
+   스쳐 지나가고 망설이는 스텝은 더 머문다.
+
+   확률은 실제 모델 출력이 아니라 감으로 붙인 값이다. 「어떤 자리는 고를 것이 없고
+   어떤 자리는 정말 반반」이라는 감만 전달되면 충분하다. */
+const DEMOS = [
+  {
+    starter: '오늘 밤 10시까지 야근하고,',
+    steps: [
+      /* 시작 문장이 공백 없이 끝나므로 첫 토큰이 앞 공백을 물고 있어야 한다.
+         안 그러면 화면에 「야근하고,집에」처럼 붙어 버린다. */
+      [' 집',39,' 따',17,' 피',14],
+      ['에',72,'으로',12,'까지',6],
+      [' 가',58,' 오',16,' 걸어가',9,'alt'],
+      ['는',81,'던',7,'면서',4],
+      [' 길',66,' 도',12,' 중',9],
+      ['에',88,'에서',5,'이',2],
+      [' 뜨',34,' 따뜻한',19,' 편의점',13],
+      ['끈한',91,'거운',5,'겁',2],
+      [' 국수',29,' 국밥',21,' 어묵',14],
+      ['를',76,'도',9,'가',6],
+      [' 사',43,' 한',18,' 먹',15],
+      [' 먹었',62,' 먹고',17,' 사서',8],
+      ['는데',47,'다',24,'더니',11],
+      [',',64,'.',19,' 그',6],
+      /* 온몸 / 속 둘 다 받침이 있어 다음 조사 '이'가 그대로 맞는다 */
+      [' 온몸',36,' 속',22,' 몸',18,'alt'],
+      ['이',84,'에',6,'은',4],
+      [' 살아',51,' 녹',24,' 풀리',11],
+      ['나는',93,'났다',3,'있는',2],
+      [' 기분',58,' 느낌',27,' 것',6,'alt'],
+      ['이었',69,'이',14,'였',9],
+      ['다',96,'어요',2,'습니다',1],
+      ['.',93,'!',4,',',1],
+    ],
+  },
+  {
+    starter: '존경하는 김 선생님, 안녕하세요!',
+    steps: [
+      [' 저',59,' 안',14,' 다',9],
+      ['는',82,'희',6,'의',4],
+      [' 3',31,' 이민',17,' 아이',12],
+      ['학년',89,'반',5,'학기',2],
+      [' 2',48,' 3',17,' 1',13,'alt'],
+      ['반',94,'학년',2,'조',1],
+      [' 이민',37,' 김',16,' 학생',11,'alt'],
+      ['준',74,'수',8,'호',6],
+      [' 학부',52,' 학생',15,' 어머니',11],
+      ['모',96,'형',1,'지',1],
+      ['입니다',87,'이고',5,'예요',3],
+      ['.',71,',',14,' 안녕',5],
+      [' 민준',46,' 아이',24,' 저희',13],
+      ['이가',68,'은',11,'이',9],
+      [' 내일',53,' 오늘',16,' 이번',11,'alt'],
+      [' 병원',57,' 학교',13,' 몸',9],
+      [' 재',41,' 진료',21,' 검진',16],
+      ['검진',92,'수술',3,'방문',2],
+      ['이',63,'을',19,'가',8],
+      [' 있어',44,' 예약',18,' 있어서',15],
+      [' 학교',72,' 등교',12,' 수업',7],
+      ['에',86,'를',6,'까지',3],
+      [' 가지',58,' 못',17,' 갈',12],
+      [' 못합니다',61,' 못할',21,' 어렵습니다',9],
+      ['.',94,',',3,'!',1],
+    ],
+  },
+  {
+    starter: '김치찌개 끓이는 법은:',
+    steps: [
+      [' 돼지',47,' 먼저',21,' 우선',12],
+      ['고기',93,'기름',2,'갈비',1],
+      ['를',78,'와',8,'는',5],
+      [' 먼저',42,' 넣고',18,' 기름',13],
+      [' 볶',39,' 썰',24,' 굽',14],
+      ['다가',56,'고',21,'아',9],
+      [',',74,'.',12,' 그',5],
+      [' 잘',34,' 김치',26,' 푹',12],
+      [' 익은',61,' 익힌',17,' 씻은',8,'alt'],
+      [' 김치',96,' 배추',2,' 파',1],
+      ['를',82,'와',6,'도',4],
+      [' 넣고',67,' 넣어',15,' 볶고',8],
+      [' 같이',38,' 함께',24,' 다시',14,'alt'],
+      [' 볶은',52,' 끓인',19,' 익힌',12],
+      [' 뒤',58,' 후',26,' 다음',11,'alt'],
+      [',',79,'에',9,'.',6],
+      [' 물',46,' 육수',27,' 국물',14],
+      ['을',88,'이',5,'도',3],
+      [' 붓고',61,' 넣고',22,' 부어',9],
+      [' 20',37,' 10',23,' 15',16,'alt'],
+      ['분간',84,'분',9,'분정도',3],
+      [' 끓이',71,' 끓여',14,' 익히',6],
+      ['면',63,'고',16,'다가',8],
+      [' 된다',76,' 완성',12,' 좋다',6],
+      ['.',92,'!',4,',',2],
+    ],
+  },
+];
+DEMOS.forEach(d => { d.text = d.steps.map(s => s[0]).join(''); });
+
+let curDemo = 0;
+let running = false;
+let runSeq = 0;   // 토큰 단위 한 회차가 20초 남짓이라, 시작 문장을 바꾸면 끊을 수 있어야 한다
+const demoText  = document.getElementById('demoText');
+const btnRun    = document.getElementById('btnRun');
+const statusEl  = document.getElementById('demoStatus');
+const pop       = document.getElementById('decisionPop');
+const candList  = document.getElementById('candList');
+
+function resetDemo() {
+  const d = DEMOS[curDemo];
+  demoText.innerHTML = `<span class="starter-part">${d.starter}</span><span class="ai-part" id="aiPart"></span><span class="caret"></span>`;
+  pop.classList.remove('show');
+  btnRun.disabled = false;
+  btnRun.textContent = 'AI에게 이어 쓰게 하기 →';
+  statusEl.textContent = '자료도 안 찾고, 인터넷도 안 씁니다. 오직 「읽어 본 글」에만 기대어 토큰 하나씩 이어 갑니다';
+}
+
+/* 후보 세 줄은 한 번만 만들고 이후에는 내용만 갈아 끼운다. innerHTML을 다시 그리면
+   cand-fill이 매번 0에서 다시 자라서 이 속도에서는 그냥 깜빡거림으로 보인다.
+   노드를 재사용해야 막대가 이전 스텝 높이에서 이번 스텝으로 미끄러진다. */
+candList.innerHTML = [0, 1, 2].map(() => `
+  <div class="cand-row">
+    <div class="cand-word"></div>
+    <div class="cand-track"><div class="cand-fill"></div></div>
+    <div class="cand-pct"></div>
+  </div>`).join('');
+const candRows = [...candList.children].map(row => ({
+  row,
+  word: row.querySelector('.cand-word'),
+  fill: row.querySelector('.cand-fill'),
+  pct:  row.querySelector('.cand-pct'),
+}));
+
+function renderStep(step) {
+  candRows.forEach((r, k) => {
+    const w = step[k * 2], p = step[k * 2 + 1];
+    r.row.classList.remove('picked');
+    /* 어절 첫 토큰은 앞에 공백을 달고 있다(' 국수'). 본문에 붙일 때는 살려야 하고
+       후보 칸에 넣을 때는 떼야 한다. 안 그러면 글자가 한쪽으로 밀린다. */
+    r.word.textContent = w.trim() || w;
+    r.pct.textContent = p + '%';
+    r.fill.style.width = p + '%';
+  });
+}
+
+document.querySelectorAll('.starter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    runSeq++;
+    running = false;
+    document.querySelectorAll('.starter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    curDemo = +chip.dataset.i;
+    resetDemo();
+  });
+});
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* 머무는 시간을 확신도에 맞춘다. 사실상 고를 것이 없는 스텝은 스쳐 지나가고,
+   진짜 망설이는 스텝은 더 오래 머문다. 일정한 속도로 넘기면 「끈한」과 「집」이
+   똑같이 어려워 보이는데, 이 둘이 다르다는 게 바로 이 수업의 핵심이다. */
+function pace(pct) {
+  if (pct >= 90) return 300;
+  if (pct >= 60) return 620;
+  return 950;
+}
+
+/* 주사위 굴리기: 실제 모델은 항상 가능성이 가장 큰 토큰을 고르는 게 아니라,
+   상위 후보 중에서 가능성에 비례해 뽑는다(temperature / top-p). 같은 질문에
+   매번 다르게 답하는 이유가 바로 이것이다.
+   제약 두 가지:
+   1. 'alt'가 붙은 스텝에서만 굴린다. 다른 곳에서 바꾸면 뒷문장이 어긋난다.
+      영어 'gr'을 'I'로 바꾸면 「Iabbed」가 되고, 한국어는 체언을 바꾸면 뒤따르는
+      조사까지 틀어진다(온몸/속처럼 받침 유무가 같은 쌍만 골랐다).
+   2. 두 가지의 가능성 비율대로 뽑는다(58 : 16, 반반이 아니다). 가중 추출이
+      실제 동작이고, 99% 스텝은 사실상 안 바뀌고 막대가 비슷한 곳만 갈라지는
+      이유도 여기서 나온다.
+   window.DEMO_GREEDY는 자동 테스트용 결정성 스위치, 즉 temperature 0. */
+function pickIndex(step) {
+  if (step[6] !== 'alt' || window.DEMO_GREEDY) return 0;
+  return Math.random() * (step[1] + step[3]) < step[1] ? 0 : 1;
+}
+
+async function runDemo() {
+  if (running) return;
+  running = true;
+  const seq = ++runSeq;
+  btnRun.disabled = true;
+  btnRun.textContent = '이어 쓰는 중……';
+  statusEl.textContent = '파란 점선 상자 안이 토큰 하나를 쓸 때마다 AI 앞에 놓이는 후보들';
+
+  const d = DEMOS[curDemo];
+  const aiPart = document.getElementById('aiPart');
+  pop.classList.add('show');
+
+  let forks = 0;                         // 이번 회차에 가장 긴 막대를 고르지 않은 횟수
+  for (const step of d.steps) {
+    const k = pickIndex(step);
+    const ms = pace(step[1]);
+    renderStep(step);
+    /* 65%는 「후보를 늘어놓는」 구간. 망설이는 스텝(950ms)은 셋 다 읽을 시간이 되고,
+       정해진 스텝(300ms)은 막대가 꽉 찬 인상만 남기고 지나간다. */
+    await sleep(ms * 0.65);
+    if (seq !== runSeq) return;          // 도중에 시작 문장을 바꿨으면 이 회차는 폐기
+    candRows[k].row.classList.add('picked');
+    if (k > 0) {
+      forks++;
+      statusEl.textContent = '보이시나요? 이번엔 가장 긴 막대를 고르지 않았어요—문장이 여기서 다른 길로 접어듭니다';
+    }
+    // 갈라지는 순간엔 조금 더 머문다. 안 그러면 스쳐 지나가 잘못 본 줄 안다
+    await sleep(ms * (k > 0 ? 0.9 : 0.35));
+    if (seq !== runSeq) return;
+    aiPart.textContent += step[k * 2];
+  }
+
+  statusEl.textContent = forks
+    ? `다 썼어요. 이번 회차엔 ${forks}곳에서 가장 긴 막대를 고르지 않았으니, 다시 돌리면 또 다른 문장이 나옵니다`
+    : '다 썼어요. 이번엔 매번 가장 큰 것을 골랐네요. 몇 번 더 돌리면 막대가 비슷한 곳에서 갈라집니다';
+  btnRun.disabled = false;
+  btnRun.textContent = '다시 한번 보기 ↻';
+  running = false;
+}
+
+btnRun.addEventListener('click', () => {
+  if (btnRun.textContent.indexOf('다시') === 0) resetDemo();
+  setTimeout(runDemo, 50);
+});
+resetDemo();
+
+/* ── 数学翻车实验 ── */
+const MATH_CASES = [
+  {
+    q: '1 + 1 = ？',
+    hint: '이 문제는 훈련 데이터에서 수백만 번 본 문제',
+    cands: [
+      { w: '2',  pct: 99 },
+      { w: '3',  pct: 0.6 },
+      { w: '11', pct: 0.4 },
+    ],
+    picked: '2',
+    verdict: '<span class="mv-ok">✓ 정답이에요.</span> 하지만 오해하지 마세요—산수를 할 줄 알아서가 아니라, <b>「1+1=」 뒤에 「2」가 오는 횟수가 압도적으로 많아서</b>예요. 사실상 답을 외운 거죠. 우리가 「생일 축하……」를 생각도 안 하고 잇는 것처럼요.',
+  },
+  {
+    q: '3847 × 2963 = ？',
+    hint: '이 문제 자체는 어디에서도 거의 본 적 없는 문제',
+    cands: [
+      { w: '11,397,461', pct: 23 },
+      { w: '11,398,661', pct: 21 },
+      { w: '11,402,381', pct: 18 },
+    ],
+    picked: '11,397,461',
+    verdict: '<span class="mv-bad">✗ 틀렸어요.</span> 정답은 <b>11,398,661</b>—후보 안에 숨어 있었는데, 확률이 더 높은 오답을 골라 버렸네요. 잘 보세요. 후보들 모두 <b>자릿수가 맞고, 앞뒤도 그럴듯하죠</b>. 「어떤 숫자가 답처럼 생겼는가」로 이어 말하기를 하고 있을 뿐, 진짜로 연필 들고 계산하는 게 아니거든요. 어떤 후보도 압도적인 가능성이 없어요—<b>이렇게 「확신이 없는」 문제에서, AI는 쉽게 넘어집니다</b>.',
+  },
+];
+
+const mathQ = document.getElementById('mathQ');
+const mathCands = document.getElementById('mathCands');
+const mathVerdict = document.getElementById('mathVerdict');
+let mathTimers = [];
+
+function runMath(i) {
+  mathTimers.forEach(t => clearTimeout(t));
+  mathTimers = [];
+  const c = MATH_CASES[i];
+  mathQ.innerHTML = c.q + '<span class="mq-hint">' + c.hint + '</span>';
+  mathVerdict.classList.remove('show');
+  mathCands.innerHTML = c.cands.map(x => `
+    <div class="cand-row" data-w="${x.w}">
+      <div class="cand-word">${x.w}</div>
+      <div class="cand-track"><div class="cand-fill" data-p="${x.pct}"></div></div>
+      <div class="cand-pct">${x.pct}%</div>
+    </div>`).join('');
+  mathTimers.push(setTimeout(() => {
+    mathCands.querySelectorAll('.cand-fill').forEach(el => el.style.width = Math.max(el.dataset.p, 2) + '%');
+  }, 80));
+  mathTimers.push(setTimeout(() => {
+    const row = mathCands.querySelector(`.cand-row[data-w="${c.picked}"]`);
+    if (row) row.classList.add('picked');
+  }, 950));
+  mathTimers.push(setTimeout(() => {
+    mathVerdict.innerHTML = c.verdict;
+    mathVerdict.classList.add('show');
+  }, 1500));
+}
+
+document.querySelectorAll('.math-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.math-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    runMath(+chip.dataset.i);
+  });
+});
+runMath(0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

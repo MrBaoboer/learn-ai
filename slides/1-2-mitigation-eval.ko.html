@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>평가 + Human-in-the-Loop: AI를 신뢰할 수 있고 제어 가능하게 | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root {
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+.section-label {
+  font-size: 12px; font-weight: 800; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+.phase-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.phase-card {
+  background: var(--card); border-radius: 12px; padding: 14px 18px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+}
+.phase-card:hover { border-color: rgba(217,119,6,0.25); }
+.phase-card.active { border-color: var(--amber); background: rgba(217,119,6,0.03); }
+.phase-tag { font-size: 12px; font-weight: 800; color: var(--amber); margin-bottom: 5px; }
+.phase-name { font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.phase-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+.insight-box {
+  background: rgba(22,163,106,0.04);
+  border: 1px solid rgba(22,163,106,0.15);
+  border-radius: 12px; padding: 14px 18px;
+}
+.insight-title { font-size: 12px; font-weight: 800; color: var(--success); margin-bottom: 10px; letter-spacing: 0.3px; }
+.insight-item {
+  font-size: 13px; color: var(--text-sub); line-height: 1.8; margin-bottom: 6px;
+}
+.insight-item:last-child { margin-bottom: 0; }
+.insight-item b { color: var(--text-main); }
+
+/* Right panel (demo area, bottom half) */
+.right-panel {
+  display: flex; flex-direction: column; min-width: 0; gap: 14px; margin-top: 28px;
+}
+.right-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.right-top .subtitle { font-size: 13px; color: var(--text-sub); margin-top: 2px; }
+
+.right-top .tab-btn {
+  padding: 9px 18px; border-radius: 9px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer; min-height: 44px;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.right-top .tab-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Review simulator */
+.review-area {
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.review-card {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px 22px;
+}
+.review-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;
+}
+.review-card-meta { display: flex; gap: 8px; align-items: center; }
+.meta-tag {
+  font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 5px;
+}
+.meta-tag.q { background: rgba(0,102,255,0.08); color: var(--accent); }
+.meta-tag.risk-high { background: rgba(229,62,62,0.1); color: var(--danger); }
+.meta-tag.risk-med { background: rgba(217,119,6,0.1); color: var(--amber); }
+.meta-tag.risk-low { background: rgba(22,163,106,0.1); color: var(--success); }
+.review-card-scene { font-size: 13px; color: var(--text-sub); }
+
+.qa-row { display: flex; gap: 12px; margin-bottom: 8px; }
+.qa-q { font-size: 14px; font-weight: 700; color: var(--text-sub); min-width: 20px; }
+.qa-content { font-size: 15px; color: var(--text-main); line-height: 1.7; flex: 1; }
+.qa-content .hl-red { color: var(--danger); font-weight: 600; text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }
+.qa-content .hl-green { color: var(--success); font-weight: 600; }
+
+.review-actions {
+  display: flex; gap: 8px; align-items: center; border-top: 1px solid rgba(0,0,0,0.05);
+  padding-top: 10px; margin-top: 2px;
+}
+.review-actions .action-label { font-size: 14px; color: var(--text-sub); font-weight: 700; margin-right: 4px; }
+.action-btn {
+  padding: 10px 18px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s;
+  background: var(--card); color: var(--text-main); min-height: 44px;
+  font-family: inherit;
+}
+.action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.action-btn.approve { border-color: rgba(22,163,106,0.3); color: var(--success); }
+.action-btn.approve:hover { background: rgba(22,163,106,0.06); }
+.action-btn.reject { border-color: rgba(229,62,62,0.3); color: var(--danger); }
+.action-btn.reject:hover { background: rgba(229,62,62,0.06); }
+.action-btn.edit { border-color: rgba(217,119,6,0.3); color: var(--amber); }
+.action-btn.edit:hover { background: rgba(217,119,6,0.06); }
+
+.review-result {
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  display: none; align-items: center; gap: 8px; flex: 1;
+}
+.review-result.visible { display: flex; }
+.review-result.approved { background: rgba(22,163,106,0.06); color: var(--success); border: 1px solid rgba(22,163,106,0.15); }
+.review-result.rejected { background: rgba(229,62,62,0.06); color: var(--danger); border: 1px solid rgba(229,62,62,0.15); }
+.review-result.edited { background: rgba(217,119,6,0.06); color: var(--amber); border: 1px solid rgba(217,119,6,0.15); }
+
+/* Metrics panel */
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.metric-card {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px;
+  text-align: center;
+}
+.metric-val { font-size: 28px; font-weight: 800; color: var(--text-main); }
+.metric-val.good { color: var(--success); }
+.metric-val.bad { color: var(--danger); }
+.metric-val.neutral { color: var(--amber); }
+.metric-label { font-size: 13px; color: var(--text-sub); margin-top: 4px; font-weight: 600; }
+.metric-desc { font-size: 12px; color: var(--text-sub); margin-top: 3px; opacity: 0.8; }
+
+/* Why it works */
+.why-box {
+  background: #1c1c1e; border-radius: 12px; padding: 14px 16px;
+  flex-shrink: 0;
+}
+.why-title {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.gen-flow {
+  display: flex; align-items: center; gap: 3px; flex-wrap: wrap; gap: 3px; margin-bottom: 10px;
+}
+.gen-tok {
+  padding: 3px 8px; border-radius: 5px; font-size: 12px; font-weight: 700;
+  background: rgba(255,255,255,0.08); color: #9ca3af;
+}
+.gen-tok.emitted { background: rgba(0,102,255,0.2); color: #93c5fd; }
+.gen-tok.halluc { background: rgba(229,62,62,0.2); color: #fca5a5; border: 1px dashed rgba(229,62,62,0.5); }
+.gen-tok.checked { background: rgba(22,163,106,0.2); color: #6ee7b7; border: 1px solid rgba(22,163,106,0.4); }
+.gen-arrow { color: #374151; font-size: 13px; align-self: center; }
+.why-insight {
+  font-size: 13px; color: #9ca3af; line-height: 1.7;
+  border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;
+}
+.why-insight b { color: #e5e7eb; }
+.why-insight .key { color: #fbbf24; font-weight: 700; }
+
+.eval-table-wrap { overflow-x: auto; }
+.why-compare { display: flex; gap: 16px; }
+.why-compare-divider { width: 1px; background: rgba(0,0,0,0.06); flex-shrink: 0; }
+.review-actions { flex-wrap: wrap; }
+.fb-kpis { display: flex; gap: 24px; flex-wrap: wrap; }
+
+@media (max-width: 768px) {
+  .phase-grid { grid-template-columns: 1fr; }
+  .metrics-row { grid-template-columns: 1fr 1fr; }
+  .why-compare { flex-direction: column; }
+  .why-compare-divider { width: auto; height: 1px; }
+  .review-card-header { flex-direction: column; gap: 6px; }
+  .fb-kpis { gap: 10px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="자동화 평가와 Human-in-the-Loop 검토는 AI 제품 품질 보증의 마지막 방어선입니다. 평가 지표 설계, 테스트셋 구축, 그리고 인간 검토 프로세스를 AI 제품에 통합하는 방법을 알아보세요.">
+<meta name="keywords" content="LLM 평가,Human in the loop,AI 품질 보증,RLHF,자동 평가,AI 검토">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-mitigation-eval.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-mitigation-eval.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-mitigation-eval.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-mitigation-eval.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-mitigation-eval.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 트레이닝">
+<meta property="og:title" content="평가 + Human-in-the-Loop: AI를 신뢰할 수 있고 제어 가능하게">
+<meta property="og:description" content="자동화 평가와 Human-in-the-Loop 검토는 AI 제품 품질 보증의 마지막 방어선입니다. 평가 지표 설계, 테스트셋 구축, 그리고 인간 검토 프로세스를 AI 제품에 통합하는 방법을 알아보세요.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-mitigation-eval.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="평가 + Human-in-the-Loop: AI를 신뢰할 수 있고 제어 가능하게">
+<meta name="twitter:description" content="자동화 평가와 Human-in-the-Loop 검토는 AI 제품 품질 보증의 마지막 방어선입니다. 평가 지표 설계, 테스트셋 구축, 그리고 인간 검토 프로세스를 AI 제품에 통합하는 방법을 알아보세요.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"대응 4: 평가 + 인간 검토","name":"대응 4: 평가 + 인간 검토","url":"https://xueai.app/slides/1-2-mitigation-eval.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 환각과 네 가지 대응","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"자동화 평가와 Human-in-the-Loop 검토는 AI 제품 품질 보증의 마지막 방어선입니다. 평가 지표 설계, 테스트셋 구축, 그리고 인간 검토 프로세스를 AI 제품에 통합하는 방법을 알아보세요.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">환각과 대응</div>
+    <h1>대응 4: 평가 + 인간 검토</h1>
+    <p class="subtitle">PM 관점: 환각 리스크 수량화, 계층별 검토 프로세스 설계, Human-in-the-Loop를 제품 안전망으로 만드는 방법. 전략 04 / 04 · 탐지 + 수정.</p>
+  </header>
+
+  <section>
+    <div class="sec-label">PM이 설계해야 할 세 가지 단계</div>
+    <div class="phase-grid">
+          <div class="phase-card active" onclick="selectPhase(0)">
+            <div class="phase-tag">단계 1 · 출시 전</div>
+            <div class="phase-name">평가 기준선: 환각 테스트셋 구축</div>
+            <div class="phase-desc">정답이 알려진 질문으로 모델을 테스트하고, 환각률을 수량화하여 허용 기준을 설정합니다.</div>
+          </div>
+          <div class="phase-card" onclick="selectPhase(1)">
+            <div class="phase-tag">단계 2 · 출시 후</div>
+            <div class="phase-name">계층별 검토: 고위험 콘텐츠 인간 감독</div>
+            <div class="phase-desc">리스크 수준에 따라 자동 라우팅: 저위험은 바로 발송, 고위험은 인간 검토 후 발송.</div>
+          </div>
+          <div class="phase-card" onclick="selectPhase(2)">
+            <div class="phase-tag">단계 3 · 지속적 개선</div>
+            <div class="phase-name">오류 피드백 루프: 실서비스 데이터로 반복</div>
+            <div class="phase-desc">검토 중 발견된 환각 사례를 Bad Case로 수집하여 모델 최적화와 Prompt 조정에 활용합니다.</div>
+          </div>
+    </div>
+
+    <div class="right-panel paywall-locked xa-peek" id="rightPanel">
+      <!-- rendered by JS -->
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">PM 핵심 인사이트</div>
+    <div class="insight-box">
+        <div class="insight-title">PM 핵심 인사이트</div>
+        <div class="insight-item">
+          <b>환각률 ≠ 0</b>: 모든 LLM은 환각을 일으킵니다. PM의 목표는 이를 <b>비즈니스 허용 임계값 이내</b>로 제어하는 것이며, 완전한 제거는 비현실적입니다.
+        </div>
+        <div class="insight-item">
+          <b>고위험 = 인간 안전망</b>: 의료·법률·금융 시나리오에서는 AI가 초안만 작성하고, <b>최종 확인은 반드시 사람이 서명해야 합니다</b>.
+        </div>
+        <div class="insight-item">
+          <b>지표는 PRD에 명시</b>: '환각률 &lt; 3%'는 '로딩 시간 &lt; 2s'처럼 측정 가능한 인수 기준이 되어야 합니다.
+        </div>
+    </div>
+  </section>
+</article>
+
+<script>
+const PHASES = [
+  {
+    title: '평가 기준선 Demo',
+    subtitle: '테스트 케이스 배치를 시뮬레이션하고 환각률 측정',
+    view: 'metrics'
+  },
+  {
+    title: '인간 검토 콘솔 Demo',
+    subtitle: '고위험 답변의 인간 검토 워크플로우 시뮬레이션',
+    view: 'review'
+  },
+  {
+    title: '오류 피드백 루프 Demo',
+    subtitle: '검토 중 발견된 Bad Case가 최적화를 어떻게 이끄는지',
+    view: 'feedback'
+  }
+];
+
+const REVIEW_CASES = [
+  {
+    scene: '금융 고객 서비스 · 재테크 조언',
+    riskLevel: 'risk-high',
+    riskLabel: '고위험',
+    q: '7천만 원이 있는데, 연 8% 저위험 상품을 추천해 주시겠어요?',
+    a: '저희에게 <span class="hl-red">연 8.5% 고정 수익률의 저위험 재테크 상품</span>이 있으며, <span class="hl-red">원금과 이자 100% 보장</span>, 최소 가입금액 700만 원입니다…',
+    resultText: { approve: '승인 및 발송됨 (리스크: 이 표현은 규제를 위반할 수 있음)', reject: '거부됨, 담당자로 이관 ✓', edit: '편집됨: "원금·이자 보장" 등 부적절한 표현 삭제' }
+  },
+  {
+    scene: '의료 상담 · 약물 복용 조언',
+    riskLevel: 'risk-high',
+    riskLabel: '고위험',
+    q: '최근 혈당이 높은데, 메트포르민 용량을 스스로 늘려도 될까요?',
+    a: '혈당이 높을 때는 <span class="hl-red">메트포르민을 하루 3g으로 스스로 증량</span>해도 괜찮습니다. 물을 충분히 드세요…',
+    resultText: { approve: '승인 및 발송됨 (리스크: 용량 변경은 의사 지도가 필요함)', reject: '거부됨, 의사에게 강제 연결 ✓', edit: '편집됨: 구체적 용량 삭제, "의사와 상담하세요" 안내 추가' }
+  },
+  {
+    scene: '제품 지원 · 기능 문의',
+    riskLevel: 'risk-low',
+    riskLabel: '저위험',
+    q: '데이터를 Excel로 내보내는 방법은 무엇인가요?',
+    a: '<span class="hl-green">우측 상단 "내보내기" 버튼을 클릭하고 "Excel 형식"을 선택하면 다운로드됩니다. 날짜 범위와 필드 필터 사용자 지정이 가능합니다.</span>',
+    resultText: { approve: '바로 승인 및 발송됨 ✓', reject: '거부됨 및 재생성', edit: '편집됨 및 스크린샷 링크 추가' }
+  }
+];
+
+const METRICS = [
+  { val: '94.2%', cls: 'good', label: '사실 정확도', desc: '테스트셋 200문항 중 188문항 환각 없음' },
+  { val: '5.8%', cls: 'bad', label: '환각률', desc: '목표 < 3%, 현재 기준 미달' },
+  { val: '2.3s', cls: 'neutral', label: '평균 응답 지연', desc: '검색 시간 포함' },
+  { val: '78%', cls: 'neutral', label: 'RAG 히트율', desc: '목표 > 85%, 최적화 필요' },
+];
+
+const FEEDBACK_STEPS = [
+  { icon: '🔴', title: 'Bad Case 발견', desc: '"금리를 날조한" 오답을 검토자가 표시하고 bad-case 태그를 달았습니다', tag: '출처: 인간 검토' },
+  { icon: '📋', title: '원인 분석', desc: '근본 원인: Prompt에 "구체적인 금리 수치 인용 금지" 제약이 없어 모델이 스스로 채워 넣음', tag: '근본 원인: Prompt 제약 누락' },
+  { icon: '🔧', title: 'Prompt 반복', desc: 'System Prompt 업데이트: 구체적 금리 언급 금지, "재무 상담사에게 문의하세요"로 대체', tag: '수정: Prompt 엔지니어링' },
+  { icon: '✅', title: '회귀 검증', desc: '해당 bad case를 테스트셋에 추가하고 재평가하여 수정 효과 확인 및 신규 문제 없음 검증', tag: '검증: 회귀 테스트' },
+];
+
+let currentPhase = 0;
+let currentTab = 'demo';
+
+function selectPhase(i) {
+  currentPhase = i;
+  currentTab = 'demo';
+  document.querySelectorAll('.phase-card').forEach((c, j) => c.classList.toggle('active', j === i));
+  renderPhase();
+}
+
+const WHY_HTML = `
+  <div style="display:none;" id="viewWhy" style="flex:1;min-height:0;">
+    <div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:28px 32px;height:100%;display:flex;flex-direction:column;gap:20px;overflow-y:auto;">
+      <div style="display:flex;gap:16px;flex:1;min-height:0;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:#6b7280;letter-spacing:0.5px;text-transform:uppercase;">인간 차단 없음</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">수습기간</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">최대</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:#dc2626;border:1px dashed rgba(229,62,62,0.35);">20일</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:#dc2626;border:1px dashed rgba(229,62,62,0.35);">…계속 날조</span>
+          </div>
+          <div style="font-size:14px;color:#6b7280;line-height:1.7;">틀렸지만 모름: 모델이 잘못된 Token을<br>기반으로 계속 추론하여 오류가 누적됨</div>
+        </div>
+        <div style="width:1px;background:rgba(0,0,0,0.07);flex-shrink:0;"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:#6b7280;letter-spacing:0.5px;text-transform:uppercase;">평가 + 인간 차단 있음</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">수습기간</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">최대</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:#dc2626;border:1px dashed rgba(229,62,62,0.35);">20일</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.08);color:#15803d;border:1px solid rgba(22,163,106,0.3);">⏸ 차단</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.08);color:#15803d;border:1px solid rgba(22,163,106,0.3);">✓ 수정</span>
+          </div>
+          <div style="font-size:14px;color:#6b7280;line-height:1.7;">출력단에 외부 수정 레이어를 설치하여<br>모델의 단방향 생성 근본 결함을 보완</div>
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,0.03);border-radius:10px;padding:18px 22px;flex-shrink:0;">
+        <div style="font-size:16px;color:#374151;line-height:1.9;">
+          모델은 <b style="color:#111827;">자체 검사 메커니즘이 없습니다</b>: 잘못된 Token을 생성한 후, 이를 기반으로 계속 추론하여 오류가 누적됩니다.
+          평가 + 인간 검토는 <span style="color:#d97706;font-weight:700;">모델 출력단에 외부 수정 레이어를 배치하는 것</span>으로,
+          "Token → Token, 단방향, 되돌아보지 않음"의 근본적인 결함을 보완합니다.
+          <b style="color:#111827;">처음 세 가지 전략은 확률을 변경하고, 이 전략은 결과를 차단합니다.</b>
+        </div>
+      </div>
+      <div style="background:rgba(229,62,62,0.04);border:1px solid rgba(229,62,62,0.15);border-radius:12px;padding:16px 22px;flex-shrink:0;">
+        <div style="font-size:13px;font-weight:800;color:#dc2626;margin-bottom:10px;letter-spacing:0.3px;">⚠ 한계: 평가 + 인간 검토가 종착점은 아닙니다</div>
+        <div style="display:flex;gap:20px;">
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#111827;font-weight:700;margin-bottom:4px;">인건비는 선형으로 확장되지 않음</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.7;">
+              사용자 수 증가 후, 모든 출력을 인간 검토에 의존하는 방식은 지속 불가능합니다. <span style="color:#dc2626;font-weight:600;">HITL은 콜드 스타트 단계의 안전망이지, 확장 단계의 장기 방안이 아닙니다.</span>
+            </div>
+          </div>
+          <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#111827;font-weight:700;margin-bottom:4px;">평가 지표에는 사후 맹점이 있음</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.7;">
+              테스트셋은 알려진 위험 포인트만 커버합니다. 모델은 <span style="color:#dc2626;font-weight:600;">테스트셋 외부의 롱테일 질문에서 여전히 많은 환각</span>을 일으킬 수 있습니다. 평가 통과 ≠ 완전히 신뢰 가능.
+            </div>
+          </div>
+          <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#111827;font-weight:700;margin-bottom:4px;">PM 대응 전략</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.7;">
+              HITL로 축적된 검토 데이터는 <span style="color:#2563eb;font-weight:600;">테스트셋 지속 확장</span>과 <span style="color:#15803d;font-weight:600;">모델 SFT 훈련</span>으로 전환하여 인건비가 시간이 지날수록 줄어들도록 해야 합니다.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+function setTab(t) {
+  currentTab = t;
+  const tabs = ['demo', 'why'];
+  document.querySelectorAll('.right-tab-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === t));
+  document.getElementById('viewDemo').style.display = t === 'demo' ? 'flex' : 'none';
+  document.getElementById('viewWhy').style.display = t === 'why' ? 'flex' : 'none';
+}
+
+function renderPhase() {
+  const p = PHASES[currentPhase];
+  const panel = document.getElementById('rightPanel');
+
+  const tabHeader = `
+    <div class="right-top" style="flex-shrink:0;">
+      <div><h3>${p.title}</h3><div class="subtitle">${p.subtitle}</div></div>
+      <div style="display:flex;gap:5px;">
+        <button class="right-tab-btn tab-btn ${currentTab === 'demo' ? 'active' : ''}" onclick="setTab('demo')">데모</button>
+        <button class="right-tab-btn tab-btn ${currentTab === 'why' ? 'active' : ''}" onclick="setTab('why')">효과 원리</button>
+      </div>
+    </div>`;
+
+  let demoContent = '';
+  if (p.view === 'metrics') {
+    demoContent = `
+      <div class="metrics-row">
+        ${METRICS.map(m => `
+          <div class="metric-card">
+            <div class="metric-val ${m.cls}">${m.val}</div>
+            <div class="metric-label">${m.label}</div>
+            <div class="metric-desc">${m.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px 22px;" class="eval-table-wrap">
+        <div class="section-label" style="margin-bottom:12px;">샘플 테스트 케이스</div>
+        <table style="width:100%;min-width:560px;border-collapse:collapse;font-size:14px;">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.06);">
+              <th style="text-align:left;padding:8px 12px;color:var(--text-sub);font-weight:700;">테스트 질문</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-sub);font-weight:700;">정답</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-sub);font-weight:700;">모델 출력</th>
+              <th style="text-align:center;padding:8px 12px;color:var(--text-sub);font-weight:700;">판정</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:10px 12px;color:var(--text-main);">수습 기간 최대 기간은?</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">3년 이상 계약: 최대 6개월</td>
+              <td style="padding:10px 12px;color:var(--success);">3년 이상 계약: 최대 6개월</td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--success);font-weight:700;">✓ 정확</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:10px 12px;color:var(--text-main);">급여는 매월 지급해야 하나요?</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">월 1회 이상</td>
+              <td style="padding:10px 12px;color:var(--success);">월 1회 이상</td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--success);font-weight:700;">✓ 정확</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:10px 12px;color:var(--text-main);">연차 최대 일수는?</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">근속 20년 이상: 15일</td>
+              <td style="padding:10px 12px;color:var(--danger);">근속 20년 이상: <b>20일</b></td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--danger);font-weight:700;">✗ 환각</span></td>
+            </tr>
+            <tr>
+              <td style="padding:10px 12px;color:var(--text-main);">수유 기간 중 해고 금지 기간은?</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">수유 기간 종료 전 (약 12개월)</td>
+              <td style="padding:10px 12px;color:var(--danger);">수유 기간 종료 전 (약 <b>18개월</b>)</td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--danger);font-weight:700;">✗ 환각</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+  } else if (p.view === 'review') {
+    demoContent = `
+      <div class="review-area">
+        ${REVIEW_CASES.map((c, idx) => `
+          <div class="review-card" id="card${idx}">
+            <div class="review-card-header">
+              <div class="review-card-meta">
+                <span class="meta-tag q">Q${idx + 1}</span>
+                <span class="meta-tag ${c.riskLevel}">${c.riskLabel}</span>
+              </div>
+              <div class="review-card-scene">${c.scene}</div>
+            </div>
+            <div class="qa-row"><div class="qa-q">사용자</div><div class="qa-content">${c.q}</div></div>
+            <div class="qa-row"><div class="qa-q">AI</div><div class="qa-content">${c.a}</div></div>
+            <div class="review-actions">
+              <span class="action-label">검토:</span>
+              <button class="action-btn approve" onclick="doAction(${idx},'approve')">✓ 승인</button>
+              <button class="action-btn reject" onclick="doAction(${idx},'reject')">✗ 거부</button>
+              <button class="action-btn edit" onclick="doAction(${idx},'edit')">✎ 편집 후 승인</button>
+              <div class="review-result" id="result${idx}"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+  } else {
+    demoContent = `
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          ${FEEDBACK_STEPS.map((step, i) => `
+            <div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;gap:16px;align-items:flex-start;">
+              <div style="width:42px;height:42px;border-radius:12px;background:rgba(0,0,0,0.04);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${step.icon}</div>
+              <div style="flex:1;">
+                <div style="font-size:16px;font-weight:700;color:var(--text-main);margin-bottom:5px;">${i + 1}. ${step.title}</div>
+                <div style="font-size:14px;color:var(--text-sub);line-height:1.7;">${step.desc}</div>
+                <div style="margin-top:8px;display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:5px;background:rgba(0,102,255,0.08);color:var(--accent);">${step.tag}</div>
+              </div>
+            </div>
+          `).join('<div style="text-align:center;font-size:18px;color:var(--text-sub);">↓</div>')}
+        </div>
+        <div style="background:rgba(22,163,106,0.04);border:1px solid rgba(22,163,106,0.15);border-radius:12px;padding:16px 20px;">
+          <div style="font-size:13px;font-weight:800;color:var(--success);margin-bottom:8px;">PM 대시보드: Bad Case 피드백 루프 효율</div>
+          <div class="fb-kpis">
+            <div style="font-size:14px;color:var(--text-sub);">발견→수정 평균 주기: <b style="color:var(--text-main);">3.2일</b></div>
+            <div style="font-size:14px;color:var(--text-sub);">이번 주 신규 bad case: <b style="color:var(--danger);">12건</b></div>
+            <div style="font-size:14px;color:var(--text-sub);">수정 및 보관 완료: <b style="color:var(--success);">47건</b></div>
+            <div style="font-size:14px;color:var(--text-sub);">회귀 통과율: <b style="color:var(--text-main);">96.8%</b></div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  panel.innerHTML = tabHeader + `
+    <div id="viewDemo" style="display:flex;flex-direction:column;gap:12px;">
+      ${demoContent}
+    </div>
+    <div id="viewWhy" style="display:none;background:var(--card);border-radius:14px;padding:24px 26px;flex-direction:column;gap:20px;border:1.5px solid var(--border);">
+      <div class="why-compare">
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">인간 차단 없음</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">수습기간</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">최대</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px dashed rgba(229,62,62,0.3);">20일</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px dashed rgba(229,62,62,0.3);">…계속 날조</span>
+          </div>
+          <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">틀렸지만 모름: 모델이 잘못된 Token 기반으로 계속 추론, 오류 누적</div>
+        </div>
+        <div class="why-compare-divider"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">평가 + 인간 차단 있음</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">수습기간</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">최대</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px dashed rgba(229,62,62,0.3);">20일</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">⏸ 차단</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">✓ 수정</span>
+          </div>
+          <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">출력단에 외부 수정 레이어를 설치하여 모델의 단방향 생성 근본 결함을 보완</div>
+        </div>
+      </div>
+      <div style="background:rgba(217,119,6,0.05);border:1px solid rgba(217,119,6,0.15);border-radius:12px;padding:20px 24px;">
+        <div style="font-size:16px;color:var(--text-main);line-height:1.9;">
+          모델은 <b>자체 검사 메커니즘이 없습니다</b>: 잘못된 Token을 생성한 후, 이를 기반으로 계속 추론하여 오류가 누적됩니다.
+          평가 + 인간 검토는 <span style="color:var(--amber);font-weight:700;">모델 출력단에 외부 수정 레이어를 배치하는 것</span>으로,
+          "Token → Token, 단방향, 되돌아보지 않음"의 근본적인 결함을 보완합니다.
+          <b>처음 세 가지 전략은 확률을 변경하고, 이 전략은 결과를 차단합니다.</b>
+        </div>
+      </div>
+    </div>`;
+
+  if (currentTab === 'why') {
+    document.getElementById('viewDemo').style.display = 'none';
+    document.getElementById('viewWhy').style.display = 'flex';
+  }
+}
+
+function doAction(idx, action) {
+  const c = REVIEW_CASES[idx];
+  const result = document.getElementById(`result${idx}`);
+  result.className = `review-result visible ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'edited'}`;
+  result.textContent = c.resultText[action];
+
+  // Disable buttons
+  document.querySelectorAll(`#card${idx} .action-btn`).forEach(b => {
+    b.disabled = true;
+    b.style.opacity = '0.4';
+    b.style.cursor = 'default';
+  });
+}
+
+renderPhase();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

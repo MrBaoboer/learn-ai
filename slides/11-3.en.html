@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Context Engineering: From Handcrafted Prompts to Auto-Evolving Systems | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.evolution-bar{display:flex;align-items:stretch;gap:0;margin:28px 0;border-radius:var(--radius);overflow:hidden;border:1.5px solid var(--border);box-shadow:var(--shadow-card)}
+.evo-step{flex:1;padding:16px 14px;text-align:center;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--card)}
+.evo-step:not(:last-child)::after{content:'→';position:absolute;right:-6px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--accent);font-weight:700;z-index:1}
+.evo-step .evo-num{font-size:11px;font-weight:800;color:var(--accent);letter-spacing:.5px}
+.evo-step .evo-label{font-size:13px;font-weight:700;color:var(--text);line-height:1.4}
+.evo-step.active{background:rgba(0,102,255,.06)}
+@media(max-width:768px){.evolution-bar{flex-direction:column}.evo-step:not(:last-child)::after{content:'↓';right:50%;top:auto;bottom:-8px;transform:translateX(50%)}}
+
+.concept-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px 28px;margin:20px 0;box-shadow:var(--shadow-card)}
+.concept-card .cc-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.concept-card .cc-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.concept-card .cc-title{font-size:17px;font-weight:800;color:var(--text)}
+.concept-card .cc-body{font-size:14px;color:var(--sub);line-height:1.8}
+.concept-card .cc-body b{color:var(--text)}
+
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}
+@media(max-width:768px){.three-col{grid-template-columns:1fr}}
+.col-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.col-card .col-badge{font-size:11px;font-weight:800;letter-spacing:.5px;padding:3px 10px;border-radius:6px;display:inline-block;margin-bottom:10px}
+.col-card .col-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:8px}
+.col-card .col-desc{font-size:13px;color:var(--sub);line-height:1.7}
+
+.fig-wrap{margin:28px 0;text-align:center}
+.fig-wrap img{max-width:100%;border-radius:var(--radius);border:1.5px solid var(--border);box-shadow:var(--shadow-card)}
+.fig-wrap .fig-cap{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.6}
+
+.formula-box{background:#1e1e2e;border-radius:var(--radius);padding:20px 24px;margin:16px 0;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;line-height:1.8;color:#cdd6f4;box-shadow:var(--shadow-card);overflow-x:auto}
+.formula-box .fk{color:#89b4fa}
+.formula-box .fs{color:#a6e3a1}
+.formula-box .fp{color:#f9e2af}
+
+.highlight-box{border-radius:var(--radius);padding:18px 22px;margin:16px 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start}
+.highlight-box.blue{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);color:var(--text)}
+.highlight-box.purple{background:rgba(124,58,237,.04);border:1.5px solid rgba(124,58,237,.18);color:var(--text)}
+.highlight-box b{color:var(--accent)}
+.highlight-box svg{flex-shrink:0;margin-top:2px}
+
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:20px 24px;font-size:15px;color:var(--text);line-height:1.7;margin-top:28px;display:flex;gap:12px;align-items:flex-start}
+.takeaway b{color:var(--accent)}
+.takeaway svg{flex-shrink:0;margin-top:2px;color:var(--accent)}
+
+.sim-controls{display:flex;gap:10px;align-items:center;padding:16px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--shadow-card)}
+.sim-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;font-family:inherit}
+.sim-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sim-btn.playing{background:var(--accent);color:#fff;border-color:var(--accent);pointer-events:none}
+.sim-status{font-size:13px;color:var(--sub);font-weight:600;margin-left:auto;font-variant-numeric:tabular-nums}
+
+.ctx-compare{margin:24px 0}
+.compare-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:768px){.compare-row{grid-template-columns:1fr}}
+.compare-card{border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-card)}
+.bad-card{background:#fef2f2;border:1.5px solid #fecaca}
+.good-card{background:#eff6ff;border:1.5px solid #bfdbfe}
+.best-card{background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1.5px solid #c4b5fd}
+.cmp-badge{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:6px;margin-bottom:14px}
+.bad-badge{background:rgba(239,68,68,.1);color:#dc2626}
+.ace-badge{background:rgba(59,130,246,.1);color:#2563eb}
+.mce-badge{background:rgba(139,92,246,.1);color:#7c3aed}
+.cmp-bar-label{font-size:11px;font-weight:600;color:var(--sub);margin-bottom:4px}
+.cmp-bar-track{height:8px;background:rgba(0,0,0,.06);border-radius:99px;overflow:hidden;margin-bottom:4px}
+.cmp-bar-fill{height:100%;border-radius:99px;transition:width .6s ease}
+.cmp-bar-val{font-size:13px;font-weight:800}
+.bad-val{color:#dc2626}
+.ace-val{color:#2563eb}
+.mce-val{color:#7c3aed}
+.cmp-verdict{margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,.06);font-size:12px;color:var(--sub);line-height:1.6}
+.compare-insight{margin-top:16px;padding:14px 18px;background:rgba(0,102,255,.04);border:1px solid rgba(0,102,255,.12);border-radius:10px;font-size:13px;color:var(--text);line-height:1.7}
+.compare-insight b{color:var(--accent)}
+
+.plain-talk{background:linear-gradient(135deg,#fffbeb,#fef9c3);border:1.5px dashed #fbbf24;border-radius:var(--radius);padding:16px 20px;margin:14px 0 28px;font-size:14px;color:#713f12;line-height:1.85;display:flex;gap:12px;align-items:flex-start}
+.plain-talk .pt-icon{flex-shrink:0;font-size:18px;line-height:1.5}
+.plain-talk b{color:#92400e}
+.plain-talk .pt-tag{font-weight:800;color:#b45309}
+
+/* 每轮实时更新的进度条 */
+.cmp-bar-fill{transition:width .35s ease}
+.cmp-round-tag{font-weight:800;color:var(--accent)}
+.compare-card.overflow-flash{animation:overflowFlash .5s ease 2}
+@keyframes overflowFlash{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 3px rgba(239,68,68,.4)}}
+.compare-card.running{box-shadow:0 0 0 2px rgba(0,102,255,.12)}
+.three-col.reveal .col-card{opacity:0;transform:translateY(16px);transition:all .4s ease}
+.three-col.show .col-card{opacity:1;transform:translateY(0)}
+.three-col.show .col-card:nth-child(1){transition-delay:.1s}
+.three-col.show .col-card:nth-child(2){transition-delay:.25s}
+.three-col.show .col-card:nth-child(3){transition-delay:.4s}
+</style>
+<meta name="description" content="From ACE to MCE to Meta-Harness: context management is evolving from handcrafted prompts to auto-evolving code systems.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Context Engineering: From Handcrafted to Auto-Evolving","name":"Context Engineering: From Handcrafted to Auto-Evolving","url":"https://xueai.app/slides/11-3.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Harness Optimization","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"From ACE to MCE to Meta-Harness: context management is evolving from handcrafted prompts to auto-evolving code systems.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/11-3.html">
+<link rel="canonical" href="https://xueai.app/slides/11-3.en.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/11-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/11-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/11-3.html">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">PART 5 · Harness & Self-Improvement</div>
+    <h1>Context Engineering: From Handcrafted Prompts to <em>Auto-Evolving Systems</em></h1>
+    <p class="subtitle">As Agent tasks grow longer, context management is no longer optional. It has become the core battleground of Harness optimization.</p>
+  </header>
+
+  <!-- ===== Evolution of Optimization Targets ===== -->
+  <div class="sec-label">Evolution of Optimization Targets</div>
+
+  <div class="evolution-bar reveal">
+    <div class="evo-step">
+      <div class="evo-num">Level 1</div>
+      <div class="evo-label">Instruction Prompt</div>
+    </div>
+    <div class="evo-step">
+      <div class="evo-num">Level 2</div>
+      <div class="evo-label">Structured Context</div>
+    </div>
+    <div class="evo-step">
+      <div class="evo-num">Level 3</div>
+      <div class="evo-label">Workflow</div>
+    </div>
+    <div class="evo-step active">
+      <div class="evo-num">Level 4</div>
+      <div class="evo-label">Harness Code</div>
+    </div>
+    <div class="evo-step">
+      <div class="evo-num">Level 5</div>
+      <div class="evo-label">Optimizer Code</div>
+    </div>
+  </div>
+
+  <div class="highlight-box blue reveal">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    <span>The smarter and more powerful the model, the more complex and general the optimization targets become. This evolution line goes all the way from tweaking prompts to optimizing the code that writes the optimizer.</span>
+  </div>
+
+  <!-- ===== Problem ===== -->
+  <div class="sec-label">The Problem: Context Bloat</div>
+
+  <div class="concept-card reveal">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(220,38,38,.08);color:var(--danger)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="cc-title">Naive Append = Loss of Control</div>
+    </div>
+    <div class="cc-body">
+      <b>Naively appending</b> all tool responses and model outputs to the context leads to rapid loss of control as Agent task duration grows.<br><br>
+      Long-context research will continue to advance, but currently <b>long-context intelligence</b> and <b>context engineering</b> are often intertwined: context management is a critical layer for building more structured, concise contexts under the limited attention of LLMs.
+    </div>
+  </div>
+
+  <!-- ===== ACE ===== -->
+  <div class="sec-label">ACE: Agentic Context Engineering</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">Plain English:</span> Context is the AI's <b>working memory</b> — everything it can see in front of it. ACE's idea is: don't let memory turn into a mess; instead, maintain a <b>well-organized working manual</b>. The doer (Generator) follows the manual, the reviewer (Reflector) summarizes lessons learned, and the editor (Curator) organizes those lessons into the manual entry by entry. The manual keeps getting sharper, not thicker.</span>
+  </div>
+
+  <div class="concept-card reveal">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(0,102,255,.08);color:var(--accent)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </div>
+      <div class="cc-title">Context is an ever-evolving script — never let Prompts grow unchecked</div>
+    </div>
+    <div class="cc-body">
+      ACE (Zhang et al. 2025) maintains a <b>structured bullet-point script</b>, where each entry includes an identifier and description. Three components collaborate to maintain this script:
+    </div>
+  </div>
+
+  <div class="three-col reveal">
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(59,130,246,.1);color:#2563eb">Component 1</div>
+      <div class="col-title">Generator</div>
+      <div class="col-desc">Executes tasks and generates trajectories, using bullet points from the script as guidance.</div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(245,158,11,.1);color:#d97706">Component 2</div>
+      <div class="col-title">Reflector</div>
+      <div class="col-desc">Distills insights from both successful and failed trajectories, extracting lessons learned.</div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(16,185,129,.1);color:#059669">Component 3</div>
+      <div class="col-title">Curator</div>
+      <div class="col-desc">Updates the structured context with incremental, itemized entries, periodically refining and deduplicating.</div>
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/ace.png" alt="ACE Framework" loading="lazy">
+    <div class="fig-cap">ACE Framework: Generator produces trajectories → Reflector distills insights → Curator incrementally updates the context script. (Source: Zhang et al. 2025)</div>
+  </div>
+
+  <div class="highlight-box purple reveal">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+    <span><b>Key Design:</b> The Curator outputs structured (identifier, description) entries and merges them into the script using <b>deterministic logic</b>, never rewriting entire prompt blobs. This avoids context collapse and conciseness bias that arise from iterative rewrites.</span>
+  </div>
+
+  <!-- ===== MCE ===== -->
+  <div class="sec-label">MCE: Meta Context Engineering</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">Plain English:</span> ACE is about organizing the manual well. MCE asks a deeper question: <b>can the method of organizing the manual itself be optimized?</b> For example, organize by time or by topic? Record outlines or detailed notes? MCE separates what to record (content) from how to record (method), and evolves both: not only do notes get better, <b>the note-taking method also keeps getting smarter</b>.</span>
+  </div>
+
+  <div class="concept-card reveal paywall-locked xa-peek">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(124,58,237,.08);color:var(--purple)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="cc-title">Separating Mechanism from Content — Bi-Level Optimization</div>
+    </div>
+    <div class="cc-body">
+      MCE (Ye et al. 2026) goes further than ACE: it separates <b>how to manage context</b> (mechanism/Skill) from <b>what is in the context</b> (content), optimizing both levels simultaneously.<br><br>
+      An MCE Skill defines the context function <code>c = F(x; ρ)</code>:<br>
+      • <b>ρ</b> = static components (prompts, knowledge base, codebase)<br>
+      • <b>F</b> = dynamic operators (search, select, filter, format)
+    </div>
+  </div>
+
+  <div class="plain-talk reveal paywall-locked">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">What the formulas mean:</span> Two sentences. Inner loop: given the current note-taking method, optimize the notes as much as possible. Outer loop: compare different note-taking methods and pick the best one. <b>Optimize content first, then optimize the method — alternating rounds</b>.</span>
+  </div>
+
+  <div class="formula-box reveal paywall-locked">
+<span class="fk">Bi-level Optimization:</span>
+<span class="fs">Inner</span>: c* = argmax J_train(c; s)     <span class="fp">← given skill s, find optimal context</span>
+<span class="fs">Outer</span>: s* = argmax J_val(c*)         <span class="fp">← find optimal skill (on validation set)</span>
+
+<span class="fk">Skill Database:</span> H = {(s_i, c_i, J_train_i, J_val_i)} tracks history
+
+<span class="fk">Skill Evolution:</span> s_new = crossover(task, H)   <span class="fp">← Meta-agent performs agentic crossover</span>
+<span class="fk">Context Optimization:</span> c_new = engineer(task, s_new; c_prev, Rollouts)
+  </div>
+
+  <div class="fig-wrap reveal paywall-locked">
+    <img src="images/harness/mce.png" alt="MCE Framework" loading="lazy">
+    <div class="fig-cap">MCE Framework: meta-level skill evolution searches context management mechanisms; base-level optimizes task context. (Source: Ye et al. 2026)</div>
+  </div>
+
+  <div class="concept-card reveal paywall-locked">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(8,145,178,.08);color:var(--cyan)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div class="cc-title">Implementation: Context Function = Directory in a File System</div>
+    </div>
+    <div class="cc-body">
+      In MCE, a context function is instantiated as a collection of files in a dedicated directory:<br><br>
+      • <b>Static files</b>: <code>skill.md</code> (stores the most important task knowledge)<br>
+      • <b>Dynamic files</b>: context data and rollout records<br><br>
+      Both meta-level and base-level optimization run in a standard coding environment using the toolset: <code>Read, Write, Edit, Bash, Glob, Grep, TodoWrite</code>
+    </div>
+  </div>
+
+  <!-- ===== Meta-Harness ===== -->
+  <div class="sec-label paywall-locked">Meta-Harness: The Harness That Optimizes the Harness</div>
+
+  <div class="plain-talk reveal paywall-locked">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">Plain English:</span> This is the outermost layer of the nesting. ACE optimizes note content, MCE optimizes the note-taking method, and Meta-Harness directly optimizes <b>the source code of the entire workbench</b>. It's like letting AI redesign the entire workshop — far beyond swapping tools or methods. Most powerful, but also the most compute-intensive (every revision requires a full trial run and scoring).</span>
+  </div>
+
+  <div class="concept-card reveal paywall-locked">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(217,119,6,.08);color:var(--amber)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <div class="cc-title">Optimization Target: The Code That Decides What Gets Stored, Retrieved, and Presented</div>
+    </div>
+    <div class="cc-body">
+      Meta-Harness (Lee et al. 2026) goes one layer deeper: what is being optimized is no longer the context content. What is being optimized is <b>the code itself that determines what information should be stored, retrieved, and presented to the model</b>. It is the Harness that optimizes the Harness.<br><br>
+      • <b>Proposer</b> is itself a coding Agent<br>
+      • Output is a <b>set of Harness candidates on the Pareto frontier</b><br>
+      • Execution history is accessed via the file system: coding agent reads on demand with <code>grep</code>/<code>cat</code>, avoiding stuffing everything into the prompt<br>
+      • Each proposed harness is a dictionary in the file system: contains source code, scores, trajectories, and state updates
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal paywall-locked">
+    <img src="images/harness/meta-harness-outer-loop.png" alt="Meta-Harness Outer Loop" loading="lazy">
+    <div class="fig-cap">Meta-Harness outer loop optimization algorithm: iteratively creates new harnesses, keeping only the qualified ones. (Source: Lee et al. 2026)</div>
+  </div>
+
+  <div class="fig-wrap reveal paywall-locked">
+    <img src="images/harness/meta-harness.png" alt="Meta-Harness Performance" loading="lazy">
+    <div class="fig-cap">Meta-Harness performance on text classification and TerminalBench-2. Note: the TerminalBench-2 experiment was initialized from an already-strong harness. (Source: Lee et al. 2026)</div>
+  </div>
+
+  <!-- ===== Comparison Summary ===== -->
+  <div class="sec-label paywall-locked">Comparison of Three Approaches</div>
+
+  <div class="three-col reveal paywall-locked">
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(59,130,246,.1);color:#2563eb">ACE</div>
+      <div class="col-title">Learn from Trajectories</div>
+      <div class="col-desc">Maintains structured bullet points via a deterministic Generator→Reflector→Curator pipeline. <b>Update rules are still hand-designed.</b></div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(124,58,237,.1);color:#7c3aed">MCE</div>
+      <div class="col-title">Evolve Management Mechanisms</div>
+      <div class="col-desc">Doesn't fix context format; uses free-form skills to store knowledge, bi-level iteration evolves both skills and context. <b>Mechanism itself is mutable.</b></div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(217,119,6,.1);color:#d97706">Meta-Harness</div>
+      <div class="col-title">Optimize the Entire System Code</div>
+      <div class="col-desc">Proposer is a coding Agent, optimization target is the harness source code itself, outputs Pareto-frontier candidates. <b>Most general but most compute-intensive.</b></div>
+    </div>
+  </div>
+
+  <!-- ===== Interactive: Context Strategy Comparison ===== -->
+  <div class="sec-label paywall-locked">Live Comparison: See Three Strategies Evolve Round by Round</div>
+
+  <div class="sim-controls paywall-locked" style="margin-bottom: 16px;">
+    <button id="btn-play-ctx" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      Run 10-Round Comparison
+    </button>
+    <button id="btn-reset-ctx" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Reset
+    </button>
+    <span id="ctx-status" class="sim-status">Ready</span>
+  </div>
+
+  <div class="ctx-compare interactive paywall-locked" id="ctx-container">
+    <div class="compare-row">
+      <div class="compare-card bad-card" id="card-naive">
+        <div class="cmp-badge bad-badge">Naive Append</div>
+        <div class="cmp-bar-label">Context Usage <span class="cmp-round-tag" data-round-tag>(Round 0)</span></div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-ctx-fill style="width:0%;background:linear-gradient(90deg,#f59e0b,#ef4444)"></div></div>
+        <div class="cmp-bar-val bad-val" data-ctx-val>—</div>
+        <div class="cmp-bar-label" style="margin-top:12px">Task Success Rate</div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-suc-fill style="width:0%;background:#ef4444"></div></div>
+        <div class="cmp-bar-val bad-val" data-suc-val>—</div>
+        <div class="cmp-verdict" data-verdict>Stuffing all history into context every round…</div>
+      </div>
+      <div class="compare-card good-card" id="card-ace">
+        <div class="cmp-badge ace-badge">ACE Structured</div>
+        <div class="cmp-bar-label">Context Usage <span class="cmp-round-tag" data-round-tag>(Round 0)</span></div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-ctx-fill style="width:0%;background:linear-gradient(90deg,#3b82f6,#60a5fa)"></div></div>
+        <div class="cmp-bar-val ace-val" data-ctx-val>—</div>
+        <div class="cmp-bar-label" style="margin-top:12px">Task Success Rate</div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-suc-fill style="width:0%;background:#3b82f6"></div></div>
+        <div class="cmp-bar-val ace-val" data-suc-val>—</div>
+        <div class="cmp-verdict" data-verdict>Curator only incrementally writes structured entries…</div>
+      </div>
+      <div class="compare-card best-card" id="card-mce">
+        <div class="cmp-badge mce-badge">MCE Meta-Evolution</div>
+        <div class="cmp-bar-label">Context Usage <span class="cmp-round-tag" data-round-tag>(Round 0)</span></div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-ctx-fill style="width:0%;background:linear-gradient(90deg,#8b5cf6,#a78bfa)"></div></div>
+        <div class="cmp-bar-val mce-val" data-ctx-val>—</div>
+        <div class="cmp-bar-label" style="margin-top:12px">Task Success Rate</div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-suc-fill style="width:0%;background:#8b5cf6"></div></div>
+        <div class="cmp-bar-val mce-val" data-suc-val>—</div>
+        <div class="cmp-verdict" data-verdict>Skill and content both evolving simultaneously…</div>
+      </div>
+    </div>
+    <div class="compare-insight" id="ctx-insight">
+      Click <b>Run 10-Round Comparison</b> above to watch how the three strategies change in real time as rounds progress: who is bloating, who stays stable, who keeps improving.
+    </div>
+  </div>
+
+  <!-- ===== Takeaway ===== -->
+  <div class="takeaway reveal paywall-locked">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+    <span><b>Core Takeaway:</b> Once harness design becomes an executable search space, powerful coding Agents can leverage the same design space that human engineers use. The future of context engineering is letting systems automatically learn what to store when, how to retrieve it, and how to present it — even the cleverest handcrafted prompts are just a transitional phase.</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){
+  var ob = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); ob.unobserve(e.target); }});
+  }, {threshold:0.15});
+  ob.observe(el);
+});
+// ═══════ Context Comparison Interactive Demo: Round-by-Round Updates ═══════
+(function(){
+  var btnPlay = document.getElementById('btn-play-ctx');
+  var btnReset = document.getElementById('btn-reset-ctx');
+  var statusTxt = document.getElementById('ctx-status');
+  var insight = document.getElementById('ctx-insight');
+  
+  var isPlaying = false;
+  var timer = null;
+
+  // Data for each of the 10 rounds: [context usage%, success rate%, note]
+  var DATA = {
+    naive: [
+      [10, 90, 'First few rounds look fine — no problems yet'],
+      [22, 88, 'History keeps piling up'],
+      [35, 85, 'Context keeps expanding'],
+      [48, 80, 'Forgetting starts to appear'],
+      [62, 68, 'Early information squeezed out of the window'],
+      [78, 45, 'Near overflow — quality drops sharply'],
+      [92, 25, '⚠ Window nearly full — massive information loss'],
+      [100, 12, '✗ Overflow! Responses start hallucinating'],
+      [100, 8, '✗ Completely broken'],
+      [100, 5, '✗ Even simple questions answered incorrectly']
+    ],
+    ace: [
+      [18, 62, 'Round 1: script framework established'],
+      [24, 68, 'Reflector distills first batch of insights'],
+      [30, 72, 'Script entries gradually enriched'],
+      [35, 75, 'Curator incrementally merges and deduplicates'],
+      [38, 77, 'Context stabilizing'],
+      [40, 78, 'Growth rate clearly slowing'],
+      [41, 79, 'Script converging'],
+      [42, 80, 'Stable around 42%'],
+      [42, 80, 'Ceiling of hand-designed rules is showing'],
+      [42, 80, '✓ Constant but no longer improving']
+    ],
+    mce: [
+      [20, 58, 'Initial skill is still clumsy'],
+      [26, 66, 'First skill evolution occurs'],
+      [29, 72, 'Memory mechanism self-adjusting'],
+      [31, 78, 'Retrieval strategy getting smarter'],
+      [32, 83, 'Skill and content evolving bi-directionally'],
+      [31, 86, 'Context actually getting leaner'],
+      [30, 89, 'Mechanism keeps improving'],
+      [30, 92, 'Getting smarter with each round'],
+      [30, 94, 'Still rising'],
+      [30, 95, '★ 95% and still climbing']
+    ]
+  };
+
+  var cards = {
+    naive: document.getElementById('card-naive'),
+    ace: document.getElementById('card-ace'),
+    mce: document.getElementById('card-mce')
+  };
+
+  function updateCard(key, round) {
+    var card = cards[key];
+    var d = DATA[key][round - 1];
+    card.querySelector('[data-round-tag]').textContent = '(Round ' + round + ')';
+    card.querySelector('[data-ctx-fill]').style.width = d[0] + '%';
+    card.querySelector('[data-ctx-val]').textContent = d[0] + '%';
+    card.querySelector('[data-suc-fill]').style.width = d[1] + '%';
+    card.querySelector('[data-suc-val]').textContent = d[1] + '%';
+    card.querySelector('[data-verdict]').textContent = d[2];
+  }
+
+  function resetSim() {
+    clearTimeout(timer);
+    isPlaying = false;
+    btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Run 10-Round Comparison';
+    btnPlay.classList.remove('playing');
+    statusTxt.textContent = 'Ready';
+    
+    Object.keys(cards).forEach(function(key){
+      var card = cards[key];
+      card.classList.remove('overflow-flash', 'running');
+      card.querySelector('[data-round-tag]').textContent = '(Round 0)';
+      card.querySelector('[data-ctx-fill]').style.width = '0%';
+      card.querySelector('[data-ctx-val]').textContent = '—';
+      card.querySelector('[data-suc-fill]').style.width = '0%';
+      card.querySelector('[data-suc-val]').textContent = '—';
+    });
+    cards.naive.querySelector('[data-verdict]').textContent = 'Stuffing all history into context every round…';
+    cards.ace.querySelector('[data-verdict]').textContent = 'Curator only incrementally writes structured entries…';
+    cards.mce.querySelector('[data-verdict]').textContent = 'Skill and content both evolving simultaneously…';
+    insight.innerHTML = 'Click <b>Run 10-Round Comparison</b> above to watch how the three strategies change in real time as rounds progress: who is bloating, who stays stable, who keeps improving.';
+  }
+
+  function playSim() {
+    if(isPlaying) return;
+    resetSim();
+    isPlaying = true;
+    btnPlay.innerHTML = 'Running...';
+    btnPlay.classList.add('playing');    Object.values(cards).forEach(function(c){ c.classList.add('running'); });
+    
+    var round = 1;
+    function step() {
+      if(round > 10) {
+        statusTxt.textContent = 'Simulation complete: Round 10 results';
+        btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Run Again';
+        btnPlay.classList.remove('playing');
+        isPlaying = false;
+        Object.values(cards).forEach(function(c){ c.classList.remove('running'); });
+        cards.naive.querySelector('[data-ctx-val]').textContent = '100% Overflow';
+        cards.ace.querySelector('[data-ctx-val]').textContent = '42% Stable';
+        cards.mce.querySelector('[data-ctx-val]').textContent = '30% Optimal';
+        insight.innerHTML = 'Key difference: naive append shows <b>linear growth</b> (inevitably overflows), ACE is <b>constant but static</b> (ceiling of hand-designed rules), MCE is <b>constant and adaptive</b> (mechanism keeps auto-improving).';
+        return;
+      }
+      statusTxt.textContent = 'Round ' + round + ' / 10';
+      updateCard('naive', round);
+      updateCard('ace', round);
+      updateCard('mce', round);
+      
+      if(round === 8) cards.naive.classList.add('overflow-flash');
+      
+      round++;
+      timer = setTimeout(step, 900);
+    }
+    
+    timer = setTimeout(step, 300);
+  }
+
+  btnPlay.addEventListener('click', playSim);
+  btnReset.addEventListener('click', resetSim);
+  
+  resetSim();
+})();
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

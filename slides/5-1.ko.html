@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>컨텍스트 윈도우: AI의 작업 메모리 | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+.desc strong{color:var(--text)}
+
+.model-grid{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.model-card{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:14px}
+.model-card .size{font-size:20px;font-weight:800;color:var(--amber);min-width:54px;text-align:right;flex-shrink:0}
+.model-card .name{font-size:15px;font-weight:700;color:var(--text);min-width:140px;flex-shrink:0}
+.model-card .desc-s{font-size:13px;color:var(--sub);line-height:1.4}
+
+.insight-box{background:rgba(215,119,6,.07);border:1px solid rgba(215,119,6,.2);border-radius:10px;padding:14px 16px;font-size:15px;color:var(--text);line-height:1.75;margin-top:14px}
+.insight-box b{color:var(--amber)}
+.insight-box strong{color:var(--text)}
+
+/* 上下文构成演示 */
+.ctx-panel{background:var(--card);border:1.5px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+.ctx-header{padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.02);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.ctx-header h4{font-size:15px;font-weight:700;color:var(--text)}
+.ctx-cap{font-size:15px;font-weight:700;color:var(--amber)}
+.ctx-body{padding:16px;display:flex;flex-direction:column;gap:12px}
+.ctx-bar{display:flex;height:44px;border-radius:8px;overflow:hidden;gap:2px}
+.ctx-seg{display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:rgba(255,255,255,.9);transition:flex .4s ease;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px}
+.ctx-labels{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:4px;padding:0 2px}
+.legend-row{display:flex;flex-wrap:wrap;gap:10px}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--sub)}
+.legend-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.status-bar{font-size:14px;font-weight:600;text-align:center;padding:8px;border-radius:6px;transition:all .3s}
+.status-bar.ok{background:rgba(22,163,74,.08);color:var(--success)}
+.status-bar.warn{background:rgba(220,38,38,.08);color:var(--danger)}
+
+.slider-row{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.slider-lbl{display:flex;justify-content:space-between;gap:10px;font-size:14px;color:var(--sub);flex-wrap:wrap}
+.slider-lbl span:last-child{font-weight:700;color:var(--amber)}
+input[type=range]{width:100%;accent-color:var(--amber);height:24px;cursor:pointer}
+
+.takeaway{background:rgba(0,102,255,.06);border:1px solid rgba(0,102,255,.15);border-radius:10px;padding:12px 16px;font-size:15px;color:var(--text);display:flex;gap:8px;align-items:flex-start;margin-top:16px;line-height:1.7}
+.takeaway b{color:var(--accent)}
+
+@media (max-width:768px){
+  .ctx-labels{display:none}
+  .model-card{flex-wrap:wrap;gap:8px}
+  .model-card .name{min-width:0}
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="대형 언어 모델의 컨텍스트 윈도우 메커니즘을 깊이 이해합니다: AI의 작업 메모리 역할, Token 예산 할당, 긴 컨텍스트에서의 성능 저하 문제, 그리고 컨텍스트 엔지니어링의 핵심 개념.">
+<meta name="keywords" content="Context Window,긴 컨텍스트,Token 예산,AI 엔지니어링">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/5-1.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/5-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/5-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/5-1.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/5-1.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 트레이닝">
+<meta property="og:title" content="컨텍스트 윈도우: AI의 작업 메모리">
+<meta property="og:description" content="대형 언어 모델의 컨텍스트 윈도우 메커니즘을 깊이 이해합니다: AI의 작업 메모리 역할, Token 예산 할당, 긴 컨텍스트에서의 성능 저하 문제, 그리고 컨텍스트 엔지니어링의 핵심 개념.">
+<meta property="og:url" content="https://xueai.app/slides/5-1.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="컨텍스트 윈도우: AI의 작업 메모리">
+<meta name="twitter:description" content="대형 언어 모델의 컨텍스트 윈도우 메커니즘을 깊이 이해합니다: AI의 작업 메모리 역할, Token 예산 할당, 긴 컨텍스트에서의 성능 저하 문제, 그리고 컨텍스트 엔지니어링의 핵심 개념.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"컨텍스트 윈도우: AI의 작업 메모리","name":"컨텍스트 윈도우: AI의 작업 메모리","url":"https://xueai.app/slides/5-1.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~심화","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 컨텍스트 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":true,"description":"대형 언어 모델의 컨텍스트 윈도우 메커니즘을 깊이 이해합니다: AI의 작업 메모리 역할, Token 예산 할당, 긴 컨텍스트에서의 성능 저하 문제, 그리고 컨텍스트 엔지니어링의 핵심 개념."}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+  <header class="lesson-header">
+    <div class="kicker">컨텍스트 엔지니어링</div>
+    <h1>컨텍스트 윈도우: AI의 작업 메모리</h1>
+    <p class="subtitle">모듈 5 · 컨텍스트 엔지니어링 · 1페이지. 아래 슬라이더를 드래그하여 윈도우 오버플로를 직접 체험해 보세요.</p>
+  </header>
+
+  <section>
+    <div class="sec-label">컨텍스트 윈도우란?</div>
+    <p class="desc">컨텍스트 윈도우(Context Window)는 모델이 한 번에 볼 수 있는 모든 텍스트입니다. <strong>윈도우를 초과하면 완전히 사라집니다</strong>: 희미한 기억조차 없이 완전히 보이지 않게 됩니다.</p>
+  </section>
+
+  <section>
+    <div class="sec-label">주요 모델 컨텍스트 윈도우 비교 (2025)</div>
+    <div class="model-grid">
+      <div class="model-card">
+        <div class="size">256K</div>
+        <div class="name">Kimi K2.5</div>
+        <div class="desc-s">약 20만 자<br>삼국지연의 전권</div>
+      </div>
+      <div class="model-card">
+        <div class="size">256K</div>
+        <div class="name">Qwen3.6-Plus</div>
+        <div class="desc-s">기본 256K<br>1M까지 확장 가능</div>
+      </div>
+      <div class="model-card">
+        <div class="size">400K</div>
+        <div class="name">GPT-5</div>
+        <div class="desc-s">약 32만 자<br>Pro 사용자 이용 가능</div>
+      </div>
+      <div class="model-card">
+        <div class="size">1M</div>
+        <div class="name">Claude Sonnet 4.6</div>
+        <div class="desc-s">약 80만 자<br>홍루몽 전권 ×5</div>
+      </div>
+      <div class="model-card">
+        <div class="size">1M</div>
+        <div class="name">Gemini 2.5 Pro</div>
+        <div class="desc-s">약 80만 자<br>2M 지원 예정</div>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <b>💰 윈도우가 클수록 비용도 높습니다:</b><br>
+      LLM은 <strong>입력 + 출력 Token 수</strong>로 과금됩니다. 100페이지 PDF(≈50K Token)를 넣으면 대화 한 번에 약 ₩100이 추가됩니다 (GPT-5 기준 참고).<br>
+      여러 차례 대화하면 이전 기록이 쌓여 윈도우를 채웁니다. <strong>컨텍스트는 유한하고 비용이 드는 자원입니다.</strong>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-label">인터랙티브 데모 · 슬라이더를 드래그하여 오버플로 체험</div>
+    <div class="ctx-panel">
+      <div class="ctx-header">
+        <h4>요청 1회의 컨텍스트 구성 (128K 윈도우)</h4>
+        <span class="ctx-cap" id="ctxCap">0K / 128K</span>
+      </div>
+      <div class="ctx-body">
+        <div class="bar-wrap">
+          <div class="ctx-bar" id="ctxBar"></div>
+          <div class="ctx-labels">
+            <span>시스템 프롬프트</span><span>대화 기록</span><span>업로드 문서</span><span>현재 질문</span><span>답변 예약</span>
+          </div>
+        </div>
+        <div class="legend-row">
+          <div class="legend-item"><div class="legend-dot" style="background:#5b4fcf"></div>시스템 프롬프트 (10K)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#0891b2"></div>대화 기록 (20K)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ea580c"></div>업로드 문서 (가변)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#16a34a"></div>현재 질문 (5K)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#d1d5db"></div>답변 예약 (10K)</div>
+        </div>
+        <div class="status-bar ok" id="statusBar">윈도우 충분 — 83K Token 사용 가능</div>
+      </div>
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-lbl">
+        <span>업로드 문서 크기 시뮬레이션 (드래그하여 오버플로 체험)</span>
+        <span id="docSize">0K Tokens</span>
+      </div>
+      <input type="range" min="0" max="150" value="0" oninput="updateCtx(this.value)">
+    </div>
+
+    <div class="takeaway">
+      <span>📏</span>
+      <span><b>윈도우는 유한한 자원입니다.</b> 사용하면 비용이 발생하고, 초과하면 잘립니다. 다음 페이지에서 오버플로 시 세 가지 처리 전략을 확인하세요.</span>
+    </div>
+  </section>
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<script>
+function updateCtx(v) {
+  const doc = parseInt(v);
+  document.getElementById('docSize').textContent = doc + 'K Tokens';
+  const total = 128, sys = 10, hist = 20, q = 5, reserve = 10;
+  const docFit = Math.min(doc, total - sys - hist - q - reserve);
+  const remaining = Math.max(0, total - sys - hist - docFit - q - reserve);
+  const overflow = doc > docFit;
+  const bar = document.getElementById('ctxBar');
+  let html = `<div class="ctx-seg" style="flex:${sys};background:#5b4fcf">시스템 ${sys}K</div>`;
+  html += `<div class="ctx-seg" style="flex:${hist};background:#0891b2">기록 ${hist}K</div>`;
+  if (docFit > 0) html += `<div class="ctx-seg" style="flex:${docFit};background:#ea580c">문서 ${docFit}K${overflow ? ' ✂️' : ''}</div>`;
+  html += `<div class="ctx-seg" style="flex:${q};background:#16a34a">질문</div>`;
+  html += `<div class="ctx-seg" style="flex:${reserve};background:#d1d5db;color:#6b6b70">예약</div>`;
+  if (remaining > 0) html += `<div class="ctx-seg" style="flex:${remaining};background:#f0ede6;color:#8e8e93">남은 ${remaining}K</div>`;
+  bar.innerHTML = html;
+  const used = sys + hist + docFit + q;
+  document.getElementById('ctxCap').textContent = `${used}K / ${total}K`;
+  const statusEl = document.getElementById('statusBar');
+  if (overflow) {
+    statusEl.className = 'status-bar warn';
+    statusEl.textContent = `⚠️ 문서가 윈도우를 초과했습니다! ${doc - docFit}K Token이 잘려 모델이 해당 부분을 전혀 볼 수 없습니다`;
+  } else {
+    statusEl.className = 'status-bar ok';
+    statusEl.textContent = `윈도우 충분 — ${remaining}K Token 사용 가능`;
+  }
+}
+updateCtx(0);
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Subtle Relationship Between Prompts and Caching | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.hash-demo{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:8px;box-shadow:var(--shadow-card)}
+.hash-demo h4{font-size:15px;font-weight:800;color:var(--text);margin:0 0 14px}
+.hash-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.hash-prompt{flex:1;min-width:200px;font-size:13px;font-family:'SF Mono',Menlo,monospace;background:#1e1b2e;color:#cdd6f4;padding:10px 12px;border-radius:7px;line-height:1.5;overflow-x:auto}
+.hash-prompt .changed{background:rgba(220,38,38,.4);border-radius:2px;padding:0 2px;color:#f38ba8}
+.hash-arrow{font-size:18px;color:var(--sub);flex-shrink:0}
+.hash-value{min-width:120px;text-align:center;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:700;font-family:'SF Mono',Menlo,monospace;border:1.5px solid var(--border)}
+.hash-value.same{background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.3);color:var(--success)}
+.hash-value.diff{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.3);color:var(--danger)}
+.hash-result{font-size:13px;font-weight:700;margin-left:8px}
+.hash-result.hit{color:var(--success)}
+.hash-result.miss{color:var(--danger)}
+
+.inject-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+@media(max-width:768px){.inject-compare{grid-template-columns:1fr}}
+.inject-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.inject-card .ic-head{padding:12px 16px;font-size:14px;font-weight:800;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+.inject-card.bad .ic-head{background:rgba(220,38,38,.05);color:var(--danger)}
+.inject-card.good .ic-head{background:rgba(22,163,74,.05);color:var(--success)}
+.inject-card .ic-body{padding:14px 16px}
+.ic-prompt-block{background:#1e1b2e;border-radius:7px;padding:10px 12px;font-size:12px;font-family:'SF Mono',Menlo,monospace;color:#cdd6f4;line-height:1.7;margin-bottom:10px}
+.ic-prompt-block .sys{color:#89b4fa}
+.ic-prompt-block .skill{color:#f9e2af}
+.ic-prompt-block .usr{color:#a6e3a1}
+.ic-prompt-block .sep{color:#6c7086}
+.ic-hit-rate{display:flex;align-items:center;gap:10px}
+.ic-hit-rate .bar{flex:1;height:12px;background:var(--bg);border-radius:6px;overflow:hidden}
+.ic-hit-rate .bar-fill{height:100%;border-radius:6px;transition:width 1s}
+.inject-card.bad .bar-fill{background:var(--danger);width:20%}
+.inject-card.good .bar-fill{background:var(--success);width:90%}
+.ic-hit-rate .pct{font-size:14px;font-weight:800;min-width:40px}
+.inject-card.bad .pct{color:var(--danger)}
+.inject-card.good .pct{color:var(--success)}
+
+.sim-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;box-shadow:var(--shadow-card)}
+.sim-panel h4{font-size:15px;font-weight:800;color:var(--text);margin:0 0 14px;display:flex;align-items:center;gap:8px}
+.sim-timeline{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
+.sim-req{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;font-size:13px;animation:log-in .25s ease}
+@keyframes log-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.sim-req.hit{background:rgba(22,163,74,.06)}
+.sim-req.miss{background:rgba(220,38,38,.06)}
+.sim-req .sr-num{font-weight:800;color:var(--sub);min-width:24px}
+.sim-req .sr-hash{font-family:'SF Mono',Menlo,monospace;font-size:12px;color:var(--sub);flex:1}
+.sim-req .sr-tag{font-size:11px;font-weight:800;padding:3px 8px;border-radius:4px}
+.sim-req.hit .sr-tag{background:rgba(22,163,74,.15);color:var(--success)}
+.sim-req.miss .sr-tag{background:rgba(220,38,38,.15);color:var(--danger)}
+.sim-controls{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.sim-btn{padding:10px 20px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s}
+.sim-btn.start{background:var(--accent);color:#fff}
+.sim-btn.start:hover{background:#0052cc}
+.sim-btn.reset{background:var(--bg);color:var(--sub);border:1px solid var(--border)}
+.sim-stat{margin-left:auto;font-size:14px;color:var(--sub)}
+.sim-stat b{color:var(--text)}
+
+.link-back{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2);border-radius:var(--radius);padding:14px 18px;font-size:14px;color:var(--text);line-height:1.7;margin-top:16px}
+.link-back b{color:var(--amber)}
+.link-back a{color:var(--accent);font-weight:700;text-decoration:underline}
+
+.takeaway{background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:20px}
+.takeaway b{color:var(--success)}
+</style>
+<meta name="description" content="Change a single character in the System Prompt and the entire KV Cache is invalidated. How you inject dynamic content directly affects cache hit rate and cost.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-22.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/9-22.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/9-22.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/9-22.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/9-22.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="The Subtle Relationship Between Prompts and Caching">
+<meta property="og:url" content="https://xueai.app/slides/9-22.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"The Subtle Relationship Between Prompts and Caching","name":"The Subtle Relationship Between Prompts and Caching","url":"https://xueai.app/slides/9-22.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Prompt Harness","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Change a single character in the System Prompt and the entire KV Cache is invalidated. How you inject dynamic content directly affects cache hit rate and cost.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt Harness</div>
+    <h1>The Subtle Relationship Between Prompts and Caching</h1>
+    <p class="subtitle">The rule of KV Cache is extremely simple: if the prefix is identical, it's a hit; differ by even one character and everything is recomputed. So injecting any dynamic content into the System Prompt may make the cache permanently miss.</p>
+  </header>
+
+  <div class="sec-label">Changed fingerprint = Cache invalidated</div>
+
+  <div class="hash-demo reveal">
+    <h4>Every request, the system computes a fingerprint (hash) of the System Prompt</h4>
+    <div class="hash-row">
+      <div class="hash-prompt"><span class="sys">System: You are an assistant. Current time: </span><span class="changed">14:35:22</span></div>
+      <div class="hash-arrow">→</div>
+      <div class="hash-value diff">a3f7c2</div>
+      <span class="hash-result miss">MISS</span>
+    </div>
+    <div class="hash-row">
+      <div class="hash-prompt"><span class="sys">System: You are an assistant. Current time: </span><span class="changed">14:35:23</span></div>
+      <div class="hash-arrow">→</div>
+      <div class="hash-value diff">b8e1d9</div>
+      <span class="hash-result miss">MISS</span>
+    </div>
+    <div class="hash-row">
+      <div class="hash-prompt"><span class="sys">System: You are an assistant. Current time: </span><span class="changed">14:35:24</span></div>
+      <div class="hash-arrow">→</div>
+      <div class="hash-value diff">c4a2f6</div>
+      <span class="hash-result miss">MISS</span>
+    </div>
+    <p style="font-size:13px;color:var(--sub);margin-top:10px;line-height:1.6">Different time each second → different fingerprint → cache never hits → recomputed every time → costs double.<br>This isn't just a timestamp issue: <b style="color:var(--danger)">any dynamic content injected into the System Prompt has the same effect.</b></p>
+  </div>
+
+  <div class="sec-label">Skill injection method also affects caching</div>
+
+  <div class="inject-compare paywall-locked xa-peek">
+    <div class="inject-card bad reveal">
+      <div class="ic-head"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Inject Skill into System</div>
+      <div class="ic-body">
+        <div class="ic-prompt-block">
+<span class="sys">[System]</span>
+You are an AI assistant...
+<span class="skill">[Current Skill: Content Creation]
+Trigger: Help me write...
+Steps: 1. Confirm requirements...</span>
+<span class="sep">---</span>
+<span class="usr">[User] Help me write an article</span>
+        </div>
+        <p style="font-size:12px;color:var(--sub);margin-bottom:8px">Switching Skills changes System → cache invalidated</p>
+        <div class="ic-hit-rate">
+          <div class="bar"><div class="bar-fill"></div></div>
+          <span class="pct">~20%</span>
+        </div>
+      </div>
+    </div>
+    <div class="inject-card good reveal">
+      <div class="ic-head"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Skill appended as a separate message</div>
+      <div class="ic-body">
+        <div class="ic-prompt-block">
+<span class="sys">[System]</span>
+You are an AI assistant...
+<span class="sep">---</span>
+<span class="skill">[Assistant/Skill message]
+Current Skill: Content Creation
+Steps: 1. Confirm requirements...</span>
+<span class="sep">---</span>
+<span class="usr">[User] Help me write an article</span>
+        </div>
+        <p style="font-size:12px;color:var(--sub);margin-bottom:8px">System never changes → prefix cache always hits</p>
+        <div class="ic-hit-rate">
+          <div class="bar"><div class="bar-fill"></div></div>
+          <span class="pct">~90%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Simulation: Cache Performance Across 10 Requests</div>
+
+  <div class="sim-panel reveal paywall-locked">
+    <h4><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg> Cache Hit Simulator</h4>
+    <p style="font-size:13px;color:var(--sub);margin-bottom:12px">Assume 3 out of 10 requests switch to a different Skill. Observe the cache difference between the two injection approaches:</p>
+    <div class="sim-timeline" id="simTimeline"></div>
+    <div class="sim-controls">
+      <button class="sim-btn start" id="simBtn" onclick="runSim()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-1px;margin-right:3px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start Simulation</button>
+      <button class="sim-btn reset" onclick="resetSim()">Reset</button>
+      <div class="sim-stat">Hit rate：<b id="simHitRate">—</b></div>
+    </div>
+  </div>
+
+  <div class="link-back reveal paywall-locked">
+    <b>Recall Lesson 8-3:</b> We previously discussed how dynamic timestamps are the most expensive anti-pattern. The conclusion of this lesson is broader: <b>it's not just timestamps — any content dynamically injected into the System Prompt is a cache killer.</b> Skills, user IDs, session markers… anything that changes should never appear in the prefix.
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>The rule of KV Cache is simple: same prefix = hit. So don't touch the prefix.</b> Put everything that might change (Skills, context, timestamps) after the System Prompt, and keep the prefix permanently stable.</span>
+  </div>
+
+</article>
+<script>
+var simRunning = false;
+var simStep = 0;
+var simTimer = null;
+var simHits = 0;
+var SCENARIOS = [
+  {skill:'General Chat', changed:false},
+  {skill:'General Chat', changed:false},
+  {skill:'General Chat', changed:false},
+  {skill:'Content Creation', changed:true},
+  {skill:'Content Creation', changed:false},
+  {skill:'Content Creation', changed:false},
+  {skill:'Code Assistant', changed:true},
+  {skill:'Code Assistant', changed:false},
+  {skill:'General Chat', changed:true},
+  {skill:'General Chat', changed:false}
+];
+
+function genHash() {
+  return Math.random().toString(36).substr(2, 6);
+}
+
+function runSim() {
+  if (simRunning) return;
+  simRunning = true;
+  document.getElementById('simBtn').textContent = 'Running...';
+  document.getElementById('simBtn').disabled = true;
+  simStep = 0;
+  simHits = 0;
+  document.getElementById('simTimeline').innerHTML = '';
+  simTimer = setInterval(function() {
+    if (simStep >= SCENARIOS.length) {
+      clearInterval(simTimer);
+      simRunning = false;
+      document.getElementById('simBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-1px;margin-right:3px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Again';
+      document.getElementById('simBtn').disabled = false;
+      return;
+    }
+    var s = SCENARIOS[simStep];
+    var isHit = !s.changed;
+    if (isHit) simHits++;
+    simStep++;
+    var timeline = document.getElementById('simTimeline');
+    var el = document.createElement('div');
+    el.className = 'sim-req ' + (isHit ? 'hit' : 'miss');
+    el.innerHTML = '<span class="sr-num">#' + simStep + '</span>'
+      + '<span class="sr-hash">Skill: ' + s.skill + (s.changed ? ' (switched!)' : '') + '</span>'
+      + '<span class="sr-tag">' + (isHit ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> HIT' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> MISS') + '</span>';
+    timeline.appendChild(el);
+    timeline.scrollTop = timeline.scrollHeight;
+    document.getElementById('simHitRate').textContent = Math.round(simHits / simStep * 100) + '%';
+  }, 600);
+}
+
+function resetSim() {
+  clearInterval(simTimer);
+  simRunning = false;
+  simStep = 0;
+  simHits = 0;
+  document.getElementById('simTimeline').innerHTML = '';
+  document.getElementById('simBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-1px;margin-right:3px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start Simulation';
+  document.getElementById('simBtn').disabled = false;
+  document.getElementById('simHitRate').textContent = '—';
+}
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

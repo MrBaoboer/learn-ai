@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Image Resolution Strategy: Match the Task, Avoid Unnecessary Cost | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+@keyframes _si{to{opacity:1}}
+body{opacity:0;animation:_si .15s ease .08s forwards}
+
+:root{
+  --red:var(--danger);
+  --green:var(--success);
+  --orange:var(--amber);
+  --surface:var(--card);
+  --surface2:#f0ede6;
+  --muted:var(--sub);
+}
+
+.lesson-header h1 em{font-style:normal;color:var(--success)}
+
+/* Two-column layout */
+.task-layout{display:grid;grid-template-columns:1fr 1.15fr;gap:18px;align-items:start}
+
+/* Task selection */
+.task-list{display:flex;flex-direction:column;gap:8px}
+.task-card{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:13px 14px;cursor:pointer;transition:all .2s;font-family:inherit;width:100%;text-align:left}
+.task-card:hover{border-color:rgba(0,102,255,.25);background:rgba(0,102,255,.02)}
+.task-card.active{border-color:var(--accent);background:rgba(0,102,255,.04);box-shadow:0 2px 12px rgba(0,102,255,.1)}
+.task-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.task-body{flex:1}
+.task-name{font-size:16px;font-weight:800;color:var(--text);margin-bottom:2px}
+.task-desc{font-size:14px;color:var(--sub);line-height:1.5}
+.task-badge{display:inline-block;margin-top:5px;padding:2px 9px;border-radius:5px;font-size:12px;font-weight:700}
+
+/* Recommended results */
+.rec-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;overflow:hidden}
+.rec-head{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2);font-size:15px;font-weight:700;color:var(--muted)}
+.rec-body{padding:16px 18px;display:flex;flex-direction:column;gap:16px;min-height:300px}
+
+/* Recommended resolution cards */
+.res-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.res-card{border-radius:9px;padding:10px 12px;text-align:center;border:1.5px solid transparent;transition:all .2s}
+.res-card.recommended{border-color:var(--success);background:rgba(22,163,74,.06)}
+.res-card.too-low{border-color:var(--border);background:var(--surface2);opacity:.6}
+.res-card.too-high{border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.04)}
+.res-card .rc-res{font-size:14px;font-weight:800;color:var(--text)}
+.res-card .rc-tok{font-size:22px;font-weight:900}
+.res-card .rc-lbl{font-size:11px;font-weight:700;margin-top:2px}
+.res-card .rc-verdict{font-size:12px;margin-top:4px;font-weight:700}
+
+/* Animated comparison bars */
+.compare-section{display:flex;flex-direction:column;gap:6px}
+.compare-title{font-size:14px;font-weight:700;color:var(--muted)}
+.compare-row{display:flex;align-items:center;gap:8px}
+.compare-res{font-size:13px;font-weight:700;min-width:80px;color:var(--text)}
+.compare-bar-wrap{flex:1;height:22px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+.compare-bar{height:100%;border-radius:5px;display:flex;align-items:center;padding-left:8px;font-size:12px;font-weight:800;color:white;white-space:nowrap;overflow:hidden;transition:width .6s ease}
+.compare-tok{font-size:13px;font-weight:800;min-width:60px;text-align:right}
+
+/* Quality description */
+.quality-section{display:flex;flex-direction:column;gap:6px}
+.quality-row{display:flex;align-items:center;gap:10px}
+.quality-label{font-size:13px;font-weight:700;min-width:80px;color:var(--sub)}
+.quality-dots{display:flex;gap:3px}
+.q-dot{width:14px;height:14px;border-radius:3px;transition:all .3s}
+.q-dot.filled{background:var(--accent)}
+.q-dot.empty{background:var(--surface2)}
+.quality-note{font-size:12px;color:var(--muted)}
+
+.insight-box{background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);border-radius:10px;padding:14px 16px;font-size:14px;color:var(--text);line-height:1.6;margin-top:16px}
+.insight-box b{color:var(--success)}
+
+@keyframes slide-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.animate-in{animation:slide-in .3s ease}
+
+@media (max-width:768px){
+  .task-layout{grid-template-columns:1fr}
+  .res-cards{grid-template-columns:repeat(3,1fr)}
+  .res-card .rc-tok{font-size:17px}
+  .compare-res,.quality-label{min-width:70px;font-size:12px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Different tasks have vastly different resolution requirements: OCR needs high resolution, while sentiment analysis works fine at low resolution. Choose the right image resolution for your task and avoid paying for unnecessary pixels.">
+<meta name="keywords" content="image resolution optimization,multimodal cost,Vision model optimization,image Token optimization,AI image processing">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-5b.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/8-5b.en.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-5b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-5b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-5b.en.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Image Resolution Strategy: Match the Task, Avoid Unnecessary Cost">
+<meta property="og:description" content="Different tasks have vastly different resolution requirements: OCR needs high resolution, while sentiment analysis works fine at low resolution. Choose the right image resolution for your task and avoid paying for unnecessary pixels.">
+<meta property="og:url" content="https://xueai.app/slides/8-5b.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Image Resolution Strategy: Match the Task, Avoid Unnecessary Cost">
+<meta name="twitter:description" content="Different tasks have vastly different resolution requirements: OCR needs high resolution, while sentiment analysis works fine at low resolution. Choose the right image resolution for your task and avoid paying for unnecessary pixels.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Match Resolution to Task","name":"Match Resolution to Task","url":"https://xueai.app/slides/8-5b.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Cost Optimization and Model Selection","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Different tasks have vastly different resolution requirements: OCR needs high resolution, while sentiment analysis works fine at low resolution. Choose the right image resolution for your task and avoid paying for unnecessary pixels.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Cost Optimization</div>
+    <h1>Image Tokens: <em>match resolution to task</em></h1>
+    <p class="subtitle">Different tasks require different levels of image detail. Using the lowest resolution that meets the task = maximum savings. Select a task type to see the recommended resolution plan.</p>
+  </header>
+
+  <div class="task-layout paywall-locked xa-peek">
+    <!-- Task types -->
+    <div>
+      <div class="sec-label">Select Your Visual Task Type</div>
+      <div class="task-list" id="taskList">
+        <button class="task-card" onclick="pickTask(this,0)">
+          <div class="task-icon" style="background:rgba(22,163,74,.12)">🐱</div>
+          <div class="task-body">
+            <div class="task-name">Coarse Classification</div>
+            <div class="task-desc">Is it a cat or a dog? Is there a person in the image? What broad category does the image belong to?</div>
+            <span class="task-badge" style="background:rgba(22,163,74,.1);color:var(--success)">Low precision required</span>
+          </div>
+        </button>
+        <button class="task-card" onclick="pickTask(this,1)">
+          <div class="task-icon" style="background:rgba(8,145,178,.12)">🏙️</div>
+          <div class="task-body">
+            <div class="task-name">Scene Understanding</div>
+            <div class="task-desc">What is happening in the image? What objects are present? Is the scene indoor or outdoor?</div>
+            <span class="task-badge" style="background:rgba(8,145,178,.1);color:var(--cyan)">Medium precision</span>
+          </div>
+        </button>
+        <button class="task-card" onclick="pickTask(this,2)">
+          <div class="task-icon" style="background:rgba(217,119,6,.12)">📄</div>
+          <div class="task-body">
+            <div class="task-name">OCR / Chart Recognition</div>
+            <div class="task-desc">Recognize text, table data, and chart numbers in the image. Requires clear text.</div>
+            <span class="task-badge" style="background:rgba(217,119,6,.1);color:var(--amber)">High precision required</span>
+          </div>
+        </button>
+        <button class="task-card" onclick="pickTask(this,3)">
+          <div class="task-icon" style="background:rgba(124,58,237,.12)">🔬</div>
+          <div class="task-body">
+            <div class="task-name">High-precision Detection / Medical Imaging</div>
+            <div class="task-desc">Pathology slides, satellite imagery, precision component inspection — requires maximum resolution.</div>
+            <span class="task-badge" style="background:rgba(124,58,237,.1);color:var(--purple)">Ultra-high precision</span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Recommended results -->
+    <div>
+      <div class="sec-label">Recommended Plan</div>
+      <div class="rec-panel" id="recPanel">
+        <div class="rec-head" id="recHead">← Select a task type on the left to see the recommended plan</div>
+        <div class="rec-body" id="recBody">
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:16px;min-height:260px">
+            Click any task type
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight-box paywall-locked" id="insightBox">
+    <b>Core Principle:</b> higher resolution is not always better. Using the minimum resolution that meets task requirements, Token counts can differ by <b>10–100x</b>.
+  </div>
+</article>
+
+<script>
+const TASKS = [
+  {
+    name: 'Coarse Classification',
+    icon: '🐱',
+    color: 'var(--green)',
+    colorRgb: '22,163,74',
+    recommended: 1,  // index in resolutions
+    resolutions: [
+      { label: '256×256', w: 256, h: 256, tokens: 64,   quality: 2, verdict: 'Adequate', cls: 'too-low' },
+      { label: '512×512', w: 512, h: 512, tokens: 258,  quality: 3, verdict: 'Recommended', cls: 'recommended' },
+      { label: '1024×768',w:1024, h: 768, tokens: 770,  quality: 4, verdict: 'Wasteful', cls: 'too-high' },
+    ],
+    insight: 'Coarse classification is insensitive to fine details; 512×512 already contains sufficient semantic information. Using 1024×768 yields almost no improvement, yet costs 3x the Tokens.',
+    qualityLabels: ['Too blurry', 'Adequate', 'No improvement', 'No improvement']
+  },
+  {
+    name: 'Scene Understanding',
+    icon: '🏙️',
+    color: 'var(--cyan)',
+    colorRgb: '8,145,178',
+    recommended: 1,
+    resolutions: [
+      { label: '512×512',  w: 512,  h: 512,  tokens: 258,  quality: 2, verdict: 'Too blurry', cls: 'too-low' },
+      { label: '1024×1024',w: 1024, h: 1024, tokens: 1026, quality: 4, verdict: 'Recommended',   cls: 'recommended' },
+      { label: '2560×1440',w: 2560, h: 1440, tokens: 3602, quality: 5, verdict: 'Excessive',   cls: 'too-high' },
+    ],
+    insight: 'Scene understanding requires identifying objects and relationships; ~1000×1000 is sufficient. Beyond this, accuracy improvement is negligible while costs increase 3.5x.',
+    qualityLabels: ['Hard to see detail', 'Adequate', 'Clear improvement', 'No perceptible improvement', 'No perceptible improvement']
+  },
+  {
+    name: 'OCR / Chart Recognition',
+    icon: '📄',
+    color: 'var(--orange)',
+    colorRgb: '217,119,6',
+    recommended: 1,
+    resolutions: [
+      { label: '1024×768', w: 1024, h: 768,  tokens: 770,  quality: 2, verdict: 'Blurry',  cls: 'too-low' },
+      { label: '2048×1536',w: 2048, h: 1536, tokens: 3074, quality: 5, verdict: 'Recommended',  cls: 'recommended' },
+      { label: '3840×2160',w: 3840, h: 2160, tokens: 8194, quality: 5, verdict: 'Excessive',  cls: 'too-high' },
+    ],
+    insight: 'OCR requires high text clarity; ~2000×1500 is the optimal balance. 4K offers almost no additional improvement for text recognition, yet costs 2.7x more.',
+    qualityLabels: ['Text blurry', 'Barely legible', 'Clear', 'Very clear', 'Same as above', 'Same as above']
+  },
+  {
+    name: 'High-precision Detection',
+    icon: '🔬',
+    color: 'var(--purple)',
+    colorRgb: '124,58,237',
+    recommended: 1,
+    resolutions: [
+      { label: '2048×2048',w: 2048, h: 2048, tokens: 4098,  quality: 3, verdict: 'Insufficient',  cls: 'too-low' },
+      { label: '4096×4096',w: 4096, h: 4096, tokens: 16386, quality: 6, verdict: 'Recommended',  cls: 'recommended' },
+      { label: '5×4K×4K images',w:4096, h: 4096, tokens: 81930, quality: 6, verdict: 'Dangerous',  cls: 'too-high' },
+    ],
+    insight: 'Medical imaging and similar tasks genuinely require high resolution. However, in batch processing, 5 4K images will hit the high-cost tier. Enable vl_high_resolution_images and control batch size.',
+    qualityLabels: ['','','Detail loss','Acceptable','Sufficient','Recommended','Limit']
+  }
+];
+
+function pickTask(btn, idx) {
+  document.querySelectorAll('.task-card').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRec(idx);
+}
+
+function renderRec(idx) {
+  const t = TASKS[idx];
+  document.getElementById('recHead').textContent = `${t.icon} ${t.name} — Resolution Recommendations`;
+
+  const maxTok = Math.max(...t.resolutions.map(r => r.tokens));
+
+  const body = document.getElementById('recBody');
+  body.innerHTML = `
+    <div class="res-cards animate-in" id="resCards"></div>
+    <div class="compare-section animate-in" id="compareSection">
+      <div class="compare-title">Token Count Comparison (shorter bar = cheaper)</div>
+    </div>
+    <div class="quality-section animate-in" id="qualitySection">
+      <div class="compare-title">Perceived Quality Comparison (more dots = better)</div>
+    </div>
+    <div style="font-size:14px;color:var(--sub);line-height:1.6;flex-shrink:0;padding-top:4px" id="insightText"></div>
+  `;
+
+  // Resolution cards
+  const cards = document.getElementById('resCards');
+  t.resolutions.forEach((r, i) => {
+    const tokColor = r.cls === 'recommended' ? `rgb(${t.colorRgb})` :
+                     r.cls === 'too-high' ? 'var(--red)' : 'var(--muted)';
+    const card = document.createElement('div');
+    card.className = 'res-card ' + r.cls;
+    card.innerHTML = `
+      <div class="rc-res">${r.label}</div>
+      <div class="rc-tok" style="color:${tokColor}">${r.tokens.toLocaleString()}</div>
+      <div class="rc-lbl" style="color:${tokColor}">Token</div>
+      <div class="rc-verdict" style="color:${tokColor}">${r.verdict}</div>
+    `;
+    cards.appendChild(card);
+  });
+
+  // Comparison bars
+  const compareSection = document.getElementById('compareSection');
+  t.resolutions.forEach((r, i) => {
+    const barColor = r.cls === 'recommended' ? `rgb(${t.colorRgb})` :
+                     r.cls === 'too-high' ? 'var(--red)' : 'var(--muted)';
+    const pct = Math.round(r.tokens / maxTok * 100);
+    const row = document.createElement('div');
+    row.className = 'compare-row';
+    row.innerHTML = `
+      <div class="compare-res">${r.label}</div>
+      <div class="compare-bar-wrap">
+        <div class="compare-bar" style="width:0%;background:${barColor}">${r.verdict}</div>
+      </div>
+      <div class="compare-tok" style="color:${barColor}">${r.tokens.toLocaleString()} T</div>
+    `;
+    compareSection.appendChild(row);
+    // Animation delay
+    setTimeout(() => {
+      row.querySelector('.compare-bar').style.width = pct + '%';
+    }, 50 + i * 100);
+  });
+
+  // Quality dots
+  const qualitySection = document.getElementById('qualitySection');
+  t.resolutions.forEach((r, i) => {
+    const dotColor = r.cls === 'recommended' ? `rgb(${t.colorRgb})` :
+                     r.cls === 'too-high' ? 'var(--red)' : 'var(--muted)';
+    const row = document.createElement('div');
+    row.className = 'quality-row';
+    const dots = Array.from({length:6}, (_,j) =>
+      `<div class="q-dot ${j < r.quality ? 'filled' : 'empty'}" style="${j < r.quality ? `background:${dotColor}` : ''}"></div>`
+    ).join('');
+    row.innerHTML = `
+      <div class="quality-label">${r.label}</div>
+      <div class="quality-dots">${dots}</div>
+      <div class="quality-note" style="color:${dotColor}">${r.verdict}</div>
+    `;
+    qualitySection.appendChild(row);
+  });
+
+  document.getElementById('insightText').innerHTML =
+    `<b style="color:rgb(${t.colorRgb})">Conclusion:</b> ${t.insight}`;
+}
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

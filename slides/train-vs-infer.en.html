@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Training vs. Inference: Two Completely Different Processes | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── Analogy Bar ── */
+.analogy-bar {
+  background: var(--card); border-radius: var(--radius); padding: 16px 20px;
+  border: 1.5px solid var(--border); font-size: 15px; color: var(--text); line-height: 1.7;
+  box-shadow: var(--shadow-card);
+}
+.analogy-bar b { color: var(--accent); }
+
+/* ── Comparison Columns ── */
+.cmp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.cmp-col {
+  border-radius: var(--radius); padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.cmp-col.train { background: rgba(8,145,178,0.05);  border: 1.5px solid rgba(8,145,178,0.2); }
+.cmp-col.infer { background: rgba(22,163,74,0.05);  border: 1.5px solid rgba(22,163,74,0.2); }
+
+.cmp-title { font-size: 17px; font-weight: 800; }
+.train .cmp-title { color: var(--cyan); }
+.infer .cmp-title { color: var(--success); }
+.cmp-desc { font-size: 13px; color: var(--sub); line-height: 1.7; }
+
+.metrics { display: flex; flex-direction: column; gap: 8px; }
+.m-row { display: flex; align-items: center; gap: 8px; }
+.m-lbl { font-size: 13px; font-weight: 700; color: var(--sub); width: 64px; flex-shrink: 0; }
+.m-val { font-size: 13px; font-weight: 700; padding: 3px 12px; border-radius: 20px; }
+.train .m-val { background: rgba(8,145,178,0.1); color: var(--cyan); }
+.infer .m-val { background: rgba(22,163,74,0.1); color: var(--success); }
+
+/* ── Interactive Experiment ── */
+.experiment {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* Input Row */
+.input-row { display: flex; gap: 8px; }
+.chat-input {
+  flex: 1; border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; font-size: 14px; font-family: inherit; color: var(--text);
+  background: var(--card); outline: none; resize: none;
+  transition: border-color 0.2s;
+}
+.chat-input:focus { border-color: var(--accent); }
+.send-btn {
+  background: var(--accent); color: white; border: none;
+  border-radius: 10px; padding: 0 20px; font-size: 14px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  min-height: 44px;
+}
+.send-btn:hover { filter: brightness(1.1); }
+
+/* Visualization Area */
+.vis-area {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+
+/* context window */
+.ctx-box {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ctx-title { font-size: 11px; font-weight: 800; color: var(--sub); text-transform: uppercase; letter-spacing: 0.4px; }
+.ctx-messages {
+  height: 220px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.msg {
+  padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5;
+  max-width: 90%; opacity: 0; transform: translateY(6px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.msg.in { opacity: 1; transform: translateY(0); }
+.msg.user { background: rgba(0,102,255,0.08); color: var(--text); align-self: flex-end; border: 1px solid rgba(0,102,255,0.15); }
+.msg.ai   { background: rgba(22,163,74,0.07); color: var(--text); align-self: flex-start; border: 1px solid rgba(22,163,74,0.15); }
+.msg-role { font-size: 10px; font-weight: 800; margin-bottom: 3px; }
+.user .msg-role { color: var(--accent); }
+.ai   .msg-role { color: var(--success); }
+
+/* params box */
+.params-box {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.params-title { font-size: 11px; font-weight: 800; color: var(--sub); text-transform: uppercase; letter-spacing: 0.4px; }
+.params-grid {
+  flex: 1; display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start;
+  min-height: 140px;
+}
+.param-dot {
+  width: 12px; height: 12px; border-radius: 3px;
+  background: rgba(0,102,255,0.15);
+  transition: background 0.3s;
+}
+.param-dot.frozen { background: rgba(8,145,178,0.2); }
+
+.frozen-badge {
+  background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.2);
+  border-radius: 8px; padding: 10px 12px;
+  font-size: 13px; font-weight: 700; color: var(--danger); line-height: 1.5; text-align: center;
+}
+
+/* conclusion */
+.conclusion-bar {
+  background: rgba(220,38,38,0.04); border: 1.5px solid rgba(220,38,38,0.18);
+  border-radius: var(--radius); padding: 16px 20px;
+  font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.7;
+}
+.conclusion-bar b { color: var(--danger); }
+
+/* shake animation */
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-5px)}
+  40%{transform:translateX(5px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}
+.shake { animation: shake 0.4s ease; }
+
+@media (max-width: 768px) {
+  .cmp-cols { grid-template-columns: 1fr; }
+  .vis-area { grid-template-columns: 1fr; }
+  .ctx-messages { height: 180px; }
+  .params-grid { min-height: 100px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Training and inference are two completely different stages of a large language model. A detailed breakdown of gradient descent and weight updates during training, and autoregressive generation during inference, to help you understand their fundamental differences and resource costs.">
+<meta name="keywords" content="LLM training,LLM inference,autoregressive generation,gradient descent,pre-training">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/train-vs-infer.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/train-vs-infer.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/train-vs-infer.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/train-vs-infer.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/train-vs-infer.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Training vs. Inference: Two Completely Different Processes">
+<meta property="og:description" content="Training and inference are two completely different stages of a large language model. A detailed breakdown of gradient descent and weight updates during training, and autoregressive generation during inference, to help you understand their fundamental differences and resource costs.">
+<meta property="og:url" content="https://xueai.app/slides/train-vs-infer.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Training vs. Inference: Two Completely Different Processes">
+<meta name="twitter:description" content="Training and inference are two completely different stages of a large language model. A detailed breakdown of gradient descent and weight updates during training, and autoregressive generation during inference, to help you understand their fundamental differences and resource costs.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Training vs. Inference: Two Different Processes","name":"Training vs. Inference: Two Different Processes","url":"https://xueai.app/slides/train-vs-infer.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practicum · Fundamentals","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Training and inference are two completely different stages of a large language model. A detailed breakdown of gradient descent and weight updates during training, and autoregressive generation during inference.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Fundamentals</div>
+    <h1>Training vs. Inference: Two Completely Different Processes</h1>
+    <p class="subtitle">Many people assume AI learns something new with every response. In reality, that's completely not the case.</p>
+  </header>
+
+  <div class="sec-label">Comparison</div>
+
+  <div class="analogy-bar">
+    Think of a student taking an exam: <b>Training</b> = years of preparation, drilling problems, memorizing knowledge &nbsp;→&nbsp; <b>Inference</b> = sitting the exam, parameters frozen, no longer learning anything new
+  </div>
+
+  <div class="cmp-cols paywall-locked xa-peek">
+    <div class="cmp-col train reveal" id="colTrain">
+      <div class="cmp-title">Training</div>
+      <div class="cmp-desc">Adjusting billions of parameters on massive datasets so the model memorizes world knowledge.</div>
+      <div class="metrics">
+        <div class="m-row"><span class="m-lbl">Frequency</span><span class="m-val">One-time</span></div>
+        <div class="m-row"><span class="m-lbl">Compute</span><span class="m-val">1K–10K GPUs</span></div>
+        <div class="m-row"><span class="m-lbl">Parameters</span><span class="m-val">Continuously updated</span></div>
+        <div class="m-row"><span class="m-lbl">Cost</span><span class="m-val">Hundreds of millions $</span></div>
+        <div class="m-row"><span class="m-lbl">Duration</span><span class="m-val">Weeks to months</span></div>
+      </div>
+    </div>
+
+    <div class="cmp-col infer reveal" id="colInfer">
+      <div class="cmp-title">Inference</div>
+      <div class="cmp-desc">Uses fixed parameters to generate a response to your input. Parameters remain completely unchanged with every conversation.</div>
+      <div class="metrics">
+        <div class="m-row"><span class="m-lbl">Frequency</span><span class="m-val">Every conversation</span></div>
+        <div class="m-row"><span class="m-lbl">Compute</span><span class="m-val">1–a few GPUs</span></div>
+        <div class="m-row"><span class="m-lbl">Parameters</span><span class="m-val">Completely frozen</span></div>
+        <div class="m-row"><span class="m-lbl">Billing</span><span class="m-val">Billed per Token</span></div>
+        <div class="m-row"><span class="m-lbl">Duration</span><span class="m-val">1–10 sec/call</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Interactive Experiment: Does What You Say Change the Parameters?</div>
+
+  <div class="experiment paywall-locked">
+
+    <div class="input-row">
+      <textarea class="chat-input" id="chatInput" rows="1"
+        placeholder="Type a message to the AI and see if the parameters change…"
+        onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" onclick="sendMsg()">Send</button>
+    </div>
+
+    <div class="vis-area">
+
+      <!-- Context Window -->
+      <div class="ctx-box">
+        <div class="ctx-title">Context Window</div>
+        <div class="ctx-messages" id="msgList">
+          <div class="msg ai in">
+            <div class="msg-role">AI</div>
+            Hello! How can I help you?
+          </div>
+        </div>
+      </div>
+
+      <!-- Parameters Area -->
+      <div class="params-box">
+        <div class="params-title">Model Parameters (Illustration)</div>
+        <div class="params-grid" id="paramGrid"></div>
+        <div class="frozen-badge" id="frozenBadge">
+          🔒 Parameters Completely Frozen<br>
+          <span style="font-weight:400;color:var(--sub);font-size:11px;">Conversations do not change any weights</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="conclusion-bar reveal" id="concl">
+      What you say to the AI <b>does not modify any parameters</b>. If you tell it "your name is Alex" today, it won't remember tomorrow when you start a new conversation — because the conversation only exists in the context window. <b>Conversation is not learning.</b>
+    </div>
+
+  </div>
+
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+// ── Parameter Grid Init ──
+const grid = document.getElementById('paramGrid');
+const PARAM_COUNT = 80;
+for (let i = 0; i < PARAM_COUNT; i++) {
+  const d = document.createElement('div');
+  d.className = 'param-dot frozen';
+  d.id = 'p' + i;
+  grid.appendChild(d);
+}
+
+// ── Keyboard Send ──
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent?.isComposing) {
+    e.preventDefault();
+    sendMsg();
+  }
+}
+
+const AI_REPLIES = [
+  'Got it — recorded in this conversation.',
+  'Sure! But note: if you refresh the page, I\'ll forget this conversation.',
+  'Received! This content exists in the context window — no parameters changed.',
+  'Understood! My parameters are still exactly what they were at the end of training, unchanged by your input.',
+  'Noted! Every inference I only read the current conversation content — I never learn new things.',
+];
+let replyIdx = 0;
+
+function sendMsg() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  // Add user message
+  addMsg('user', text);
+
+  // Parameters "shake" but don't change color → shake animation
+  const badge = document.getElementById('frozenBadge');
+  badge.classList.remove('shake');
+  void badge.offsetWidth;
+  badge.classList.add('shake');
+
+  // Brief flash of a few param dots (simulating processing), but color reverts immediately
+  const dots = grid.querySelectorAll('.param-dot');
+  const flashIdx = Array.from({length: 8}, () => Math.floor(Math.random() * PARAM_COUNT));
+  flashIdx.forEach(i => {
+    dots[i].style.background = 'rgba(22,163,74,0.5)';
+    setTimeout(() => dots[i].style.background = '', 400);
+  });
+
+  // AI reply
+  setTimeout(() => {
+    const reply = AI_REPLIES[replyIdx % AI_REPLIES.length];
+    replyIdx++;
+    addMsg('ai', reply);
+  }, 600);
+}
+
+function addMsg(role, text) {
+  const list = document.getElementById('msgList');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="msg-role">${role === 'user' ? 'You' : 'AI'}</div>${text}`;
+  list.appendChild(div);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => div.classList.add('in'));
+  });
+  list.scrollTop = list.scrollHeight;
+}
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

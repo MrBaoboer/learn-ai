@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding 방법론 9강: 데이터베이스 먼저 백업, 불가역 작업 전 롤백 방안 수립, 배포 전 diff 검토. 배포 diff 검토 시뮬레이터와 세 가지 게이트 체크리스트 포함.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<title>9강: 파괴적 작업의 세 가지 안전 게이트 | AI 마스터클래스</title>
+<link rel="canonical" href="https://xueai.app/slides/vibe-9.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/vibe-9.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/vibe-9.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/vibe-9.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/vibe-9.html">
+<link rel="stylesheet" href="lesson.css">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e;--vibe-soft:rgba(13,148,136,.08);--vibe-line:rgba(13,148,136,.25)}
+.lesson-header .kicker{color:var(--vibe)}
+a{color:var(--vibe-deep)}
+code{color:var(--vibe-deep);background:rgba(13,148,136,.08)}
+.l-callout{background:rgba(13,148,136,.04);border-color:var(--vibe-line)}
+.l-callout b{color:var(--vibe)}
+.desc{font-size:15px;color:var(--sub);line-height:1.8;margin-bottom:12px}
+pre{margin:12px 0 0;padding:16px 18px;overflow:auto;border:1.5px solid var(--border);border-radius:12px;background:#0e1c1a;color:#d9f2ec;font-size:12.5px;line-height:1.7}
+pre code{background:none;padding:0;color:#d9f2ec}
+.demo-hd{font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.4px;text-transform:uppercase;margin-bottom:10px}
+
+/* ── 공통 제어 버튼 ── */
+.btn{padding:11px 22px;border-radius:10px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-p{background:var(--vibe);color:#fff}
+.btn-p:hover{filter:brightness(1.08)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.05);color:var(--sub);border:1.5px solid var(--border)}
+.ctrl-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.hint{font-size:13px;color:var(--sub)}
+
+/* ── 세 가지 게이트 개요 ── */
+.gate-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.gate-grid h3{font-size:15.5px;font-weight:800;margin-bottom:5px}
+.gate-grid p{font-size:13.5px;color:var(--sub);line-height:1.75}
+.gate-tag{display:inline-block;margin-bottom:8px;padding:2px 10px;border:1px solid var(--vibe-line);border-radius:999px;background:var(--vibe-soft);color:var(--vibe-deep);font-family:"SF Mono",Menlo,monospace;font-size:11px;font-weight:800;letter-spacing:.04em}
+
+/* ── 데모 1: diff 검토 시뮬레이터 ── */
+.rel-card{padding:14px 18px;border:1.5px solid var(--vibe-line);border-radius:12px;background:var(--vibe-soft)}
+.rel-card .rt{font-family:"SF Mono",Menlo,monospace;font-size:13px;font-weight:800;color:var(--vibe-deep);margin-bottom:4px}
+.rel-card p{font-size:14px;line-height:1.7;margin:0}
+.df-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.df-row{display:flex;align-items:center;gap:12px;padding:12px 15px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);flex-wrap:wrap;transition:border-color .15s}
+.df-row.marked-ok{border-color:rgba(22,163,74,.4)}
+.df-row.marked-risk{border-color:rgba(220,38,38,.4)}
+.df-info{flex:1;min-width:220px}
+.df-file{font-family:"SF Mono",Menlo,monospace;font-size:13px;font-weight:700;color:var(--text)}
+.df-desc{font-size:12.5px;color:var(--sub);margin-top:2px;line-height:1.6}
+.df-acts{display:flex;gap:8px}
+.mark-btn{padding:9px 15px;border-radius:9px;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;min-height:44px;transition:all .15s}
+.mark-btn:hover{border-color:rgba(0,0,0,.2)}
+.mark-btn.ok-on{border-color:rgba(22,163,74,.55);background:rgba(22,163,74,.08);color:var(--success)}
+.mark-btn.risk-on{border-color:rgba(220,38,38,.5);background:rgba(220,38,38,.07);color:var(--danger)}
+.report{display:none;margin-top:14px;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card)}
+.report.show{display:block}
+.rp-hd{padding:10px 16px;background:rgba(0,0,0,.03);border-bottom:1px solid var(--border);font-family:"SF Mono",Menlo,monospace;font-size:12.5px;font-weight:800;letter-spacing:.5px;color:var(--sub)}
+.rp-body{padding:14px 16px;display:flex;flex-direction:column;gap:9px}
+.rp-line{font-size:13.5px;line-height:1.65;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.rp-line .rf{font-family:"SF Mono",Menlo,monospace;font-size:12.5px;font-weight:700}
+.rp-line .you-ok{color:var(--success);font-weight:700}
+.rp-line .you-no{color:var(--danger);font-weight:700}
+.rp-why{font-size:12.5px;color:var(--sub);width:100%;line-height:1.65}
+.rp-sum{margin-top:4px;padding:13px 15px;border-radius:10px;font-size:14px;font-weight:700;line-height:1.7;border:1.5px solid rgba(220,38,38,.4);background:rgba(220,38,38,.05);color:var(--danger)}
+
+/* ── 데모 2: 세 가지 게이트 체크리스트 ── */
+.op-list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.op-btn{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:13px 15px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;text-align:left;min-height:44px;transition:all .2s}
+.op-btn:hover{border-color:rgba(0,0,0,.18)}
+.op-btn.active{border-color:var(--vibe);background:var(--vibe-soft)}
+.op-btn h4{font-size:15px;font-weight:800;color:var(--text)}
+.op-btn.active h4{color:var(--vibe-deep)}
+.op-btn p{font-size:12.5px;color:var(--sub);margin:0}
+.gate-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.gate-item{display:flex;gap:12px;padding:13px 15px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);cursor:pointer;transition:all .15s;align-items:flex-start;min-height:44px}
+.gate-item:hover{border-color:rgba(0,0,0,.18)}
+.gate-item.checked{border-color:rgba(22,163,74,.45);background:rgba(22,163,74,.05)}
+.gate-item.blocked{border-color:rgba(220,38,38,.38);background:rgba(220,38,38,.04)}
+.g-box{width:22px;height:22px;border-radius:6px;border:2px solid rgba(0,0,0,.2);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;transition:all .15s;background:var(--card)}
+.gate-item.checked .g-box{background:var(--success);border-color:var(--success)}
+.gate-item.blocked .g-box{border-color:rgba(220,38,38,.55);color:var(--danger);background:rgba(220,38,38,.06)}
+.g-t{font-size:14.5px;font-weight:800}
+.g-d{font-size:13px;color:var(--sub);margin-top:2px;line-height:1.65}
+.gate-result{display:none;margin-top:12px;padding:13px 16px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;line-height:1.75}
+.gate-result.show{display:block}
+.gate-result.pass{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.05)}
+.gate-result.warn{border-color:rgba(217,119,6,.4);background:rgba(217,119,6,.06)}
+.gate-result.stop{border-color:rgba(220,38,38,.4);background:rgba(220,38,38,.05)}
+.gate-result b{color:var(--text)}
+
+/* ── 규칙 핵심 ── */
+.rule-cols h3{font-size:15.5px;font-weight:800;margin-bottom:5px}
+.rule-cols ul{margin:0;padding-left:20px;font-size:13.5px;color:var(--sub);line-height:1.85}
+
+@media (max-width:768px){
+  .gate-grid,.op-list{grid-template-columns:1fr}
+  .df-acts{width:100%}
+  .df-acts .mark-btn{flex:1}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"파괴적 작업의 세 가지 안전 게이트","name":"파괴적 작업의 세 가지 안전 게이트","url":"https://xueai.app/slides/vibe-9.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~심화","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 환경 및 보안","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Vibe Coding 방법론 9강: 데이터베이스 먼저 백업, 불가역 작업 전 롤백 방안 수립, 배포 전 diff 검토. 배포 diff 검토 시뮬레이터와 세 가지 게이트 체크리스트 포함.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">VIBE CODING 방법론 · 9강</div>
+    <h1>파괴적 작업의 세 가지 안전 게이트</h1>
+    <p class="subtitle">배포할 때 A 기능만 변경했다고 생각했지만, 실제 diff에는 지난주 B 디버깅 중의 임시 변경이 섞여 들어가서 반제품 코드가 프로덕션에 들어갔습니다. 데이터베이스, 설정, 배포 같은 불가역 작업은 실행 전에 반드시 게이트를 설치해야 합니다. 아래 두 가지 연습은 모두 직접 조작할 수 있습니다.</p>
+  </header>
+
+  <div class="l-callout reveal">
+    <p style="font-size:14.5px;line-height:1.8"><b>핵심 원칙:</b> 불가역 작업의 안전은 게이트에서 옵니다. 백업은 데이터 손실을 막고, 롤백 방안은 복구 불가를 막고, diff 검토는 문제 있는 배포를 막습니다 - 세 가지 게이트 모두 실행 전에 설치됩니다.</p>
+  </div>
+
+  <section>
+    <div class="sec-label">세 가지 게이트 개요</div>
+    <div class="gate-grid">
+      <div class="l-card reveal">
+        <span class="gate-tag">GATE 1 · 백업</span>
+        <h3>데이터베이스 변경 전 백업</h3>
+        <p>백업은 프로젝트 루트 디렉토리 <code>backups/</code>에 타임스탬프를 포함한 이름으로 저장합니다. 백업 없이 migrate, drop, alter, delete 작업은 실행할 수 없습니다. 비용은 명령어 한 줄이지만, 걸리는 것은 전체 데이터베이스입니다.</p>
+      </div>
+      <div class="l-card reveal">
+        <span class="gate-tag">GATE 2 · 롤백</span>
+        <h3>불가역 작업 전 롤백 방안 수립</h3>
+        <p>롤백 방안은 세 가지를 답해야 합니다: 작업 전 상태로 어떻게 복원하는가, 어떤 백업 파일이 필요한가, 예상 복원 시간. 이 세 가지를 답하지 못하면 작업을 충분히 생각하지 않은 것입니다.</p>
+      </div>
+      <div class="l-card reveal">
+        <span class="gate-tag">GATE 3 · 검토</span>
+        <h3>배포 전 diff 검토</h3>
+        <p>「내가 무엇을 변경했다고 생각했는가」와 「실제로 무엇을 변경했는가」를 분리해서 비교합니다. SubAgent가 독립적으로 diff와 Release Notes의 차이를 분석하고, 위험이 발견되면 배포를 중단합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-label">인터랙티브 연습 1 · 배포 diff 검토 시뮬레이터</div>
+    <p class="desc">당신은 이번 배포의 reviewer입니다. Release Notes에는 한 가지만 적혀 있지만 실제 diff에는 7개의 파일이 있습니다. 각 파일의 변경 사항이 「예상대로」인지 「위험 존재」인지 판단하고 모두 표시한 후 검토 보고서를 생성하세요.</p>
+    <div class="l-card reveal">
+      <div class="rel-card">
+        <div class="rt">RELEASE_NOTES.md · v1.4.0</div>
+        <p>✨ 다크 모드 추가: 설정에서 어두운 인터페이스로 전환 가능 — 장시간 사용 시 눈이 피로하지 않습니다.</p>
+      </div>
+      <div class="df-list" id="dfList"></div>
+      <div class="ctrl-row">
+        <button class="btn btn-p" id="dfReport" onclick="dfMakeReport()" disabled>검토 보고서 생성</button>
+        <button class="btn btn-r" onclick="dfReset()">초기화</button>
+        <span class="hint" id="dfProg">표시됨 0 / 7 파일</span>
+      </div>
+      <div class="report" id="dfReportBox">
+        <div class="rp-hd">SUBAGENT DIFF REVIEW · v1.3.2 → HEAD</div>
+        <div class="rp-body" id="dfReportBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="paywall-locked xa-peek">
+    <div class="sec-label">인터랙티브 연습 2 · 이 작업에는 몇 개의 게이트가 필요한가</div>
+    <p class="desc">작업 유형을 선택하고 통과해야 할 게이트를 하나씩 체크한 후 실행해보세요. 빠뜨린 항목이 있으면 그에 해당하는 결과를 볼 수 있습니다.</p>
+    <div class="l-card reveal">
+      <div class="op-list">
+        <button class="op-btn active" id="opBtn0" onclick="pickOp(0)">
+          <h4>데이터베이스 migration</h4><p>테이블 구조 변경, 마이그레이션 스크립트 실행</p>
+        </button>
+        <button class="op-btn" id="opBtn1" onclick="pickOp(1)">
+          <h4>환경 변수 수정</h4><p>API Key 교체, 서비스 설정 조정</p>
+        </button>
+        <button class="op-btn" id="opBtn2" onclick="pickOp(2)">
+          <h4>서버에 직접 파일 복사</h4><p>scp로 수정한 파일 전송</p>
+        </button>
+      </div>
+      <div class="gate-list" id="gateList"></div>
+      <div class="ctrl-row">
+        <button class="btn btn-p" onclick="gateRun()">작업 실행</button>
+        <span class="hint">게이트를 먼저 체크하고 실행하세요</span>
+      </div>
+      <div class="gate-result" id="gateResult"></div>
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">규칙 핵심 내용</div>
+    <div class="l-card reveal">
+      <h3 style="font-size:15.5px;font-weight:800;margin-bottom:4px">백업 명령어 (SQLite 예시)</h3>
+<pre><code># 데이터베이스 구조 또는 데이터와 관련된 모든 변경은 실행 전 반드시 백업 필요
+cp database.db backups/database_$(date +%Y%m%d_%H%M%S).db</code></pre>
+      <p class="hint" style="margin-top:8px">백업 파일 명명 형식: {원본파일명}_{YYYYMMDD_HHMMSS}.db, 프로젝트 루트 backups/ 디렉토리에 통일하여 저장.</p>
+    </div>
+    <div class="l-cols rule-cols" style="margin-top:14px">
+      <div class="l-card reveal">
+        <h3>배포 채널</h3>
+        <ul>
+          <li>코드 배포, 버전 배포, 서버 배포는 반드시 GitHub를 통해야 합니다</li>
+          <li>서버는 <code>git pull</code> 또는 CI/CD 파이프라인으로 코드를 가져옵니다</li>
+          <li>긴급 핫픽스는 예외 가능하나 사후에 반드시 commit으로 동기화해야 합니다</li>
+          <li>사용자가 명확히 확인하기 전까지 태그 생성, push, 배포는 모두 금지됩니다</li>
+        </ul>
+      </div>
+      <div class="l-card reveal">
+        <h3>자격증명 관리</h3>
+        <ul>
+          <li>모든 자격증명은 환경 변수 또는 secrets를 통해 관리합니다</li>
+          <li>코드 또는 설정 파일에 하드코딩하는 것은 금지됩니다</li>
+          <li>키가 한번 git 히스토리에 들어가면 영구 유출된 것으로, 폐기하고 재발급해야 합니다</li>
+        </ul>
+      </div>
+    </div>
+    <div class="l-callout reveal" style="margin-top:14px">
+      <p style="font-size:14px;line-height:1.8"><b>설계 의도:</b> Release Notes는 예상 변경 사항을 설명하지만 실제 commit에는 관계없는 조정이나 실수로 인한 삭제가 섞여 들어갈 수 있습니다. 정규 팀은 CI/CD와 PR review로 이 문제를 막지만, 독립 개발자는 종종 review를 건너뛰고 직접 push합니다. diff 검토 규칙은 SubAgent를 reviewer로 활용하는 것과 같습니다.</p>
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">수업 실습 · 30분</div>
+    <div class="l-card reveal">
+      <p style="font-size:14px;color:var(--sub);line-height:1.9;margin:0">제출물: 위험 검토 보고서. ① 테스트 저장소에 배포 주제와 무관한 변경을 의도적으로 혼입하고(예: 기존 함수의 로직 수정), ② 주제 기능만 설명하는 Release Notes를 작성한 후 AI에게 「전체 diff 가져오기 → 파일별 비교 → 분류 처리」 세 단계로 검토를 요청합니다. ③ AI가 혼입된 변경 사항을 발견하고 배포를 중단할 수 있는지 확인하고, 위험 보고서를 프로세스 템플릿으로 보관합니다.</p>
+    </div>
+  </section>
+
+  <div class="l-card reveal paywall-locked" style="margin-top:28px">
+    <p style="font-size:12.5px;color:var(--sub);line-height:1.8;margin:0">출처: 오픈소스 저장소 <a href="https://github.com/itshen/xs_vibe_rules">itshen/xs_vibe_rules</a>의 <code>rule-opensource.mdc</code> 6장 6.4/6.5 「데이터베이스 백업 및 롤백 방안」, 10장 「배포 및 환경」.</p>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<script>
+/* ═══ 데모 1: 배포 diff 검토 시뮬레이터 ═══ */
+const D_FILES = [
+  { f:'src/theme/darkTheme.css', d:'새 파일, 다크 테마의 색상 변수 및 컴포넌트 스타일 정의', risk:false,
+    why:'다크 모드의 핵심 스타일 파일로 Release Notes 설명과 일치합니다.' },
+  { f:'src/components/ThemeToggle.tsx', d:'새 파일, 설정 페이지의 테마 전환 스위치 컴포넌트', risk:false,
+    why:'새로운 컴포넌트로 이번 배포 주제에 해당합니다.' },
+  { f:'src/App.tsx', d:'수정, ThemeToggle 마운트 및 사용자 테마 설정 읽기', risk:false,
+    why:'다크 모드 연결을 위한 통합 변경으로 범위가 합리적입니다.' },
+  { f:'src/utils/messageParser.ts', d:'수정, 기존 메시지 파싱 함수의 분기 로직 재작성', risk:true,
+    why:'다크 모드와 무관하며 기존 기능의 로직을 수정한 것으로 Release Notes에 전혀 언급되지 않았습니다. 지난주 디버깅 중의 임시 변경이 섞여 들어왔을 가능성이 높습니다.' },
+  { f:'package.json', d:'수정, axios 0.27.2에서 1.6.0으로 업그레이드', risk:true,
+    why:'메이저 버전 의존성 변경이며 Release Notes에 언급되지 않았습니다. axios 1.x에는 호환성을 깨는 변경이 있어 모든 네트워크 요청에 영향을 줄 수 있습니다.' },
+  { f:'src/styles/tokens.css', d:'수정, 다크 테마 참조를 위한 색상 변수 세트 추가', risk:false,
+    why:'기존 값을 변경하지 않고 변수만 추가하여 이번 주제를 지원합니다.' },
+  { f:'docs/RELEASE_NOTES.md', d:'수정, v1.4.0 릴리스 노트 추가', risk:false,
+    why:'배포 프로세스의 일상적인 문서 업데이트입니다.' }
+];
+let dfMarks = new Array(D_FILES.length).fill(null); // 0 = 예상대로, 1 = 위험 존재
+
+function dfRender() {
+  const list = document.getElementById('dfList');
+  list.innerHTML = '';
+  D_FILES.forEach(function (file, i) {
+    const row = document.createElement('div');
+    row.className = 'df-row';
+    row.id = 'dfRow' + i;
+
+    const info = document.createElement('div');
+    info.className = 'df-info';
+    info.innerHTML = '<div class="df-file">' + file.f + '</div><div class="df-desc">' + file.d + '</div>';
+
+    const acts = document.createElement('div');
+    acts.className = 'df-acts';
+    const bOk = document.createElement('button');
+    bOk.className = 'mark-btn';
+    bOk.textContent = '예상대로';
+    bOk.onclick = function () { dfMark(i, 0); };
+    const bRisk = document.createElement('button');
+    bRisk.className = 'mark-btn';
+    bRisk.textContent = '위험 존재';
+    bRisk.onclick = function () { dfMark(i, 1); };
+    acts.appendChild(bOk);
+    acts.appendChild(bRisk);
+
+    row.appendChild(info);
+    row.appendChild(acts);
+    list.appendChild(row);
+  });
+}
+
+function dfMark(i, val) {
+  dfMarks[i] = val;
+  const row = document.getElementById('dfRow' + i);
+  row.className = 'df-row ' + (val === 0 ? 'marked-ok' : 'marked-risk');
+  const btns = row.querySelectorAll('.mark-btn');
+  btns[0].className = 'mark-btn' + (val === 0 ? ' ok-on' : '');
+  btns[1].className = 'mark-btn' + (val === 1 ? ' risk-on' : '');
+  const n = dfMarks.filter(function (m) { return m !== null; }).length;
+  document.getElementById('dfProg').textContent = '표시됨 ' + n + ' / ' + D_FILES.length + ' 파일';
+  document.getElementById('dfReport').disabled = n < D_FILES.length;
+}
+
+function dfMakeReport() {
+  const body = document.getElementById('dfReportBody');
+  body.innerHTML = '';
+  let correct = 0, riskCount = 0;
+  D_FILES.forEach(function (file, i) {
+    const truth = file.risk ? 1 : 0;
+    const you = dfMarks[i];
+    const hit = you === truth;
+    if (hit) correct++;
+    if (file.risk) riskCount++;
+    const line = document.createElement('div');
+    line.className = 'rp-line';
+    line.innerHTML =
+      '<span>' + (file.risk ? '⚠️' : '✅') + '</span>' +
+      '<span class="rf">' + file.f + '</span>' +
+      '<span>검토 결론: ' + (file.risk ? '위험 존재' : '예상대로') + '</span>' +
+      '<span class="' + (hit ? 'you-ok' : 'you-no') + '">당신의 판단: ' + (hit ? '정확' : '오답') + '</span>' +
+      '<span class="rp-why">' + file.why + '</span>';
+    body.appendChild(line);
+  });
+  const sum = document.createElement('div');
+  sum.className = 'rp-sum';
+  sum.textContent = '정확히 판단 ' + correct + ' / ' + D_FILES.length + ' · 위험한 변경 ' + riskCount +
+    '개 감지 ⚠️ 위험 존재: 배포 중단, 사용자 확인 대기. 확인 전까지 태그 생성, push, 배포 모두 금지.';
+  body.appendChild(sum);
+  document.getElementById('dfReportBox').classList.add('show');
+}
+
+function dfReset() {
+  dfMarks = new Array(D_FILES.length).fill(null);
+  document.getElementById('dfProg').textContent = '표시됨 0 / ' + D_FILES.length + ' 파일';
+  document.getElementById('dfReport').disabled = true;
+  document.getElementById('dfReportBox').classList.remove('show');
+  dfRender();
+}
+
+/* ═══ 데모 2: 세 가지 게이트 체크리스트 ═══ */
+const OPS = [
+  {
+    gates: [
+      { t:'백업 게이트', d:'cp database.db backups/database_$(date +%Y%m%d_%H%M%S).db 실행 - 백업을 backups/에 타임스탬프 이름으로 저장',
+        miss:'백업 없이 migrate가 잘못되면 전체 데이터베이스를 복구할 방법이 없습니다. 규칙: 백업 없이 migrate, drop, alter, delete 작업은 실행 불가.' },
+      { t:'롤백 게이트', d:'먼저 세 가지 요소를 명확히 하세요: 작업 전 상태로 어떻게 복원하는가, 어떤 백업 파일이 필요한가, 예상 복원 시간',
+        miss:'롤백 세 가지 요소를 말하지 못하면 작업을 충분히 생각하지 않은 것입니다. 문제 발생 시 문서를 뒤지며 복구 방법을 찾아야 하고 다운타임을 통제할 수 없습니다.' },
+      { t:'채널 게이트', d:'마이그레이션 스크립트가 GitHub에 커밋되어 있고, 서버가 git pull 또는 CI/CD로 가져옵니다',
+        miss:'스크립트가 저장소에 없으면 프로덕션 데이터베이스 구조와 저장소 코드가 불일치하여 이후 매 배포마다 같은 문제가 발생할 수 있습니다.' }
+    ],
+    blocked: -1
+  },
+  {
+    gates: [
+      { t:'백업 게이트', d:'현재 변수 스냅샷을 backups/에 내보내기(타임스탬프 포함), 이전 값 기록',
+        miss:'잘못 변경한 후에는 아무도 이전 값을 기억하지 못하고, 서비스가 시작되지 않아도 되돌아갈 수 없습니다.' },
+      { t:'롤백 게이트', d:'세 가지 요소: 어떻게 복원하는가, 어떤 스냅샷이 필요한가, 예상 복원 시간',
+        miss:'환경 변수 오류는 종종 서비스 무음 이상으로 나타나며, 롤백 방안이 없으면 문제 해결이 매우 느립니다.' },
+      { t:'자격증명 게이트', d:'새 키는 환경 변수 또는 secrets를 통해 주입하며, 코드나 설정 파일에 하드코딩하는 것은 금지됩니다',
+        miss:'키가 한번 git 히스토리에 들어가면 영구 유출되어 폐기하고 재발급해야 합니다.' }
+    ],
+    blocked: -1
+  },
+  {
+    gates: [
+      { t:'백업 게이트', d:'덮어쓸 기존 파일을 backups/에 타임스탬프와 함께 백업',
+        miss:'덮어쓴 후 기존 파일이 없어지면 문제 발생 시 변경 전후 비교도 할 수 없습니다.' },
+      { t:'롤백 게이트', d:'세 가지 요소: 어떻게 복원하는가, 어떤 백업이 필요한가, 예상 복원 시간',
+        miss:'수동으로 복사한 파일은 버전 기록이 없어서, 롤백을 미리 계획하지 않으면 사고 발생 시 기억에 의존해 복원해야 합니다.' },
+      { t:'채널 게이트', d:'배포는 GitHub를 통해야 하며, 서버는 git pull 또는 CI/CD로 가져옵니다',
+        blockedMsg:'이 게이트는 통과할 수 없습니다: 파일을 직접 복사하면 버전 관리를 우회하여 추적도 롤백도 불가능합니다. 올바른 방법은 commit을 GitHub에 push하고 서버에서 git pull을 실행하는 것입니다. 긴급 핫픽스는 예외 가능하나 사후에 반드시 commit으로 동기화해야 합니다.' }
+    ],
+    blocked: 2
+  }
+];
+let curOp = 0;
+let gateChecks = [];
+
+function pickOp(i) {
+  curOp = i;
+  for (let j = 0; j < 3; j++) document.getElementById('opBtn' + j).classList.toggle('active', j === i);
+  gateChecks = OPS[i].gates.map(function () { return false; });
+  gateRender();
+  const r = document.getElementById('gateResult');
+  r.className = 'gate-result';
+  r.innerHTML = '';
+}
+
+function gateRender() {
+  const op = OPS[curOp];
+  const list = document.getElementById('gateList');
+  list.innerHTML = '';
+  op.gates.forEach(function (g, i) {
+    const isBlocked = i === op.blocked;
+    const item = document.createElement('div');
+    item.className = 'gate-item' + (isBlocked ? ' blocked' : (gateChecks[i] ? ' checked' : ''));
+    const box = document.createElement('div');
+    box.className = 'g-box';
+    box.textContent = isBlocked ? '✕' : (gateChecks[i] ? '✓' : '');
+    const txt = document.createElement('div');
+    txt.innerHTML = '<div class="g-t">' + g.t + '</div><div class="g-d">' + g.d + '</div>';
+    item.appendChild(box);
+    item.appendChild(txt);
+    item.onclick = function () {
+      if (isBlocked) {
+        gateShow('stop', '<b>⛔ 이 항목은 체크할 수 없습니다.</b> ' + g.blockedMsg);
+        return;
+      }
+      gateChecks[i] = !gateChecks[i];
+      gateRender();
+    };
+    list.appendChild(item);
+  });
+}
+
+function gateShow(cls, html) {
+  const r = document.getElementById('gateResult');
+  r.className = 'gate-result show ' + cls;
+  r.innerHTML = html;
+}
+
+function gateRun() {
+  const op = OPS[curOp];
+  if (op.blocked >= 0) {
+    gateShow('stop', '<b>⛔ 작업이 차단되었습니다.</b> ' + op.gates[op.blocked].blockedMsg +
+      (gateChecks.some(function (c, i) { return !c && i !== op.blocked; })
+        ? '<br>또한 백업 게이트와 롤백 게이트도 아직 모두 통과하지 않았습니다.' : ''));
+    return;
+  }
+  const missing = [];
+  op.gates.forEach(function (g, i) { if (!gateChecks[i]) missing.push(g); });
+  if (missing.length) {
+    gateShow('warn', '<b>⚠️ ' + missing.length + '개 게이트가 아직 통과되지 않아 작업이 중단됩니다.</b><br>' +
+      missing.map(function (g) { return '「' + g.t + '」 빠짐: ' + g.miss; }).join('<br>'));
+    return;
+  }
+  gateShow('pass', '<b>✅ 세 가지 게이트 모두 통과 - 실행 가능합니다.</b> 실행 후 백업 경로와 롤백 방안을 CHANGELOG에 기록하여 이번 작업을 추적 가능하게 하세요.');
+}
+
+/* 초기화 */
+dfRender();
+pickOp(0);
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

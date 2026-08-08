@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding 방법론 2강: 재진술·PRD·확인·코딩의 4단계 흐름, 일괄 수정 중단점, 중복 구현 감지.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<title>2강: 4단계 흐름 — 재진술, PRD, 확인, 코딩 | AI 실전 강좌</title>
+<link rel="canonical" href="https://xueai.app/slides/vibe-2.ko.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/vibe-2.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/vibe-2.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/vibe-2.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/vibe-2.html">
+<link rel="stylesheet" href="lesson.css">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e}
+.lesson-header .kicker{color:var(--vibe)}
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+/* 단계 진행 바 */
+.stage-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px}
+.stage{padding:10px 8px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);text-align:center;transition:all .25s}
+.stage .sg-num{font-size:12px;font-weight:800;color:var(--sub)}
+.stage .sg-name{font-size:14px;font-weight:800;color:var(--text);margin-top:2px}
+.stage.cur{border-color:var(--vibe);background:rgba(13,148,136,.06)}
+.stage.cur .sg-num,.stage.cur .sg-name{color:var(--vibe)}
+.stage.done{border-color:rgba(22,163,74,.3);background:rgba(22,163,74,.04)}
+.stage.done .sg-name{color:var(--success)}
+
+/* 데모 영역 */
+.vis-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;margin-top:14px}
+.vis-bar{padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.vis-bar-title{font-size:14px;font-weight:700;color:var(--sub)}
+.vis-body{min-height:280px;max-height:460px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.msg{padding:10px 14px;border-radius:10px;font-size:14px;line-height:1.65;opacity:0;transform:translateY(8px);transition:all .35s ease;flex-shrink:0}
+.msg.show{opacity:1;transform:translateY(0)}
+.msg.user{background:rgba(8,145,178,.1);color:var(--cyan)}
+.msg.ai{background:rgba(0,0,0,.05);color:var(--text)}
+.msg.wait{background:rgba(217,119,6,.09);color:var(--amber);font-weight:600}
+.msg.ok{background:rgba(22,163,74,.09);color:var(--success);font-weight:600}
+.msg.prd{background:rgba(13,148,136,.06);border:1.5px solid rgba(13,148,136,.22);color:var(--text)}
+.msg.prd .prd-title{font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--vibe);margin-bottom:6px}
+.msg.prd pre{margin:8px 0 0;padding:12px 14px;overflow:auto;border-radius:10px;background:#0e1c1a;color:#d9f2ec;font-size:12.5px;line-height:1.6;border:none}
+.btn-appr{display:inline-block;margin-top:8px;padding:10px 22px;border-radius:9px;border:none;background:var(--success);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px}
+.btn-appr:hover{filter:brightness(1.08)}
+
+.ctrl-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn{padding:11px 24px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-p{background:var(--vibe);color:#fff}
+.btn-p:hover{filter:brightness(1.08)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.05);color:var(--sub);border:1px solid var(--border)}
+.hint{font-size:13px;color:var(--sub)}
+
+/* 슬라이더 데모 */
+.slider-box{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:12px}
+.slider-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.slider-row label{font-size:15px;font-weight:700;color:var(--text);flex-shrink:0}
+.slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--vibe);height:44px;cursor:pointer}
+.file-count{font-size:26px;font-weight:800;color:var(--vibe);min-width:70px;text-align:center}
+.file-count small{font-size:13px;font-weight:600;color:var(--sub)}
+
+.gate{margin-top:16px;border-radius:12px;padding:16px 18px;transition:all .25s}
+.gate.pass{background:rgba(22,163,74,.05);border:1.5px solid rgba(22,163,74,.3)}
+.gate.stop{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.35)}
+.gate-title{font-size:16px;font-weight:800;margin-bottom:6px}
+.gate.pass .gate-title{color:var(--success)}
+.gate.stop .gate-title{color:var(--amber)}
+.gate-desc{font-size:14px;color:var(--sub);line-height:1.7}
+.plan-list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.plan-item{display:grid;grid-template-columns:200px 1fr 170px;gap:12px;padding:10px 14px;border-radius:10px;background:var(--card);border:1px solid var(--border);font-size:13.5px;align-items:center}
+.plan-item .pf{font-family:"SF Mono","Fira Code",Menlo,monospace;font-weight:700;color:var(--vibe-deep);word-break:break-all}
+.plan-item .pw{color:var(--text)}
+.plan-item .pd{color:var(--sub);font-size:12.5px}
+
+/* 3가지 요소 */
+.elem-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:12px}
+.elem-grid .l-card h3{font-size:16px;margin-bottom:4px}
+.elem-grid .l-card p{font-size:14px;color:var(--sub);line-height:1.7}
+.elem-num{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:rgba(13,148,136,.1);color:var(--vibe);font-size:13px;font-weight:800;margin-bottom:8px}
+
+pre{margin:12px 0 0;padding:16px 18px;overflow:auto;border:1.5px solid var(--border);border-radius:12px;background:#0e1c1a;color:#d9f2ec;font-size:13px;line-height:1.65}
+pre code{padding:0;background:none;color:#d9f2ec}
+code{color:var(--vibe-deep);background:rgba(13,148,136,.08)}
+
+.vibe-callout{background:rgba(13,148,136,.05);border:1.5px solid rgba(13,148,136,.25);border-radius:14px;padding:18px 22px}
+.vibe-callout b{color:var(--vibe)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub)}
+.src-note a{color:var(--vibe-deep)}
+
+@media (max-width:768px){
+  .stage-row{grid-template-columns:1fr 1fr}
+  .elem-grid{grid-template-columns:1fr}
+  .plan-item{grid-template-columns:1fr;gap:4px}
+  .vis-body{min-height:220px}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"4단계 흐름: 재진술, PRD, 확인, 코딩","name":"4단계 흐름: 재진술, PRD, 확인, 코딩","url":"https://xueai.app/slides/vibe-2.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 워크플로우 제어","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":true,"description":"Vibe Coding 방법론 2강: 재진술·PRD·확인·코딩의 4단계 흐름, 일괄 수정 중단점, 중복 구현 감지."}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Vibe Coding 방법론 · 2강</div>
+    <h1>4단계 흐름: 재진술, PRD, 확인, 코딩</h1>
+    <p class="subtitle">소프트웨어 공학의 요구사항 확인 단계를 인간-AI 협업에 도입합니다. AI는 코드를 작성하기 전에 반드시 요구사항을 재진술하고, PRD를 작성하며, 명시적 승인을 받아야 합니다. 여기에 일괄 수정 중단점과 중복 감지 규칙을 더해 실행 전에 피해 범위를 통제합니다.</p>
+  </header>
+
+  <section class="reveal">
+    <div class="sec-label">인터랙티브 데모 1 · 5단계 흐름 시뮬레이터</div>
+    <p class="desc">실제 요구사항 "보고서 내보내기 기능을 추가해줘"로 전체 흐름을 실행해봅니다. "다음 단계"를 클릭하고 4단계에 주목하세요: "승인"을 클릭하지 않으면 AI는 코드를 작성하지 않습니다.</p>
+    <div class="stage-row" id="stageRow">
+      <div class="stage"><div class="sg-num">STEP 1</div><div class="sg-name">생각 & 질문</div></div>
+      <div class="stage"><div class="sg-num">STEP 2</div><div class="sg-name">재진술</div></div>
+      <div class="stage"><div class="sg-num">STEP 3</div><div class="sg-name">PRD 작성</div></div>
+      <div class="stage"><div class="sg-num">STEP 4</div><div class="sg-name">승인 대기</div></div>
+      <div class="stage"><div class="sg-num">STEP 5</div><div class="sg-name">코딩 시작</div></div>
+    </div>
+    <div class="vis-wrap">
+      <div class="vis-bar"><span class="vis-bar-title" id="flowTitle">"다음 단계"를 클릭하여 시작</span><span class="hint" id="flowHint"></span></div>
+      <div class="vis-body" id="flowBody"></div>
+    </div>
+    <div class="ctrl-row">
+      <button class="btn btn-p" id="flowNext" onclick="flowStep()">다음 단계</button>
+      <button class="btn btn-r" onclick="flowReset()">다시 보기</button>
+      <span class="hint" id="flowMsg"></span>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">왜 구체적인 단계를 명시해야 하는가</div>
+    <div class="vibe-callout">
+      <p style="line-height:1.8"><b>"이해한 후 코딩해주세요"라는 말은 너무 모호합니다.</b> AI는 스스로 "이미 이해했다"고 판단하고 바로 시작합니다. "PRD 작성, 승인 대기"와 같은 구체적인 동작을 명시해야 AI가 실제로 멈춥니다. 실제로 간단한 한 줄 수정은 AI가 스스로 PRD가 필요 없다고 판단합니다 — 이 흐름은 주로 다중 파일 변경과 신규 기능 개발, 즉 재작업 비용이 가장 높은 작업을 차단합니다.</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">인터랙티브 데모 2 · 일괄 수정 중단점</div>
+    <p class="desc">규칙 원문: "3개 파일 초과 수정 시 반드시 수정 계획을 먼저 나열하고 사용자 확인 후 진행해야 합니다." 슬라이더를 드래그하여 이번에 수정할 파일 수를 바꾸고 중단점이 언제 트리거되는지 확인하세요.</p>
+    <div class="slider-box">
+      <div class="slider-row">
+        <label for="fileSlider">이번에 수정할 파일 수</label>
+        <input type="range" id="fileSlider" min="1" max="8" value="2" oninput="updateGate(this.value)">
+        <div class="file-count"><span id="fileNum">2</span> <small>개 파일</small></div>
+      </div>
+      <div class="gate pass" id="gateBox"></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">수정 계획의 3가지 요소</div>
+    <div class="elem-grid">
+      <div class="l-card"><span class="elem-num">01</span><h3>어떤 파일을 변경할지</h3><p>완전한 파일 목록입니다. 사람이 먼저 범위가 맞는지 확인하고, 그 다음 내용을 검토합니다. 목록 자체가 "왜 이 요구사항에 설정 파일이 포함되지?"와 같은 이상을 드러낼 수 있습니다.</p></div>
+      <div class="l-card"><span class="elem-num">02</span><h3>각 파일에서 무엇을 변경할지</h3><p>파일별로 변경 내용을 명확히 작성합니다. AI가 하나의 요구사항을 빌미로 관련 없는 리팩토링이나 정리를 "편의상" 하는 것을 방지합니다.</p></div>
+      <div class="l-card"><span class="elem-num">03</span><h3>변경 간 의존 관계</h3><p>어떤 것을 먼저 바꾸고, 어떤 것을 나중에 바꾸며, 누가 누구에 의존하는지 명시합니다. 연쇄적으로 파일을 수정한 후 접근 방식이 잘못됐다는 것을 발견하고 롤백 비용이 너무 높아지는 것을 방지합니다.</p></div>
+    </div>
+    <p class="desc" style="margin-top:12px;font-size:14px">임계값은 프로젝트별로 조정할 수 있습니다. 3개 파일은 저자 프로젝트에서의 경험치이며, 신중한 프로젝트는 1로 낮추고, 빠른 프로토타입은 5까지 늘릴 수 있습니다.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">기능 추가 전 중복 감지 규칙</div>
+    <div class="l-cols">
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">문제: AI는 프로젝트에 이미 있는 구현을 모릅니다</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">AI의 컨텍스트는 현재 대화에만 국한됩니다 — 3개월 전 다른 대화에서 작성된 유틸리티 함수는 볼 수 없습니다. 제약 없이는 같은 <code>formatDate</code>가 네 번 작성되고, 매번 동작이 약간씩 달라집니다.</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">규칙: 먼저 검색, 그 다음 실행</h3>
+        <ul style="padding-left:20px;font-size:14px;color:var(--sub);line-height:1.9">
+          <li>기능 추가 전, 반드시 프로젝트에 유사한 구현이 있는지 먼저 검색해야 합니다</li>
+          <li>검색 범위: 관련 디렉토리의 함수명, 클래스명, 유틸리티 메서드</li>
+          <li>기존 구현을 발견했을 때 재사용 또는 확장을 우선합니다</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">핵심 요점</div>
+    <div class="vibe-callout">
+      <p style="line-height:1.8"><b>중단점은 실행 전에 설정해야 합니다.</b> 재진술과 PRD는 이해 오류를 차단하고, 수정 계획은 연쇄적 잘못된 변경을 차단하며, 중복 감지는 바퀴의 재발명을 차단합니다. 세 가지 관문 모두 사후 롤백보다 저렴합니다.</p>
+    </div>
+    <p class="src-note">출처: <code style="background:none;color:var(--vibe-deep)">rule-opensource.mdc</code> 제2장 "요구사항 처리 및 개발 흐름"에 해당하며, 저장소 <a href="https://github.com/itshen/xs_vibe_rules">itshen/xs_vibe_rules</a>.</p>
+  </section>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<script>
+/* ── 인터랙티브 1: 5단계 흐름 시뮬레이터 ── */
+var FLOW = [
+  {
+    stage: 0, title: 'STEP 1 · AI 먼저 생각하고, 사람에게 질문',
+    msgs: [
+      {cls:'user', text:'사용자: 보고서 내보내기 기능을 추가해줘'},
+      {cls:'ai', text:'AI: 알겠습니다. 시작 전에 질문이 세 가지 있습니다: 내보내기 형식이 CSV인가요 Excel인가요? 최대 행 수는 얼마나 되나요? 현재 필터 조건을 포함해야 하나요?'}
+    ]
+  },
+  {
+    stage: 1, title: 'STEP 2 · AI가 자신의 이해로 요구사항 재진술',
+    msgs: [
+      {cls:'user', text:'사용자: Excel, 최대 5만 행, 현재 필터 조건 포함'},
+      {cls:'ai', text:'AI 재진술: "제가 이해한 바는 다음과 같습니다: 보고서 페이지에 내보내기 버튼을 추가하고, 사용자의 현재 필터 조건으로 Excel을 내보내며, 상한은 5만 행, 초과 시 분할 내보내기를 안내합니다. 이 이해가 맞나요?"'}
+    ]
+  },
+  {
+    stage: 2, title: 'STEP 3 · PRD.md 작성, 순서도는 Mermaid 사용',
+    msgs: [
+      {cls:'prd', html:
+        '<div class="prd-title">PRD.md · 보고서 내보내기 기능</div>' +
+        '<div style="font-size:14px;line-height:1.7"><b>목표:</b> 현재 필터 조건으로 Excel 내보내기, 상한 5만 행.<br><b>수정 파일:</b> ReportPage.tsx, exportApi.ts, routes/export.py</div>' +
+        '<pre>flowchart LR\n  A[내보내기 클릭] --&gt; B{행수 &lt;= 5만?}\n  B -- 예 --&gt; C[Excel 생성 및 다운로드]\n  B -- 아니오 --&gt; D[분할 내보내기 안내]</pre>'
+      }
+    ]
+  },
+  {
+    stage: 3, title: 'STEP 4 · 명시적 승인 전까지 코딩 금지',
+    msgs: [
+      {cls:'wait', text:'AI: PRD가 생성되었습니다. 명시적 승인을 받기 전까지 어떤 코드도 작성하지 않겠습니다.', approve:true}
+    ]
+  },
+  {
+    stage: 4, title: 'STEP 5 · 코딩 시작; 문서와 코드 동기화 유지',
+    msgs: [
+      {cls:'ai', text:'AI: PRD에 따라 코딩을 시작합니다. 변경 범위는 계획에 있는 3개 파일로 고정됩니다.'},
+      {cls:'ok', text:'흐름 완료. 향후 요구사항 변경 시: PRD.md를 먼저 업데이트하고, 그 다음 코드를 변경합니다.'}
+    ]
+  }
+];
+var flowCur = 0, waitingApprove = false;
+
+function flowStep() {
+  if (waitingApprove || flowCur >= FLOW.length) return;
+  var s = FLOW[flowCur];
+  var body = document.getElementById('flowBody');
+  s.msgs.forEach(function(m){
+    var el = document.createElement('div');
+    el.className = 'msg ' + m.cls;
+    if (m.html) { el.innerHTML = m.html; } else { el.textContent = m.text; }
+    if (m.approve) {
+      var btn = document.createElement('button');
+      btn.className = 'btn-appr';
+      btn.textContent = '승인, 코딩 시작';
+      btn.onclick = approve;
+      el.appendChild(document.createElement('br'));
+      el.appendChild(btn);
+    }
+    body.appendChild(el);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add('show'); }); });
+  });
+  body.scrollTop = body.scrollHeight;
+
+  document.getElementById('flowTitle').textContent = s.title;
+  var stages = document.querySelectorAll('#stageRow .stage');
+  stages.forEach(function(el, i){
+    el.classList.toggle('cur', i === s.stage);
+    el.classList.toggle('done', i < s.stage);
+  });
+  flowCur++;
+  document.getElementById('flowHint').textContent = flowCur + ' / ' + FLOW.length;
+
+  if (s.stage === 3) {
+    waitingApprove = true;
+    document.getElementById('flowNext').disabled = true;
+    document.getElementById('flowMsg').textContent = '중단점 트리거됨: 계속하려면 데모 영역에서 "승인"을 클릭하세요.';
+  } else if (flowCur >= FLOW.length) {
+    document.getElementById('flowNext').disabled = true;
+    document.getElementById('flowMsg').textContent = '데모 완료.';
+    document.querySelectorAll('#stageRow .stage').forEach(function(el){ el.classList.remove('cur'); el.classList.add('done'); });
+  } else {
+    document.getElementById('flowMsg').textContent = '';
+  }
+}
+
+function approve() {
+  if (!waitingApprove) return;
+  waitingApprove = false;
+  var body = document.getElementById('flowBody');
+  var el = document.createElement('div');
+  el.className = 'msg user';
+  el.textContent = '사용자: 승인, 코딩 시작.';
+  body.appendChild(el);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add('show'); }); });
+  body.scrollTop = body.scrollHeight;
+  document.getElementById('flowNext').disabled = false;
+  document.getElementById('flowMsg').textContent = '승인 완료 — 개발 단계로 진행할 수 있습니다.';
+}
+
+function flowReset() {
+  flowCur = 0;
+  waitingApprove = false;
+  document.getElementById('flowBody').innerHTML = '';
+  document.getElementById('flowTitle').textContent = '"다음 단계"를 클릭하여 시작';
+  document.getElementById('flowHint').textContent = '';
+  document.getElementById('flowMsg').textContent = '';
+  document.getElementById('flowNext').disabled = false;
+  document.querySelectorAll('#stageRow .stage').forEach(function(el){ el.classList.remove('cur','done'); });
+}
+
+/* ── 인터랙티브 2: 일괄 수정 중단점 슬라이더 ── */
+var FILES = [
+  {name:'ReportPage.tsx',      what:'내보내기 버튼 및 로딩 상태 추가',       dep:'exportApi.ts에 의존'},
+  {name:'exportApi.ts',        what:'내보내기 API 호출 캡슐화',                 dep:'백엔드 내보내기 라우트에 의존'},
+  {name:'routes/export.py',    what:'내보내기 라우트 추가, 필터 파라미터 읽기',       dep:'excel_writer.py에 의존'},
+  {name:'excel_writer.py',     what:'Excel 생성, 5만 행 상한 검증',       dep:'독립 모듈 — 먼저 수정'},
+  {name:'models/report.py',    what:'쿼리 함수에 필터 파라미터 추가',             dep:'routes에서 호출됨'},
+  {name:'config.py',           what:'내보내기 행 수 상한 설정 항목 추가',           dep:'excel_writer가 읽음'},
+  {name:'tests/test_export.py',what:'내보내기 기능 단위 테스트',                 dep:'위 모든 파일 완료 후'},
+  {name:'docs/PRD.md',         what:'내보내기 기능 PRD 동기화 업데이트',             dep:'코드와 동기화 유지'}
+];
+
+function updateGate(val) {
+  var n = parseInt(val, 10);
+  document.getElementById('fileNum').textContent = n;
+  var box = document.getElementById('gateBox');
+  if (n < 3) {
+    box.className = 'gate pass';
+    box.innerHTML = '<div class="gate-title">중단점 미트리거 — 바로 진행</div>' +
+      '<div class="gate-desc">변경이 ' + n + '개 파일에만 영향을 미칩니다 — 소규모 수정입니다. AI는 PRD가 필요 없다고 스스로 판단하고 변경 후 영향 범위를 선언합니다. 규칙의 목적은 위험 통제입니다; 간단한 변경에는 절차가 필요 없습니다.</div>';
+  } else {
+    box.className = 'gate stop';
+    box.innerHTML = '<div class="gate-title">중단점 트리거됨: 수정 계획 먼저 제출, 확인 후 진행</div>' +
+      '<div class="gate-desc">이번 변경은 ' + n + '개 파일에 영향을 미쳐 3개 파일 임계값에 도달했습니다. AI는 아래 수정 계획을 먼저 나열해야 하며, 사람이 확인 후 코딩을 시작할 수 있습니다.</div>' +
+      '<div class="plan-list">' +
+      FILES.slice(0, n).map(function(f){
+        return '<div class="plan-item"><span class="pf">' + f.name + '</span><span class="pw">' + f.what + '</span><span class="pd">' + f.dep + '</span></div>';
+      }).join('') +
+      '</div>';
+  }
+}
+
+/* 초기화 */
+updateGate(document.getElementById('fileSlider').value);
+lessonOnView(document.getElementById('flowBody'), function(){
+  if (flowCur === 0) flowStep();
+});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

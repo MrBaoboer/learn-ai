@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>컨텍스트 엔지니어링: 수동 Prompt에서 자동 진화 시스템으로 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.evolution-bar{display:flex;align-items:stretch;gap:0;margin:28px 0;border-radius:var(--radius);overflow:hidden;border:1.5px solid var(--border);box-shadow:var(--shadow-card)}
+.evo-step{flex:1;padding:16px 14px;text-align:center;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--card)}
+.evo-step:not(:last-child)::after{content:'→';position:absolute;right:-6px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--accent);font-weight:700;z-index:1}
+.evo-step .evo-num{font-size:11px;font-weight:800;color:var(--accent);letter-spacing:.5px}
+.evo-step .evo-label{font-size:13px;font-weight:700;color:var(--text);line-height:1.4}
+.evo-step.active{background:rgba(0,102,255,.06)}
+@media(max-width:768px){.evolution-bar{flex-direction:column}.evo-step:not(:last-child)::after{content:'↓';right:50%;top:auto;bottom:-8px;transform:translateX(50%)}}
+
+.concept-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px 28px;margin:20px 0;box-shadow:var(--shadow-card)}
+.concept-card .cc-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.concept-card .cc-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.concept-card .cc-title{font-size:17px;font-weight:800;color:var(--text)}
+.concept-card .cc-body{font-size:14px;color:var(--sub);line-height:1.8}
+.concept-card .cc-body b{color:var(--text)}
+
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}
+@media(max-width:768px){.three-col{grid-template-columns:1fr}}
+.col-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.col-card .col-badge{font-size:11px;font-weight:800;letter-spacing:.5px;padding:3px 10px;border-radius:6px;display:inline-block;margin-bottom:10px}
+.col-card .col-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:8px}
+.col-card .col-desc{font-size:13px;color:var(--sub);line-height:1.7}
+
+.fig-wrap{margin:28px 0;text-align:center}
+.fig-wrap img{max-width:100%;border-radius:var(--radius);border:1.5px solid var(--border);box-shadow:var(--shadow-card)}
+.fig-wrap .fig-cap{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.6}
+
+.formula-box{background:#1e1e2e;border-radius:var(--radius);padding:20px 24px;margin:16px 0;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;line-height:1.8;color:#cdd6f4;box-shadow:var(--shadow-card);overflow-x:auto}
+.formula-box .fk{color:#89b4fa}
+.formula-box .fs{color:#a6e3a1}
+.formula-box .fp{color:#f9e2af}
+
+.highlight-box{border-radius:var(--radius);padding:18px 22px;margin:16px 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start}
+.highlight-box.blue{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);color:var(--text)}
+.highlight-box.purple{background:rgba(124,58,237,.04);border:1.5px solid rgba(124,58,237,.18);color:var(--text)}
+.highlight-box b{color:var(--accent)}
+.highlight-box svg{flex-shrink:0;margin-top:2px}
+
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:20px 24px;font-size:15px;color:var(--text);line-height:1.7;margin-top:28px;display:flex;gap:12px;align-items:flex-start}
+.takeaway b{color:var(--accent)}
+.takeaway svg{flex-shrink:0;margin-top:2px;color:var(--accent)}
+
+.sim-controls{display:flex;gap:10px;align-items:center;padding:16px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--shadow-card)}
+.sim-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;font-family:inherit}
+.sim-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sim-btn.playing{background:var(--accent);color:#fff;border-color:var(--accent);pointer-events:none}
+.sim-status{font-size:13px;color:var(--sub);font-weight:600;margin-left:auto;font-variant-numeric:tabular-nums}
+
+.ctx-compare{margin:24px 0}
+.compare-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:768px){.compare-row{grid-template-columns:1fr}}
+.compare-card{border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-card)}
+.bad-card{background:#fef2f2;border:1.5px solid #fecaca}
+.good-card{background:#eff6ff;border:1.5px solid #bfdbfe}
+.best-card{background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1.5px solid #c4b5fd}
+.cmp-badge{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:6px;margin-bottom:14px}
+.bad-badge{background:rgba(239,68,68,.1);color:#dc2626}
+.ace-badge{background:rgba(59,130,246,.1);color:#2563eb}
+.mce-badge{background:rgba(139,92,246,.1);color:#7c3aed}
+.cmp-bar-label{font-size:11px;font-weight:600;color:var(--sub);margin-bottom:4px}
+.cmp-bar-track{height:8px;background:rgba(0,0,0,.06);border-radius:99px;overflow:hidden;margin-bottom:4px}
+.cmp-bar-fill{height:100%;border-radius:99px;transition:width .6s ease}
+.cmp-bar-val{font-size:13px;font-weight:800}
+.bad-val{color:#dc2626}
+.ace-val{color:#2563eb}
+.mce-val{color:#7c3aed}
+.cmp-verdict{margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,.06);font-size:12px;color:var(--sub);line-height:1.6}
+.compare-insight{margin-top:16px;padding:14px 18px;background:rgba(0,102,255,.04);border:1px solid rgba(0,102,255,.12);border-radius:10px;font-size:13px;color:var(--text);line-height:1.7}
+.compare-insight b{color:var(--accent)}
+
+.plain-talk{background:linear-gradient(135deg,#fffbeb,#fef9c3);border:1.5px dashed #fbbf24;border-radius:var(--radius);padding:16px 20px;margin:14px 0 28px;font-size:14px;color:#713f12;line-height:1.85;display:flex;gap:12px;align-items:flex-start}
+.plain-talk .pt-icon{flex-shrink:0;font-size:18px;line-height:1.5}
+.plain-talk b{color:#92400e}
+.plain-talk .pt-tag{font-weight:800;color:#b45309}
+
+/* 每轮实时更新的进度条 */
+.cmp-bar-fill{transition:width .35s ease}
+.cmp-round-tag{font-weight:800;color:var(--accent)}
+.compare-card.overflow-flash{animation:overflowFlash .5s ease 2}
+@keyframes overflowFlash{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 3px rgba(239,68,68,.4)}}
+.compare-card.running{box-shadow:0 0 0 2px rgba(0,102,255,.12)}
+.three-col.reveal .col-card{opacity:0;transform:translateY(16px);transition:all .4s ease}
+.three-col.show .col-card{opacity:1;transform:translateY(0)}
+.three-col.show .col-card:nth-child(1){transition-delay:.1s}
+.three-col.show .col-card:nth-child(2){transition-delay:.25s}
+.three-col.show .col-card:nth-child(3){transition-delay:.4s}
+</style>
+<meta name="description" content="ACE에서 MCE, Meta-Harness까지: 컨텍스트 관리의 최적화 목표는 수동 Prompt 작성에서 자동 진화하는 코드 시스템으로 발전하고 있습니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"컨텍스트 엔지니어링: 수동 작성에서 자동 진화로","name":"컨텍스트 엔지니어링: 수동 작성에서 자동 진화로","url":"https://xueai.app/slides/11-3.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Harness 최적화","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"ACE에서 MCE, Meta-Harness까지: 컨텍스트 관리의 최적화 목표는 수동 Prompt 작성에서 자동 진화하는 코드 시스템으로 발전하고 있습니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/11-3.html">
+<link rel="canonical" href="https://xueai.app/slides/11-3.ko.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/11-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/11-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/11-3.html">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">PART 5 · Harness와 자기 개선</div>
+    <h1>컨텍스트 엔지니어링: 수동 Prompt에서 <em>자동 진화</em>로</h1>
+    <p class="subtitle">Agent 작업이 길어질수록 컨텍스트 관리는 선택 사항이 아닙니다. 이제 Harness 최적화의 핵심 전장이 되고 있습니다.</p>
+  </header>
+
+  <!-- ===== 최적화 대상의 진화 ===== -->
+  <div class="sec-label">최적화 대상의 진화</div>
+
+  <div class="evolution-bar reveal">
+    <div class="evo-step">
+      <div class="evo-num">Level 1</div>
+      <div class="evo-label">명령 Prompt</div>
+    </div>
+    <div class="evo-step">
+      <div class="evo-num">Level 2</div>
+      <div class="evo-label">구조화된 컨텍스트</div>
+    </div>
+    <div class="evo-step">
+      <div class="evo-num">Level 3</div>
+      <div class="evo-label">워크플로</div>
+    </div>
+    <div class="evo-step active">
+      <div class="evo-num">Level 4</div>
+      <div class="evo-label">Harness 코드</div>
+    </div>
+    <div class="evo-step">
+      <div class="evo-num">Level 5</div>
+      <div class="evo-label">옵티마이저 코드</div>
+    </div>
+  </div>
+
+  <div class="highlight-box blue reveal">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    <span>모델이 더 스마트하고 강력해질수록, 최적화할 수 있는 대상은 더 복잡해지고 방법은 더 범용화됩니다. 이 진화 경로는 Prompt 튜닝에서 시작해 옵티마이저를 작성하는 코드 최적화까지 이어집니다.</span>
+  </div>
+
+  <!-- ===== 문제 ===== -->
+  <div class="sec-label">문제: 컨텍스트 팽창</div>
+
+  <div class="concept-card reveal">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(220,38,38,.08);color:var(--danger)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="cc-title">단순 추가 = 통제 불능</div>
+    </div>
+    <div class="cc-body">
+      모든 도구 응답과 모델 생성 결과를 컨텍스트에 <b>단순히 추가</b>하면, Agent 작업 시간이 길어짐에 따라 빠르게 통제 불능 상태가 됩니다.<br><br>
+      장문 컨텍스트 연구는 계속 발전할 것이지만, 현재 <b>장문 컨텍스트 지능</b>과 <b>컨텍스트 엔지니어링</b>은 종종 얽혀 있습니다. LLM의 제한된 주의력 하에서 더 구조화되고 간결한 컨텍스트를 구축하는 것이 컨텍스트 관리의 핵심 역할입니다.
+    </div>
+  </div>
+
+  <!-- ===== ACE ===== -->
+  <div class="sec-label">ACE: Agentic Context Engineering</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">쉽게 말하면:</span> 컨텍스트는 AI의 <b>작업 기억</b>입니다 — 눈앞에 보이는 모든 자료입니다. ACE의 아이디어는 기억이 뒤죽박죽이 되지 않도록 <b>체계적인 작업 매뉴얼</b>을 유지하는 것입니다. 실행자(Generator)는 매뉴얼을 따라 작업하고, 검토자(Reflector)는 교훈을 요약하며, 편집자(Curator)는 그 교훈을 하나씩 매뉴얼에 정리합니다. 매뉴얼은 사용할수록 더 정교해지고 두꺼워지지 않습니다.</span>
+  </div>
+
+  <div class="concept-card reveal">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(0,102,255,.08);color:var(--accent)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </div>
+      <div class="cc-title">컨텍스트는 계속 진화하는 스크립트 — Prompt가 무한히 증가해서는 안 됩니다</div>
+    </div>
+    <div class="cc-body">
+      ACE(Zhang et al. 2025)는 <b>구조화된 bullet point 스크립트</b>를 유지합니다. 각 항목에는 identifier와 description이 포함됩니다. 세 가지 컴포넌트가 협력하여 이 스크립트를 관리합니다:
+    </div>
+  </div>
+
+  <div class="three-col reveal">
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(59,130,246,.1);color:#2563eb">컴포넌트 1</div>
+      <div class="col-title">Generator</div>
+      <div class="col-desc">작업을 실행하고 궤적을 생성합니다. 스크립트의 bullet point를 지침으로 활용합니다.</div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(245,158,11,.1);color:#d97706">컴포넌트 2</div>
+      <div class="col-title">Reflector</div>
+      <div class="col-desc">성공 및 실패 궤적에서 인사이트를 추출하고 교훈을 도출합니다.</div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(16,185,129,.1);color:#059669">컴포넌트 3</div>
+      <div class="col-title">Curator</div>
+      <div class="col-desc">증분 방식의 항목화된 entries로 구조화된 컨텍스트를 업데이트하고, 주기적으로 정제·중복 제거합니다.</div>
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/ace.png" alt="ACE Framework" loading="lazy">
+    <div class="fig-cap">ACE 프레임워크: Generator가 궤적 생성 → Reflector가 인사이트 추출 → Curator가 컨텍스트 스크립트 증분 업데이트. (출처: Zhang et al. 2025)</div>
+  </div>
+
+  <div class="highlight-box purple reveal">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+    <span><b>핵심 설계:</b> Curator는 구조화된 (identifier, description) 항목을 출력하고 <b>결정론적 로직</b>으로 스크립트에 병합합니다. 전체 prompt blob을 절대 재작성하지 않습니다. 이로써 반복 재작성 시 발생하는 컨텍스트 붕괴와 간결성 편향을 방지합니다.</span>
+  </div>
+
+  <!-- ===== MCE ===== -->
+  <div class="sec-label">MCE: Meta Context Engineering</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">쉽게 말하면:</span> ACE가 매뉴얼을 잘 정리하는 것이라면, MCE는 더 깊은 질문을 던집니다: <b>매뉴얼을 정리하는 방법 자체도 최적화할 수 있을까요?</b> 예를 들어, 시간순으로 정리할까요, 주제별로 정리할까요? 개요를 기록할까요, 세부 내용을 기록할까요? MCE는 무엇을 기록할 것(내용)과 어떻게 기록할 것(방법)을 분리하여, 두 가지 모두 진화시킵니다. 노트가 더 좋아질 뿐만 아니라, <b>노트 작성 방법도 점점 더 스마트해집니다</b>.</span>
+  </div>
+
+  <div class="concept-card reveal paywall-locked xa-peek">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(124,58,237,.08);color:var(--purple)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="cc-title">메커니즘과 콘텐츠 분리 — 이중 레벨 최적화</div>
+    </div>
+    <div class="cc-body">
+      MCE(Ye et al. 2026)는 ACE에서 한 단계 더 나아갑니다: <b>컨텍스트를 어떻게 관리할 것인가</b>(메커니즘/Skill)와 <b>컨텍스트에 무엇이 있는가</b>(내용)를 분리하여 두 레벨을 동시에 최적화합니다.<br><br>
+      MCE Skill은 컨텍스트 함수 <code>c = F(x; ρ)</code>를 정의합니다:<br>
+      • <b>ρ</b> = 정적 컴포넌트 (Prompt, 지식 베이스, 코드베이스)<br>
+      • <b>F</b> = 동적 연산자 (검색, 선택, 필터링, 포맷팅)
+    </div>
+  </div>
+
+  <div class="plain-talk reveal paywall-locked">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">수식의 의미:</span> 두 문장입니다. 내부 루프: 현재의 노트 작성 방법으로 노트를 최대한 잘 작성합니다. 외부 루프: 다양한 노트 작성 방법을 비교하여 최선을 선택합니다. <b>먼저 내용을 최적화하고, 그 다음 방법을 최적화합니다 — 번갈아가며 수행합니다</b>.</span>
+  </div>
+
+  <div class="formula-box reveal paywall-locked">
+<span class="fk">이중 레벨 최적화:</span>
+<span class="fs">내부</span>: c* = argmax J_train(c; s)     <span class="fp">← skill s가 주어졌을 때 최적 컨텍스트 탐색</span>
+<span class="fs">외부</span>: s* = argmax J_val(c*)         <span class="fp">← 최적 skill 탐색 (검증 세트에서)</span>
+
+<span class="fk">Skill 데이터베이스:</span> H = {(s_i, c_i, J_train_i, J_val_i)} 이력 추적
+
+<span class="fk">Skill 진화:</span> s_new = crossover(task, H)   <span class="fp">← Meta-agent가 agentic crossover 수행</span>
+<span class="fk">컨텍스트 최적화:</span> c_new = engineer(task, s_new; c_prev, Rollouts)
+  </div>
+
+  <div class="fig-wrap reveal paywall-locked">
+    <img src="images/harness/mce.png" alt="MCE Framework" loading="lazy">
+    <div class="fig-cap">MCE 프레임워크: meta-level Skill 진화가 컨텍스트 관리 메커니즘을 탐색하고, base-level이 작업 컨텍스트를 최적화합니다. (출처: Ye et al. 2026)</div>
+  </div>
+
+  <div class="concept-card reveal paywall-locked">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(8,145,178,.08);color:var(--cyan)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div class="cc-title">구현: 컨텍스트 함수 = 파일 시스템의 디렉토리</div>
+    </div>
+    <div class="cc-body">
+      MCE에서 context function은 전용 디렉토리의 파일 집합으로 인스턴스화됩니다:<br><br>
+      • <b>정적 파일</b>: <code>skill.md</code> (작업의 가장 중요한 지식 저장)<br>
+      • <b>동적 파일</b>: 컨텍스트 데이터와 rollout 기록<br><br>
+      meta-level과 base-level 최적화 모두 표준 코딩 환경에서 실행됩니다. 사용 도구 세트: <code>Read, Write, Edit, Bash, Glob, Grep, TodoWrite</code>
+    </div>
+  </div>
+
+  <!-- ===== Meta-Harness ===== -->
+  <div class="sec-label paywall-locked">Meta-Harness: Harness를 최적화하는 Harness</div>
+
+  <div class="plain-talk reveal paywall-locked">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">쉽게 말하면:</span> 이것이 중첩 구조의 가장 바깥 레이어입니다. ACE는 노트 내용을 최적화하고, MCE는 노트 작성 방법을 최적화하며, Meta-Harness는 <b>전체 작업대의 소스 코드</b>를 직접 최적화합니다. AI가 공장 전체를 재설계하는 것과 같습니다 — 도구나 방법을 교체하는 것을 훨씬 넘어섭니다. 가장 강력하지만 컴퓨팅 비용도 가장 높습니다 (버전을 변경할 때마다 완전한 시험 실행과 채점이 필요합니다).</span>
+  </div>
+
+  <div class="concept-card reveal paywall-locked">
+    <div class="cc-head">
+      <div class="cc-icon" style="background:rgba(217,119,6,.08);color:var(--amber)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <div class="cc-title">최적화 대상: 정보 저장, 검색, 제시를 결정하는 코드</div>
+    </div>
+    <div class="cc-body">
+      Meta-Harness(Lee et al. 2026)는 한 레이어 더 깊이 들어갑니다: 최적화되는 것은 더 이상 컨텍스트 내용이 아닙니다. 최적화되는 것은 <b>어떤 정보를 저장하고, 검색하고, 모델에 제시할지를 결정하는 코드 자체</b>입니다. 이것이 Harness를 최적화하는 Harness입니다.<br><br>
+      • <b>Proposer</b> 자체가 코딩 Agent입니다<br>
+      • 출력은 Pareto 프론티어 위의 <b>Harness 후보 집합</b>입니다<br>
+      • 실행 이력은 파일 시스템을 통해 접근합니다: coding agent가 <code>grep</code>/<code>cat</code>으로 필요 시 읽어, prompt에 전부 밀어 넣는 것을 방지합니다<br>
+      • 제안된 각 harness는 파일 시스템의 딕셔너리입니다: 소스 코드, 점수, 궤적, 상태 업데이트를 포함합니다
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal paywall-locked">
+    <img src="images/harness/meta-harness-outer-loop.png" alt="Meta-Harness Outer Loop" loading="lazy">
+    <div class="fig-cap">Meta-Harness 외부 루프 최적화 알고리즘: 새로운 harness를 반복적으로 생성하고 적격한 것만 유지합니다. (출처: Lee et al. 2026)</div>
+  </div>
+
+  <div class="fig-wrap reveal paywall-locked">
+    <img src="images/harness/meta-harness.png" alt="Meta-Harness Performance" loading="lazy">
+    <div class="fig-cap">Meta-Harness의 텍스트 분류 및 TerminalBench-2에서의 성능. 참고: TerminalBench-2 실험은 이미 강력한 harness에서 초기화되었습니다. (출처: Lee et al. 2026)</div>
+  </div>
+
+  <!-- ===== 비교 요약 ===== -->
+  <div class="sec-label paywall-locked">세 가지 방법 비교</div>
+
+  <div class="three-col reveal paywall-locked">
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(59,130,246,.1);color:#2563eb">ACE</div>
+      <div class="col-title">궤적에서 학습</div>
+      <div class="col-desc">결정론적인 Generator→Reflector→Curator 파이프라인으로 구조화된 bullet point를 유지합니다. <b>업데이트 규칙은 여전히 수동 설계됩니다.</b></div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(124,58,237,.1);color:#7c3aed">MCE</div>
+      <div class="col-title">관리 메커니즘 진화</div>
+      <div class="col-desc">컨텍스트 형식을 고정하지 않고, free-form skill로 지식을 저장하며, 이중 레벨 반복으로 skill과 context를 함께 진화시킵니다. <b>메커니즘 자체가 변합니다.</b></div>
+    </div>
+    <div class="col-card">
+      <div class="col-badge" style="background:rgba(217,119,6,.1);color:#d97706">Meta-Harness</div>
+      <div class="col-title">전체 시스템 코드 최적화</div>
+      <div class="col-desc">Proposer가 코딩 Agent이며, 최적화 대상은 harness 소스 코드 자체이고, Pareto 프론티어 후보 집합을 출력합니다. <b>가장 범용적이지만 가장 컴퓨팅 집약적입니다.</b></div>
+    </div>
+  </div>
+
+  <!-- ===== 인터랙티브: 컨텍스트 전략 비교 ===== -->
+  <div class="sec-label paywall-locked">실시간 비교: 세 가지 전략의 라운드별 변화 관찰</div>
+
+  <div class="sim-controls paywall-locked" style="margin-bottom: 16px;">
+    <button id="btn-play-ctx" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      10라운드 비교 실행
+    </button>
+    <button id="btn-reset-ctx" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      초기화
+    </button>
+    <span id="ctx-status" class="sim-status">준비됨</span>
+  </div>
+
+  <div class="ctx-compare interactive paywall-locked" id="ctx-container">
+    <div class="compare-row">
+      <div class="compare-card bad-card" id="card-naive">
+        <div class="cmp-badge bad-badge">단순 추가</div>
+        <div class="cmp-bar-label">컨텍스트 사용량 <span class="cmp-round-tag" data-round-tag>(0라운드)</span></div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-ctx-fill style="width:0%;background:linear-gradient(90deg,#f59e0b,#ef4444)"></div></div>
+        <div class="cmp-bar-val bad-val" data-ctx-val>—</div>
+        <div class="cmp-bar-label" style="margin-top:12px">작업 성공률</div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-suc-fill style="width:0%;background:#ef4444"></div></div>
+        <div class="cmp-bar-val bad-val" data-suc-val>—</div>
+        <div class="cmp-verdict" data-verdict>매 라운드 모든 이력을 컨텍스트에 밀어 넣습니다…</div>
+      </div>
+      <div class="compare-card good-card" id="card-ace">
+        <div class="cmp-badge ace-badge">ACE 구조화</div>
+        <div class="cmp-bar-label">컨텍스트 사용량 <span class="cmp-round-tag" data-round-tag>(0라운드)</span></div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-ctx-fill style="width:0%;background:linear-gradient(90deg,#3b82f6,#60a5fa)"></div></div>
+        <div class="cmp-bar-val ace-val" data-ctx-val>—</div>
+        <div class="cmp-bar-label" style="margin-top:12px">작업 성공률</div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-suc-fill style="width:0%;background:#3b82f6"></div></div>
+        <div class="cmp-bar-val ace-val" data-suc-val>—</div>
+        <div class="cmp-verdict" data-verdict>Curator가 구조화된 항목만 증분 추가합니다…</div>
+      </div>
+      <div class="compare-card best-card" id="card-mce">
+        <div class="cmp-badge mce-badge">MCE 메타 진화</div>
+        <div class="cmp-bar-label">컨텍스트 사용량 <span class="cmp-round-tag" data-round-tag>(0라운드)</span></div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-ctx-fill style="width:0%;background:linear-gradient(90deg,#8b5cf6,#a78bfa)"></div></div>
+        <div class="cmp-bar-val mce-val" data-ctx-val>—</div>
+        <div class="cmp-bar-label" style="margin-top:12px">작업 성공률</div>
+        <div class="cmp-bar-track"><div class="cmp-bar-fill" data-suc-fill style="width:0%;background:#8b5cf6"></div></div>
+        <div class="cmp-bar-val mce-val" data-suc-val>—</div>
+        <div class="cmp-verdict" data-verdict>Skill과 내용이 동시에 두 레이어에서 진화합니다…</div>
+      </div>
+    </div>
+    <div class="compare-insight" id="ctx-insight">
+      위의 <b>10라운드 비교 실행</b>을 클릭하여 세 가지 전략이 라운드별로 실시간으로 어떻게 변화하는지 관찰하세요: 누가 팽창하고, 누가 안정적이며, 누가 계속 성장합니까.
+    </div>
+  </div>
+
+  <!-- ===== Takeaway ===== -->
+  <div class="takeaway reveal paywall-locked">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+    <span><b>핵심 교훈:</b> harness 설계가 실행 가능한 탐색 공간이 되면, 강력한 코딩 Agent는 인간 엔지니어가 사용하는 것과 동일한 설계 공간을 활용할 수 있습니다. 컨텍스트 엔지니어링의 미래는 시스템이 언제 무엇을 저장하고, 어떻게 검색하며, 어떻게 제시할지 자동으로 학습하도록 만드는 것입니다. 아무리 뛰어난 수동 Prompt도 과도기적 단계일 뿐입니다.</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){
+  var ob = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); ob.unobserve(e.target); }});
+  }, {threshold:0.15});
+  ob.observe(el);
+});
+// ═══════ 컨텍스트 비교 인터랙티브 데모: 라운드별 업데이트 ═══════
+(function(){
+  var btnPlay = document.getElementById('btn-play-ctx');
+  var btnReset = document.getElementById('btn-reset-ctx');
+  var statusTxt = document.getElementById('ctx-status');
+  var insight = document.getElementById('ctx-insight');
+  
+  var isPlaying = false;
+  var timer = null;
+
+  // 각 라운드의 세 가지 전략 데이터: [컨텍스트 사용량%, 성공률%, 비고]
+  var DATA = {
+    naive: [
+      [10, 90, '처음 몇 라운드는 정상 — 문제가 보이지 않습니다'],
+      [22, 88, '이력이 계속 쌓입니다'],
+      [35, 85, '컨텍스트가 계속 팽창합니다'],
+      [48, 80, '망각이 시작됩니다'],
+      [62, 68, '초기 정보가 윈도우 밖으로 밀려납니다'],
+      [78, 45, '오버플로 직전 — 품질이 급락합니다'],
+      [92, 25, '⚠ 윈도우 거의 가득 참 — 대량 손실'],
+      [100, 12, '✗ 오버플로! 환각이 시작됩니다'],
+      [100, 8, '✗ 완전히 작동 불능'],
+      [100, 5, '✗ 간단한 질문도 틀립니다']
+    ],
+    ace: [
+      [18, 62, '1라운드: 스크립트 프레임워크 수립'],
+      [24, 68, 'Reflector가 첫 번째 인사이트를 추출합니다'],
+      [30, 72, '스크립트 항목이 점차 풍부해집니다'],
+      [35, 75, 'Curator가 증분 병합 및 중복 제거'],
+      [38, 77, '컨텍스트가 안정화되고 있습니다'],
+      [40, 78, '증가세가 눈에 띄게 둔화됩니다'],
+      [41, 79, '스크립트가 수렴합니다'],
+      [42, 80, '약 42% 수준에서 안정적입니다'],
+      [42, 80, '수동 설계 규칙의 천장이 보입니다'],
+      [42, 80, '✓ 일정하지만 더 이상 개선되지 않습니다']
+    ],
+    mce: [
+      [20, 58, '초기 skill은 아직 서툽니다'],
+      [26, 66, '첫 번째 skill 진화'],
+      [29, 72, '메모리 메커니즘이 자기 조정합니다'],
+      [31, 78, '검색 전략이 더 스마트해집니다'],
+      [32, 83, 'Skill과 내용이 이중 레이어에서 진화합니다'],
+      [31, 86, '컨텍스트가 오히려 더 간결해집니다'],
+      [30, 89, '메커니즘이 계속 개선됩니다'],
+      [30, 92, '라운드마다 더 스마트해집니다'],
+      [30, 94, '여전히 상승 중'],
+      [30, 95, '★ 95%이며 여전히 오르는 중']
+    ]
+  };
+
+  var cards = {
+    naive: document.getElementById('card-naive'),
+    ace: document.getElementById('card-ace'),
+    mce: document.getElementById('card-mce')
+  };
+
+  function updateCard(key, round) {
+    var card = cards[key];
+    var d = DATA[key][round - 1];
+    card.querySelector('[data-round-tag]').textContent = '(' + round + '라운드)';
+    card.querySelector('[data-ctx-fill]').style.width = d[0] + '%';
+    card.querySelector('[data-ctx-val]').textContent = d[0] + '%';
+    card.querySelector('[data-suc-fill]').style.width = d[1] + '%';
+    card.querySelector('[data-suc-val]').textContent = d[1] + '%';
+    card.querySelector('[data-verdict]').textContent = d[2];
+  }
+
+  function resetSim() {
+    clearTimeout(timer);
+    isPlaying = false;
+    btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> 10라운드 비교 실행';
+    btnPlay.classList.remove('playing');
+    statusTxt.textContent = '준비됨';
+    
+    Object.keys(cards).forEach(function(key){
+      var card = cards[key];
+      card.classList.remove('overflow-flash', 'running');
+      card.querySelector('[data-round-tag]').textContent = '(0라운드)';
+      card.querySelector('[data-ctx-fill]').style.width = '0%';
+      card.querySelector('[data-ctx-val]').textContent = '—';
+      card.querySelector('[data-suc-fill]').style.width = '0%';
+      card.querySelector('[data-suc-val]').textContent = '—';
+    });
+    cards.naive.querySelector('[data-verdict]').textContent = '매 라운드 모든 이력을 컨텍스트에 밀어 넣습니다…';
+    cards.ace.querySelector('[data-verdict]').textContent = 'Curator가 구조화된 항목만 증분 추가합니다…';
+    cards.mce.querySelector('[data-verdict]').textContent = 'Skill과 내용이 동시에 두 레이어에서 진화합니다…';
+    insight.innerHTML = '위의 <b>10라운드 비교 실행</b>을 클릭하여 세 가지 전략이 라운드별로 실시간으로 어떻게 변화하는지 관찰하세요: 누가 팽창하고, 누가 안정적이며, 누가 계속 성장합니까.';
+  }
+
+  function playSim() {
+    if(isPlaying) return;
+    resetSim();
+    isPlaying = true;
+    btnPlay.innerHTML = '실행 중...';
+    btnPlay.classList.add('playing');
+    Object.values(cards).forEach(function(c){ c.classList.add('running'); });
+    
+    var round = 1;
+    function step() {
+      if(round > 10) {
+        statusTxt.textContent = '시뮬레이션 완료: 10라운드 결과';
+        btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> 다시 실행';
+        btnPlay.classList.remove('playing');
+        isPlaying = false;
+        Object.values(cards).forEach(function(c){ c.classList.remove('running'); });
+        cards.naive.querySelector('[data-ctx-val]').textContent = '100% 오버플로';
+        cards.ace.querySelector('[data-ctx-val]').textContent = '42% 안정';
+        cards.mce.querySelector('[data-ctx-val]').textContent = '30% 최적';
+        insight.innerHTML = '핵심 차이: 단순 추가는 <b>선형 증가</b>(필연적으로 오버플로), ACE는 <b>일정하지만 정적</b>(수동 규칙 천장), MCE는 <b>일정하면서 적응적</b>(메커니즘이 지속적으로 자동 개선됩니다).';
+        return;
+      }
+      statusTxt.textContent = round + ' / 10라운드';
+      updateCard('naive', round);
+      updateCard('ace', round);
+      updateCard('mce', round);
+      
+      if(round === 8) cards.naive.classList.add('overflow-flash');
+      
+      round++;
+      timer = setTimeout(step, 900);
+    }
+    
+    timer = setTimeout(step, 300);
+  }
+
+  btnPlay.addEventListener('click', playSim);
+  btnReset.addEventListener('click', resetSim);
+  
+  resetSim();
+})();
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

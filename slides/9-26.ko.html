@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>정기 실행 태스크의 비용 함정 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.cost-compare{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+@media(max-width:768px){.cost-compare{grid-template-columns:1fr}}
+.cost-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.cost-panel .cp-head{padding:14px 18px;font-size:15px;font-weight:800;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.cost-panel.reuse .cp-head{background:rgba(220,38,38,.05);color:var(--danger)}
+.cost-panel.fresh .cp-head{background:rgba(22,163,74,.05);color:var(--success)}
+.cost-panel .cp-body{padding:18px}
+
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:160px;padding:10px 0;border-bottom:1px solid var(--border)}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.bar-col .bar{width:100%;border-radius:4px 4px 0 0;transition:height .6s ease;min-height:4px}
+.cost-panel.reuse .bar{background:linear-gradient(to top,var(--danger),#f87171)}
+.cost-panel.fresh .bar{background:linear-gradient(to top,var(--success),#4ade80)}
+.bar-col .bar-label{font-size:10px;color:var(--sub);margin-top:4px;text-align:center}
+.chart-legend{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--sub)}
+
+.cost-stat{display:flex;gap:10px;margin-top:14px}
+.cost-stat-item{flex:1;text-align:center;padding:10px;border-radius:8px;background:var(--bg)}
+.cost-stat-item .csv{font-size:20px;font-weight:900}
+.cost-stat-item .csl{font-size:11px;color:var(--sub);font-weight:600;margin-top:2px}
+.cost-panel.reuse .csv{color:var(--danger)}
+.cost-panel.fresh .csv{color:var(--success)}
+
+.slider-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;box-shadow:var(--shadow-card)}
+.slider-panel h4{font-size:15px;font-weight:800;color:var(--text);margin:0 0 14px;display:flex;align-items:center;gap:8px}
+.sp-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sp-row label{font-size:14px;font-weight:600;color:var(--sub);min-width:80px}
+.sp-row input[type=range]{flex:1;min-width:180px;accent-color:var(--accent)}
+.sp-row .sp-val{font-size:18px;font-weight:900;color:var(--accent);min-width:50px}
+.sp-results{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
+.sp-result{flex:1;min-width:140px;padding:14px;border-radius:var(--radius-sm);text-align:center;border:1.5px solid var(--border)}
+.sp-result .sr-v{font-size:22px;font-weight:900}
+.sp-result .sr-l{font-size:12px;color:var(--sub);font-weight:600;margin-top:4px}
+.sp-result.bad .sr-v{color:var(--danger)}
+.sp-result.good .sr-v{color:var(--success)}
+.sp-result.diff .sr-v{color:var(--amber)}
+
+.why-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-top:16px;box-shadow:var(--shadow-card)}
+.why-box h4{font-size:15px;font-weight:800;color:var(--text);margin:0 0 12px}
+.why-steps{display:flex;flex-direction:column;gap:8px}
+.why-step{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;background:var(--bg);font-size:13px;color:var(--sub);line-height:1.6}
+.why-step .ws-num{width:24px;height:24px;border-radius:50%;background:var(--danger);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.why-step b{color:var(--text)}
+
+.takeaway{background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:20px}
+.takeaway b{color:var(--success)}
+</style>
+<meta name="description" content="Agent가 정기 태스크를 실행할 때 이전 세션을 재사용하면 컨텍스트가 점점 길어져 비용이 눈덩이처럼 불어납니다. 올바른 방법: 매번 새 세션을 생성합니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-26.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/9-26.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/9-26.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/9-26.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/9-26.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="定时任务的成本陷阱">
+<meta property="og:url" content="https://xueai.app/slides/9-26.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"정기 실행 태스크의 비용 함정","name":"정기 실행 태스크의 비용 함정","url":"https://xueai.app/slides/9-26.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~고급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 멀티 Agent","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Agent가 정기 태스크를 실행할 때 이전 세션을 재사용하면 컨텍스트가 점점 길어져 비용이 눈덩이처럼 불어납니다. 올바른 방법: 매번 새 세션을 생성합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">멀티 Agent</div>
+    <h1>정기 실행 태스크의 비용 함정</h1>
+    <p class="subtitle">Agent가 매 시간 뉴스를 정리하게 하는 것은 간단해 보입니다. 하지만 이전 세션을 재사용하면 컨텍스트가 계속 늘어나 24시간 후 비용이 폭발합니다. 한 가지 선택으로 월 청구서가 10배 차이날 수 있습니다.</p>
+  </header>
+
+  <div class="sec-label">세션 재사용 vs. 새 세션 생성</div>
+
+  <div class="cost-compare">
+    <div class="cost-panel reuse reveal">
+      <div class="cp-head"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger,#dc2626)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:3px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> 이전 세션 재사용</div>
+      <div class="cp-body">
+        <div class="bar-chart" id="reuseChart"></div>
+        <div class="chart-legend"><span>1회</span><span>12회</span><span>24회</span></div>
+        <div class="cost-stat">
+          <div class="cost-stat-item"><div class="csv" id="reuseTotalCost">$7.20</div><div class="csl">24시간 총 비용</div></div>
+          <div class="cost-stat-item"><div class="csv" id="reuseLastCost">$0.60</div><div class="csl">마지막 실행 비용</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="cost-panel fresh reveal">
+      <div class="cp-head"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success,#16a34a)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:3px"><path d="M20 6L9 17l-5-5"/></svg> 매번 새 세션 생성</div>
+      <div class="cp-body">
+        <div class="bar-chart" id="freshChart"></div>
+        <div class="chart-legend"><span>1회</span><span>12회</span><span>24회</span></div>
+        <div class="cost-stat">
+          <div class="cost-stat-item"><div class="csv" id="freshTotalCost">$0.72</div><div class="csl">24시간 총 비용</div></div>
+          <div class="cost-stat-item"><div class="csv" id="freshLastCost">$0.03</div><div class="csl">실행당 비용</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">「실행 일수」를 드래그하여 차이를 확인하세요</div>
+
+  <div class="slider-panel reveal paywall-locked xa-peek">
+    <h4><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> 成本计算器</h4>
+    <div class="sp-row">
+      <label>실행 일수:</label>
+      <input type="range" id="daySlider" min="1" max="30" value="7" oninput="updateCostCalc()">
+      <span class="sp-val" id="dayCount">7</span>
+    </div>
+    <div class="sp-row" style="margin-top:10px">
+      <label>하루 실행 횟수:</label>
+      <input type="range" id="freqSlider" min="1" max="48" value="24" oninput="updateCostCalc()">
+      <span class="sp-val" id="freqCount">24</span><span style="font-size:13px;color:var(--sub)">회</span>
+    </div>
+    <div class="sp-results">
+      <div class="sp-result bad"><div class="sr-v" id="calcReuse">$50.4</div><div class="sr-l">세션 재사용 총 비용</div></div>
+      <div class="sp-result good"><div class="sr-v" id="calcFresh">$5.0</div><div class="sr-l">새 세션 총 비용</div></div>
+      <div class="sp-result diff"><div class="sr-v" id="calcMultiple">10x</div><div class="sr-l">비용 배수 차이</div></div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">세션 재사용 비용이 눈덩이처럼 불어나는 이유</div>
+
+  <div class="why-box reveal paywall-locked">
+    <h4>컨텍스트 누적 과정</h4>
+    <div class="why-steps">
+      <div class="why-step">
+        <div class="ws-num">1</div>
+        <span>1회 실행: 컨텍스트 = System Prompt + 현재 대화 ≈ <b>2,000 토큰</b></span>
+      </div>
+      <div class="why-step">
+        <div class="ws-num">2</div>
+        <span>2회 실행: 컨텍스트 = 1회 전체 + 현재 대화 ≈ <b>4,000 토큰</b></span>
+      </div>
+      <div class="why-step">
+        <div class="ws-num">3</div>
+        <span>10회 실행: 컨텍스트 = 1~9회 전체 + 현재 ≈ <b>20,000 토큰</b></span>
+      </div>
+      <div class="why-step">
+        <div class="ws-num">4</div>
+        <span>24회 실행: 컨텍스트 = 1~23회 전체 + 현재 ≈ <b>48,000 토큰</b>. 모든 요청마다 이 이전 토큰 비용을 지불합니다!</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:16px">
+    <b>새 세션 = 매번 처음부터 시작.</b> 24회 실행 비용은 1회와 완전히 동일합니다. 이전 컨텍스트를 전혀 가져가지 않기 때문입니다. 정기 태스크는 기억이 필요 없습니다: 현재 뉴스를 정리하면 충분하고 어제 무엇을 정리했는지 알 필요가 없습니다.
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>정기 태스크는 매번 새 세션을 생성하고 이전 것을 재사용하지 마세요. 이 선택으로 월 청구서가 10배 차이날 수 있습니다.</b> 대부분의 정기 태스크는 컨텍스트 기억이 필요 없으며, 새 세션은 더 저렴하고 안정적입니다.</span>
+  </div>
+
+</article>
+<script>
+(function(){
+  function renderCharts() {
+    var reuseEl = document.getElementById('reuseChart');
+    var freshEl = document.getElementById('freshChart');
+    var reuseHtml = '', freshHtml = '';
+    var reuseCosts = [], freshCosts = [];
+    for (var i = 1; i <= 24; i++) {
+      var rCost = 0.03 * i;
+      var fCost = 0.03;
+      reuseCosts.push(rCost);
+      freshCosts.push(fCost);
+    }
+    var maxCost = reuseCosts[23];
+    for (var i = 0; i < 24; i++) {
+      var rH = (reuseCosts[i] / maxCost * 100);
+      var fH = (freshCosts[i] / maxCost * 100);
+      reuseHtml += '<div class="bar-col"><div class="bar" style="height:' + rH + '%"></div></div>';
+      freshHtml += '<div class="bar-col"><div class="bar" style="height:' + Math.max(fH, 4) + '%"></div></div>';
+    }
+    reuseEl.innerHTML = reuseHtml;
+    freshEl.innerHTML = freshHtml;
+
+    var rTotal = reuseCosts.reduce(function(a,b){return a+b}, 0);
+    document.getElementById('reuseTotalCost').textContent = '$' + rTotal.toFixed(2);
+    document.getElementById('reuseLastCost').textContent = '$' + reuseCosts[23].toFixed(2);
+    document.getElementById('freshTotalCost').textContent = '$' + (0.03 * 24).toFixed(2);
+    document.getElementById('freshLastCost').textContent = '$0.03';
+  }
+  renderCharts();
+})();
+
+function updateCostCalc() {
+  var days = parseInt(document.getElementById('daySlider').value);
+  var freq = parseInt(document.getElementById('freqSlider').value);
+  document.getElementById('dayCount').textContent = days;
+  document.getElementById('freqCount').textContent = freq;
+
+  var baseCost = 0.03;
+  var freshTotal = days * freq * baseCost;
+
+  var reuseTotal = 0;
+  for (var d = 0; d < days; d++) {
+    for (var f = 1; f <= freq; f++) {
+      var run = d * freq + f;
+      reuseTotal += baseCost * run;
+    }
+  }
+
+  var multiple = freshTotal > 0 ? Math.round(reuseTotal / freshTotal) : 1;
+
+  document.getElementById('calcReuse').textContent = '$' + reuseTotal.toFixed(1);
+  document.getElementById('calcFresh').textContent = '$' + freshTotal.toFixed(1);
+  document.getElementById('calcMultiple').textContent = multiple + 'x';
+}
+updateCostCalc();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

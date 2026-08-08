@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>스트리밍 출력과 포맷 조합: AI 제품의 즉각 응답 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* 페이지 로컬 별칭 — 디자인 시스템 변수에 매핑 (JS에서 이름 참조) */
+:root {
+  --surface2: #f0ede6;
+  --muted: var(--sub);
+  --green: var(--success);
+  --red: var(--danger);
+  --orange: #ea580c;
+}
+
+/* ── 시나리오 선택기 ── */
+.mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mode-btn {
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--card);
+  cursor: pointer; font-family: inherit; text-align: left;
+  transition: all 0.2s; display: flex; align-items: center; gap: 10px;
+  min-height: 44px; box-shadow: var(--shadow-card);
+}
+.mode-btn .badge {
+  font-size: 11px; font-weight: 800; font-family: "SF Mono", Menlo, monospace;
+  padding: 3px 8px; border-radius: 4px; flex-shrink: 0;
+}
+.mode-btn .txt h4 { font-size: 14px; font-weight: 700; color: var(--text); }
+.mode-btn .txt p { font-size: 12px; color: var(--sub); margin-top: 1px; line-height: 1.5; }
+.mode-btn.active { border-color: var(--purple); }
+.mode-btn.active .txt h4 { color: var(--purple); }
+
+/* ── 제어 버튼 ── */
+.ctrl-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.ctrl-btn {
+  padding: 11px 24px; background: var(--purple); color: white;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: opacity 0.2s; min-height: 44px;
+}
+.ctrl-btn:hover { opacity: 0.85; }
+.ctrl-btn:disabled { opacity: 0.45; cursor: default; }
+
+.insight-row {
+  font-size: 14px; color: var(--text); line-height: 1.7;
+  background: rgba(124,58,237,0.06); border: 1.5px solid rgba(124,58,237,0.18);
+  border-radius: var(--radius); padding: 14px 18px; margin-top: 16px;
+}
+.insight-row b { color: var(--purple); }
+
+/* ── 3열 비교 ── */
+.compare-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.col-panel {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column;
+  overflow: hidden; transition: border-color 0.3s;
+}
+.col-panel.streaming { border-color: var(--purple); }
+.col-panel.done-good { border-color: var(--success); }
+.col-panel.done-bad { border-color: var(--danger); }
+.col-header {
+  padding: 10px 14px; background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.col-header .fmt-badge {
+  font-size: 12px; font-weight: 800; font-family: "SF Mono", Menlo, monospace;
+  padding: 2px 8px; border-radius: 4px;
+}
+.col-header .status { font-size: 12px; font-weight: 600; }
+.col-body { min-height: 260px; max-height: 380px; overflow: auto; padding: 12px; }
+
+/* 렌더링 영역 */
+.render-area { font-size: 14px; line-height: 1.7; min-height: 60px; }
+.render-area .chunk { display: inline; }
+.render-area .visible { color: var(--text); }
+.render-area .pending { color: var(--sub); opacity: 0.4; }
+
+/* 원시 스트림 */
+.raw-stream {
+  font-size: 12px; font-family: "SF Mono", "Fira Code", Menlo, monospace;
+  color: #6c7086; background: #1e1b2e; border-radius: 6px;
+  padding: 8px; margin-top: 8px; line-height: 1.6;
+  max-height: 120px; overflow: auto; word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* 파싱 결과 카드 */
+.parsed-card {
+  background: rgba(22,163,74,0.06); border: 1px solid rgba(22,163,74,0.2);
+  border-radius: 7px; padding: 8px 10px; margin-top: 6px;
+  font-size: 13px; color: var(--text); line-height: 1.6; display: none;
+}
+.parsed-card.show { display: block; }
+.parsed-card .pc-label { font-size: 11px; font-weight: 800; color: var(--success); margin-bottom: 4px; }
+.parsed-field { display: flex; gap: 6px; margin-bottom: 2px; }
+.parsed-field .k { color: var(--cyan); font-weight: 700; flex-shrink: 0; font-size: 12px; }
+.parsed-field .v { color: var(--text); font-size: 12px; }
+
+.wait-card {
+  background: rgba(220,38,38,0.05); border: 1px solid rgba(220,38,38,0.15);
+  border-radius: 7px; padding: 8px 10px; margin-top: 6px;
+  font-size: 12px; color: var(--danger); display: none; line-height: 1.6;
+}
+.wait-card.show { display: block; }
+
+/* 하단 설명 */
+.bottom-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.insight-cell {
+  background: rgba(124,58,237,0.06); border: 1.5px solid rgba(124,58,237,0.15);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+  font-size: 13px; color: var(--text); line-height: 1.6;
+}
+.insight-cell b { color: var(--purple); }
+
+@keyframes blink-cur { 0%,100%{opacity:1} 50%{opacity:0} }
+.cursor::after { content: '▋'; animation: blink-cur 0.8s infinite; font-size: 14px; color: var(--purple); }
+
+@media (max-width: 768px) {
+  .mode-tabs { grid-template-columns: 1fr; }
+  .compare-cols { grid-template-columns: 1fr; }
+  .bottom-bar { grid-template-columns: 1fr; }
+  .col-body { min-height: 0; max-height: 300px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Streaming은 AI 제품 UX의 핵심입니다. 이 페이지에서는 SSE 프로토콜 원리, 스트리밍 출력과 Markdown 렌더링의 조합, 스트리밍 JSON 파싱의 도전과 해결책을 설명합니다.">
+<meta name="keywords" content="스트리밍출력,Streaming,SSE,LLM스트리밍,실시간출력,AI제품경험">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/6-4.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/6-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/6-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/6-4.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/6-4.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="스트리밍 출력과 포맷 조합: AI 제품의 즉각 응답">
+<meta property="og:description" content="Streaming은 AI 제품 UX의 핵심입니다. SSE 프로토콜 원리, 스트리밍 출력과 Markdown 렌더링의 조합, 스트리밍 JSON 파싱의 도전과 해결책을 설명합니다.">
+<meta property="og:url" content="https://xueai.app/slides/6-4.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="스트리밍 출력과 포맷 조합: AI 제품의 즉각 응답">
+<meta name="twitter:description" content="Streaming은 AI 제품 UX의 핵심입니다. SSE 프로토콜 원리, 스트리밍 출력과 Markdown 렌더링의 조합, 스트리밍 JSON 파싱의 도전과 해결책을 설명합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"스트리밍 출력과 포맷 조합: AI 제품의 즉각 응답","name":"스트리밍 출력과 포맷 조합","url":"https://xueai.app/slides/6-4.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Prompt 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Streaming은 AI 제품 UX의 핵심입니다. SSE 프로토콜 원리, 스트리밍 출력과 Markdown 렌더링의 조합, 스트리밍 JSON 파싱의 도전과 해결책을 설명합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt 엔지니어링</div>
+    <h1>스트리밍 출력과 포맷 조합</h1>
+    <p class="subtitle">LLM은 <b>Token 단위로 출력</b>합니다. 동일한 응답 내용이라도 포맷이 다르면 스트리밍 경험이 완전히 달라집니다. 시나리오를 선택하고 재생을 클릭하여 세 가지 포맷의 렌더링 차이를 확인하세요.</p>
+  </header>
+
+  <div class="sec-label">데모 시나리오 선택</div>
+
+  <div class="mode-tabs">
+    <button class="mode-btn active" onclick="selectMode(this,0)">
+      <span class="badge" style="background:#ede9fe;color:#6d28d9">도구 추천</span>
+      <div class="txt"><h4>구조화된 목록 출력</h4><p>도구 3개, 이름/유형/하이라이트 포함</p></div>
+    </button>
+    <button class="mode-btn" onclick="selectMode(this,1)">
+      <span class="badge" style="background:#dbeafe;color:#1e40af">분석 보고서</span>
+      <div class="txt"><h4>다중 필드 결론 출력</h4><p>결론/이유/행동/신뢰도</p></div>
+    </button>
+  </div>
+
+  <div class="ctrl-btns">
+    <button class="ctrl-btn" id="playBtn" onclick="startStream()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+      스트리밍 출력 재생 시작
+    </button>
+    <button class="ctrl-btn" id="resetBtn" onclick="resetAll()" style="background:var(--card);color:var(--text);border:1.5px solid var(--border)">초기화</button>
+  </div>
+
+  <div class="sec-label">세 가지 포맷 실시간 비교</div>
+
+  <div class="compare-cols paywall-locked xa-peek">
+    <!-- JSON 열 -->
+    <div class="col-panel" id="panelJson">
+      <div class="col-header">
+        <span class="fmt-badge" style="background:#fef3c7;color:#92400e">JSON</span>
+        <span class="status" id="statusJson" style="color:var(--muted)">대기 중</span>
+      </div>
+      <div class="col-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">원시 스트림 Token (문자 단위 누적)</div>
+        <div class="raw-stream" id="rawJson"></div>
+        <div class="wait-card" id="waitJson">
+          ⏳ 완전한 JSON이 도착할 때까지 파싱 대기…<br>
+          스트리밍 중 JSON은 불완전하므로<br>
+          중간에 파싱하여 렌더링할 수 없습니다
+        </div>
+        <div class="parsed-card" id="parsedJson">
+          <div class="pc-label">✓ JSON 파싱 완료 (전체 텍스트 도착 후)</div>
+          <div id="parsedJsonContent"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Markdown 열 -->
+    <div class="col-panel" id="panelMd">
+      <div class="col-header">
+        <span class="fmt-badge" style="background:#ede9fe;color:#6d28d9">Markdown</span>
+        <span class="status" id="statusMd" style="color:var(--muted)">대기 중</span>
+      </div>
+      <div class="col-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">렌더링 영역 (문자 단위 표시)</div>
+        <div class="render-area cursor" id="renderMd"></div>
+        <div class="wait-card" id="waitMd" style="background:rgba(234,88,12,.05);border-color:rgba(234,88,12,.2);color:var(--orange)">
+          ⚠️ 문자 단위 표시는 유연하지만,<br>
+          Markdown에서<br>
+          구조화된 필드를 안정적으로 추출할 수 없습니다
+        </div>
+      </div>
+    </div>
+
+    <!-- XML 열 -->
+    <div class="col-panel" id="panelXml">
+      <div class="col-header">
+        <span class="fmt-badge" style="background:#dbeafe;color:#1e40af">XML 커스텀 태그</span>
+        <span class="status" id="statusXml" style="color:var(--muted)">대기 중</span>
+      </div>
+      <div class="col-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">증분 파싱 렌더링 (&lt;/tag&gt; 캡처 즉시 렌더링)</div>
+        <div id="xmlCards"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">핵심 결론</div>
+
+  <div class="bottom-bar paywall-locked">
+    <div class="insight-cell">
+      <b>JSON 스트리밍</b><br>
+      백엔드 친화적이나 스트리밍에 불리합니다:<br>
+      <b>전체 텍스트 도착</b>을 기다려야 파싱 가능,<br>
+      사용자는 loading 상태만 봅니다
+    </div>
+    <div class="insight-cell">
+      <b>Markdown 스트리밍</b><br>
+      가장 부드러운 사용자 경험:<br>
+      문자 단위 표시로 타이핑 느낌이 나지만,<br>
+      <b>구조화된 필드 추출</b>이 불가능합니다
+    </div>
+    <div class="insight-cell">
+      <b>XML 스트리밍</b><br>
+      <b>최선의 조합</b>: 스트리밍 + 구조화<br>
+      <code>&lt;/name&gt;</code> 캡처 즉시 렌더링,<br>
+      Claude가 기본 권장하는 방식
+    </div>
+  </div>
+
+  <div class="insight-row paywall-locked">
+    <b>핵심 결론:</b>
+    XML은 태그 캡처 → 즉시 필드 렌더링; JSON은 전체 텍스트 대기 → 한 번에 파싱; MD는 문자 단위 표시 → 필드 추출 불가.
+  </div>
+
+</article>
+
+<script>
+// ── 두 가지 시나리오 데이터 ──
+const MODES = [
+  {
+    // 시나리오 0: 도구 추천
+    jsonTokens: `{\n  "tools": [\n    {\n      "name": "Notion AI",\n      "type": "글쓰기 보조",\n      "highlight": "원클릭 요약 및 재작성"\n    },\n    {\n      "name": "Midjourney",\n      "type": "이미지 생성",\n      "highlight": "다양한 예술 스타일"\n    },\n    {\n      "name": "Copilot",\n      "type": "코드 자동완성",\n      "highlight": "50개 이상 언어 지원"\n    }\n  ]\n}`,
+    jsonFields: [
+      {k:'name', v:'Notion AI'},{k:'type', v:'글쓰기 보조'},{k:'highlight', v:'원클릭 요약 및 재작성'},
+      {k:'name', v:'Midjourney'},{k:'type', v:'이미지 생성'},{k:'highlight', v:'다양한 예술 스타일'},
+      {k:'name', v:'Copilot'},{k:'type', v:'코드 자동완성'},{k:'highlight', v:'50개 이상 언어 지원'},
+    ],
+    mdTokens: `## AI 도구 추천\n\n### 1. Notion AI\n- **유형**: 글쓰기 보조\n- **하이라이트**: 원클릭 요약 및 재작성\n\n### 2. Midjourney\n- **유형**: 이미지 생성\n- **하이라이트**: 다양한 예술 스타일\n\n### 3. Copilot\n- **유형**: 코드 자동완성\n- **하이라이트**: 50개 이상 언어 지원`,
+    xmlTokens: `<tool_list>\n  <tool>\n    <name>Notion AI</name>\n    <type>글쓰기 보조</type>\n    <highlight>원클릭 요약 및 재작성</highlight>\n  </tool>\n  <tool>\n    <name>Midjourney</name>\n    <type>이미지 생성</type>\n    <highlight>다양한 예술 스타일</highlight>\n  </tool>\n  <tool>\n    <name>Copilot</name>\n    <type>코드 자동완성</type>\n    <highlight>50개 이상 언어 지원</highlight>\n  </tool>\n</tool_list>`,
+    // XML 캡처 이벤트: [tokenIndex, fieldLabel, fieldValue, isNewCard]
+    xmlEvents: [
+      [18, 'name', 'Notion AI', true],
+      [24, 'type', '글쓰기 보조', false],
+      [32, 'highlight', '원클릭 요약 및 재작성', false],
+      [52, 'name', 'Midjourney', true],
+      [58, 'type', '이미지 생성', false],
+      [66, 'highlight', '다양한 예술 스타일', false],
+      [86, 'name', 'Copilot', true],
+      [92, 'type', '코드 자동완성', false],
+      [100, 'highlight', '50개 이상 언어 지원', false],
+    ]
+  },
+  {
+    // 시나리오 1: 분석 보고서
+    jsonTokens: `{\n  "conclusion": "RAG 방식 채택 권장",\n  "reason": "환각률 높음, 지식베이스 준비 완료",\n  "action": "1단계: 벡터 데이터베이스 배포",\n  "confidence": "0.87"\n}`,
+    jsonFields: [
+      {k:'conclusion', v:'RAG 방식 채택 권장'},
+      {k:'reason', v:'환각률 높음, 지식베이스 준비 완료'},
+      {k:'action', v:'1단계: 벡터 데이터베이스 배포'},
+      {k:'confidence', v:'0.87'},
+    ],
+    mdTokens: `## 분석 결론\n\n**결론**: RAG 방식 채택 권장\n\n**이유**: 환각률 높음, 지식베이스 준비 완료\n\n**권장 행동**: 1단계: 벡터 데이터베이스 배포\n\n**신뢰도**: 0.87`,
+    xmlTokens: `<report>\n  <conclusion>RAG 방식 채택 권장</conclusion>\n  <reason>환각률 높음, 지식베이스 준비 완료</reason>\n  <action>1단계: 벡터 데이터베이스 배포</action>\n  <confidence>0.87</confidence>\n</report>`,
+    xmlEvents: [
+      [14, 'conclusion', 'RAG 방식 채택 권장', true],
+      [22, 'reason', '환각률 높음, 지식베이스 준비 완료', false],
+      [30, 'action', '1단계: 벡터 데이터베이스 배포', false],
+      [38, 'confidence', '0.87', false],
+    ]
+  }
+];
+
+let curMode = 0;
+let timers = [];
+let playing = false;
+
+function selectMode(btn, i) {
+  if (playing) return;
+  curMode = i;
+  document.querySelectorAll('.mode-btn').forEach((b,j) => b.classList.toggle('active', j===i));
+  resetAll();
+}
+
+function resetAll() {
+  timers.forEach(clearTimeout); timers = [];
+  playing = false;
+  document.getElementById('playBtn').disabled = false;
+  // reset JSON
+  document.getElementById('rawJson').textContent = '';
+  document.getElementById('waitJson').classList.remove('show');
+  document.getElementById('parsedJson').classList.remove('show');
+  document.getElementById('statusJson').textContent = '대기 중';
+  document.getElementById('statusJson').style.color = 'var(--muted)';
+  document.getElementById('panelJson').className = 'col-panel';
+  // reset MD
+  document.getElementById('renderMd').className = 'render-area cursor';
+  document.getElementById('renderMd').textContent = '';
+  document.getElementById('waitMd').classList.remove('show');
+  document.getElementById('statusMd').textContent = '대기 중';
+  document.getElementById('statusMd').style.color = 'var(--muted)';
+  document.getElementById('panelMd').className = 'col-panel';
+  // reset XML
+  document.getElementById('xmlCards').innerHTML = '';
+  document.getElementById('statusXml').textContent = '대기 중';
+  document.getElementById('statusXml').style.color = 'var(--muted)';
+  document.getElementById('panelXml').className = 'col-panel';
+}
+
+function startStream() {
+  if (playing) return;
+  playing = true;
+  document.getElementById('playBtn').disabled = true;
+  const m = MODES[curMode];
+  streamJson(m);
+  streamMd(m);
+  streamXml(m);
+}
+
+function streamJson(m) {
+  const chars = m.jsonTokens.split('');
+  const rawEl = document.getElementById('rawJson');
+  const statusEl = document.getElementById('statusJson');
+  const panelEl = document.getElementById('panelJson');
+  panelEl.classList.add('streaming');
+  statusEl.textContent = '스트리밍 수신 중…';
+  statusEl.style.color = 'var(--purple)';
+  // show wait card early
+  const t0 = setTimeout(() => document.getElementById('waitJson').classList.add('show'), 400);
+  timers.push(t0);
+  chars.forEach((ch, i) => {
+    const t = setTimeout(() => {
+      rawEl.textContent += ch;
+      rawEl.scrollTop = rawEl.scrollHeight;
+    }, i * 22);
+    timers.push(t);
+  });
+  const totalMs = chars.length * 22 + 200;
+  const tf = setTimeout(() => {
+    document.getElementById('waitJson').classList.remove('show');
+    panelEl.classList.remove('streaming');
+    panelEl.classList.add('done-good');
+    statusEl.textContent = '✓ 파싱 완료';
+    statusEl.style.color = 'var(--green)';
+    const pc = document.getElementById('parsedJson');
+    pc.classList.add('show');
+    document.getElementById('parsedJsonContent').innerHTML = m.jsonFields.map(f =>
+      `<div class="parsed-field"><span class="k">${f.k}:</span><span class="v">${f.v}</span></div>`
+    ).join('');
+  }, totalMs);
+  timers.push(tf);
+}
+
+function streamMd(m) {
+  const chars = m.mdTokens.split('');
+  const renderEl = document.getElementById('renderMd');
+  const statusEl = document.getElementById('statusMd');
+  const panelEl = document.getElementById('panelMd');
+  panelEl.classList.add('streaming');
+  statusEl.textContent = '스트리밍 렌더링 중…';
+  statusEl.style.color = 'var(--purple)';
+  chars.forEach((ch, i) => {
+    const t = setTimeout(() => {
+      if (ch === '\n') {
+        renderEl.appendChild(document.createElement('br'));
+      } else {
+        const span = document.createElement('span');
+        // Style markdown syntax chars differently
+        if (['#','*','-'].includes(ch)) span.style.color = 'var(--purple)';
+        span.textContent = ch;
+        renderEl.appendChild(span);
+      }
+    }, i * 22);
+    timers.push(t);
+  });
+  const totalMs = chars.length * 22 + 200;
+  const tm = setTimeout(() => {
+    renderEl.classList.remove('cursor');
+    document.getElementById('waitMd').classList.add('show');
+    panelEl.classList.remove('streaming');
+    panelEl.classList.add('done-bad');
+    statusEl.textContent = '⚠ 필드 추출 불가';
+    statusEl.style.color = 'var(--orange)';
+  }, totalMs);
+  timers.push(tm);
+}
+
+function streamXml(m) {
+  const chars = m.xmlTokens.split('');
+  const cardsEl = document.getElementById('xmlCards');
+  const statusEl = document.getElementById('statusXml');
+  const panelEl = document.getElementById('panelXml');
+  panelEl.classList.add('streaming');
+  statusEl.textContent = '스트리밍 파싱 중…';
+  statusEl.style.color = 'var(--purple)';
+
+  // Build event map: token index → xml event
+  const eventMap = {};
+  m.xmlEvents.forEach(ev => { eventMap[ev[0]] = ev; });
+
+  // track current card element
+  let currentCard = null;
+
+  chars.forEach((ch, i) => {
+    const t = setTimeout(() => {
+      if (eventMap[i]) {
+        const [, field, value, isNew] = eventMap[i];
+        if (isNew) {
+          currentCard = document.createElement('div');
+          currentCard.style.cssText = 'background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:8px 10px;margin-bottom:7px;animation:_si .25s ease';
+          currentCard.innerHTML = `<div style="font-size:11px;font-weight:800;color:var(--green);margin-bottom:4px">✓ 증분 캡처</div>`;
+          cardsEl.appendChild(currentCard);
+        }
+        if (currentCard) {
+          const row = document.createElement('div');
+          row.className = 'parsed-field';
+          row.innerHTML = `<span class="k" style="color:var(--cyan);font-weight:700;font-size:12px;min-width:60px">${field}:</span><span style="font-size:13px;color:var(--text)">${value}</span>`;
+          currentCard.appendChild(row);
+          cardsEl.scrollTop = cardsEl.scrollHeight;
+        }
+      }
+    }, i * 22);
+    timers.push(t);
+  });
+
+  const totalMs = chars.length * 22 + 200;
+  const tf = setTimeout(() => {
+    panelEl.classList.remove('streaming');
+    panelEl.classList.add('done-good');
+    statusEl.textContent = '✓ 전체 필드 렌더링 완료';
+    statusEl.style.color = 'var(--green)';
+    playing = false;
+    document.getElementById('playBtn').disabled = false;
+  }, totalMs);
+  timers.push(tf);
+}
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

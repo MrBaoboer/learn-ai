@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Faking Chat Logs: How OpenAI First Taught Models to Converse | xueai.app</title>
+<script src="../global-attn.js"></script>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.lesson-header h1 .em { color: var(--accent); }
+
+/* ── 分隔线 ── */
+.divider {
+  border: none; height: 1px;
+  background: var(--border);
+  margin: 36px 0;
+}
+
+/* ── 步骤卡片 ── */
+.step-card {
+  border-radius: var(--radius-sm); padding: 18px 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  margin-bottom: 20px;
+}
+.step-card .num {
+  font-size: 11px; font-weight: 800; color: var(--accent);
+  letter-spacing: 0.4px; margin-bottom: 6px;
+}
+.step-card .content {
+  font-size: 15px; color: var(--text); line-height: 1.75;
+}
+
+/* ── 聊天演示区 ── */
+.demo-section {
+  margin-top: 8px;
+  margin-bottom: 20px;
+}
+.section-label {
+  font-size: 12px; font-weight: 700; color: var(--sub);
+  letter-spacing: 0.4px; text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.chat-demo {
+  background: var(--card); border-radius: var(--radius); padding: 22px 24px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 14px;
+  position: relative;
+}
+.btn-replay {
+  position: absolute; top: 10px; right: 12px;
+  background: var(--card); color: var(--sub); border: 1px solid rgba(0,0,0,0.12);
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s; font-family: inherit; z-index: 2;
+}
+.btn-replay:hover { background: rgba(0,0,0,0.05); color: var(--text); }
+
+.raw-text-box {
+  background: rgba(0,0,0,0.03); border-radius: var(--radius-sm); padding: 16px 18px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 14px; line-height: 1.85; color: var(--text);
+  opacity: 0; transform: translateY(4px);
+  transition: all 0.4s;
+}
+.raw-text-box.show { opacity: 1; transform: translateY(0); }
+.rt-user { color: var(--accent); font-weight: 700; }
+.rt-ai { color: var(--success); font-weight: 700; }
+
+.arrow-label {
+  text-align: center; font-size: 13px; font-weight: 700; color: var(--sub);
+  opacity: 0; transition: opacity 0.4s;
+}
+.arrow-label.show { opacity: 1; }
+
+.typing-output {
+  background: rgba(22,163,74,0.05); border: 1px solid rgba(22,163,74,0.15);
+  border-radius: var(--radius-sm); padding: 16px 18px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 14px; line-height: 1.85;
+  opacity: 0; transition: opacity 0.4s;
+  min-height: 52px;
+}
+.typing-output.show { opacity: 1; }
+
+.cursor-blink {
+  display: inline-block; width: 2px; height: 1em;
+  background: var(--success); vertical-align: text-bottom;
+  animation: blink 0.9s step-start infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.round2-label {
+  font-size: 12px; font-weight: 700; color: var(--sub);
+  letter-spacing: 0.3px; margin-top: 4px;
+  opacity: 0; transition: opacity 0.4s;
+}
+.round2-label.show { opacity: 1; }
+
+.next-prompt-box {
+  background: rgba(0,0,0,0.03); border-radius: var(--radius-sm); padding: 16px 18px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 14px; line-height: 1.85;
+  opacity: 0; transform: translateY(4px);
+  transition: all 0.4s;
+}
+.next-prompt-box.show { opacity: 1; transform: translateY(0); }
+.next-prompt-box .rt-ai { color: var(--success); font-weight: 700; }
+.next-prompt-box .rt-user { color: var(--accent); font-weight: 700; }
+.next-prompt-box .incomplete { color: var(--danger); font-style: italic; }
+
+/* ── 结论徽章 ── */
+.wow-badge {
+  background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.2);
+  border-radius: var(--radius); padding: 20px 24px;
+  font-size: 19px; font-weight: 800; color: var(--amber);
+  text-align: center;
+  opacity: 0; transition: opacity 0.5s;
+  margin-top: 12px;
+}
+.wow-badge.show { opacity: 1; }
+
+/* ── 移动端适配 ── */
+@media (max-width: 768px) {
+  .step-card { padding: 14px 16px; }
+  .step-card .content { font-size: 14px; }
+  .chat-demo { padding: 16px 14px; gap: 12px; }
+  .raw-text-box,
+  .typing-output,
+  .next-prompt-box { padding: 12px 14px; font-size: 13px; line-height: 1.75; }
+  .wow-badge { font-size: 16px; padding: 16px 18px; }
+  .divider { margin: 28px 0; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="How did OpenAI transform GPT from a completion engine into a conversational assistant? By faking chat logs to teach the model role-playing — the very origin of instruction alignment.">
+<meta name="keywords" content="instruction tuning,SFT,chat format,RLHF,ChatGPT mechanics,conversational model">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-fake-chat.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-fake-chat.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-fake-chat.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-fake-chat.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-fake-chat.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Faking Chat Logs: How OpenAI First Taught Models to Converse">
+<meta property="og:description" content="How did OpenAI transform GPT from a completion engine into a conversational assistant? By faking chat logs to teach the model role-playing — the very origin of instruction alignment.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-fake-chat.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Faking Chat Logs: How OpenAI First Taught Models to Converse">
+<meta name="twitter:description" content="How did OpenAI transform GPT from a completion engine into a conversational assistant? By faking chat logs to teach the model role-playing — the very origin of instruction alignment.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Faking Chat Logs","name":"Faking Chat Logs","url":"https://xueai.app/slides/1-2-fake-chat.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · From Completion to Conversation","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"How did OpenAI transform GPT from a completion engine into a conversational assistant? By faking chat logs to teach the model role-playing — the very origin of instruction alignment.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+
+<article class="lesson">
+
+  <!-- 标题区 -->
+  <header class="lesson-header">
+    <div class="kicker">From Completion to Conversation</div>
+    <h1>A language model only knows how to complete text —<br>so what if I <span class="em">fabricate</span> a chat log and ask it to finish it?</h1>
+    <p class="subtitle">
+      You can only predict the next token, right?<br>
+      So I'll craft a format: "Here's an unfinished chat log — fill in the assistant's reply."
+    </p>
+  </header>
+
+  <hr class="divider">
+
+  <!-- 第一步 + 第一轮演示 -->
+  <div class="step-card reveal" id="sc1">
+    <div class="num">Step 1</div>
+    <div class="content">
+      Assemble a "fake chat log":<br>
+      write the user's message, then deliberately leave the assistant's line blank
+    </div>
+  </div>
+
+  <div class="demo-section reveal paywall-locked xa-peek">
+    <div class="section-label">Round 1: What does the model see? What does it complete?</div>
+    <div class="chat-demo" id="demo1">
+      <button class="btn-replay" id="replay1" onclick="playRound1()" style="display:none;">↺ Replay</button>
+      <div class="raw-text-box" id="rawBox1">
+        <span class="rt-user">User:</span> Who is Zixia the Fairy? (紫霞仙子, a character from the classic Chinese film <em>A Chinese Odyssey</em>)<br>
+        <span class="rt-ai">Assistant:</span><span id="cursor1" class="cursor-blink" style="display:none;"></span>
+      </div>
+
+      <div class="arrow-label" id="arrow1">↓ Model starts completing from "Assistant:" onward</div>
+
+      <div class="typing-output" id="out1">
+        <span class="rt-ai">Assistant completes:</span><span id="out1Text"></span><span class="cursor-blink" id="cur1" style="display:none;"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第二步（穿插在两段演示之间） -->
+  <div class="step-card reveal paywall-locked" id="sc2">
+    <div class="num">Step 2</div>
+    <div class="content">
+      Feed the entire text to the Base model —<br>
+      it will do exactly one thing: <strong>complete from the end</strong>
+    </div>
+  </div>
+
+  <hr class="divider paywall-locked">
+
+  <!-- 第三步 + 第二轮演示 -->
+  <div class="step-card reveal paywall-locked" id="sc3">
+    <div class="num">Step 3</div>
+    <div class="content">
+      When the user sends another message, concatenate "the previous reply + the new question"<br>
+      into a longer pending-completion text, then send it to the model again
+    </div>
+  </div>
+
+  <div class="demo-section reveal paywall-locked">
+    <div class="chat-demo" id="demo2">
+      <button class="btn-replay" id="replay2" onclick="playRound2()" style="display:none;">↺ Replay</button>
+      <div class="round2-label" id="r2label">Round 2: The user speaks again — the first-round answer is appended and sent</div>
+
+      <div class="next-prompt-box" id="rawBox2">
+        <span class="rt-user">User:</span> Who is Zixia the Fairy?<br>
+        <span class="rt-ai">Assistant:</span><span id="prevAnswer"></span><br>
+        <span class="rt-user">User:</span> Who did she love?<br>
+        <span class="rt-ai">Assistant:</span><span class="incomplete" id="cursor2"></span>
+      </div>
+
+      <div class="typing-output" id="out2">
+        <span class="rt-ai">Assistant completes:</span><span id="out2Text"></span><span class="cursor-blink" id="cur2" style="display:none;"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 结论 -->
+  <div class="wow-badge reveal paywall-locked" id="wowBadge">
+    Well, well — the model actually nailed it!!!
+  </div>
+
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+const ANSWER1 = 'Zixia the Fairy (紫霞仙子) is a character from the classic Chinese film A Chinese Odyssey, the one Zhizun Bao loved most deeply.';
+const ANSWER2 = 'She loved Zhizun Bao, and for him she willingly shed her blood to open the Moonlight Treasure Box.';
+
+let round1Done = false;   // 第一轮播放完毕后，才允许第二轮自动播放
+let round2Pending = false; // 第二轮已进入视野但在等第一轮完成
+let timer1 = null, timer2 = null;
+
+function typeText(targetId, text, cursorId, onDone) {
+  let idx = 0;
+  const el = document.getElementById(targetId);
+  const cur = document.getElementById(cursorId);
+  el.textContent = '';
+  if (cur) cur.style.display = 'inline-block';
+  const timer = setInterval(() => {
+    if (idx >= text.length) {
+      clearInterval(timer);
+      if (cur) cur.style.display = 'none';
+      if (onDone) onDone();
+      return;
+    }
+    el.textContent += text[idx];
+    idx++;
+  }, 45);
+  return timer;
+}
+
+/* 第一轮：展示待补全文本 → 打字 ANSWER1 → 填入第二轮的 prevAnswer */
+function playRound1() {
+  if (timer1) { clearInterval(timer1); timer1 = null; }
+  document.getElementById('replay1').style.display = 'none';
+  document.getElementById('out1Text').textContent = '';
+  document.getElementById('rawBox1').classList.add('show');
+  document.getElementById('cursor1').style.display = 'inline-block';
+  setTimeout(() => document.getElementById('cursor1').style.display = 'none', 800);
+
+  setTimeout(() => {
+    document.getElementById('arrow1').classList.add('show');
+    document.getElementById('out1').classList.add('show');
+    timer1 = typeText('out1Text', ANSWER1, 'cur1', () => {
+      timer1 = null;
+      document.getElementById('prevAnswer').textContent = ANSWER1;
+      document.getElementById('replay1').style.display = 'inline-block';
+      round1Done = true;
+      if (round2Pending) { round2Pending = false; playRound2(); }
+    });
+  }, 900);
+}
+
+/* 第二轮：展示拼接后的更长文本 → 打字 ANSWER2（依赖第一轮已填入 prevAnswer） */
+function playRound2() {
+  if (!round1Done) { round2Pending = true; return; }
+  if (timer2) { clearInterval(timer2); timer2 = null; }
+  document.getElementById('replay2').style.display = 'none';
+  document.getElementById('out2Text').textContent = '';
+  document.getElementById('r2label').classList.add('show');
+  document.getElementById('rawBox2').classList.add('show');
+  document.getElementById('cursor2').textContent = '▌';
+
+  setTimeout(() => {
+    document.getElementById('cursor2').textContent = '';
+    document.getElementById('out2').classList.add('show');
+    timer2 = typeText('out2Text', ANSWER2, 'cur2', () => {
+      timer2 = null;
+      document.getElementById('replay2').style.display = 'inline-block';
+    });
+  }, 900);
+}
+
+lessonOnView(document.getElementById('demo1'), playRound1);
+lessonOnView(document.getElementById('demo2'), playRound2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

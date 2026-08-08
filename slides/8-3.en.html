@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dynamic Timestamps: The Most Expensive System Prompt Anti-Pattern | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+/* ── Wrong vs Correct Design ── */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sys-box{border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:var(--shadow-card)}
+.sys-box-h{padding:9px 16px;font-size:15px;font-weight:700;border-bottom:1px solid var(--border)}
+.sys-box-b{padding:14px 16px}
+.sys-box.bad .sys-box-h{background:rgba(220,38,38,.06);color:var(--danger)}
+.sys-box.good .sys-box-h{background:rgba(22,163,74,.06);color:var(--success)}
+.code-blk{background:#1e1b2e;border-radius:7px;padding:11px 13px;font-size:13px;font-family:'Fira Code','SF Mono',Menlo,monospace;line-height:1.65;color:#cdd6f4;margin-bottom:10px;overflow-x:auto}
+.code-blk .ts{background:rgba(220,38,38,.3);border-radius:2px;padding:0 2px;color:#f38ba8}
+.code-blk .stable{background:rgba(22,163,74,.25);border-radius:2px;padding:0 2px;color:#a6e3a1}
+.metric-row{display:flex;gap:8px}
+.metric-item{flex:1;text-align:center;background:var(--bg);border-radius:6px;padding:8px 5px}
+.metric-item .v{font-size:17px;font-weight:700}
+.metric-item .l{font-size:11px;color:var(--sub)}
+
+.killer-box{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.killer-box b{color:var(--amber)}
+.killer-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.killer-tag{background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);color:var(--danger);padding:4px 11px;border-radius:5px;font-size:14px;font-weight:600}
+
+/* ── Live Comparison Panel ── */
+.live-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.live-header{padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg);font-size:14px;font-weight:700;color:var(--sub);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.live-clock{font-family:'SF Mono',Menlo,monospace;font-size:18px;font-weight:900;color:var(--text);letter-spacing:1px}
+.live-body{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+
+.vs-col{background:var(--card);display:flex;flex-direction:column}
+.vs-col-h{padding:9px 12px;font-size:14px;font-weight:800;border-bottom:1px solid var(--border)}
+.vs-col.bad-col .vs-col-h{background:rgba(220,38,38,.05);color:var(--danger)}
+.vs-col.good-col .vs-col-h{background:rgba(22,163,74,.05);color:var(--success)}
+
+.sys-display{margin:10px 12px;border-radius:7px;padding:9px 12px;font-family:'Fira Code','SF Mono',Menlo,monospace;font-size:12.5px;line-height:1.65;background:#1e1b2e;color:#cdd6f4;transition:all .25s;overflow-x:auto}
+.dyn-ts{color:#f38ba8;font-weight:800;transition:all .2s}
+.static-ts{color:#a6e3a1;font-weight:800}
+
+.cache-status{margin:0 12px 10px;border-radius:8px;padding:10px 12px;font-size:14px;font-weight:700;text-align:center;transition:all .3s}
+.cache-status.hit{background:rgba(22,163,74,.1);color:var(--success);border:1.5px solid rgba(22,163,74,.3)}
+.cache-status.miss{background:rgba(220,38,38,.1);color:var(--danger);border:1.5px solid rgba(220,38,38,.3)}
+@keyframes flash-miss{0%{background:rgba(220,38,38,.5);transform:scale(1.02)}50%{background:rgba(220,38,38,.2)}100%{background:rgba(220,38,38,.1);transform:scale(1)}}
+.cache-status.miss.flash{animation:flash-miss .4s ease}
+
+.hit-bar-wrap{margin:0 12px 10px;display:flex;flex-direction:column;gap:4px}
+.hit-bar-label{font-size:13px;font-weight:700;color:var(--sub);display:flex;justify-content:space-between}
+.hit-bar-track{height:10px;background:var(--bg);border-radius:5px;overflow:hidden}
+.hit-bar-fill{height:100%;border-radius:5px;transition:width .5s ease}
+.vs-col.bad-col .hit-bar-fill{background:var(--danger)}
+.vs-col.good-col .hit-bar-fill{background:var(--success)}
+
+.req-log{height:160px;overflow-y:auto;margin:0 12px 12px;display:flex;flex-direction:column;gap:4px}
+.req-item{font-size:12px;padding:4px 8px;border-radius:5px;display:flex;align-items:center;gap:6px;flex-shrink:0;animation:log-in .2s ease}
+@keyframes log-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.req-item.hit{background:rgba(22,163,74,.07);color:var(--success)}
+.req-item.miss{background:rgba(220,38,38,.07);color:var(--danger)}
+.req-item .req-ts{font-family:'SF Mono',Menlo,monospace;flex:1}
+.req-item .req-tag{font-weight:800;font-size:11px}
+
+/* ── Stats Row ── */
+.live-stats{display:flex;gap:10px;margin-top:12px}
+.live-stat{flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;box-shadow:var(--shadow-card)}
+.live-stat .sv{font-size:20px;font-weight:900}
+.live-stat .sl{font-size:11px;color:var(--sub);font-weight:600}
+.live-stat.bad-stat .sv{color:var(--danger)}
+.live-stat.good-stat .sv{color:var(--success)}
+.live-stat.neutral .sv{color:var(--text)}
+
+/* ── Controls ── */
+.ctrl-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn-ctrl{padding:10px 22px;border-radius:8px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-start{background:var(--success);color:white}
+.btn-stop{background:rgba(220,38,38,.15);color:var(--danger);border:1.5px solid rgba(220,38,38,.3)}
+.btn-reset{background:var(--card);color:var(--sub);border:1px solid var(--border)}
+.ctrl-hint{flex:1;font-size:13px;color:var(--sub);min-width:180px}
+
+.takeaway{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.2);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:16px}
+.takeaway b{color:var(--success)}
+
+@media (max-width:768px){
+  .compare-grid{grid-template-columns:1fr}
+  .live-body{grid-template-columns:1fr}
+  .live-stats{flex-wrap:wrap}
+  .live-stat{min-width:calc(50% - 5px)}
+  .req-log{height:120px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Inserting the current timestamp into the System Prompt is one of the most common and costly AI development anti-patterns. It prevents KV Cache from ever hitting, forcing full recomputation on every request.">
+<meta name="keywords" content="System Prompt anti-pattern,KV Cache miss,dynamic timestamp,AI development pitfalls,Prompt design">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-3.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/8-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-3.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Dynamic Timestamps: The Most Expensive System Prompt Anti-Pattern">
+<meta property="og:description" content="Inserting the current timestamp into the System Prompt is one of the most common and costly AI development anti-patterns. It prevents KV Cache from ever hitting, forcing full recomputation on every request.">
+<meta property="og:url" content="https://xueai.app/slides/8-3.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dynamic Timestamps: The Most Expensive System Prompt Anti-Pattern">
+<meta name="twitter:description" content="Inserting the current timestamp into the System Prompt is one of the most common and costly AI development anti-patterns. It prevents KV Cache from ever hitting, forcing full recomputation on every request.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Dynamic Timestamps: The Most Expensive System Prompt Anti-Pattern","name":"Dynamic Timestamps: The Most Expensive System Prompt Anti-Pattern","url":"https://xueai.app/slides/8-3.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI in Practice · Cost Optimization & Model Selection","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Inserting the current timestamp into the System Prompt is one of the most common and costly AI development anti-patterns. It prevents KV Cache from ever hitting, forcing full recomputation on every request.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Cost Optimization</div>
+    <h1>Dynamic Timestamps: The Most Expensive System Prompt</h1>
+    <p class="subtitle">One small design mistake can completely invalidate your KV Cache and double the cost of every conversation: putting a dynamic timestamp in your System Prompt.</p>
+  </header>
+
+  <div class="sec-label">Wrong vs. Right Design</div>
+
+  <div class="compare-grid">
+    <div class="sys-box bad">
+      <div class="sys-box-h">❌ Wrong Design</div>
+      <div class="sys-box-b">
+        <div class="code-blk">System: You are an assistant.
+Current time: <span class="ts">2026-04-10 14:35:22</span>
+...</div>
+        <div class="metric-row">
+          <div class="metric-item"><div class="v" style="color:var(--danger)">0%</div><div class="l">Cache Hit Rate</div></div>
+          <div class="metric-item"><div class="v" style="color:var(--danger)">+100%</div><div class="l">Extra Cost</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="sys-box good">
+      <div class="sys-box-h">✅ Correct Design</div>
+      <div class="sys-box-b">
+        <div class="code-blk">System: You are an assistant.
+<span class="stable">(no timestamp)</span>
+User: [<span class="stable">2026-04-10</span>] Please help me...</div>
+        <div class="metric-row">
+          <div class="metric-item"><div class="v" style="color:var(--success)">~95%</div><div class="l">Cache Hit Rate</div></div>
+          <div class="metric-item"><div class="v" style="color:var(--success)">-70%</div><div class="l">Cost Savings</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">Live Comparison Simulation</div>
+
+  <div class="live-panel paywall-locked xa-peek">
+    <div class="live-header">
+      <span>Live Comparison</span>
+      <span class="live-clock" id="liveClock">--:--:--</span>
+      <span style="font-size:13px;color:var(--sub)">One request per second</span>
+    </div>
+    <div class="live-body">
+      <!-- Left: dynamic timestamp (bad) -->
+      <div class="vs-col bad-col">
+        <div class="vs-col-h">❌ Dynamic Timestamp (second-precision)</div>
+        <div class="sys-display" id="badSysPrompt">System: You are an assistant.<br>Current time: <span class="dyn-ts" id="dynTs">--:--:--</span><br>...</div>
+        <div class="cache-status miss" id="badCacheStatus">⏳ Waiting for request...</div>
+        <div class="hit-bar-wrap">
+          <div class="hit-bar-label"><span>Cache Hit Rate</span><span id="badHitPct">0%</span></div>
+          <div class="hit-bar-track"><div class="hit-bar-fill" id="badHitBar" style="width:0%"></div></div>
+        </div>
+        <div class="req-log" id="badLog"></div>
+      </div>
+      <!-- Right: static System Prompt (good) -->
+      <div class="vs-col good-col">
+        <div class="vs-col-h">✅ Static System Prompt</div>
+        <div class="sys-display" id="goodSysPrompt">System: You are an assistant.<br><span class="static-ts">(no timestamp)</span><br>User: [<span class="static-ts" id="staticDate">--</span>] ...</div>
+        <div class="cache-status hit" id="goodCacheStatus">⏳ Waiting for request...</div>
+        <div class="hit-bar-wrap">
+          <div class="hit-bar-label"><span>Cache Hit Rate</span><span id="goodHitPct">0%</span></div>
+          <div class="hit-bar-track"><div class="hit-bar-fill" id="goodHitBar" style="width:0%"></div></div>
+        </div>
+        <div class="req-log" id="goodLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="live-stats paywall-locked">
+    <div class="live-stat neutral"><div class="sv" id="statReqs">0</div><div class="sl">Total Requests</div></div>
+    <div class="live-stat bad-stat"><div class="sv" id="statBadMiss">0</div><div class="sl">Left Cache Miss</div></div>
+    <div class="live-stat good-stat"><div class="sv" id="statGoodHit">0</div><div class="sl">Right Cache Hit</div></div>
+    <div class="live-stat good-stat"><div class="sv" id="statSave">—</div><div class="sl">Right Cost Savings</div></div>
+  </div>
+
+  <div class="ctrl-row paywall-locked">
+    <button class="btn-ctrl btn-start" id="btnStart" onclick="startSim()">▶ Start Simulation</button>
+    <button class="btn-ctrl btn-stop" id="btnStop" onclick="stopSim()" style="display:none">⏹ Pause</button>
+    <button class="btn-ctrl btn-reset" onclick="resetSim()">Reset</button>
+    <div class="ctrl-hint" id="ctrlHint">Once started, one request fires per second — watch the KV Cache hit difference between the two sides</div>
+  </div>
+
+  <div class="sec-label paywall-locked">Other Common Cache Killers</div>
+
+  <div class="killer-box paywall-locked">
+    <b>Other common KV Cache killers:</b>
+    <div class="killer-tags">
+      <span class="killer-tag">Second-precision timestamps</span>
+      <span class="killer-tag">Random Session IDs</span>
+      <span class="killer-tag">User ID prefixes</span>
+      <span class="killer-tag">A/B test variables</span>
+      <span class="killer-tag">Random emoji prefixes</span>
+      <span class="killer-tag">Dynamic ad copy</span>
+    </div>
+    <div style="font-size:14px;margin-top:10px;color:var(--sub)">Anything that makes the System Prompt different each time will completely invalidate the cache.</div>
+  </div>
+
+  <div class="takeaway paywall-locked">
+    <span style="flex-shrink:0">🔒</span>
+    <span><b>Rule: System Prompt = fixed prefix.</b> Put dynamic content (time, user info, random content) in the User message — never in the System Prompt.</span>
+  </div>
+
+</article>
+
+<script>
+let simTimer = null;
+let totalReqs = 0, badMiss = 0, goodHit = 0;
+let lastBadSysHash = null;  // last "fingerprint" of the bad-side system prompt
+
+// simulated clock base (accelerated: each tick = +1 second)
+let simSec = 0;
+const BASE_DATE = '2026-04-10';
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+function getSimTime() {
+  const h = pad(Math.floor(simSec / 3600) % 24);
+  const m = pad(Math.floor(simSec / 60) % 60);
+  const s = pad(simSec % 60);
+  return { hms: `${h}:${m}:${s}`, date: BASE_DATE };
+}
+
+function addLog(logEl, ts, isHit, label) {
+  const item = document.createElement('div');
+  item.className = 'req-item ' + (isHit ? 'hit' : 'miss');
+  item.innerHTML = `<span class="req-ts">${ts}</span><span class="req-tag">${isHit ? '✓ HIT' : '✗ MISS'}</span><span style="font-size:11px">${label}</span>`;
+  logEl.appendChild(item);
+  // keep only the last 6 entries
+  while (logEl.children.length > 6) logEl.removeChild(logEl.firstChild);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function flashMiss(el) {
+  el.classList.remove('flash');
+  void el.offsetWidth; // reflow
+  el.classList.add('flash');
+}
+
+function tick() {
+  simSec++;
+  totalReqs++;
+  const { hms, date } = getSimTime();
+
+  // update clock
+  document.getElementById('liveClock').textContent = hms;
+  document.getElementById('dynTs').textContent = hms;
+  document.getElementById('staticDate').textContent = date;
+
+  // ── Bad side: System Prompt contains second-precision timestamp, MISS every second ──
+  const badHash = hms; // changes every second
+  const badIsHit = (badHash === lastBadSysHash);
+  lastBadSysHash = badHash;
+
+  const badStatusEl = document.getElementById('badCacheStatus');
+  if (badIsHit) {
+    badStatusEl.className = 'cache-status hit';
+    badStatusEl.textContent = '✓ Cache Hit';
+  } else {
+    badMiss++;
+    badStatusEl.className = 'cache-status miss flash';
+    badStatusEl.textContent = '✗ Cache MISS — Rebuilding cache!';
+    flashMiss(badStatusEl);
+    // flash the timestamp in sys-display red
+    const dynEl = document.getElementById('dynTs');
+    dynEl.style.background = 'rgba(220,38,38,.5)';
+    dynEl.style.color = '#ff6b6b';
+    setTimeout(() => {
+      dynEl.style.background = '';
+      dynEl.style.color = '';
+    }, 350);
+  }
+  addLog(document.getElementById('badLog'), hms, badIsHit, badIsHit ? '' : 'Full recompute');
+  const badHitCount = totalReqs - badMiss;
+  const badHitPct = totalReqs > 0 ? Math.round(badHitCount / totalReqs * 100) : 0;
+  document.getElementById('badHitPct').textContent = badHitPct + '%';
+  document.getElementById('badHitBar').style.width = badHitPct + '%';
+
+  // ── Good side: System Prompt is fixed, cache built once, all subsequent requests hit ──
+  const goodIsHit = (totalReqs > 1); // first request builds cache, all subsequent hit
+  if (goodIsHit) goodHit++;
+  const goodStatusEl = document.getElementById('goodCacheStatus');
+  if (goodIsHit) {
+    goodStatusEl.className = 'cache-status hit';
+    goodStatusEl.textContent = '✓ Cache Hit — New tokens only';
+  } else {
+    goodStatusEl.className = 'cache-status miss';
+    goodStatusEl.textContent = '⚡ Cache built for the first time (once only)';
+  }
+  addLog(document.getElementById('goodLog'), hms, goodIsHit, goodIsHit ? 'New tokens only' : 'Initializing');
+  const goodHitPct = totalReqs > 0 ? Math.round(goodHit / totalReqs * 100) : 0;
+  document.getElementById('goodHitPct').textContent = goodHitPct + '%';
+  document.getElementById('goodHitBar').style.width = goodHitPct + '%';
+
+  // stats
+  document.getElementById('statReqs').textContent = totalReqs;
+  document.getElementById('statBadMiss').textContent = badMiss;
+  document.getElementById('statGoodHit').textContent = goodHit;
+  const savePct = totalReqs > 1 ? Math.round(goodHit / totalReqs * 100) : 0;
+  document.getElementById('statSave').textContent = savePct > 0 ? '~' + savePct + '%' : '—';
+
+  // hint text
+  if (totalReqs > 3) {
+    document.getElementById('ctrlHint').textContent =
+      `Left: ${totalReqs} requests, ${badMiss} MISSes; Right: ${goodHit} hits, saving ~${savePct}% cost`;
+  }
+
+  if (totalReqs >= 20) stopSim();
+}
+
+function startSim() {
+  if (simTimer) return;
+  document.getElementById('btnStart').style.display = 'none';
+  document.getElementById('btnStop').style.display = '';
+  simTimer = setInterval(tick, 800);
+  tick();
+}
+
+function stopSim() {
+  clearInterval(simTimer);
+  simTimer = null;
+  document.getElementById('btnStart').style.display = '';
+  document.getElementById('btnStop').style.display = 'none';
+  if (totalReqs >= 20) {
+    document.getElementById('btnStart').textContent = '▶ Continue';
+    document.getElementById('ctrlHint').textContent = '20-round demo complete — click "Reset" to go again';
+  }
+}
+
+function resetSim() {
+  stopSim();
+  totalReqs = 0; badMiss = 0; goodHit = 0; simSec = 0; lastBadSysHash = null;
+  document.getElementById('btnStart').textContent = '▶ Start Simulation';
+  document.getElementById('liveClock').textContent = '--:--:--';
+  document.getElementById('dynTs').textContent = '--:--:--';
+  document.getElementById('staticDate').textContent = '--';
+  document.getElementById('badCacheStatus').className = 'cache-status miss';
+  document.getElementById('badCacheStatus').textContent = '⏳ Waiting for request...';
+  document.getElementById('goodCacheStatus').className = 'cache-status hit';
+  document.getElementById('goodCacheStatus').textContent = '⏳ Waiting for request...';
+  document.getElementById('badLog').innerHTML = '';
+  document.getElementById('goodLog').innerHTML = '';
+  document.getElementById('badHitPct').textContent = '0%';
+  document.getElementById('goodHitPct').textContent = '0%';
+  document.getElementById('badHitBar').style.width = '0%';
+  document.getElementById('goodHitBar').style.width = '0%';
+  document.getElementById('statReqs').textContent = '0';
+  document.getElementById('statBadMiss').textContent = '0';
+  document.getElementById('statGoodHit').textContent = '0';
+  document.getElementById('statSave').textContent = '—';
+  document.getElementById('ctrlHint').textContent = 'Once started, one request fires per second — watch the KV Cache hit difference between the two sides';
+}
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

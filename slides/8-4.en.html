@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comprehensive Cost Optimization: A System-Level Approach | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+/* ── Cost Simulator ── */
+.sim-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-card)}
+.sim-title{font-size:14px;font-weight:700;color:var(--sub)}
+
+.cost-state{display:flex;flex-direction:column;gap:8px}
+.cost-row{display:flex;align-items:center;gap:8px}
+.cost-row-label{font-size:13px;font-weight:700;color:var(--sub);width:52px;flex-shrink:0;text-align:right}
+.cost-bar-wrap{flex:1;height:28px;background:var(--bg);border-radius:6px;overflow:hidden;position:relative}
+.cost-bar-inner{height:100%;display:flex;gap:1px;transition:all .6s ease}
+.cost-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:rgba(255,255,255,.95);overflow:hidden;white-space:nowrap;padding:0 4px;transition:flex .6s ease,opacity .5s ease,min-width .6s ease;border-radius:3px}
+.cost-seg.gone{flex:0 !important;min-width:0 !important;opacity:0;padding:0}
+.cost-pct{font-size:13px;font-weight:800;min-width:40px;text-align:right;transition:color .4s}
+
+/* Savings Labels */
+.save-labels{display:flex;flex-wrap:wrap;gap:6px}
+.save-tag{padding:4px 11px;border-radius:5px;font-size:13px;font-weight:700;border:1.5px solid transparent;transition:all .3s;opacity:.35}
+.save-tag.active{opacity:1}
+.save-tag.s1{background:rgba(22,163,74,.1);border-color:rgba(22,163,74,.3);color:var(--success)}
+.save-tag.s2{background:rgba(8,145,178,.1);border-color:rgba(8,145,178,.3);color:var(--cyan)}
+.save-tag.s3{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.25);color:var(--danger)}
+.save-tag.s4{background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.3);color:var(--purple)}
+.save-tag.s5{background:rgba(217,119,6,.1);border-color:rgba(217,119,6,.3);color:var(--amber)}
+
+.total-save{text-align:center;padding:6px 0}
+.total-save .big{font-size:44px;font-weight:900;transition:all .5s}
+.total-save .lbl{font-size:14px;color:var(--sub);font-weight:600;margin-top:2px}
+
+/* Implementation Steps */
+.path-steps{display:flex;flex-direction:column;gap:6px;min-height:20px}
+.path-step{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--sub);line-height:1.6;padding:3px 0;opacity:0;transform:translateX(-8px);transition:all .35s ease}
+.path-step.show{opacity:1;transform:translateX(0)}
+.path-step .step-num{width:20px;height:20px;border-radius:50%;background:var(--success);color:white;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+
+/* ── Strategy Cards ── */
+.strat-list{display:flex;flex-direction:column;gap:8px}
+.strat-item{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:13px 16px;cursor:pointer;transition:all .2s;font-family:inherit;width:100%;text-align:left;box-shadow:var(--shadow-card);min-height:44px}
+.strat-item:hover{border-color:rgba(22,163,74,.3);background:rgba(22,163,74,.02)}
+.strat-item.active{border-color:var(--success);background:rgba(22,163,74,.04);box-shadow:0 2px 12px rgba(22,163,74,.1)}
+.strat-badge{padding:3px 9px;border-radius:5px;font-size:12px;font-weight:800;white-space:nowrap}
+.p1{background:rgba(22,163,74,.12);color:var(--success)}
+.p2{background:rgba(8,145,178,.12);color:var(--cyan)}
+.p3{background:rgba(220,38,38,.1);color:var(--danger)}
+.p4{background:rgba(124,58,237,.12);color:var(--purple)}
+.p5{background:rgba(217,119,6,.12);color:var(--amber)}
+.strat-name{font-size:15px;font-weight:700;color:var(--text)}
+.strat-sub{font-size:13px;color:var(--sub);margin-top:1px}
+.strat-saving{font-size:13px;font-weight:800;white-space:nowrap}
+
+/* ── Detail Expansion Area ── */
+.detail-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 20px;min-height:90px;overflow:hidden;position:relative;box-shadow:var(--shadow-card)}
+.detail-inner{font-size:14px;color:var(--sub);line-height:1.7;animation:fade-in .25s ease}
+@keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.detail-inner b{color:var(--text)}
+.detail-inner .flow{display:flex;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap}
+.detail-inner .flow-step{padding:3px 10px;border-radius:5px;font-size:13px;font-weight:700;background:var(--bg)}
+.detail-inner .flow-arrow{color:var(--sub);font-size:14px;font-weight:700}
+.detail-inner .flow-step.hit{background:rgba(22,163,74,.1);color:var(--success)}
+.detail-inner .flow-step.skip{background:rgba(8,145,178,.1);color:var(--cyan)}
+.detail-inner .flow-step.flag{background:rgba(220,38,38,.1);color:var(--danger)}
+
+.takeaway{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.2);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.takeaway b{color:var(--success)}
+
+@media (max-width:768px){
+  .strat-item{grid-template-columns:1fr;gap:6px}
+  .strat-saving{justify-self:start}
+  .cost-row-label{width:44px;font-size:12px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="AI system cost optimization is more than compressing Prompts. A five-layer comprehensive optimization framework — from model selection and request merging to caching, output truncation, batching, and traffic control — helps AI product managers make data-driven cost decisions.">
+<meta name="keywords" content="AI cost optimization,large model cost,model selection,batching,API cost control,AI cost reduction">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-4.en.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-4.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-4.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Comprehensive Cost Optimization: A System-Level Approach">
+<meta property="og:description" content="AI system cost optimization is more than compressing Prompts. A five-layer comprehensive optimization framework — from model selection and request merging to caching, output truncation, batching, and traffic control — helps AI product managers make data-driven cost decisions.">
+<meta property="og:url" content="https://xueai.app/slides/8-4.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Comprehensive Cost Optimization: A System-Level Approach">
+<meta name="twitter:description" content="AI system cost optimization is more than compressing Prompts. A five-layer comprehensive optimization framework — from model selection and request merging to caching, output truncation, batching, and traffic control — helps AI product managers make data-driven cost decisions.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Comprehensive Cost Optimization: A System-Level Approach","name":"Comprehensive Cost Optimization: A System-Level Approach","url":"https://xueai.app/slides/8-4.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI in Action · Cost Optimization & Model Selection","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"AI system cost optimization is more than compressing Prompts. A five-layer comprehensive optimization framework helps AI product managers make data-driven cost decisions.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Cost Optimization</div>
+    <h1>Comprehensive Cost Optimization</h1>
+    <p class="subtitle">Single optimizations have limited impact. Layered, combined strategies can reduce AI costs by 70–90%. Click the strategy cards below to watch the cost bar change in real time.</p>
+  </header>
+
+  <div class="sec-label">Five-Layer Optimization Strategy</div>
+
+  <div style="font-size:13px;color:var(--sub);margin-bottom:10px">Click in order to stack effects (click again to deactivate)</div>
+  <div class="strat-list" id="stratList">
+
+    <button class="strat-item" onclick="pickStrat(this,0)">
+      <span class="strat-badge p1">Priority 1</span>
+      <div>
+        <div class="strat-name">KV Cache + Fixed System Prompt</div>
+        <div class="strat-sub">Simplest and highest impact. History hits cache, recomputation drops to zero</div>
+      </div>
+      <div class="strat-saving" style="color:var(--success)">Saves 30–50%</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,1)">
+      <span class="strat-badge p2">Priority 2</span>
+      <div>
+        <div class="strat-name">Intent Detection → Model Routing</div>
+        <div class="strat-sub">80% of simple queries use a small model; only complex ones go to the flagship</div>
+      </div>
+      <div class="strat-saving" style="color:var(--cyan)">Saves 40–60%</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,2)">
+      <span class="strat-badge p3">Priority 3</span>
+      <div>
+        <div class="strat-name">RAG Trigger Filtering</div>
+        <div class="strat-sub">Add a "does this need RAG?" check to skip unnecessary vector retrieval</div>
+      </div>
+      <div class="strat-saving" style="color:var(--danger)">Saves 20–40%</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,3)">
+      <span class="strat-badge p4">Priority 4</span>
+      <div>
+        <div class="strat-name">Conversation History Compression (Summarization)</div>
+        <div class="strat-sub">After N turns, replace ~2,000 token history with a ~200 token summary</div>
+      </div>
+      <div class="strat-saving" style="color:var(--purple)">Long conversations save 60–80%</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,4)">
+      <span class="strat-badge p5">Priority 5</span>
+      <div>
+        <div class="strat-name">Semantic Cache</div>
+        <div class="strat-sub">Reuse the same answer for semantically similar queries; FAQs skip the LLM entirely</div>
+      </div>
+      <div class="strat-saving" style="color:var(--amber)">FAQs save 70–90%</div>
+    </button>
+
+  </div>
+
+  <div class="sec-label">Cost Simulator</div>
+
+  <div class="sim-box paywall-locked xa-peek">
+    <div class="sim-title">100,000 conversations/day · click strategies above to stack optimization effects</div>
+
+    <div class="cost-state">
+      <div class="cost-row">
+        <div class="cost-row-label">Before</div>
+        <div class="cost-bar-wrap">
+          <div class="cost-bar-inner">
+            <div class="cost-seg" style="flex:35;background:#dc2626" id="seg-before-hist">Repeated History 35%</div>
+            <div class="cost-seg" style="flex:25;background:#d97706" id="seg-before-rag">Unnecessary RAG 25%</div>
+            <div class="cost-seg" style="flex:20;background:#7c3aed" id="seg-before-model">Flagship Model 20%</div>
+            <div class="cost-seg" style="flex:20;background:#0891b2" id="seg-before-real">Necessary Compute 20%</div>
+          </div>
+        </div>
+        <div class="cost-pct" style="color:var(--danger)">100%</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-row-label">Current</div>
+        <div class="cost-bar-wrap">
+          <div class="cost-bar-inner" id="afterBar">
+            <div class="cost-seg" style="flex:35;background:#dc2626" id="seg-hist">Repeated History</div>
+            <div class="cost-seg" style="flex:25;background:#d97706" id="seg-rag">Unnecessary RAG</div>
+            <div class="cost-seg" style="flex:20;background:#7c3aed" id="seg-model">Flagship Model</div>
+            <div class="cost-seg" style="flex:20;background:#0891b2" id="seg-real">Necessary 20%</div>
+            <div class="cost-seg" style="flex:0;background:rgba(22,163,74,.35);color:#16a34a;min-width:0" id="seg-saved">Saved</div>
+          </div>
+        </div>
+        <div class="cost-pct" id="afterPct" style="color:var(--text)">100%</div>
+      </div>
+    </div>
+
+    <div class="save-labels">
+      <span class="save-tag s1" id="tag1">KV Cache −35%</span>
+      <span class="save-tag s2" id="tag2">Model Routing −12%</span>
+      <span class="save-tag s3" id="tag3">RAG Filtering −18%</span>
+      <span class="save-tag s4" id="tag4">History Compression −8%</span>
+      <span class="save-tag s5" id="tag5">Semantic Cache −7%</span>
+    </div>
+
+    <div class="total-save">
+      <div class="big" id="totalBig" style="color:var(--sub)">0%</div>
+      <div class="lbl">Stacked Savings</div>
+    </div>
+
+    <div class="path-steps" id="pathSteps"></div>
+  </div>
+
+  <div class="sec-label paywall-locked">Implementation Details</div>
+
+  <div class="detail-panel paywall-locked" id="detailPanel">
+    <div class="detail-inner" style="color:var(--sub);font-size:14px;text-align:center;padding-top:18px">
+      ↑ Click any strategy above to view the implementation flow
+    </div>
+  </div>
+
+  <div class="takeaway paywall-locked" style="margin-top:20px">
+    <b>Cost optimization is architecture design, not an afterthought.</b> Considering these 5 layers at system design time is 10× easier than retrofitting after launch.
+  </div>
+
+</article>
+
+<script>
+// Each strategy's eliminated cost segment and residual percentage after stacking
+const STRATS = [
+  {
+    segId: 'seg-hist',
+    tagId: 'tag1',
+    savePct: 35,   // eliminates repeated history 35%
+    tagCls: 's1',
+    steps: [
+      'Remove all dynamic content from System Prompt (timestamps, user IDs, random content)',
+      'Keep System Prompt completely fixed → platform auto-hits prefix cache',
+      'Move all dynamic info into User messages → only new tokens computed each turn',
+      'OpenAI / Claude / Gemini all support this natively — zero extra configuration'
+    ],
+    flow: ['Request in','SYS fixed?','✓ Cache hit','New tokens only'],
+    detail: `<b>KV Cache principle:</b> System Prompt unchanged → platform caches its K/V matrix → subsequent conversations don't recompute.<br><br>
+      <div class="flow">
+        <span class="flow-step">New request</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">SYS cache hit</span><span class="flow-arrow">→</span>
+        <span class="flow-step skip">Only new tokens</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">Return result</span>
+      </div>
+      <b>Key:</b> Changing even one character in System Prompt fully invalidates the cache.\`
+  },
+  {
+    segId: 'seg-model',
+    tagId: 'tag2',
+    savePct: 12,
+    tagCls: 's2',
+    steps: [
+      'Add an intent classifier at the request entry point (use a cheap small model, e.g. gpt-4o-mini)',
+      '"Simple Q&A/chitchat" → answer directly with small model (cost ~1/10)',
+      '"Professional analysis/creation" → route to flagship model',
+      'Classification cost with small model is negligible; saves 40–60% of flagship model cost'
+    ],
+    detail: `<b>Model routing flow:</b> First use a cheap model to assess complexity, then decide which model answers.<br><br>
+      <div class="flow">
+        <span class="flow-step">User request</span><span class="flow-arrow">→</span>
+        <span class="flow-step">Small model classifies</span><span class="flow-arrow">→</span>
+        <span class="flow-step skip">Simple: small model answers</span>
+      </div>
+      <div class="flow" style="margin-top:2px">
+        <span style="width:80px;display:inline-block"></span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step flag">Complex: flagship model</span>
+      </div>
+      <b>In practice:</b> 80% of conversations can be handled by the small model; flagship model usage drops to 20%.\`
+  },
+  {
+    segId: 'seg-rag',
+    tagId: 'tag3',
+    savePct: 18,
+    tagCls: 's3',
+    steps: [
+      'Add a judgment step at the start of the RAG flow: does this question need document retrieval?',
+      '"General knowledge" (e.g. "what is Python") → skip RAG, answer directly',
+      '"Product-specific questions" (e.g. "what is your refund policy") → trigger vector retrieval',
+      'Can use rule-based judgment (keyword matching) or small model classification'
+    ],
+    detail: `<b>RAG trigger filter:</b> Not every question needs retrieval — filter out general knowledge questions.<br><br>
+      <div class="flow">
+        <span class="flow-step">User query</span><span class="flow-arrow">→</span>
+        <span class="flow-step">Need RAG?</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">No: answer directly</span>
+      </div>
+      <div class="flow" style="margin-top:2px">
+        <span style="width:80px;display:inline-block"></span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step flag">Yes: vector search → inject context</span>
+      </div>
+      <b>Effect:</b> In production, ~40–70% of questions can skip RAG.\`
+  },
+  {
+    segId: null,  // reduces remaining hist portion
+    tagId: 'tag4',
+    savePct: 8,
+    tagCls: 's4',
+    steps: [
+      'Set threshold: trigger when conversation exceeds 20 turns or history tokens exceed 3,000',
+      'Use one LLM call to compress the early N turns into a ~200-token summary',
+      'Replace original history with the summary; context usage drops dramatically',
+      'Compress early (before near-overflow), not after it happens'
+    ],
+    detail: `<b>Compression timing:</b> Proactively compress before context fills up, not passively truncate after overflow.<br><br>
+      <div class="flow">
+        <span class="flow-step">Turn N</span><span class="flow-arrow">→</span>
+        <span class="flow-step flag">History > 3000T?</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">Trigger summary compression</span>
+      </div>
+      <div class="flow" style="margin-top:4px">
+        <span class="flow-step">~2000T history</span><span class="flow-arrow">compress to</span>
+        <span class="flow-step hit">~200T summary</span><span class="flow-arrow">saves</span>
+        <span class="flow-step hit">90%</span>
+      </div>`
+  },
+  {
+    segId: null,
+    tagId: 'tag5',
+    savePct: 7,
+    tagCls: 's5',
+    steps: [
+      'Maintain a vector database storing Embeddings of high-quality historical Q-A pairs',
+      'For each new request, compute Embedding first; search for historical answers with similarity > threshold (e.g. 0.92)',
+      'Hit → return cached answer directly, no LLM call (latency ~10ms)',
+      'Miss → call LLM normally, then store the new Q-A into the cache'
+    ],
+    detail: `<b>Semantic cache vs exact cache:</b> "How do I get a refund" and "What is the refund process" → semantically similar → reuse the same answer.<br><br>
+      <div class="flow">
+        <span class="flow-step">New question Embedding</span><span class="flow-arrow">→</span>
+        <span class="flow-step">Vector search</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">Similarity > 0.92: HIT</span>
+      </div>
+      <div class="flow" style="margin-top:2px">
+        <span style="width:140px;display:inline-block"></span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step flag">Miss: call LLM + store cache</span>
+      </div>
+      <b>Best for:</b> customer service FAQs, high-frequency similar-question systems (hit rate can reach 60–80%).\`
+  }
+];
+
+// Currently active strategy set
+let activeSet = new Set();
+// Current flex values for each segment (dynamic)
+let segFlex = { hist: 35, rag: 25, model: 20, real: 20, saved: 0 };
+
+function pickStrat(btn, idx) {
+  const s = STRATS[idx];
+  const isOn = activeSet.has(idx);
+
+  if (isOn) {
+    // deactivate
+    activeSet.delete(idx);
+    btn.classList.remove('active');
+    document.getElementById(s.tagId).classList.remove('active');
+  } else {
+    // activate
+    activeSet.add(idx);
+    btn.classList.add('active');
+    document.getElementById(s.tagId).classList.add('active');
+  }
+
+  // recalculate bar
+  recalcBar();
+  // update details
+  renderDetail(idx, !isOn);
+  // update step list (show last activated strategy)
+  renderSteps(idx, !isOn);
+}
+
+function recalcBar() {
+  // reset
+  let hist = 35, rag = 25, model = 20, real = 20;
+  let saved = 0;
+
+  if (activeSet.has(0)) { saved += 35; hist = 0; }       // KV Cache eliminates repeated history
+  if (activeSet.has(1)) { saved += 12; model = 8; }      // routing: flagship 20→8
+  if (activeSet.has(2)) { saved += 18; rag = 7; }        // RAG filter: 25→7
+  if (activeSet.has(3)) { saved += 8; hist = Math.max(0, hist - 8); }  // history compression
+  if (activeSet.has(4)) { saved += 7; }                  // semantic cache
+
+  const total = hist + rag + model + real + saved;
+  const remaining = 100 - saved;
+
+  // apply flex
+  const apply = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.flex = val;
+    if (val === 0) { el.classList.add('gone'); el.textContent = ''; }
+    else { el.classList.remove('gone'); }
+  };
+  apply('seg-hist',  hist);
+  apply('seg-rag',   rag);
+  apply('seg-model', model);
+  apply('seg-real',  real);
+
+  const savedEl = document.getElementById('seg-saved');
+  savedEl.style.flex = saved;
+  savedEl.style.minWidth = saved > 0 ? '40px' : '0';
+  savedEl.textContent = saved > 0 ? `Saved ${saved}%` : '';
+
+  // update percentage numbers
+  const pctEl = document.getElementById('afterPct');
+  pctEl.textContent = remaining + '%';
+  pctEl.style.color = saved > 50 ? 'var(--success)' : saved > 20 ? 'var(--amber)' : 'var(--text)';
+
+  // large number
+  const bigEl = document.getElementById('totalBig');
+  bigEl.textContent = saved + '%';
+  bigEl.style.color = saved > 60 ? 'var(--success)' : saved > 30 ? 'var(--amber)' : 'var(--sub)';
+}
+
+function renderDetail(idx, isActivating) {
+  const s = STRATS[idx];
+  const panel = document.getElementById('detailPanel');
+  if (!isActivating) {
+    panel.innerHTML = '<div class="detail-inner" style="color:var(--sub);font-size:14px;text-align:center;padding-top:18px">↑ Click any strategy above to view the implementation flow</div>';
+    return;
+  }
+  panel.innerHTML = `<div class="detail-inner">${s.detail}</div>`;
+}
+
+function renderSteps(idx, isActivating) {
+  const s = STRATS[idx];
+  const el = document.getElementById('pathSteps');
+  el.innerHTML = '';
+  if (!isActivating) return;
+  s.steps.forEach((text, i) => {
+    const div = document.createElement('div');
+    div.className = 'path-step';
+    div.innerHTML = `<div class="step-num">${i+1}</div><div>${text}</div>`;
+    el.appendChild(div);
+    setTimeout(() => div.classList.add('show'), i * 80);
+  });
+}
+
+// initialize
+recalcBar();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

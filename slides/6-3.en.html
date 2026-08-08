@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Output Format Trade-offs: JSON / Markdown / Plain Text | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* Page-local aliases — all mapped to design system variables (referenced by JS render functions) */
+:root {
+  --surface2: #f0ede6;
+  --muted: var(--sub);
+  --green: var(--success);
+  --red: var(--danger);
+}
+
+/* ── Format selection list ── */
+.fmt-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fmt-btn {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--card);
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+  text-align: left; width: 100%; min-height: 44px;
+  box-shadow: var(--shadow-card);
+}
+.fmt-btn:hover { border-color: rgba(0,0,0,0.15); }
+.fmt-btn.active { border-color: var(--purple); background: rgba(124,58,237,0.04); }
+.badge {
+  padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800;
+  flex-shrink: 0; min-width: 48px; text-align: center;
+  font-family: "SF Mono", Menlo, monospace;
+}
+.ft h4 { font-size: 15px; font-weight: 700; color: var(--text); transition: color 0.2s; }
+.fmt-btn.active .ft h4 { color: var(--purple); }
+.ft p { font-size: 12px; color: var(--sub); margin-top: 2px; line-height: 1.5; }
+
+/* ── Score grid ── */
+.score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sc {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 8px; text-align: center;
+}
+.sc .sl { font-size: 11px; color: var(--sub); font-weight: 600; margin-bottom: 4px; }
+.sc .sv { font-size: 15px; font-weight: 800; }
+.sv.good { color: var(--success); }
+.sv.mid { color: var(--amber); }
+.sv.bad { color: var(--danger); }
+
+/* ── Trade-off description ── */
+.tradeoff-box {
+  background: rgba(124,58,237,0.05); border: 1.5px solid rgba(124,58,237,0.15);
+  border-radius: var(--radius); padding: 14px 18px;
+  font-size: 14px; color: var(--text); line-height: 1.8; margin-top: 12px;
+}
+.tradeoff-box b { color: var(--purple); }
+.warn-tag {
+  background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.2);
+  color: var(--danger); padding: 1px 7px; border-radius: 4px;
+  font-size: 12px; font-weight: 600;
+}
+.good-tag {
+  background: rgba(22,163,74,0.08); border: 1px solid rgba(22,163,74,0.2);
+  color: var(--success); padding: 1px 7px; border-radius: 4px;
+  font-size: 12px; font-weight: 600;
+}
+
+/* ── Streaming demo area ── */
+.demo-hd { font-size: 14px; font-weight: 800; color: var(--sub); letter-spacing: 0.4px; margin-bottom: 12px; }
+.stream-area { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.stream-panel {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sp-hd {
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: var(--surface2); font-size: 13px; font-weight: 700;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.sp-body { height: 320px; overflow-y: auto; position: relative; }
+
+/* Normal code view */
+.code-view {
+  padding: 12px 14px; font-size: 13px;
+  font-family: "SF Mono", "Fira Code", Menlo, monospace;
+  line-height: 1.7; color: #cdd6f4; background: #1e1b2e;
+  min-height: 100%; white-space: pre-wrap; word-break: break-word;
+}
+/* Render view */
+.render-view { padding: 12px 14px; font-size: 14px; line-height: 1.75; color: var(--text); }
+
+/* Token flowing characters */
+.tk { display: inline; opacity: 0; animation: tkIn 0.08s ease forwards; }
+@keyframes tkIn { to { opacity: 1; } }
+
+/* Progress bar */
+.prog-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.prog-track { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 0.2s; }
+.prog-pct { font-size: 12px; color: var(--sub); min-width: 36px; }
+
+.ctrl-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.btn {
+  padding: 11px 24px; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700; border: none; cursor: pointer;
+  font-family: inherit; transition: all 0.15s; min-height: 44px;
+}
+.btn-play { background: var(--purple); color: white; }
+.btn-play:hover { filter: brightness(1.1); }
+.btn-play:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-rst { background: var(--card); color: var(--sub); border: 1.5px solid var(--border); }
+.hint { font-size: 13px; color: var(--sub); }
+
+/* rendered MD styles */
+.r-h2 { font-size: 17px; font-weight: 800; color: var(--text); margin: 6px 0 4px; }
+.r-h3 { font-size: 15px; font-weight: 700; color: #5b4fcf; margin: 4px 0 2px; }
+.r-li::before { content: "•"; color: var(--purple); margin-right: 5px; }
+.r-li { padding-left: 10px; margin: 2px 0; font-size: 14px; }
+.r-bq { padding-left: 10px; color: var(--sub); font-style: italic; margin: 4px 0; font-size: 13px; }
+.r-strong { font-weight: 800; color: var(--text); }
+
+/* streaming status badge */
+.status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.status.live { background: #fef3c7; color: #92400e; animation: pulse 1.2s ease infinite; }
+.status.done { background: #d1fae5; color: #065f46; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+@media (max-width: 768px) {
+  .fmt-list { grid-template-columns: 1fr; }
+  .score-grid { grid-template-columns: repeat(2, 1fr); }
+  .stream-area { grid-template-columns: 1fr; }
+  .sp-body { height: 240px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Which output format should you choose for different scenarios? Compare JSON (programmatic parsing), Markdown (user display), and plain text (voice/simple scenarios), plus engineering approaches for enforcing structured output.">
+<meta name="keywords" content="LLM output format,JSON output,Markdown output,structured output,Function Calling">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/6-3.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/6-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/6-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/6-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/6-3.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Output Format Trade-offs: JSON / Markdown / Plain Text">
+<meta property="og:description" content="Which output format should you choose for different scenarios? Compare JSON (programmatic parsing), Markdown (user display), and plain text (voice/simple scenarios), plus engineering approaches for enforcing structured output.">
+<meta property="og:url" content="https://xueai.app/slides/6-3.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Output Format Trade-offs: JSON / Markdown / Plain Text">
+<meta name="twitter:description" content="Which output format should you choose for different scenarios? Compare JSON (programmatic parsing), Markdown (user display), and plain text (voice/simple scenarios), plus engineering approaches for enforcing structured output.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Output Format Trade-offs","name":"Output Format Trade-offs","url":"https://xueai.app/slides/6-3.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Prompt Engineering","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Which output format should you choose for different scenarios? Compare JSON (programmatic parsing), Markdown (user display), and plain text (voice/simple scenarios), plus engineering approaches for enforcing structured output.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt Engineering</div>
+    <h1>Output Format Trade-offs</h1>
+    <p class="subtitle">There is no universally best format — only the format best suited to the use case. The impact of format choice becomes especially apparent during streaming. Select a format and click "Start Streaming Demo" to observe the Token generation experience differences.</p>
+  </header>
+
+  <div class="sec-label">Five Output Formats</div>
+
+  <div class="fmt-list">
+    <button class="fmt-btn active" onclick="pickFmt(this,0)">
+      <span class="badge" style="background:#f0ede6;color:#6b6b70">TXT</span>
+      <div class="ft"><h4>Plain Text</h4><p>Direct streaming display, most stable</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,1)">
+      <span class="badge" style="background:#fef3c7;color:#92400e">JSON</span>
+      <div class="ft"><h4>JSON Structured</h4><p>Incomplete during streaming, cannot parse in real time</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,2)">
+      <span class="badge" style="background:#ede9fe;color:#6d28d9">MD</span>
+      <div class="ft"><h4>Markdown</h4><p>Streamable rendering, hard to extract structure</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,3)">
+      <span class="badge" style="background:#d1fae5;color:#065f46">YAML</span>
+      <div class="ft"><h4>YAML</h4><p>Token-efficient, also incomplete during streaming</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,4)">
+      <span class="badge" style="background:#dbeafe;color:#1e40af">XML</span>
+      <div class="ft"><h4>XML / Custom Tags</h4><p>Incrementally parseable during streaming, most friendly</p></div>
+    </button>
+  </div>
+
+  <div class="sec-label">Scenario Fit</div>
+
+  <div class="score-grid" id="scoreGrid"></div>
+  <div class="tradeoff-box" id="tradeoffBox"></div>
+
+  <div class="sec-label">Streaming Demo</div>
+
+  <div class="demo-hd" id="demoHd">Demo: Plain Text — Streaming Token Experience</div>
+  <div class="stream-area paywall-locked xa-peek">
+    <div class="stream-panel">
+      <div class="sp-hd">
+        <span id="rawTitle">Raw Token Stream</span>
+        <span class="status live" id="rawStatus">Waiting</span>
+      </div>
+      <div class="sp-body">
+        <div class="code-view" id="rawView"></div>
+      </div>
+    </div>
+    <div class="stream-panel">
+      <div class="sp-hd">
+        <span id="rendTitle">Frontend Render Result</span>
+        <span class="status live" id="rendStatus">Waiting</span>
+      </div>
+      <div class="sp-body" id="rendBody">
+        <div class="render-view" id="rendView"></div>
+      </div>
+    </div>
+  </div>
+  <div class="prog-row paywall-locked">
+    <div class="prog-track"><div class="prog-fill" id="progFill" style="background:var(--purple)"></div></div>
+    <span class="prog-pct" id="progPct">0%</span>
+  </div>
+  <div class="ctrl-row paywall-locked">
+    <button class="btn btn-play" id="btnPlay" onclick="playDemo()">▶ Start Streaming Demo</button>
+    <button class="btn btn-rst" onclick="resetDemo()">Reset</button>
+    <span class="hint" id="playHint"></span>
+  </div>
+
+</article>
+
+<script>
+const FMTS = [
+  {
+    demoHd: 'Demo: Plain Text — Streaming Token Experience',
+    rawTitle: 'Raw Token Stream',
+    rendTitle: 'Frontend Real-time Display (Direct)',
+    scores: [
+      {lbl:'Frontend',val:'Direct',cls:'good'},{lbl:'Token Count',val:'Fewest',cls:'good'},
+      {lbl:'Structure Parse',val:'Hard',cls:'bad'},{lbl:'Streaming UX',val:'✓✓',cls:'good'}
+    ],
+    tradeoff: `<b>Plain Text best for:</b> Displaying directly to users / No programmatic field reading / Very long outputs<br><br>
+<span class="good-tag">Pro</span> Fewest tokens, instant display during streaming, no need to wait for full text<br>
+<span class="good-tag">Pro</span> No parse failures from missing brackets<br>
+<span class="warn-tag">Con</span> Difficult to extract structured information, not suitable for programmatic consumption`,
+    raw: 'Notion AI\nType: Writing assistant\nHighlight: Seamless Notion integration\nBest for: Content teams\n\nMidjourney\nType: Image generation\nHighlight: Rich artistic styles\nBest for: Designers',
+    renderFn: (raw) => `<div style="white-space:pre-wrap;font-size:14px;font-family:monospace;color:var(--sub)">${escHtml(raw)}</div>`
+  },
+  {
+    demoHd: 'Demo: JSON — Incomplete During Streaming, Cannot Parse',
+    rawTitle: 'Raw Token Stream (JSON incomplete until…)',
+    rendTitle: 'Frontend must wait for full text to parse',
+    scores: [
+      {lbl:'Frontend',val:'✓',cls:'good'},{lbl:'Token Count',val:'Medium',cls:'mid'},
+      {lbl:'Structure Parse',val:'✓✓',cls:'good'},{lbl:'Streaming UX',val:'Poor',cls:'bad'}
+    ],
+    tradeoff: `<b>JSON best for:</b> Backend field reading / Data storage / Frontend dynamic rendering (non-streaming)<br><br>
+<span class="good-tag">Pro</span> JSON.parse() gives precise fields, easy frontend rendering<br>
+<span class="warn-tag">Con</span> JSON is incomplete during streaming — must wait for full text before parsing<br>
+<span class="warn-tag">Con</span> Very long JSON may fail generation due to missing brackets; fallback logic required`,
+    raw: '{\n  "tools": [\n    {\n      "name": "Notion AI",\n      "type": "Writing assistant",\n      "highlight": "Seamless Notion integration"\n    },\n    {\n      "name": "Midjourney",\n      "type": "Image generation"\n    }\n  ]\n}',
+    renderFn: (raw, pct) => {
+      if (pct < 100) {
+        return `<div style="padding:20px;text-align:center;color:var(--amber)">
+          <div style="font-size:32px;margin-bottom:8px">⏳</div>
+          <div style="font-size:15px;font-weight:700">Waiting for full JSON…</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:6px">Incomplete JSON during streaming cannot be parsed; user sees blank</div>
+        </div>`;
+      }
+      return `<div style="padding:12px;font-size:14px">
+        <div style="color:var(--green);font-weight:700;margin-bottom:8px">✅ JSON received, starting parse…</div>
+        <div style="background:var(--surface2);border-radius:6px;padding:8px 10px;font-size:13px;font-family:monospace">
+          name: <b>Notion AI</b> | type: Writing assistant<br>
+          name: <b>Midjourney</b> | type: Image generation
+        </div>
+      </div>`;
+    }
+  },
+  {
+    demoHd: 'Demo: Markdown — Streamable Rendering, Characters Appear Progressively',
+    rawTitle: 'Raw Token Stream (Markdown syntax)',
+    rendTitle: 'Frontend Real-time Rendering (progressive)',
+    scores: [
+      {lbl:'Frontend',val:'✓✓',cls:'good'},{lbl:'Token Count',val:'Medium',cls:'mid'},
+      {lbl:'Structure Parse',val:'Hard',cls:'bad'},{lbl:'Streaming UX',val:'✓',cls:'good'}
+    ],
+    tradeoff: `<b>Markdown best for:</b> Rendering directly to users / Document-style output / Chat interfaces<br><br>
+<span class="good-tag">Pro</span> Beautiful rendered format — headings/bold/lists work out of the box, natural streaming display<br>
+<span class="warn-tag">Con</span> Extremely hard to extract structured content, not suitable for programmatic consumption<br>
+<span class="warn-tag">Con</span> Markdown styles inconsistent across models (mixed use of * and -)`,
+    raw: '## AI Tool Recommendations\n\n### 1. Notion AI\n- **Type**: Writing assistant\n- **Highlight**: Seamless Notion integration\n- **Best for**: Content teams\n\n### 2. Midjourney\n- **Type**: Image generation\n- **Highlight**: Rich artistic styles\n\n> Both tools offer free trials',
+    renderFn: (raw) => mdRender(raw)
+  },
+  {
+    demoHd: 'Demo: YAML — Most Token-Efficient, Also Incomplete During Streaming',
+    rawTitle: 'Raw Token Stream (YAML format)',
+    rendTitle: 'Frontend must wait for full text to parse',
+    scores: [
+      {lbl:'Frontend',val:'Backend',cls:'mid'},{lbl:'Token Count',val:'Fewest',cls:'good'},
+      {lbl:'Structure Parse',val:'✓',cls:'good'},{lbl:'Streaming UX',val:'So-so',cls:'mid'}
+    ],
+    tradeoff: `<b>YAML best for:</b> Backend processing / Config file generation / Data streams without frontend awareness<br><br>
+<span class="good-tag">Pro</span> 15–30% fewer tokens than JSON (no quotes/brackets overhead), equally precise parsing<br>
+<span class="good-tag">Pro</span> Human-readable, ideal for config file generation<br>
+<span class="warn-tag">Con</span> Also incomplete during streaming; indentation errors cause parse failures`,
+    raw: 'tools:\n  - name: Notion AI\n    type: Writing assistant\n    highlight: Seamless Notion integration\n    suitable_for: Content teams\n\n  - name: Midjourney\n    type: Image generation\n    highlight: Rich artistic styles\n    suitable_for: Designers',
+    renderFn: (raw, pct) => {
+      if (pct < 100) {
+        return `<div style="padding:20px;text-align:center;color:var(--amber)">
+          <div style="font-size:32px;margin-bottom:8px">⏳</div>
+          <div style="font-size:15px;font-weight:700">Waiting for full YAML…</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:6px">Cannot parse while indentation structure is incomplete</div>
+        </div>`;
+      }
+      return `<div style="padding:12px;font-size:14px">
+        <div style="color:var(--green);font-weight:700;margin-bottom:8px">✅ YAML complete, starting parse…</div>
+        <div style="background:var(--surface2);border-radius:6px;padding:8px 10px;font-size:13px;font-family:monospace">
+          tools[0].name = Notion AI<br>tools[1].name = Midjourney
+        </div>
+        <div style="color:var(--muted);font-size:13px;margin-top:6px">~20% fewer tokens than JSON ✓</div>
+      </div>`;
+    }
+  },
+  {
+    demoHd: 'Demo: XML — Incrementally Parseable During Streaming, Each Closing Tag Ready to Use',
+    rawTitle: 'Raw Token Stream (XML custom tags)',
+    rendTitle: 'Frontend incremental parse: render on each closing tag',
+    scores: [
+      {lbl:'Frontend',val:'✓✓',cls:'good'},{lbl:'Token Count',val:'Higher',cls:'bad'},
+      {lbl:'Tool Calls',val:'✓✓',cls:'good'},{lbl:'Streaming UX',val:'✓✓',cls:'good'}
+    ],
+    tradeoff: `<b>XML best for:</b> Tool calls / Streaming rendering / Claude's recommended format<br><br>
+<span class="good-tag">Pro</span> Incremental parsing during streaming: render immediately on each &lt;/name&gt; tag, no need to wait for full text<br>
+<span class="good-tag">Pro</span> Tool call structure naturally maps to XML; Anthropic Claude's native preference<br>
+<span class="warn-tag">Con</span> Highest token consumption (tags themselves cost tokens)`,
+    raw: '<tool_list>\n  <tool>\n    <name>Notion AI</name>\n    <type>Writing assistant</type>\n    <highlight>Seamless Notion integration</highlight>\n  </tool>\n  <tool>\n    <name>Midjourney</name>\n    <type>Image generation</type>\n    <highlight>Rich artistic styles</highlight>\n  </tool>\n</tool_list>',
+    renderFn: (raw) => xmlRender(raw)
+  }
+];
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function mdRender(raw) {
+  let html = escHtml(raw);
+  html = html.replace(/^## (.+)$/gm, '<div class="r-h2">$1</div>');
+  html = html.replace(/^### (.+)$/gm, '<div class="r-h3">$1</div>');
+  html = html.replace(/^\- \*\*(.+?)\*\*：(.+)$/gm, '<div class="r-li"><span class="r-strong">$1</span>: $2</div>');
+  html = html.replace(/^\- (.+)$/gm, '<div class="r-li">$1</div>');
+  html = html.replace(/^&gt; (.+)$/gm, '<div class="r-bq">$1</div>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<span class="r-strong">$1</span>');
+  html = html.replace(/\n/g, '');
+  return `<div style="padding:10px 14px">${html}</div>`;
+}
+
+function xmlRender(raw) {
+  const matches = [...raw.matchAll(/<tool>([\s\S]*?)<\/tool>/g)];
+  if (!matches.length) return `<div style="padding:12px;color:var(--muted);font-size:13px">Waiting for first &lt;/tool&gt; closing tag…</div>`;
+  let html = '<div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px">';
+  matches.forEach((m, i) => {
+    const name = (m[1].match(/<name>(.*?)<\/name>/) || ['','?'])[1];
+    const type = (m[1].match(/<type>(.*?)<\/type>/) || ['',''])[1];
+    const hl   = (m[1].match(/<highlight>(.*?)<\/highlight>/) || ['',''])[1];
+    html += `<div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:14px">
+      <div style="font-weight:800;color:var(--purple);margin-bottom:3px">${escHtml(name)}</div>
+      ${type?`<div style="color:var(--sub);font-size:13px">Type: ${escHtml(type)}</div>`:''}
+      ${hl?`<div style="color:var(--green);font-size:13px;margin-top:2px">✓ ${escHtml(hl)}</div>`:''}
+    </div>`;
+  });
+  html += `<div style="color:var(--green);font-size:12px;margin-top:2px">↑ Parsed ${matches.length} item(s) (streaming in progress…)</div>`;
+  html += '</div>';
+  return html;
+}
+
+let curFmt = 0, playing = false, rawTimer = null;
+
+function pickFmt(btn, idx) {
+  document.querySelectorAll('.fmt-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+  curFmt = idx;
+  resetDemo();
+  const f = FMTS[idx];
+  document.getElementById('demoHd').textContent = f.demoHd;
+  document.getElementById('rawTitle').textContent = f.rawTitle;
+  document.getElementById('rendTitle').textContent = f.rendTitle;
+  document.getElementById('scoreGrid').innerHTML = f.scores.map(s =>
+    `<div class="sc"><div class="sl">${s.lbl}</div><div class="sv ${s.cls}">${s.val}</div></div>`
+  ).join('');
+  document.getElementById('tradeoffBox').innerHTML = f.tradeoff;
+}
+
+function playDemo() {
+  if (playing) return;
+  playing = true;
+  document.getElementById('btnPlay').disabled = true;
+  document.getElementById('playHint').textContent = 'Streaming tokens…';
+  document.getElementById('rawStatus').textContent = 'Generating';
+  document.getElementById('rawStatus').className = 'status live';
+  document.getElementById('rendStatus').textContent = 'Rendering';
+  document.getElementById('rendStatus').className = 'status live';
+
+  const f = FMTS[curFmt];
+  const rawEl = document.getElementById('rawView');
+  const rendEl = document.getElementById('rendView');
+  const prog = document.getElementById('progFill');
+  const progPct = document.getElementById('progPct');
+  rawEl.innerHTML = '';
+
+  const chars = f.raw.split('');
+  let i = 0, raw = '';
+
+  function tick() {
+    if (i >= chars.length) {
+      document.getElementById('rawStatus').textContent = 'Done';
+      document.getElementById('rawStatus').className = 'status done';
+      document.getElementById('rendStatus').textContent = 'Done';
+      document.getElementById('rendStatus').className = 'status done';
+      playing = false;
+      document.getElementById('playHint').textContent = 'Streaming demo complete — observe the experience difference on both sides';
+      rendEl.innerHTML = f.renderFn(raw, 100);
+      prog.style.width = '100%'; progPct.textContent = '100%';
+      return;
+    }
+    const ch = chars[i++];
+    raw += ch;
+    // Color raw stream tokens
+    const span = document.createElement('span');
+    span.className = 'tk';
+    if (ch === '<') span.style.color='#f38ba8';
+    else if (ch === '>') span.style.color='#f38ba8';
+    else if (ch === '"') span.style.color='#a6e3a1';
+    else if (ch === ':') span.style.color='#89dceb';
+    else span.style.color='#cdd6f4';
+    span.textContent = ch;
+    rawEl.appendChild(span);
+    rawEl.parentElement.scrollTop = rawEl.parentElement.scrollHeight;
+
+    const pct = Math.round(i / chars.length * 100);
+    prog.style.width = pct + '%'; progPct.textContent = pct + '%';
+
+    // Right-side render (refresh every 5 characters)
+    if (i % 5 === 0 || i === chars.length) {
+      rendEl.innerHTML = f.renderFn(raw, pct);
+      document.getElementById('rendBody').scrollTop = 9999;
+    }
+
+    const delay = ch === '\n' ? 60 : 18;
+    rawTimer = setTimeout(tick, delay);
+  }
+  tick();
+}
+
+function resetDemo() {
+  clearTimeout(rawTimer);
+  playing = false;
+  document.getElementById('rawView').innerHTML = '';
+  document.getElementById('rendView').innerHTML = `<div style="padding:16px;color:var(--muted);font-size:14px">Click "Start Streaming Demo" to see the effect…</div>`;
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('btnPlay').textContent = '▶ Start Streaming Demo';
+  document.getElementById('playHint').textContent = '';
+  document.getElementById('progFill').style.width = '0%';
+  document.getElementById('progPct').textContent = '0%';
+  document.getElementById('rawStatus').textContent = 'Waiting';
+  document.getElementById('rawStatus').className = 'status live';
+  document.getElementById('rendStatus').textContent = 'Waiting';
+  document.getElementById('rendStatus').className = 'status live';
+}
+
+// Initialize
+pickFmt(document.querySelector('.fmt-btn.active'), 0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

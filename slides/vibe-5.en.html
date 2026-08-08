@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding methodology section 5: add logs first to locate the root cause before changing code, no guesswork fixes, answer three questions before fixing, declare impact scope after fixing.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<title>Section 5: The Debugging Iron Rule: Log First, Then Fix | AI Practicum</title>
+<link rel="canonical" href="https://xueai.app/slides/vibe-5.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/vibe-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/vibe-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/vibe-5.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/vibe-5.html">
+<link rel="stylesheet" href="lesson.css">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e;--vibe-soft:rgba(13,148,136,.08)}
+.lesson-header .kicker{color:var(--vibe)}
+
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+
+/* Bug 案例框 */
+.bug-box{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.22);border-radius:10px;padding:13px 16px;font-size:14.5px;line-height:1.75;color:var(--text);margin-top:12px}
+.bug-box b{color:var(--danger)}
+
+/* 路径选择按钮组（延续 5-2 的按钮组写法） */
+.path-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.path-btn{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;transition:all .2s;font-family:inherit;text-align:left;width:100%;min-height:44px;box-shadow:var(--shadow-card)}
+.path-btn:hover{border-color:rgba(0,0,0,.15)}
+.path-btn h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px}
+.path-btn p{font-size:13px;color:var(--sub)}
+.path-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.path-btn.p0 .path-icon{background:rgba(220,38,38,.1)}
+.path-btn.p1 .path-icon{background:var(--vibe-soft)}
+.path-btn.p0.active{border-color:var(--danger);background:rgba(220,38,38,.04)}
+.path-btn.p0.active h4{color:var(--danger)}
+.path-btn.p1.active{border-color:var(--vibe);background:rgba(13,148,136,.05)}
+.path-btn.p1.active h4{color:var(--vibe-deep)}
+
+/* 计数器 */
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px}
+.stat{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;text-align:center}
+.stat .sv{font-size:26px;font-weight:800;color:var(--text);font-family:"SF Mono",Menlo,monospace;line-height:1.3}
+.stat .sv.hot{color:var(--danger)}
+.stat .sv.cool{color:var(--vibe-deep)}
+.stat .sl{font-size:12px;color:var(--sub);font-weight:700;letter-spacing:.4px}
+
+/* 演示区（延续 5-2 的气泡写法） */
+.vis-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;margin-top:14px}
+.vis-bar{padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.vis-bar-title{font-size:14px;font-weight:700;color:var(--sub)}
+.vis-body{min-height:240px;max-height:400px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.msg{padding:10px 14px;border-radius:10px;font-size:14.5px;line-height:1.65;opacity:0;transform:translateY(8px);transition:all .35s ease;flex-shrink:0}
+.msg.show{opacity:1;transform:translateY(0)}
+.msg.ai{background:rgba(0,0,0,.045);color:var(--text)}
+.msg.log{background:#0e1c1a;color:#5eead4;font-family:"SF Mono",Menlo,monospace;font-size:13px}
+.msg.warning{background:rgba(220,38,38,.07);color:var(--danger);font-weight:600}
+.msg.ok{background:rgba(22,163,74,.08);color:var(--success);font-weight:600}
+.msg.fix{background:var(--vibe-soft);color:var(--vibe-deep);font-family:"SF Mono",Menlo,monospace;font-size:13px}
+
+.ctrl-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn{padding:11px 22px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-p{background:var(--vibe);color:#fff}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.05);color:var(--sub);border:1px solid var(--border)}
+.hint{font-size:13px;color:var(--sub)}
+
+/* 战绩对比 */
+.score-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.score-box{border-radius:12px;padding:14px 16px;border:1.5px solid var(--border);background:var(--card)}
+.score-box h4{font-size:14px;font-weight:800;margin-bottom:6px}
+.score-box.s0 h4{color:var(--danger)}
+.score-box.s1 h4{color:var(--vibe-deep)}
+.score-box .sd{font-size:13.5px;color:var(--sub);line-height:1.7;font-family:"SF Mono",Menlo,monospace}
+.score-box.done.s0{border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.03)}
+.score-box.done.s1{border-color:rgba(13,148,136,.35);background:rgba(13,148,136,.04)}
+
+/* 三问自查器 */
+.qcheck{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.qc-item{border:1.5px solid var(--border);border-radius:12px;background:var(--card);overflow:hidden;box-shadow:var(--shadow-card)}
+.qc-head{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;background:none;border:none;cursor:pointer;font-family:inherit;text-align:left;min-height:44px}
+.qc-badge{width:30px;height:30px;border-radius:8px;background:rgba(0,0,0,.05);color:var(--sub);font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.qc-item.open .qc-badge{background:var(--vibe);color:#fff}
+.qc-head h4{font-size:15px;font-weight:700;color:var(--text);flex:1}
+.qc-arrow{font-size:13px;color:var(--sub);transition:transform .2s}
+.qc-item.open .qc-arrow{transform:rotate(90deg)}
+.qc-body{display:none;padding:0 16px 14px 58px;font-size:13.5px;color:var(--sub);line-height:1.75}
+.qc-item.open .qc-body{display:block}
+.qc-body b{color:var(--vibe-deep)}
+.unlock-area{margin-top:14px}
+.fix-result{display:none;margin-top:12px}
+.fix-result.show{display:block}
+
+.imp-line{font-family:"SF Mono",Menlo,monospace;font-size:13.5px;background:rgba(0,0,0,.04);border-radius:8px;padding:10px 14px;margin-top:10px;color:var(--text)}
+
+.src-note{margin-top:24px;font-size:12.5px;color:var(--sub)}
+.src-note a{color:var(--vibe-deep)}
+
+@media (max-width:768px){
+  .path-row{grid-template-columns:1fr}
+  .stat-row{grid-template-columns:1fr 1fr 1fr}
+  .score-grid{grid-template-columns:1fr}
+  .qc-body{padding-left:16px}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"The Debugging Iron Rule: Log First, Then Fix","name":"The Debugging Iron Rule: Log First, Then Fix","url":"https://xueai.app/slides/vibe-5.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practicum · Quality Baseline","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Vibe Coding methodology section 5: add logs first to locate the root cause before changing code, no guesswork fixes, answer three questions before fixing, declare impact scope after fixing.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+  <header class="lesson-header">
+    <div class="kicker">Vibe Coding Methodology · Section 5</div>
+    <h1>The Debugging Iron Rule: Log First, Then Fix</h1>
+    <p class="subtitle">When AI hits an error, its first instinct is to guess a cause and try a fix, then guess another if it fails. This section establishes the most fundamental rule: no guesswork fixes. The two demos below let you compare the two bug-fixing paths hands-on.</p>
+  </header>
+
+  <section class="reveal">
+    <div class="sec-label">Core Rule</div>
+    <div class="l-callout" style="background:var(--vibe-soft);border-color:rgba(13,148,136,.3)">
+      <p><b style="color:var(--vibe-deep)">No guesswork fixes.</b> When the root cause cannot be confirmed, you must first validate your hypothesis through logs, breakpoints, or test scripts. "Let me just try changing this and see" is forbidden. Backend logs go to the terminal; frontend logs go to the browser Console. For any problem, the first step is always: add logs.</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Interactive Demo 1 · Same Bug, Two Approaches</div>
+    <div class="bug-box"><b>Bug scene:</b> In the chat input box under a Chinese IME, when the user presses Enter to confirm a candidate word, the half-typed pinyin is sent as a message.</div>
+    <p class="desc" style="margin-top:10px">Click a path to observe the fix process. The counters on the right track the number of rounds and cumulative lines changed.</p>
+
+    <div class="path-row">
+      <button class="path-btn p0" id="pb0" onclick="pickPath(0)">
+        <div class="path-icon">🎲</div>
+        <div><h4>Guesswork Fix</h4><p>Guess a cause, try a change</p></div>
+      </button>
+      <button class="path-btn p1" id="pb1" onclick="pickPath(1)">
+        <div class="path-icon">🔍</div>
+        <div><h4>Log First, Then Fix</h4><p>Add logs, examine evidence, locate root cause</p></div>
+      </button>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="sv" id="stRound">0</div><div class="sl">Fix Rounds</div></div>
+      <div class="stat"><div class="sv" id="stLines">0</div><div class="sl">Lines Changed</div></div>
+      <div class="stat"><div class="sv" id="stState">Pending</div><div class="sl">Bug Status</div></div>
+    </div>
+
+    <div class="vis-wrap">
+      <div class="vis-bar">
+        <span class="vis-bar-title" id="visTitle">Select a path above to begin</span>
+        <span style="font-size:13px;color:var(--sub)" id="stepHint"></span>
+      </div>
+      <div class="vis-body" id="visBody"></div>
+    </div>
+    <div class="ctrl-row">
+      <button class="btn btn-r" onclick="replayPath()">↺ Replay Current Path</button>
+      <span class="hint" id="ctrlHint"></span>
+    </div>
+
+    <div class="score-grid">
+      <div class="score-box s0" id="score0">
+        <h4>Guesswork Fix · Results</h4>
+        <div class="sd" id="score0d">Not yet demonstrated</div>
+      </div>
+      <div class="score-box s1" id="score1">
+        <h4>Log First, Then Fix · Results</h4>
+        <div class="sd" id="score1d">Not yet demonstrated</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">Interactive Demo 2 · Pre-Fix Three-Question Checklist</div>
+    <div class="bug-box" style="background:rgba(217,119,6,.06);border-color:rgba(217,119,6,.25)"><b style="color:var(--amber)">New Bug arrived:</b> After the user deletes a chat message, the unread count on the conversation list does not update.</div>
+    <p class="desc" style="margin-top:10px">The rule requires answering three questions before fixing any bug. Open each question in order — only after reading all three will the "Start Fix" button unlock.</p>
+
+    <div class="qcheck" id="qcheck">
+      <div class="qc-item" id="qc0">
+        <button class="qc-head" onclick="openQ(0)">
+          <span class="qc-badge">Q1</span>
+          <h4>What is the complete business flow for the feature containing this bug?</h4>
+          <span class="qc-arrow">▶</span>
+        </button>
+        <div class="qc-body">The chain is <b>delete message → update conversation summary → recalculate unread count → push list refresh</b>. Investigation found that "recalculate unread count" is only triggered when a new message arrives; the delete path never reaches it at all. Staring only at the error point will never reveal this chain.</div>
+      </div>
+      <div class="qc-item" id="qc1">
+        <button class="qc-head" onclick="openQ(1)">
+          <span class="qc-badge">Q2</span>
+          <h4>What other modules will be affected by this change?</h4>
+          <span class="qc-arrow">▶</span>
+        </button>
+        <div class="qc-body">Changing the recalculation timing will affect three areas: <b>conversation list, app badge, and multi-device message sync</b>. Understand the upstream/downstream dependencies before acting — avoid fixing one thing and breaking another. The rule also recommends: launch a SubAgent to investigate the impact scope in parallel, and only modify after confirming it is safe.</div>
+      </div>
+      <div class="qc-item" id="qc2">
+        <button class="qc-head" onclick="openQ(2)">
+          <span class="qc-badge">Q3</span>
+          <h4>Are there other places with the same type of problem?</h4>
+          <span class="qc-arrow">▶</span>
+        </button>
+        <div class="qc-body">Yes. <b>"Mark as read" and "retract message"</b> follow the same update chain and also missed triggering the recalculation. The same pitfall is rarely in just one place — fix them all this time.</div>
+      </div>
+    </div>
+
+    <div class="unlock-area">
+      <button class="btn btn-p" id="btnFix" onclick="doFix()" disabled>🔒 Start Fix (answer all three questions first)</button>
+      <div class="fix-result" id="fixResult">
+        <div class="l-callout" style="background:rgba(22,163,74,.05);border-color:rgba(22,163,74,.28)">
+          <p><b style="color:var(--success)">Pre-fix research complete — proceed.</b> After fixing, there is one last step: declare the impact scope so everyone knows what to regression-test.</p>
+          <div class="imp-line">⚡ Impact scope: conversation list unread count, app badge, mark as read, retract message</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Delivery Gate · Two Hard Checks</div>
+    <div class="l-cols">
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:6px;color:var(--vibe-deep)">No Mock to Bypass Real AI Interfaces</h3>
+        <p class="desc" style="font-size:13.5px">For any feature involving AI model calls, confirm the interface is truly accessible before delivery. If the user has not provided an API Key, stop and ask for it — hardcoding fake responses or local mocks to bypass the real call is forbidden. Once the key is in place, send a test request to verify it works before continuing development.</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:6px;color:var(--vibe-deep)">No Delivery Without Passing Unit Tests</h3>
+        <p class="desc" style="font-size:13.5px">Cover core business logic, API interfaces, data processing functions, and edge cases. Test files go in <code>tests/</code>, named <code>test_{module_name}.py</code>; Python projects use pytest. Temporary scripts used for debugging must be deleted after use.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Key Takeaways</div>
+    <div class="l-callout" style="background:var(--vibe-soft);border-color:rgba(13,148,136,.3)">
+      <p><b style="color:var(--vibe-deep)">Evidence first.</b> The 2 minutes spent adding logs saves three rounds of guesswork rework and prevents the root cause from being buried. After fixing, declare the impact scope in the format <code>⚡ Impact scope: XXX, YYY, ZZZ</code>, and pass both the real interface check and unit tests before delivery.</p>
+    </div>
+    <div class="l-card src-note">Source: this section is adapted from chapter 8 "Debugging and Logging Standards" of rule-opensource.mdc in the open-source repository <a href="https://github.com/itshen/xs_vibe_rules" target="_blank" rel="noopener">itshen/xs_vibe_rules</a>.</div>
+  </section>
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<script>
+/* ── 交互一：两条修 Bug 路径对比 ── */
+const PATHS = [
+  {
+    name: 'Guesswork Fix',
+    final: '3 rounds · 47 lines changed · Bug still present',
+    steps: [
+      { cls:'ai',      text:'AI: This might be a duplicate event binding on the send button. Let me remove one listener and see.', round:1, lines:12, title:'Round 1: Start Guessing' },
+      { cls:'warning', text:'Test: Problem persists — IME Enter still triggers a false send.', round:1, lines:12, title:'Round 1: Wrong guess' },
+      { cls:'ai',      text:'AI: Maybe there is no debounce. Let me add 300ms debounce to the send action.', round:2, lines:26, title:'Round 2: Guess again' },
+      { cls:'warning', text:'Test: Not fixed — now there is a new send-delay issue on top of it.', round:2, lines:26, title:'Round 2: Wrong again' },
+      { cls:'ai',      text:'AI: Let me try switching keydown to keyup, and rewrite the event handler while I am at it.', round:3, lines:47, title:'Round 3: Still guessing' },
+      { cls:'warning', text:'Test: Still misfiring. After three rounds the event handling logic is unrecognizable and the original state is gone.', round:3, lines:47, title:'Code mangled, root cause buried' }
+    ],
+    endState: 'Not fixed', endHot: true
+  },
+  {
+    name: 'Log First, Then Fix',
+    final: '1 round · 4 lines changed · Fixed and impact scope declared',
+    steps: [
+      { cls:'ai',  text:'AI: No code changes yet. I will add one log line in the keydown callback to print e.key and isComposing.', round:1, lines:1, title:'Step 1: Add a log' },
+      { cls:'log', text:'Console › key=Enter  isComposing=true  ← IME confirm-candidate Enter is also firing here', round:1, lines:1, title:'Step 2: Examine evidence' },
+      { cls:'ai',  text:'AI: Root cause found. The code only checks e.key === "Enter" without checking isComposing, so the IME confirm-candidate Enter is treated as a send.', round:1, lines:1, title:'Step 3: Locate root cause' },
+      { cls:'fix', text:'if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { send() }', round:1, lines:4, title:'Step 4: Fix in one shot' },
+      { cls:'ok',  text:'Tests pass. ⚡ Impact scope: all input components with Enter-to-send; recommend regression-testing chat box and comment box.', round:1, lines:4, title:'Step 5: Declare impact scope' }
+    ],
+    endState: 'Fixed', endHot: false
+  }
+];
+
+let curPath = -1, curStep = 0, stepTimer = null;
+const pathDone = [false, false];
+
+function pickPath(idx) {
+  curPath = idx;
+  document.getElementById('pb0').classList.toggle('active', idx === 0);
+  document.getElementById('pb1').classList.toggle('active', idx === 1);
+  playPath();
+}
+
+function replayPath() {
+  if (curPath < 0) return;
+  playPath();
+}
+
+function setStats(round, lines, state, hot) {
+  const r = document.getElementById('stRound');
+  const l = document.getElementById('stLines');
+  const s = document.getElementById('stState');
+  r.textContent = round;
+  l.textContent = lines;
+  s.textContent = state;
+  r.className = 'sv' + (hot ? ' hot' : ' cool');
+  l.className = 'sv' + (hot ? ' hot' : ' cool');
+  s.className = 'sv' + (hot ? ' hot' : ' cool');
+  s.style.fontSize = '17px';
+}
+
+function playPath() {
+  clearInterval(stepTimer);
+  curStep = 0;
+  document.getElementById('visBody').innerHTML = '';
+  document.getElementById('ctrlHint').textContent = '';
+  const p = PATHS[curPath];
+  const hot = curPath === 0;
+  setStats(0, 0, 'Investigating', hot);
+  document.getElementById('visTitle').textContent = p.name + ': Running demo';
+
+  stepTimer = setInterval(function () {
+    if (curStep >= p.steps.length) {
+      clearInterval(stepTimer);
+      stepTimer = null;
+      setStats(p.steps[p.steps.length - 1].round, p.steps[p.steps.length - 1].lines, p.endState, p.endHot);
+      document.getElementById('visTitle').textContent = p.name + ': Demo complete';
+      document.getElementById('ctrlHint').textContent = 'Try the other path and compare the numbers';
+      pathDone[curPath] = true;
+      const box = document.getElementById('score' + curPath);
+      box.classList.add('done');
+      document.getElementById('score' + curPath + 'd').textContent = p.final;
+      return;
+    }
+    const step = p.steps[curStep];
+    const body = document.getElementById('visBody');
+    const el = document.createElement('div');
+    el.className = 'msg ' + step.cls;
+    el.textContent = step.text;
+    body.appendChild(el);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add('show'); }); });
+    body.scrollTop = body.scrollHeight;
+
+    setStats(step.round, step.lines, 'Investigating', hot);
+    document.getElementById('visTitle').textContent = step.title;
+    curStep++;
+    document.getElementById('stepHint').textContent = curStep + ' / ' + p.steps.length;
+  }, 1000);
+}
+
+/* 进入视野时自动播放第一条路径 */
+let demoStarted = false;
+lessonOnView(document.getElementById('visBody'), function () {
+  if (demoStarted || curPath >= 0) return;
+  demoStarted = true;
+  pickPath(0);
+});
+
+/* ── 交互二：修复前三问自查器 ── */
+const qOpened = [false, false, false];
+
+function openQ(idx) {
+  const item = document.getElementById('qc' + idx);
+  item.classList.toggle('open');
+  if (item.classList.contains('open')) qOpened[idx] = true;
+
+  if (qOpened[0] && qOpened[1] && qOpened[2]) {
+    const btn = document.getElementById('btnFix');
+    btn.disabled = false;
+    btn.textContent = '✓ All three answered — start fix';
+  }
+}
+
+function doFix() {
+  document.getElementById('fixResult').classList.add('show');
+  document.getElementById('btnFix').disabled = true;
+  document.getElementById('btnFix').textContent = 'Fix complete';
+}
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

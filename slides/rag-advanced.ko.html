@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RAG의 비용과 최적화: 공짜 점심은 없다 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* cost rows */
+.cost-rows { display: flex; flex-direction: column; gap: 8px; }
+.cost-row {
+  display: flex; align-items: center; gap: 0;
+  background: var(--card); border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.cost-row.highlight { border-color: rgba(229,62,62,0.3); }
+.cr-step {
+  width: 110px; flex-shrink: 0;
+  padding: 12px 14px; font-size: 13px; font-weight: 600; color: var(--text);
+  border-right: 1px solid var(--border);
+}
+.cr-badge {
+  width: 100px; flex-shrink: 0;
+  padding: 0 12px; display: flex; align-items: center;
+  border-right: 1px solid var(--border); align-self: stretch;
+}
+.pill {
+  display: inline-block; padding: 3px 10px; border-radius: 8px;
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.pill.low  { background: rgba(22,163,74,0.1);  color: var(--success); }
+.pill.mid  { background: rgba(217,119,6,0.1);  color: var(--amber); }
+.pill.high { background: rgba(229,62,62,0.1);  color: var(--danger); }
+.cr-note { flex: 1; padding: 12px 14px; font-size: 12px; color: var(--sub); line-height: 1.5; }
+.cost-row.highlight .cr-note { color: var(--text); font-weight: 600; }
+
+.insight-box {
+  background: rgba(234,88,12,0.06); border: 1.5px solid rgba(234,88,12,0.2);
+  border-radius: var(--radius); padding: 14px 18px;
+  font-size: 14px; color: var(--text); line-height: 1.7;
+  margin-top: 14px;
+}
+.insight-box b { color: var(--amber); }
+.insight-box .key { color: var(--danger); font-weight: 700; }
+
+.pm-box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px;
+  margin-top: 14px;
+}
+.pm-box .pm-title { font-size: 11px; font-weight: 800; color: var(--sub); letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 8px; }
+.pm-row { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--sub); line-height: 1.6; margin-bottom: 6px; }
+.pm-row:last-child { margin-bottom: 0; }
+.pm-row b { color: var(--text); }
+
+/* Optimization Strategies */
+.strat-rows { display: flex; flex-direction: column; gap: 10px; }
+.strat-item {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  padding: 15px 16px 15px 20px;
+  position: relative; overflow: hidden;
+  cursor: pointer;
+  transition: opacity 0.35s, transform 0.35s, border-color 0.2s, box-shadow 0.2s;
+  display: flex; align-items: flex-start; gap: 14px;
+}
+.strat-item::before {
+  content: ''; position: absolute;
+  left: 0; top: 0; bottom: 0; width: 4px;
+}
+.strat-item.s1::before { background: var(--accent); }
+.strat-item.s2::before { background: var(--amber); }
+.strat-item.s3::before { background: var(--success); }
+.strat-item.s4::before { background: var(--cyan); }
+
+.strat-item.active.s1 { border-color: rgba(0,102,255,0.35); box-shadow: 0 4px 16px rgba(0,102,255,0.08); }
+.strat-item.active.s2 { border-color: rgba(217,119,6,0.35); box-shadow: 0 4px 16px rgba(217,119,6,0.08); }
+.strat-item.active.s3 { border-color: rgba(22,163,74,0.35); box-shadow: 0 4px 16px rgba(22,163,74,0.08); }
+.strat-item.active.s4 { border-color: rgba(8,145,178,0.35); box-shadow: 0 4px 16px rgba(8,145,178,0.08); }
+
+.si-icon { flex-shrink: 0; width: 22px; height: 22px; margin-top: 1px; }
+.strat-item.s1 .si-icon { color: var(--accent); }
+.strat-item.s2 .si-icon { color: var(--amber); }
+.strat-item.s3 .si-icon { color: var(--success); }
+.strat-item.s4 .si-icon { color: var(--cyan); }
+
+.si-body { flex: 1; min-width: 0; }
+.si-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.si-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.si-saving {
+  font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;
+}
+.s1 .si-saving { background: rgba(0,102,255,0.08); color: var(--accent); }
+.s2 .si-saving { background: rgba(217,119,6,0.08); color: var(--amber); }
+.s3 .si-saving { background: rgba(22,163,74,0.08); color: var(--success); }
+.s4 .si-saving { background: rgba(8,145,178,0.08); color: var(--cyan); }
+
+.si-desc {
+  font-size: 13px; color: var(--sub); line-height: 1.65;
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.35s ease, margin-top 0.2s;
+}
+.strat-item.active .si-desc { max-height: 160px; margin-top: 6px; }
+.si-desc b { color: var(--text); }
+
+.conclusion-bar {
+  background: rgba(229,62,62,0.04); border: 1px solid rgba(229,62,62,0.18);
+  border-radius: var(--radius); padding: 14px 18px; font-size: 14px;
+  color: var(--text); line-height: 1.65;
+  margin-top: 20px;
+}
+.conclusion-bar b { color: var(--danger); }
+
+@media (max-width: 768px) {
+  .cost-row { flex-wrap: wrap; }
+  .cr-step { width: auto; flex: 1; border-right: none; }
+  .cr-badge { border-right: none; }
+  .cr-note { flex-basis: 100%; padding-top: 0; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="RAG는 환각을 줄일 수 있지만 상당한 비용이 발생합니다: 지연 증가, Token 소비 2배, 검색 품질이 답변 정확도에 영향을 미칩니다. RAG 최적화 전략 심층 분석: 청킹, 재순위, 하이브리드 검색.">
+<meta name="keywords" content="RAG최적화,검색증강생성비용,벡터검색,재순위,Hybrid Search,RAG지연">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/rag-advanced.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/rag-advanced.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/rag-advanced.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/rag-advanced.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/rag-advanced.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 제품 관리자 교육">
+<meta property="og:title" content="RAG의 비용과 최적화: 공짜 점심은 없다">
+<meta property="og:description" content="RAG는 환각을 줄일 수 있지만 상당한 비용이 발생합니다: 지연 증가, Token 소비 2배, 검색 품질이 답변 정확도에 영향을 미칩니다. RAG 최적화 전략 심층 분석: 청킹, 재순위, 하이브리드 검색.">
+<meta property="og:url" content="https://xueai.app/slides/rag-advanced.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="RAG의 비용과 최적화: 공짜 점심은 없다">
+<meta name="twitter:description" content="RAG는 환각을 줄일 수 있지만 상당한 비용이 발생합니다: 지연 증가, Token 소비 2배, 검색 품질이 답변 정확도에 영향을 미칩니다. RAG 최적화 전략 심층 분석: 청킹, 재순위, 하이브리드 검색.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"RAG의 비용과 최적화 전략","name":"RAG의 비용과 최적화 전략","url":"https://xueai.app/slides/rag-advanced.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강의 · 환각과 네 가지 대응","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"RAG는 환각을 줄일 수 있지만 상당한 비용이 발생합니다: 지연 증가, Token 소비 2배, 검색 품질이 답변 정확도에 영향을 미칩니다. RAG 최적화 전략 심층 분석: 청킹, 재순위, 하이브리드 검색.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">환각과 대응</div>
+    <h1>RAG의 비용과 최적화 전략</h1>
+    <p class="subtitle">RAG 쿼리마다 추가 비용이 발생합니다. 최적화하지 않으면 사용량이 늘어날수록 비용이 빠르게 제어 불능 상태가 됩니다.</p>
+  </header>
+
+  <!-- Cost Analysis -->
+  <div class="sec-label">추가 비용 발생 원인</div>
+
+  <div class="cost-rows">
+    <div class="cost-row reveal" id="cr0">
+      <div class="cr-step">문서 벡터화</div>
+      <div class="cr-badge"><span class="pill low">낮음(1회성)</span></div>
+      <div class="cr-note">Embedding을 DB에 저장할 때 한 번 실행, 이후 재사용</div>
+    </div>
+    <div class="cost-row reveal" id="cr1">
+      <div class="cr-step">질문 벡터화</div>
+      <div class="cr-badge"><span class="pill low">낮음</span></div>
+      <div class="cr-note">쿼리당 약 0.1위안/백만 Token</div>
+    </div>
+    <div class="cost-row reveal" id="cr2">
+      <div class="cr-step">벡터 검색</div>
+      <div class="cr-badge"><span class="pill mid">중간</span></div>
+      <div class="cr-note">대규모 지식 베이스에서 지연이 현저히 증가</div>
+    </div>
+    <div class="cost-row highlight reveal" id="cr3">
+      <div class="cr-step">Prompt 증가</div>
+      <div class="cr-badge"><span class="pill high">높음</span></div>
+      <div class="cr-note">매 요청마다 500–2000 Token 추가 주입, LLM 비용 2배 증가 ⚠</div>
+    </div>
+  </div>
+
+  <div class="insight-box reveal" id="insightBox">
+    <b>가장 핵심적인 최적화:</b> 먼저 의도를 파악하여 RAG가 필요한지 판단합니다. <span class="key">대화의 70%는 사실 문서 검색이 필요 없습니다.</span> LLM을 직접 사용하는 것이 더 빠르고 저렴합니다.
+  </div>
+
+  <div class="pm-box reveal paywall-locked xa-peek" id="pmBox">
+    <div class="pm-title">PM 대응 전략</div>
+    <div class="pm-row">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+      <span><b>검색 명중률 평가 시스템 구축</b>: 몇 개의 질문이 올바른 문서를 성공적으로 검색했는지 파악합니다</span>
+    </div>
+    <div class="pm-row">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+      <span><b>인용 출처 강제 표시</b>: 사용자가 검증할 수 있게 하고, 지식 베이스 품질 향상을 촉진합니다</span>
+    </div>
+    <div class="pm-row">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+      <span><b>정기적인 지식 베이스 정리</b>: RAG 품질 상한 = 지식 베이스 품질</span>
+    </div>
+  </div>
+
+  <!-- Four Optimization Strategies -->
+  <div class="sec-label paywall-locked">네 가지 최적화 전략 (클릭하여 펼치기)</div>
+
+  <div class="strat-rows paywall-locked">
+
+    <div class="strat-item s1 reveal" id="si0" onclick="toggleStrat(0)">
+      <svg class="si-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><line x1="21" y1="2" x2="9.5" y2="13.5"/><line x1="15" y1="8" x2="17" y2="10"/></svg>
+      <div class="si-body">
+        <div class="si-header">
+          <div class="si-title">키워드 트리거 (필터링)</div>
+          <div class="si-saving">비용 절감: 30–70% 쿼리 스킵</div>
+        </div>
+        <div class="si-desc">
+          먼저 질문에 검색이 필요한지 판단합니다. "오늘 며칠이에요?"는 문서를 검색할 필요 없이 바로 답합니다. "환불 정책이 어떻게 되나요?"는 RAG를 트리거합니다.<br>
+          <b>구현:</b> 의도 분류기 또는 간단한 규칙으로 사전 판단하여 불필요한 검색 경로를 건너뜁니다.
+        </div>
+      </div>
+    </div>
+
+    <div class="strat-item s2 reveal" id="si1" onclick="toggleStrat(1)">
+      <svg class="si-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+      <div class="si-body">
+        <div class="si-header">
+          <div class="si-title">모델 라우팅 (단계적 처리)</div>
+          <div class="si-saving">전체 LLM 비용 60–80% 절감</div>
+        </div>
+        <div class="si-desc">
+          간단한 질문은 소형 모델(저렴), 복잡한 질문에만 플래그십 모델을 사용합니다. "안녕하세요"에 GPT-4를 쓰는 낭비를 방지합니다.<br>
+          <b>구현:</b> 질문 복잡도 분류 + 모델 계층 설정 (소형 모델 기본, 대형 모델 필요시 호출).
+        </div>
+      </div>
+    </div>
+
+    <div class="strat-item s3 reveal" id="si2" onclick="toggleStrat(2)">
+      <svg class="si-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      <div class="si-body">
+        <div class="si-header">
+          <div class="si-title">시맨틱 캐싱</div>
+          <div class="si-saving">고빈도 쿼리 지연·비용 50% 절감</div>
+        </div>
+        <div class="si-desc">
+          유사한 질문은 동일한 검색 결과를 재사용합니다. "환불 정책"과 "환불 방법"의 결과는 거의 동일하여 중복 검색이 불필요합니다.<br>
+          <b>구현:</b> 질문 벡터 유사도 ≥ 0.95이면 캐시를 바로 반환하여 전체 RAG 경로를 건너뜁니다.
+        </div>
+      </div>
+    </div>
+
+    <div class="strat-item s4 reveal" id="si3" onclick="toggleStrat(3)">
+      <svg class="si-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+      <div class="si-body">
+        <div class="si-header">
+          <div class="si-title">정밀 청킹 (Chunking 전략)</div>
+          <div class="si-saving">정확도 20–40% 향상</div>
+        </div>
+        <div class="si-desc">
+          문서 분할 단위가 검색 품질에 영향을 미칩니다. 너무 크면 불필요한 Token이 주입되고, 너무 작으면 맥락이 손실됩니다.<br>
+          <b>베스트 프랙티스:</b> 512–800 Token/청크, 제목/단락 경계를 기준으로 의미적 완정성을 유지합니다.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="conclusion-bar reveal paywall-locked" id="conclusionBar">
+    <b>RAG ≠ 전량 검색.</b> 프로덕션 RAG 시스템의 핵심은 「<b>언제 RAG를 사용하지 않을지</b>」입니다. 필터링과 라우팅이 핵심입니다. 지식 베이스 품질 → 검색 품질 → 답변 품질, 세 단계 모두 빠져서는 안 됩니다.
+  </div>
+
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+// Strategy card: click to expand/collapse (content fades in on scroll, no unlock required)
+function toggleStrat(i) {
+  document.getElementById('si' + i).classList.toggle('active');
+}
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

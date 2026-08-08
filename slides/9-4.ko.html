@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>모델이 다운되면 어떻게 되나요? | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.chain-wrap{display:flex;flex-direction:column;align-items:center;gap:0;margin-top:8px;position:relative}
+.chain-node{width:100%;max-width:520px;padding:16px 22px;border-radius:var(--radius);border:1.5px solid var(--border);background:var(--card);box-shadow:var(--shadow-card);display:flex;align-items:center;gap:14px;opacity:0;transform:translateX(-20px);transition:all .5s ease}
+.chain-node.active{opacity:1;transform:translateX(0)}
+.chain-node.fail{border-color:rgba(220,38,38,.4)}
+.chain-node.success{border-color:rgba(22,163,74,.4)}
+.chain-node.fallback{border-color:rgba(217,119,6,.4)}
+.chain-node.final{border-color:rgba(124,58,237,.4)}
+.chain-node .node-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+.chain-node .node-icon img{width:100%;height:100%;object-fit:cover;border-radius:12px}
+.chain-node.fail .node-icon{background:rgba(220,38,38,.08)}
+.chain-node.success .node-icon{background:rgba(22,163,74,.08)}
+.chain-node.fallback .node-icon{background:rgba(217,119,6,.08)}
+.chain-node.final .node-icon{background:rgba(124,58,237,.08)}
+.chain-node .node-text{flex:1}
+.chain-node .node-title{font-size:14px;font-weight:700;color:var(--text)}
+.chain-node .node-desc{font-size:12px;color:var(--sub);margin-top:2px}
+.chain-connector{width:2px;height:24px;background:var(--border);position:relative}
+.chain-connector::after{content:'↓';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);color:var(--sub);font-size:11px;background:var(--bg);padding:0 4px}
+
+.replay-btn{display:block;margin:20px auto 0;background:var(--accent);color:#fff;border:none;padding:10px 24px;border-radius:999px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(0,102,255,.25);transition:transform .15s,box-shadow .15s}
+.replay-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,102,255,.35)}
+.replay-btn:active{transform:translateY(0)}
+
+.state-imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px}
+@media(max-width:768px){.state-imgs{grid-template-columns:1fr}}
+.state-item{text-align:center;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-card)}
+.state-item img{max-width:120px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:10px}
+.state-item .s-label{font-size:13px;font-weight:700;color:var(--text)}
+.state-item .s-desc{font-size:12px;color:var(--sub);margin-top:4px;line-height:1.5}
+
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px}
+@media(max-width:768px){.concept-grid{grid-template-columns:1fr}}
+.concept-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.concept-card .c-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:10px}
+.concept-card .c-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.concept-card .c-desc{font-size:13px;color:var(--sub);line-height:1.6}
+
+.result-demo{display:flex;align-items:center;gap:16px;margin-top:20px;padding:20px;background:var(--card);border:1.5px solid rgba(22,163,74,.3);border-radius:var(--radius);box-shadow:var(--shadow-card)}
+@media(max-width:768px){.result-demo{flex-direction:column}}
+.result-demo img{max-width:200px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);flex-shrink:0}
+.result-demo .result-text{flex:1}
+.result-demo .result-text h4{font-size:16px;font-weight:800;color:var(--success);margin:0 0 8px}
+.result-demo .result-text p{font-size:14px;color:var(--sub);line-height:1.7;margin:0}
+
+.takeaway{background:rgba(217,119,6,.04);border:1.5px solid rgba(217,119,6,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--amber)}
+</style>
+<meta name="description" content="이미지 생성 모델은 타임아웃, 속도 제한, 다운타임이 발생할 수 있습니다. 폴백 체인으로 사용자는 언제나 이미지를 받을 수 있습니다. Alice의 실제 상태로 오류 처리 제품 설계를 보여줍니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-4.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/9-4.ko.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/9-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/9-4.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/9-4.ko.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="모델이 다운되면 어떻게 되나요?">
+<meta property="og:url" content="https://xueai.app/slides/9-4.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"모델이 다운되면 어떻게 되나요?","name":"모델이 다운되면 어떻게 되나요?","url":"https://xueai.app/slides/9-4.ko.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · AI 이미지 생성","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"이미지 생성 모델은 타임아웃, 속도 제한, 다운타임이 발생할 수 있습니다. 폴백 체인으로 사용자는 언제나 이미지를 받을 수 있습니다. Alice의 실제 상태로 오류 처리 제품 설계를 보여줍니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">AI 이미지 생성</div>
+    <h1>모델이 다운되면 어떻게 되나요?</h1>
+    <p class="subtitle">Alice에서 사용자가 「그림 하나 그려줘」라고 하면, 백엔드에서는 Gemini가 타임아웃되고, Seedream이 속도 제한에 걸리고, GPT Image도 오류가 발생할 수 있습니다. 사용자는 어떤 모델이 다운됐는지 신경 쓰지 않습니다. 그들이 신경 쓰는 건 단 하나: 이미지가 나오는가?</p>
+  </header>
+
+  <div class="sec-label">Alice의 세 가지 상태</div>
+
+  <div class="state-imgs reveal">
+    <div class="state-item">
+      <img src="images/alice/thinking.webp" alt="Alice 생각 중">
+      <div class="s-label">생각 중</div>
+      <div class="s-desc">이미지 생성 중, 잠시만 기다려 주세요</div>
+    </div>
+    <div class="state-item">
+      <img src="images/alice/error.webp" alt="Alice 오류 상태">
+      <div class="s-label">오류 발생</div>
+      <div class="s-desc">모델에서 오류 반환, 폴백 전환 중</div>
+    </div>
+    <div class="state-item">
+      <img src="images/alice/empty.webp" alt="Alice 빈 상태">
+      <div class="s-label">전부 실패</div>
+      <div class="s-desc">모든 모델 사용 불가, 우아한 강등</div>
+    </div>
+  </div>
+
+  <div class="sec-label">폴백 체인: Alice의 안전망</div>
+
+  <div class="chain-wrap" id="chainWrap">
+    <div class="chain-node fail" id="n1">
+      <div class="node-icon"><img src="images/alice/error.webp" alt="실패"></div>
+      <div class="node-text">
+        <div class="node-title">모델 A (Gemini) 15초 타임아웃</div>
+        <div class="node-desc">타임아웃 서킷 브레이커 발동 → 자동 폴백</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node fallback" id="n2">
+      <div class="node-icon" style="font-size:18px">⚡</div>
+      <div class="node-text">
+        <div class="node-title">모델 B (Seedream)로 전환</div>
+        <div class="node-desc">폴백 모델 인계, 사용자에게 투명</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node fail" id="n3">
+      <div class="node-icon"><img src="images/alice/error.webp" alt="실패"></div>
+      <div class="node-text">
+        <div class="node-title">모델 B 속도 제한 오류 반환</div>
+        <div class="node-desc">동시 처리 한도 초과, 다음 폴백으로 계속</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node fallback" id="n4">
+      <div class="node-icon" style="font-size:18px">⚡</div>
+      <div class="node-text">
+        <div class="node-title">모델 C (GPT Image)로 전환</div>
+        <div class="node-desc">세 번째 폴백 투입</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node success" id="n5">
+      <div class="node-icon"><img src="images/alice/thinking.webp" alt="성공"></div>
+      <div class="node-text">
+        <div class="node-title">모델 C 이미지 생성 성공 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success,#16a34a)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="node-desc">사용자가 이미지 수령, 전환 과정이 완전히 투명</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node final paywall-locked xa-peek" id="n6">
+      <div class="node-icon"><img src="images/alice/empty.webp" alt="최종 폴백"></div>
+      <div class="node-text">
+        <div class="node-title">전부 실패? 우아한 강등</div>
+        <div class="node-desc">「죄송합니다, 서비스가 혼잡합니다. 대기열에 추가되었으며 나중에 알려드리겠습니다.」</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="replay-btn paywall-locked" onclick="replayChain()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-1px;margin-right:3px"><polygon points="5 3 19 12 5 21 5 3"/></svg> 다시 재생</button>
+
+  <div class="sec-label paywall-locked">최종 결과: 사용자가 보는 것</div>
+
+  <div class="result-demo reveal paywall-locked">
+    <img src="images/alice/life_thinking_rainy.webp" alt="Alice 비 오는 날 생각 중 - 최종 이미지 생성 결과">
+    <div class="result-text">
+      <h4>두 번의 모델 실패에도 불구하고 사용자는 여전히 이미지를 받았습니다</h4>
+      <p>사용자는 「Alice가 그리고 있습니다…」라는 대기 상태만 보고 결과를 받습니다. 백엔드에서 모델 A가 타임아웃되고, 모델 B가 속도 제한에 걸리고, 모델 C가 투입됩니다. 이 모든 것이 사용자에게 완전히 투명합니다. 이것이 폴백 체인의 가치입니다.</p>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">세 가지 제품 접근법</div>
+
+  <div class="concept-grid paywall-locked">
+    <div class="concept-card reveal">
+      <div class="c-icon" style="background:rgba(217,119,6,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+      <div class="c-title">우선순위 정렬 + 화이트리스트</div>
+      <div class="c-desc">모델 우선순위를 사전 설정합니다. 시나리오별로 다른 모델 조합을 지정할 수 있습니다: 인물 클로즈업에는 최고 품질 모델, 단순 배경에는 저렴하고 빠른 모델.</div>
+    </div>
+    <div class="concept-card reveal">
+      <div class="c-icon" style="background:rgba(22,163,74,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="c-title">헬스 체크 메커니즘</div>
+      <div class="c-desc">각 모델의 상태를 주기적으로 점검합니다. 다운 확인된 모델은 즉시 건너뛰고, 복구 후 자동으로 다시 활성화합니다. 사용자의 대기 시간을 죽은 모델에 낭비하지 않습니다.</div>
+    </div>
+    <div class="concept-card reveal">
+      <div class="c-icon" style="background:rgba(124,58,237,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+      <div class="c-title">이미지-to-이미지 강등</div>
+      <div class="c-desc">일부 모델은 이미지-to-이미지를 지원하지 않습니다. 폴백 모델이 이를 지원하지 않으면 텍스트-to-이미지로 전환합니다. 품질은 낮아지지만 적어도 이미지는 생성됩니다.</div>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>사용자는 어떤 모델을 사용하는지 신경 쓰지 않습니다. 그들이 신경 쓰는 건 이미지가 나오는가입니다.</b> Alice에서 폴백 체인은 주력 모델이 전부 다운되더라도 최악의 경우 몇 초 더 기다리거나 친절한 메시지를 받을 뿐, 차가운 오류 페이지는 절대 만나지 않도록 보장합니다.</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+function replayChain() {
+  var nodes = document.querySelectorAll('.chain-node');
+  for (var i = 0; i < nodes.length; i++) {
+    nodes[i].classList.remove('active');
+  }
+  var delays = [300, 900, 1500, 2100, 2700, 3400];
+  for (var i = 0; i < nodes.length; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        nodes[idx].classList.add('active');
+      }, delays[idx]);
+    })(i);
+  }
+}
+
+lessonOnView(document.getElementById('chainWrap'), function() {
+  replayChain();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

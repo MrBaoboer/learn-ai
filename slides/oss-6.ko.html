@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>증류는 어떻게 하는가: 교사에서 학생으로 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<link rel="stylesheet" href="oss.css?v=20260808b">
+<style>
+/* 하드 라벨 vs 소프트 라벨: 이 페이지에서 가장 핵심적인 비교 그림 */
+.lbl-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+.lbl-box {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow-card);
+}
+.lbl-box.is-soft { border-color: rgba(79,70,229,.3); background: rgba(79,70,229,.03); }
+.lbl-head { font-size: 14.5px; font-weight: 800; margin-bottom: 3px; }
+.lbl-sub { font-size: 12.5px; color: var(--sub); margin-bottom: 12px; }
+.lbl-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13.5px; }
+.lbl-row .lr-k { width: 34px; font-weight: 700; flex-shrink: 0; }
+.lbl-row .lr-bar { flex: 1; height: 10px; background: rgba(0,0,0,.06); border-radius: 5px; overflow: hidden; }
+.lbl-row .lr-bar i { display: block; height: 100%; border-radius: 5px; background: var(--sub); opacity: .35; }
+.lbl-box.is-soft .lr-bar i { background: var(--oss); opacity: 1; }
+.lbl-row .lr-v {
+  width: 46px; text-align: right; flex-shrink: 0;
+  font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--sub);
+}
+.lbl-note { font-size: 13px; color: var(--sub); line-height: 1.65; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+/* 증류 산출물 목록 */
+.distill-list { display: flex; flex-direction: column; gap: 7px; margin: 14px 0; }
+.dl-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+  padding: 10px 16px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: var(--card); font-size: 13.5px;
+}
+.dl-row .dl-name { font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; font-weight: 600; }
+.dl-row .dl-base { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.dl-row .dl-base.b-a { background: rgba(79,70,229,.1); color: var(--oss); }
+.dl-row .dl-base.b-b { background: rgba(217,119,6,.13); color: var(--amber); }
+@media (max-width: 768px) { .lbl-pair { grid-template-columns: 1fr; } }
+</style>
+<!-- SEO Start -->
+<meta name="description" content="지식 증류의 전체 흐름: 문제 세트 준비, 교사 모델의 응답과 추론 과정 보존, 정답·오답 라벨 대신 확률 분포 사용, 학생 모델 훈련, 평가와 반복. DeepSeek-R1과 함께 공개된 여섯 개 증류 모델을 예로 실제 증류 산출물이 어떤 모습인지 살펴봅니다.">
+<meta name="keywords" content="지식 증류 과정,소프트 라벨,온도 계수,Teacher Student,DeepSeek-R1-Distill,모델 증류 방법">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/oss-6.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/oss-6.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/oss-6.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/oss-6.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/oss-6.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="증류는 어떻게 하는가: 교사에서 학생으로">
+<meta property="og:description" content="지식 증류의 전체 흐름, 그리고 DeepSeek-R1과 함께 공개된 여섯 개 증류 모델이라는 실제 사례.">
+<meta property="og:url" content="https://xueai.app/slides/oss-6.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="증류는 어떻게 하는가: 교사에서 학생으로">
+<meta name="twitter:description" content="지식 증류의 전체 흐름, 그리고 DeepSeek-R1과 함께 공개된 여섯 개 증류 모델이라는 실제 사례.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "LearningResource"], "headline": "증류는 어떻게 하는가: 교사에서 학생으로", "name": "증류는 어떻게 하는가: 교사에서 학생으로", "url": "https://xueai.app/slides/oss-6.ko.html", "inLanguage": "ko", "author": {"@type": "Person", "name": "洛小山"}, "publisher": {"@type": "Organization", "name": "xueai.app", "url": "https://xueai.app"}, "learningResourceType": "강의", "educationalLevel": "입문에서 심화까지", "isPartOf": {"@type": "Course", "name": "AI 실전 코스 · 대규모 모델을 작게 만드는 법", "url": "https://xueai.app/slides/learn.html"}, "isAccessibleForFree": false, "description": "지식 증류의 전체 흐름: 문제 세트 준비, 교사 모델의 응답과 추론 과정 보존, 정답·오답 라벨 대신 확률 분포 사용, 학생 모델 훈련, 평가와 반복. DeepSeek-R1과 함께 공개된 여섯 개 증류 모델을 예로 실제 증류 산출물이 어떤 모습인지 살펴봅니다.", "hasPart": {"@type": "WebPageElement", "isAccessibleForFree": false, "cssSelector": ".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">오픈소스 특집 · 대규모 모델을 작게 만드는 법</div>
+    <h1>증류는 어떻게 하는가: 교사에서 학생으로</h1>
+    <p class="subtitle">지난 절에서는 모델을 왜 작게 만드는지 다뤘습니다. 이번 절은 구체적으로 어떻게 하는지 봅니다. 전체 과정은 생각보다 소박합니다. 교사에게 문제를 풀게 하고, 그 풀이 과정을 기록해 두고, 그 자료로 학생을 훈련시킵니다. 어려운 건 절차가 아니라 세부입니다.</p>
+  </header>
+
+  <div class="sec-label">다섯 단계로 끝납니다</div>
+
+  <div class="oss-steps">
+    <div class="oss-step">
+      <div class="ostep-n">1</div>
+      <div class="ostep-body">
+        <h4>문제 세트 준비하기</h4>
+        <p>목표 영역을 포괄하는 문제를 모읍니다. 사람이 직접 정리해도 되고 모델에게 생성시켜도 됩니다. 이 단계가 학생 모델 능력의 상한을 결정합니다. 질문에 포함되지 않은 영역은 학생도 배우지 못합니다.</p>
+      </div>
+    </div>
+    <div class="oss-step">
+      <div class="ostep-n">2</div>
+      <div class="ostep-body">
+        <h4>교사 모델이 답하고, 추론 과정을 온전히 남기기</h4>
+        <p>핵심은 「온전히」입니다. 최종 답만 남기면 학생은 결론을 암기하는 데 그칩니다. 중간 추론 과정까지 남겨야 학생이 어떻게 생각하는지를 배울 기회가 생깁니다. 추론형 모델이 교사에 특히 적합한 이유도 이것입니다. 애초에 사고 과정을 밖으로 써내는 모델이니까요.</p>
+      </div>
+    </div>
+    <div class="oss-step">
+      <div class="ostep-n">3</div>
+      <div class="ostep-body">
+        <h4>최종 답이 아니라 확률 분포를 꺼내기</h4>
+        <p>모델이 단어 하나를 출력할 때 내부에는 후보 단어 전체의 확률표가 들어 있습니다. 1위 하나만 가져오면 많은 정보를 버리는 셈이고, 표 전체를 남기면 전달되는 정보량이 완전히 달라집니다. 다음 단락에서 자세히 다룹니다.</p>
+      </div>
+    </div>
+    <div class="oss-step">
+      <div class="ostep-n">4</div>
+      <div class="ostep-body">
+        <h4>이 자료로 학생 모델 훈련하기</h4>
+        <p>훈련 데이터는 세 부분으로 구성됩니다. 원래 문제, 교사의 온전한 답변, 그리고 매 단계의 확률 분포입니다. 학생 모델의 목표는 자신의 출력 분포를 교사의 것에 최대한 가깝게 만드는 것입니다.</p>
+      </div>
+    </div>
+    <div class="oss-step">
+      <div class="ostep-n">5</div>
+      <div class="ostep-body">
+        <h4>평가하고 반복하기</h4>
+        <p>테스트 세트에서 학생이 교사와 얼마나 벌어지는지 확인하고, 다시 돌아가 문제 세트의 커버리지와 훈련 설정을 조정합니다. 보통 몇 바퀴는 돌아야 합니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">3단계가 왜 중요한가</div>
+
+  <p>이미지 분류 문제가 하나 있고 정답이 고양이라고 해봅시다. 전통적인 훈련은 모델에게 이렇게 알려줍니다. 고양이는 맞고 나머지는 전부 틀렸다. 증류는 교사의 판단을 그대로 학생에게 넘깁니다.</p>
+
+  <div class="lbl-pair">
+    <div class="lbl-box">
+      <div class="lbl-head">하드 라벨</div>
+      <div class="lbl-sub">전통적인 훈련 방식</div>
+      <div class="lbl-row"><span class="lr-k">고양이</span><span class="lr-bar"><i style="width:100%"></i></span><span class="lr-v">정답</span></div>
+      <div class="lbl-row"><span class="lr-k">개</span><span class="lr-bar"><i style="width:0"></i></span><span class="lr-v">오답</span></div>
+      <div class="lbl-row"><span class="lr-k">토끼</span><span class="lr-bar"><i style="width:0"></i></span><span class="lr-v">오답</span></div>
+      <div class="lbl-note">개와 토끼가 똑같이 오답으로 처리되어, 둘의 틀린 정도가 같아집니다. 「개는 고양이와 꽤 비슷하고 토끼는 한참 멀다」는 정보가 완전히 사라집니다.</div>
+    </div>
+    <div class="lbl-box is-soft">
+      <div class="lbl-head">소프트 라벨</div>
+      <div class="lbl-sub">증류 방식</div>
+      <div class="lbl-row"><span class="lr-k">고양이</span><span class="lr-bar"><i style="width:72%"></i></span><span class="lr-v">72%</span></div>
+      <div class="lbl-row"><span class="lr-k">개</span><span class="lr-bar"><i style="width:20%"></i></span><span class="lr-v">20%</span></div>
+      <div class="lbl-row"><span class="lr-k">토끼</span><span class="lr-bar"><i style="width:8%"></i></span><span class="lr-v">8%</span></div>
+      <div class="lbl-note">학생은 답이 고양이라는 것 외에, 교사가 보기에 이 셋이 서로 얼마나 가깝고 먼지도 알게 됩니다. 같은 한 문제인데 실려 오는 정보가 훨씬 많습니다.</div>
+    </div>
+  </div>
+
+  <div class="l-callout">
+    <b>한 줄로 정리하면:</b> 하드 라벨은 학생에게 답만 알려주고, 소프트 라벨은 교사가 어떻게 저울질했는지까지 알려줍니다. 한 번 훈련해서 얻는 양이 몇 배 차이 나고, 이것이 증류가 처음부터 훈련하는 것보다 돈이 덜 드는 근본적인 이유입니다.
+  </div>
+
+  <div class="sec-label">온도 계수: 분포를 부드럽게 만들기</div>
+
+  <p>실제로 해보면 요령이 하나 더 필요합니다. 교사가 지나치게 확신하면 확률 분포가 아주 뾰족해집니다. 예를 들어 <code>98% / 1% / 1%</code> 정도면 하드 라벨과 별 차이가 없어서, 소프트 라벨의 장점이 드러나지 않습니다.</p>
+
+  <p class="paywall-locked xa-peek">그래서 확률을 계산할 때 <code>T</code>라는 값으로 나눠줍니다. 이것이 온도 계수입니다. <code>T</code>가 클수록 분포가 완만해지고, 단어 사이의 상대적 관계가 그만큼 뚜렷해집니다. 2부에서 다룬 Temperature와 같은 메커니즘이지만 용도가 다릅니다. 거기서는 출력을 다양하게 만들기 위한 것이었고, 여기서는 정보를 학생에게 더 충분히 전달하기 위한 것입니다.</p>
+
+  <p class="paywall-locked">이 대목이 이 절에서 머릿속으로 그려 보기 가장 어려운 부분이니, 바로 끌어 보게 하겠습니다. 아래는 교사가 고양이 사진 한 장을 볼 때 내놓는 판단이고, <code>T</code>는 여러분이 조정합니다.</p>
+
+  <div class="oss-lab paywall-locked" data-lab="직접 해보기">
+    <div class="lab-q">T를 맨 왼쪽에서 오른쪽으로 천천히 끌면서 「개」와 「토끼」 두 줄을 주시하세요.</div>
+
+    <div class="lab-ctrl">
+      <div class="lab-row">
+        <span class="lab-label">온도 T</span>
+        <input type="range" class="lab-range" id="tSlider" min="1" max="200" value="10" aria-label="온도 계수">
+        <span class="lab-val" id="tVal">T = 1</span>
+      </div>
+      <div class="lab-row">
+        <div class="lab-seg" id="tMode" role="group" aria-label="레이블 종류">
+          <button type="button" data-m="hard">하드 레이블</button>
+          <button type="button" data-m="soft" class="is-on">소프트 레이블</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="lab-out">
+      <div class="lab-dist" id="tDist"></div>
+      <div class="lab-row" style="margin-top:16px">
+        <span class="lab-label" id="tInfoLabel"></span>
+        <span class="ld-track" style="flex:1;height:22px;background:var(--oss-soft);border-radius:6px;overflow:hidden">
+          <i class="ld-fill" id="tInfoBar" style="display:block;height:100%;background:var(--oss);border-radius:6px;width:0"></i>
+        </span>
+        <span class="lab-val" id="tInfoVal"></span>
+      </div>
+      <div class="lab-verdict" id="tHint"></div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">실제 증류 산출물 하나</div>
+
+  <p class="paywall-locked">절차만 이야기하면 추상적입니다. 공개된 예를 하나 보겠습니다. DeepSeek는 2025년 1월 R1을 공개할 때 증류 버전 모델 여섯 개를 함께 오픈소스로 냈습니다. 모두 R1이 생성한 추론 데이터로 훈련된 것들입니다.</p>
+
+  <div class="distill-list paywall-locked">
+    <div class="dl-row"><span class="dl-name">DeepSeek-R1-Distill-Qwen-1.5B</span><span class="dl-base b-a">Qwen2.5 베이스</span></div>
+    <div class="dl-row"><span class="dl-name">DeepSeek-R1-Distill-Qwen-7B</span><span class="dl-base b-a">Qwen2.5 베이스</span></div>
+    <div class="dl-row"><span class="dl-name">DeepSeek-R1-Distill-Llama-8B</span><span class="dl-base b-b">Llama3 베이스</span></div>
+    <div class="dl-row"><span class="dl-name">DeepSeek-R1-Distill-Qwen-14B</span><span class="dl-base b-a">Qwen2.5 베이스</span></div>
+    <div class="dl-row"><span class="dl-name">DeepSeek-R1-Distill-Qwen-32B</span><span class="dl-base b-a">Qwen2.5 베이스</span></div>
+    <div class="dl-row"><span class="dl-name">DeepSeek-R1-Distill-Llama-70B</span><span class="dl-base b-b">Llama3 베이스</span></div>
+  </div>
+
+  <div class="oss-src paywall-locked">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>출처: DeepSeek-R1 공식 저장소의 모델 카드와 GitHub 설명. 원문은 「open-source distilled 1.5B, 7B, 8B, 14B, 32B, and 70B checkpoints based on Qwen2.5 and Llama3 series」입니다. 공개일 2025-01-20, 확인일 2026-08-07.</span>
+  </div>
+
+  <p class="paywall-locked">이 목록에는 눈여겨볼 세부가 하나 있습니다. <b>학생 모델의 베이스가 자사 것이 아니라, 남이 공개한 모델 중에서 고른 것</b>이라는 점입니다. 여섯 개 중 네 개는 Qwen2.5, 두 개는 Llama3를 택했습니다.</p>
+
+  <p class="paywall-locked">왜 이렇게 골랐는지 공식 설명은 없습니다. 다만 조건 몇 가지는 거꾸로 추정할 수 있습니다. 베이스는 가중치가 공개되어 있고 라이선스가 재훈련을 허용해야 합니다. 아니면 만들어도 공개할 수 없습니다. 크기 계열도 충분히 갖춰져 있어야 1.5B부터 70B까지 여러 구간을 한 번에 커버할 수 있습니다. 커뮤니티 툴체인도 성숙해야 훈련과 배포에서 바퀴를 다시 만들지 않아도 됩니다. 이 셋을 동시에 만족하는 선택지는 당시 많지 않았습니다.</p>
+
+  <div class="l-callout paywall-locked">
+    <b>이 이야기를 따로 다루는 이유:</b> 업체가 스스로 말하는 개방 수준에는 거품이 섞일 수 있습니다. 하지만 다른 회사가 자기 플래그십 성과를 당신의 베이스 위에 올리겠다고 결정하는 건, 진짜 돈이 드는 연산 자원을 걸고 던지는 표입니다. <b>공식 소개보다 제3자의 선택이 더 믿을 만합니다.</b>
+  </div>
+
+  <div class="sec-label paywall-locked">성능은 실제로 어떤가</div>
+
+  <p class="paywall-locked">DeepSeek가 공개한 평가에서 32B 증류 버전은 수학과 코드 관련 몇몇 벤치마크에서 OpenAI o1-mini를 넘었고, 공식적으로는 같은 시기 덴스 모델 중 새로운 최고 성적에 도달했다고 밝혔습니다.</p>
+
+  <div class="oss-warn paywall-locked">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    <div><b>여기서는 한 번 의심해 볼 필요가 있습니다.</b> 커뮤니티가 자체 테스트 세트로 재현했을 때 결과가 공식 수치와 늘 일치하지는 않았고, 실제 체감이 발표된 수준보다 낮다는 개발자 피드백도 있었습니다. 누가 조작했다는 뜻은 아닙니다. 더 흔한 원인은 평가 세트 선택, 프롬프트 작성 방식, 샘플링 파라미터의 차이입니다. <b>결론은 늘 같습니다. 공식 점수는 참고용일 뿐이고, 실제로 쓰기 전에 자기 과제로 한 번 돌려봐야 합니다.</b></div>
+  </div>
+
+  <div class="oss-src paywall-locked">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>공식 평가 데이터는 DeepSeek-R1 공개 설명 기준. 커뮤니티 재현 결과의 불일치는 r/LocalLLaMA 등 공개 논의를 참고했습니다. 확인일 2026-08-07.</span>
+  </div>
+
+  <p class="paywall-locked">여기까지가 증류의 장점입니다. 싸고, 빠르고, 로컬에서 돌아갑니다. 다음 절은 그 대가를 다룹니다. 학생은 교사의 전부를 배우고, 거기에는 교사의 나쁜 습관도 포함됩니다.</p>
+
+</article>
+
+<script src="oss-interact.js?v=20260808"></script>
+<script>
+/* 温度系数实验台。
+   这是本章最抽象的一个概念。「T 越大分布越平缓」这句话读一百遍也不如
+   拖一次滑块，看着「狗」那根柱子从 1% 长到 20% 来得直接。硬软标签切换
+   放在旁边，是为了让学员看到硬标签那种「除了正确答案什么都不说」的贫瘠。 */
+(function () {
+  var C = window.OSSInteract;
+  var slider = document.getElementById('tSlider');
+  if (!C || !slider) { return; }
+
+  var t = C.dict();
+  var NAME = { cat: t.labelCat, dog: t.labelDog, rabbit: t.labelRabbit, car: t.labelCar };
+  var state = { mode: 'soft' };
+
+  var elDist = document.getElementById('tDist');
+  var elVal = document.getElementById('tVal');
+  var elBar = document.getElementById('tInfoBar');
+  var elInfoVal = document.getElementById('tInfoVal');
+  var elHint = document.getElementById('tHint');
+  var anim = {};
+
+  document.getElementById('tInfoLabel').textContent = t.infoLabel;
+  document.querySelector('#tMode button[data-m="hard"]').textContent = t.hardLabel;
+  document.querySelector('#tMode button[data-m="soft"]').textContent = t.softLabel;
+
+  function render() {
+    /* 滑块用整数避免浮点抖动，除以 10 得到 0.1 到 20 的温度区间 */
+    var T = Number(slider.value) / 10;
+    var soft = state.mode === 'soft';
+
+    /* 硬标签就是「正确答案 100%，其余全 0」，不经过 softmax。
+       这正是这一节要对比的那个贫瘠状态。 */
+    var rows = soft
+      ? C.teacherDist(T)
+      : C.TEACHER_LOGITS.map(function (l, i) { return { id: l.id, p: i === 0 ? 100 : 0 }; });
+
+    elVal.textContent = soft ? t.tempNow(T) : t.hardLabel;
+    slider.disabled = !soft;
+
+    elDist.innerHTML = rows.map(function (r) {
+      return '<div class="lab-drow' + (r.p < 5 ? ' is-dim' : '') + '">'
+        + '<span class="ld-name">' + NAME[r.id] + '</span>'
+        + '<span class="ld-track"><i class="ld-fill" style="width:' + r.p + '%"></i></span>'
+        + '<span class="ld-p">' + r.p + '%</span>'
+        + '</div>';
+    }).join('');
+
+    var info = soft ? C.infoRichness(T) : 0;
+    elBar.style.width = info + '%';
+    elInfoVal.textContent = info + '%';
+
+    var band = (!soft || T < 0.8) ? 'low' : (T <= 6 ? 'mid' : 'high');
+    elHint.textContent = band === 'low' ? t.tempHintLow
+      : band === 'mid' ? t.tempHintMid : t.tempHintHigh;
+    elHint.classList.toggle('is-warn', soft && T > 6);
+
+    /* 分布条本身有宽度过渡，跟着滑块连续变化已经够明显。这里只在结论换了
+       说法时提示一次，让学员注意到自己刚跨过了一个区间。 */
+    C.fireOnChange(elHint, band + (soft ? 's' : 'h'), anim, 'band');
+  }
+
+  document.getElementById('tMode').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-m]');
+    if (!btn) { return; }
+    state.mode = btn.dataset.m;
+    this.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('is-on', b === btn);
+    });
+    render();
+  });
+
+  C.bindRange(slider, render);
+})();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260806b"></script><!--seo:end-->
+</body>
+</html>

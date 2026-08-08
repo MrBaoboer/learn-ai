@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ToolKind and Read-Only Semantics | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--accent:#d99516;--gold:#f4b942;--amber-soft:rgba(217,149,22,.09)}
+.objective{display:flex;gap:14px;align-items:flex-start;background:linear-gradient(135deg,var(--amber-soft),transparent);border:1px solid rgba(217,149,22,.27);border-radius:14px;padding:18px 20px;margin:18px 0 28px}.objective svg{flex:0 0 auto;color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:4px}.objective span{font-size:14px;line-height:1.7}
+.gate{background:#17130d;border:1px solid #594015;border-radius:18px;padding:20px;box-shadow:0 18px 48px rgba(70,45,4,.18)}.gate svg{display:block;width:100%;height:auto}.caption{text-align:center;color:#a99779;font-size:12px;margin-top:8px}
+.branch-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.branch{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:19px;box-shadow:var(--shadow-card)}.branch h3{font-size:15px;margin:0 0 9px;color:var(--text)}.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;padding:5px 8px;border-radius:6px;background:var(--bg);color:var(--text)}.branch p{font-size:12px;color:var(--sub);line-height:1.7;margin:10px 0 0}
+.warning{padding:16px 18px;background:#fff7e6;border:1px solid #efd49c;border-radius:12px;color:#5e471f;font-size:13px;line-height:1.75}.warning b{color:#9b670b}
+.source{background:#18140e;border:1px solid #4d3816;border-radius:14px;overflow:hidden}.source-head{padding:10px 16px;background:#251d11;color:#d9c39c;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.source pre{padding:17px;margin:0;overflow:auto}.source code{color:#f5ead7;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace}.kw{color:#f4b942}.fn{color:#e8a92f}.str{color:#c9db96}.cm{color:#968970}
+.exercise{display:grid;grid-template-columns:auto 1fr;gap:15px;padding:20px;border:1px solid rgba(217,149,22,.3);border-radius:14px;background:linear-gradient(135deg,#fff8e9,var(--card))}.exercise strong{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:#fff}.exercise h3{margin:0 0 6px;font-size:16px}.exercise p{margin:0;font-size:13px;line-height:1.75;color:var(--sub)}
+.snapshot{margin-top:13px;padding:13px 16px;border-left:3px solid var(--accent);background:var(--bg);font-size:12px;line-height:1.7;color:var(--sub)}.snapshot code{color:var(--text)}
+.takeaway{margin-top:22px;padding:19px 22px;border-radius:14px;background:#241a0b;color:#f7ead2;display:flex;gap:13px;line-height:1.75}.takeaway svg{flex:0 0 auto;color:var(--gold)}.takeaway b{color:var(--gold)}
+@media(max-width:720px){.branch-grid{grid-template-columns:1fr}.gate{padding:10px}.source-head{overflow-wrap:anywhere}}
+</style>
+<meta name="description" content="Based on tool_taxonomy.rs, explains real ToolKind branches, is_read_only default classification, and permission decision boundaries.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/12-8.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/12-8.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/12-8.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/12-8.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/12-8.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="ToolKind and Read-Only Semantics">
+<meta property="og:url" content="https://xueai.app/slides/12-8.en.html">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"ToolKind Provides Default Read-Only Semantics","name":"ToolKind Provides Default Read-Only Semantics","url":"https://xueai.app/slides/12-8.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practical Course · Tool System","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Based on tool_taxonomy.rs, explains real ToolKind branches, is_read_only default classification, and permission decision boundaries.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Grok Build · Tool Classification</div>
+    <h1>ToolKind Provides Default Read-Only Semantics</h1>
+    <p class="subtitle"><code>is_read_only()</code> is the default classification at the tool-kind layer. Individual tools can override it, and whether a tool ultimately executes still depends on rules, sandboxes, Hooks, and interactive approval.</p>
+  </header>
+
+  <div class="objective reveal">
+    <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 4v5c0 5-3.4 8-8 9-4.6-1-8-4-8-9V7l8-4z"/><path d="M9 12l2 2 4-5"/></svg>
+    <span><b>Learning Objective</b> Accurately identify real <code>ToolKind</code> branches, remember that <code>Task</code> returns false and there is no <code>TaskOutput</code> kind in the source code, and explain the boundary between read-only classification and full permission decisions.</span>
+  </div>
+
+  <div class="sec-label">Core Visual · Instructional Decision Diagram</div>
+  <div class="gate reveal">
+    <svg viewBox="0 0 940 320" role="img" aria-label="Multi-layer flow from tool classification to execution decision">
+      <defs><marker id="arr8" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#d99516"/></marker></defs>
+      <rect x="25" y="105" width="155" height="82" rx="14" fill="#2b200f" stroke="#9b6b18"/><text x="102" y="137" text-anchor="middle" fill="#f4b942" font-size="15" font-weight="800">ToolKind</text><text x="102" y="163" text-anchor="middle" fill="#ead7b7" font-size="12">Semantic Type</text>
+      <path d="M180 146H247" stroke="#d99516" stroke-width="2" marker-end="url(#arr8)"/>
+      <rect x="260" y="105" width="170" height="82" rx="14" fill="#9b6b18"/><text x="345" y="137" text-anchor="middle" fill="#fff" font-size="14" font-weight="800">is_read_only()</text><text x="345" y="162" text-anchor="middle" fill="#fff3d7" font-size="12">Kind Default</text>
+      <path d="M430 146H497" stroke="#d99516" stroke-width="2" marker-end="url(#arr8)"/>
+      <rect x="510" y="36" width="170" height="72" rx="14" fill="#2b200f" stroke="#9b6b18"/><text x="595" y="66" text-anchor="middle" fill="#f4b942" font-size="14" font-weight="700">Tool Override</text><text x="595" y="89" text-anchor="middle" fill="#ead7b7" font-size="12">ToolMetadata</text>
+      <rect x="510" y="126" width="170" height="72" rx="14" fill="#2b200f" stroke="#9b6b18"/><text x="595" y="156" text-anchor="middle" fill="#f4b942" font-size="14" font-weight="700">Env Control</text><text x="595" y="179" text-anchor="middle" fill="#ead7b7" font-size="12">Rules · Sandbox · Hook</text>
+      <rect x="510" y="216" width="170" height="72" rx="14" fill="#2b200f" stroke="#9b6b18"/><text x="595" y="246" text-anchor="middle" fill="#f4b942" font-size="14" font-weight="700">User Control</text><text x="595" y="269" text-anchor="middle" fill="#ead7b7" font-size="12">Interactive Approval</text>
+      <path d="M497 146L510 72M497 146L510 162M497 146L510 252" stroke="#d99516" stroke-width="1.8"/>
+      <path d="M680 72L748 135M680 162H748M680 252L748 189" stroke="#d99516" stroke-width="1.8" marker-end="url(#arr8)"/>
+      <rect x="760" y="114" width="155" height="94" rx="14" fill="#d99516"/><text x="837" y="150" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">Final Exec Decision</text><text x="837" y="176" text-anchor="middle" fill="#fff8e8" font-size="12">Allow · Deny · Ask</text>
+    </svg>
+    <div class="caption">Instructional decision diagram: illustrates multi-layer control relationships, not a single function call chain.</div>
+  </div>
+
+  <div class="sec-label">Real Classification Branches</div>
+  <div class="branch-grid">
+    <div class="branch read reveal">
+      <h3><code>is_read_only() == true</code></h3>
+      <div class="chips"><span class="chip">Read</span><span class="chip">Search</span><span class="chip">Lsp</span><span class="chip">ListDir</span><span class="chip">List</span><span class="chip">MemorySearch</span><span class="chip">MemoryGet</span><span class="chip">WebSearch</span><span class="chip">WebFetch</span><span class="chip">EnterPlan</span><span class="chip">ExitPlan</span><span class="chip">AskUser</span></div>
+      <p>These kinds default to read-only. Individual tools can still override this default via their own metadata.</p>
+    </div>
+    <div class="branch write reveal">
+      <h3><code>is_read_only() == false</code></h3>
+      <div class="chips"><span class="chip">Edit</span><span class="chip">Delete</span><span class="chip">Write</span><span class="chip">Move</span><span class="chip">Execute</span><span class="chip">Plan</span><span class="chip">Task</span><span class="chip">Skill</span><span class="chip">SearchTool</span><span class="chip">UseTool</span><span class="chip">Monitor</span><span class="chip">GoalUpdate</span></div>
+      <p>This branch also includes background tasks, media generation, deployment, and more. <code>Task</code> is explicitly in the false branch.</p>
+    </div>
+  </div>
+
+  <div class="warning reveal"><b>Boundary Note:</b> <code>is_read_only</code> describes the default side-effect semantics; it alone does not imply "auto-execute" or "must prompt." Command rules, workspace permissions, sandboxes, Hooks, and user approval all affect the final outcome. In the display layer, the label for <code>Execute</code> is <code>Run Command</code>.</div>
+
+  <div class="sec-label">Real Source Code Evidence</div>
+  <div class="source reveal paywall-locked xa-peek">
+    <div class="source-head">crates/codegen/xai-grok-tools/src/tool_taxonomy.rs · Lines 37–113 (excerpt)</div>
+    <pre><code><span class="kw">pub fn</span> <span class="fn">presentation_name</span>(self) -&gt; &amp;<span class="kw">'static</span> str {
+    <span class="kw">match</span> self {
+        ToolKind::Execute =&gt; <span class="str">"Run Command"</span>,
+        <span class="cm">/* other presentation_name branches omitted */</span>
+    }
+}
+
+<span class="kw">pub fn</span> <span class="fn">is_read_only</span>(self) -&gt; bool {
+    <span class="kw">match</span> self {
+        ToolKind::Read
+        | ToolKind::Search
+        | ToolKind::Lsp
+        | ToolKind::ListDir
+        | ToolKind::List
+        | ToolKind::MemorySearch
+        | ToolKind::MemoryGet
+        | ToolKind::WebSearch
+        | ToolKind::WebFetch
+        | ToolKind::EnterPlan
+        | ToolKind::ExitPlan
+        | ToolKind::AskUser =&gt; <span class="kw">true</span>,
+        ToolKind::Edit
+        | ToolKind::Delete
+        | ToolKind::Write
+        | ToolKind::Move
+        | ToolKind::Execute
+        | ToolKind::Plan
+        | ToolKind::BackgroundTaskAction
+        | ToolKind::WaitTasksAction
+        | ToolKind::KillTaskAction
+        | ToolKind::Skill
+        | ToolKind::Task
+        | ToolKind::ImageGen
+        | ToolKind::VideoGen
+        | ToolKind::ImageToVideo
+        | ToolKind::ReferenceToVideo
+        | ToolKind::DeployApp
+        | ToolKind::SearchTool
+        | ToolKind::UseTool
+        | ToolKind::Monitor
+        | ToolKind::GoalUpdate
+        | ToolKind::Other =&gt; <span class="kw">false</span>,
+    }
+}</code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>Source snapshot note:</b> Based on the local repository at <code>grok-build-main</code>, files <code>crates/codegen/xai-grok-tools/src/types/tool.rs</code> and <code>tool_taxonomy.rs</code>, verified on 2026-07-17. Comments in the excerpt explicitly mark the omitted portions.</div>
+
+  <div class="sec-label paywall-locked">Class Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <strong>02</strong>
+    <div><h3>Identify the classification, then complete the permission context</h3><p>Analyze <code>Task</code>, <code>Execute</code>, and <code>WebFetch</code> individually. First write the kind's default read-only value and display label, then list the four control signals that must be checked before final execution.</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l4 4L19 6"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway:</b> <code>ToolKind::is_read_only()</code> provides a reusable kind-level default. <code>Task</code> is false, there is no <code>TaskOutput</code> kind in the source, and the unified label for <code>Execute</code> is <code>Run Command</code>. Full permission evaluation requires reading further runtime environment and user control signals.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

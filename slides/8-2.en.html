@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KV Cache: Trade Space for Time (and Save Real Money) | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+.analogy-box{background:rgba(124,58,237,.05);border:1.5px solid rgba(124,58,237,.15);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.analogy-box b{color:var(--purple)}
+
+.kv-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kv-box{border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:var(--shadow-card)}
+.kv-box-h{padding:9px 16px;font-size:15px;font-weight:700;border-bottom:1px solid var(--border)}
+.kv-box-b{padding:14px 16px;font-size:14px;color:var(--sub);line-height:1.7}
+.kv-box.no .kv-box-h{background:rgba(220,38,38,.05);color:var(--danger)}
+.kv-box.yes .kv-box-h{background:rgba(22,163,74,.05);color:var(--success)}
+
+.insight-box{background:rgba(22,163,74,.05);border:1.5px solid rgba(22,163,74,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.insight-box b{color:var(--success)}
+.warn-box{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.2);border-radius:var(--radius);padding:16px 20px;font-size:14px;color:var(--text);line-height:1.7}
+.warn-box b{color:var(--danger)}
+
+.next-card{background:rgba(22,163,74,.05);border:1.5px solid rgba(22,163,74,.25);border-radius:var(--radius);padding:14px 18px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.next-card:hover{background:rgba(22,163,74,.1)}
+
+/* ── Demo Area ── */
+.mode-tabs{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.mode-tabs span{font-size:14px;color:var(--sub);margin-right:4px;font-weight:600}
+.mode-btn{padding:7px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-size:14px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s;min-height:36px}
+.mode-btn.active-bad{border-color:var(--danger);background:rgba(220,38,38,.08);color:var(--danger)}
+.mode-btn.active-good{border-color:var(--success);background:rgba(22,163,74,.08);color:var(--success)}
+
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.leg{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--sub)}
+.leg-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+
+.viz-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.viz-title{padding:9px 16px;border-bottom:1px solid var(--border);background:var(--bg);font-size:13px;font-weight:700;color:var(--sub)}
+.turns-list{padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-height:60px;overflow-x:auto}
+
+.turn-row{display:flex;align-items:center;gap:10px;flex-shrink:0;animation:row-in .3s ease}
+@keyframes row-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.turn-label{font-size:13px;font-weight:800;color:var(--sub);min-width:34px;flex-shrink:0}
+
+.bar-wrap{flex:1;overflow:hidden}
+.bar-track{height:28px;border-radius:6px;display:flex;gap:1px;background:transparent;min-width:0}
+.bar-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;overflow:hidden;white-space:nowrap;padding:0 4px;border-radius:4px;flex-shrink:0;animation:seg-in .35s ease}
+@keyframes seg-in{from{opacity:0;transform:scaleX(0.6)}to{opacity:1;transform:scaleX(1)}}
+.bar-seg.sys{background:var(--purple)}
+.bar-seg.recalc{background:var(--danger)}
+.bar-seg.cached{background:rgba(22,163,74,.3);color:var(--success)}
+.bar-seg.new{background:var(--accent)}
+
+.turn-meta{min-width:80px;flex-shrink:0;text-align:right}
+.turn-cost{font-size:14px;font-weight:800}
+.turn-cost.bad{color:var(--danger)}
+.turn-cost.good{color:var(--success)}
+.turn-diff{font-size:11px;color:var(--sub)}
+
+.stat-row{display:flex;gap:10px;margin-top:12px}
+.stat-box{flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center;box-shadow:var(--shadow-card)}
+.stat-box .sv{font-size:22px;font-weight:900}
+.stat-box .sl{font-size:12px;color:var(--sub);font-weight:600}
+.stat-box.waste .sv{color:var(--danger)}
+.stat-box.save .sv{color:var(--success)}
+.stat-box.turns .sv{color:var(--text)}
+
+.ctrl-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn-turn{padding:10px 24px;border-radius:8px;background:var(--success);color:white;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:opacity .2s;min-height:44px}
+.btn-turn:disabled{opacity:.35;cursor:not-allowed}
+.btn-reset{padding:10px 16px;border-radius:8px;background:var(--card);color:var(--sub);font-size:14px;font-weight:600;border:1px solid var(--border);cursor:pointer;font-family:inherit;min-height:44px}
+.ctrl-hint{flex:1;font-size:13px;color:var(--sub);line-height:1.4;min-width:180px}
+
+.takeaway{background:rgba(22,163,74,.05);border:1.5px solid rgba(22,163,74,.18);border-radius:var(--radius);padding:14px 18px;font-size:15px;color:var(--text);line-height:1.7;margin-top:14px}
+.takeaway b{color:var(--success)}
+
+@media (max-width:768px){
+  .kv-compare{grid-template-columns:1fr}
+  .stat-row{flex-wrap:wrap}
+  .stat-box{min-width:calc(50% - 5px)}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="KV Cache is the core technique for accelerating large model inference. How it works: caching the K/V pairs of Attention to avoid redundant computation on existing tokens, simultaneously reducing latency and cost.">
+<meta name="keywords" content="KV Cache,large model cache,inference acceleration,Attention Cache,LLM performance optimization">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-2.en.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-2.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-2.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-2.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-2.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="KV Cache: Trade Space for Time (and Save Real Money)">
+<meta property="og:description" content="KV Cache is the core technique for accelerating large model inference. How it works: caching the K/V pairs of Attention to avoid redundant computation on existing tokens, simultaneously reducing latency and cost.">
+<meta property="og:url" content="https://xueai.app/slides/8-2.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="KV Cache: Trade Space for Time (and Save Real Money)">
+<meta name="twitter:description" content="KV Cache is the core technique for accelerating large model inference. How it works: caching the K/V pairs of Attention to avoid redundant computation on existing tokens, simultaneously reducing latency and cost.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"KV Cache: Trade Space for Time (and Money)","name":"KV Cache: Trade Space for Time (and Money)","url":"https://xueai.app/slides/8-2.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI in Action · Cost Optimization & Model Selection","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"KV Cache is the core technique for accelerating large model inference. How it works: caching the K/V pairs of Attention to avoid redundant computation on existing tokens, simultaneously reducing latency and cost.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Cost Optimization</div>
+    <h1>KV Cache: Trading Space for Speed</h1>
+    <p class="subtitle">In every conversation turn, the model runs Attention computation over all historical Tokens. KV Cache stores the already-computed K/V matrices so only new Tokens need to be computed next turn.</p>
+  </header>
+
+  <div class="sec-label">How It Works</div>
+
+  <div class="analogy-box">
+    <b>Analogy:</b><br>
+    Without cache = rewriting the entire textbook from memory every class<br>
+    With cache = textbook is archived; today you only review today's new notes
+  </div>
+
+  <div class="kv-compare" style="margin-top:14px">
+    <div class="kv-box no">
+      <div class="kv-box-h">Without KV Cache</div>
+      <div class="kv-box-b">
+        Every turn: System Prompt + full history is <b>fully recomputed</b><br><br>
+        Cost of turn N = sum of all Tokens from turn 1 to N
+      </div>
+    </div>
+    <div class="kv-box yes">
+      <div class="kv-box-h">With KV Cache</div>
+      <div class="kv-box-b">
+        K/V of historical Tokens is cached; <b>only this turn's new Tokens are computed</b><br><br>
+        Cost of turn N ≈ just the new Tokens added this turn
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">Turn-by-Turn Comparison Demo</div>
+
+  <div class="mode-tabs">
+    <span>Mode:</span>
+    <button class="mode-btn active-bad" id="btnBad" onclick="setMode('bad')">Without Cache</button>
+    <button class="mode-btn" id="btnGood" onclick="setMode('good')">With Cache</button>
+  </div>
+  <div class="legend paywall-locked xa-peek">
+    <div class="leg"><div class="leg-dot" style="background:var(--purple)"></div>System Prompt</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--danger)"></div>Redundant Computation</div>
+    <div class="leg"><div class="leg-dot" style="background:rgba(22,163,74,.4)"></div>Cache Hit</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--accent)"></div>New Computation</div>
+  </div>
+
+  <div class="viz-panel paywall-locked">
+    <div class="viz-title" id="vizTitle">Click "Next Turn" to start · each block = fixed token count, SYS always constant</div>
+    <div class="turns-list" id="turnsList"></div>
+  </div>
+
+  <div class="stat-row paywall-locked">
+    <div class="stat-box turns"><div class="sv" id="statTurns">0</div><div class="sl">Turns Shown</div></div>
+    <div class="stat-box waste"><div class="sv" id="statWaste">0T</div><div class="sl">Without Cache (cumulative)</div></div>
+    <div class="stat-box save"><div class="sv" id="statSave">0T</div><div class="sl">With Cache (cumulative)</div></div>
+    <div class="stat-box save"><div class="sv" id="statPct" style="color:var(--accent)">—</div><div class="sl">Savings Rate</div></div>
+  </div>
+
+  <div class="ctrl-bar paywall-locked">
+    <button class="btn-turn" id="btnNext" onclick="nextTurn()">▶ Next Turn</button>
+    <button class="btn-reset" onclick="resetDemo()">Reset</button>
+    <div class="ctrl-hint" id="ctrlHint">Switch between "Without Cache / With Cache" to compare both modes</div>
+  </div>
+
+  <div class="takeaway paywall-locked"><b>Conclusion:</b> The more conversation turns there are, the greater the KV Cache savings. Keeping your System Prompt constant is the simplest and most effective optimization.</div>
+
+  <div class="sec-label paywall-locked">Key Reminders</div>
+
+  <div class="insight-box paywall-locked">
+    <b>The longer the System Prompt, the more valuable KV Cache becomes.</b><br>
+    A 5,000-Token System Prompt across 1,000 conversation turns saves approximately 80% of total cost with KV Cache. <b>Keeping System Prompt constant = cache hit.</b>
+  </div>
+
+  <div class="warn-box paywall-locked" style="margin-top:14px">
+    <b>⚠️ Hidden Pitfall: Distributed Inference Servers</b><br>
+    Cloud LLMs typically run on <b>multiple inference servers</b>. Your request may be routed to a different node each time, and that node has no cache of your previous context — <b>implicit cache will always MISS</b>.
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:14px">
+    <b>Coming up next:</b> Explicit caching: guarantee a cache hit with one line of code, with Claude / Qwen / OpenAI code examples and a hit-rate simulation comparison.
+  </div>
+
+</article>
+
+<script>
+// Conversation content (for title display)
+const TURNS = [
+  { user: 'Hi, can you help me analyze this', assistant: 'Sure, let me help you' },
+  { user: 'The data shows sales are declining', assistant: 'There could be several reasons' },
+  { user: 'Are competitors facing the same issue?', assistant: 'Based on industry data' },
+  { user: 'What should we do about it?', assistant: 'I suggest focusing on three directions' },
+  { user: 'Which direction should we prioritize?', assistant: 'I think the second one is most critical' },
+];
+
+// Pixel width per "block" — fixed, visually represents token count
+const SYS_PX  = 72;   // System Prompt fixed width (px)
+const TURN_PX = 40;   // Per-turn conversation fixed width (px)
+
+let mode = 'bad';
+let curTurn = 0;
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btnBad').className  = 'mode-btn' + (m === 'bad'  ? ' active-bad'  : '');
+  document.getElementById('btnGood').className = 'mode-btn' + (m === 'good' ? ' active-good' : '');
+  resetDemo();
+}
+
+function resetDemo() {
+  curTurn = 0;
+  document.getElementById('turnsList').innerHTML = '';
+  document.getElementById('vizTitle').textContent = 'Click "Next Turn" to start · bar width represents computation';
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('btnNext').textContent = '▶ Next Turn';
+  document.getElementById('statTurns').textContent = '0';
+  document.getElementById('statWaste').textContent = '0T';
+  document.getElementById('statSave').textContent = '0T';
+  document.getElementById('statPct').textContent = '—';
+  document.getElementById('ctrlHint').textContent = 'Switch between modes to compare effects';
+}
+
+function nextTurn() {
+  if (curTurn >= TURNS.length) return;
+  const turnNum = curTurn + 1;
+  const list = document.getElementById('turnsList');
+
+  // Absolute pixel per segment — SYS always SYS_PX, each turn always TURN_PX, no scaling
+  const sysPx   = SYS_PX;
+  const histPx  = curTurn * TURN_PX;   // existing history turns
+  const newPx   = TURN_PX;             // this turn new (fixed)
+
+  // actual computed pixels this turn (for stats display)
+  const badPx  = sysPx + histPx + newPx;   // without cache: full recompute
+  const goodPx = curTurn === 0 ? sysPx + newPx : newPx; // with cache: first turn includes SYS, subsequent turns new only
+
+  const row = document.createElement('div');
+  row.className = 'turn-row';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'turn-label';
+  lbl.textContent = `Turn ${turnNum}`;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'bar-wrap';
+
+  const bar = document.createElement('div');
+  bar.className = 'bar-track';
+
+  if (mode === 'bad') {
+    bar.appendChild(seg('recalc', sysPx, 'SYS'));
+    if (histPx > 0) bar.appendChild(seg('recalc', histPx, 'Hist×' + curTurn));
+    bar.appendChild(seg('new', newPx, `+T${turnNum}`));
+  } else {
+    const sClass = curTurn === 0 ? 'sys' : 'cached';
+    bar.appendChild(seg(sClass, sysPx, 'SYS'));
+    if (histPx > 0) bar.appendChild(seg('cached', histPx, 'Cached×' + curTurn));
+    bar.appendChild(seg('new', newPx, `+T${turnNum}`));
+  }
+
+  wrap.appendChild(bar);
+
+  // right-side annotation
+  const meta = document.createElement('div');
+  meta.className = 'turn-meta';
+  const computedPx = mode === 'bad' ? badPx : goodPx;
+  const costDiv = document.createElement('div');
+  costDiv.className = 'turn-cost ' + (mode === 'bad' ? 'bad' : 'good');
+  costDiv.textContent = computedPx + ' T';
+  const diffDiv = document.createElement('div');
+  diffDiv.className = 'turn-diff';
+  diffDiv.textContent = mode === 'bad' ? 'Full Recompute' : (curTurn === 0 ? 'First Run' : 'New Only');
+  meta.appendChild(costDiv);
+  meta.appendChild(diffDiv);
+
+  row.appendChild(lbl);
+  row.appendChild(wrap);
+  row.appendChild(meta);
+  list.appendChild(row);
+  row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  curTurn++;
+
+  // cumulative stats
+  let badTotal = 0, goodTotal = 0;
+  for (let i = 1; i <= curTurn; i++) {
+    badTotal  += SYS_PX + (i - 1) * TURN_PX + TURN_PX;          // full recompute
+    goodTotal += i === 1 ? SYS_PX + TURN_PX : TURN_PX;           // first turn includes SYS, subsequent new only
+  }
+  const pct = badTotal > 0 ? Math.round((1 - goodTotal / badTotal) * 100) : 0;
+
+  document.getElementById('statTurns').textContent = curTurn;
+  document.getElementById('statWaste').textContent = badTotal + ' T';
+  document.getElementById('statSave').textContent  = goodTotal + ' T';
+  document.getElementById('statPct').textContent   = pct + '%';
+  document.getElementById('vizTitle').textContent  =
+    mode === 'bad'
+      ? `Turn ${curTurn}: Full recompute ${badPx} T · SYS + history accumulate each turn`
+      : `Turn ${curTurn}: Only compute ${goodPx} T · SYS width constant = cache hit`;
+
+  if (curTurn >= TURNS.length) {
+    document.getElementById('btnNext').disabled = true;
+    document.getElementById('btnNext').textContent = '✓ Demo Complete';
+    document.getElementById('ctrlHint').textContent = `Switch mode then click Reset to replay · Total savings ${pct}%`;
+  }
+}
+
+function seg(cls, px, label) {
+  const d = document.createElement('div');
+  d.className = 'bar-seg ' + cls;
+  d.style.width = px + 'px';
+  d.textContent = px >= 36 ? label : '';
+  return d;
+}
+
+resetDemo();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dissecting a Real-World Skill: Alice Release Assistant | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--green:var(--success);--orange:var(--amber);--red:var(--danger);--muted:var(--sub);--surface:var(--card);--surface2:rgba(0,0,0,.04)}
+
+.body-grid{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+@media (max-width:768px){.body-grid{grid-template-columns:1fr}}
+
+/* ── left area: Skill anatomy card ── */
+.main-col{min-width:0}
+.main-scroll{display:flex;flex-direction:column;gap:10px}
+
+.sk-section{border:1.5px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;transition:border-color .2s;flex-shrink:0}
+.sk-section:hover{border-color:rgba(217,119,6,.3)}
+.sk-section.active{border-color:var(--orange)}
+.sk-head{padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;transition:background .15s}
+.sk-head:hover{background:rgba(0,0,0,.015)}
+.sk-num{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0}
+.sk-head-text{flex:1}
+.sk-head-title{font-size:15px;font-weight:800;color:var(--text)}
+.sk-head-sub{font-size:13px;color:var(--muted);margin-top:1px}
+.sk-arrow{font-size:13px;color:var(--muted);transition:transform .25s;flex-shrink:0}
+.sk-section.active .sk-arrow{transform:rotate(90deg)}
+
+.sk-body{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1)}
+.sk-section.active .sk-body{max-height:800px}
+.sk-inner{padding:0 14px 12px}
+
+/* meta-info internal */
+.meta-grid{display:grid;grid-template-columns:80px 1fr;gap:4px 10px;font-size:14px}
+.meta-label{font-weight:700;color:var(--muted)}
+.meta-val{color:var(--text);font-weight:600}
+.trigger-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.trigger-chip{padding:3px 10px;border-radius:6px;font-size:13px;font-weight:700;background:rgba(217,119,6,.08);color:var(--orange);border:1px solid rgba(217,119,6,.15)}
+
+/* decision tree */
+.flow-row{display:flex;align-items:center;gap:0;font-size:13px;flex-wrap:wrap;padding:4px 0}
+.flow-node{padding:5px 12px;border-radius:8px;font-weight:700;white-space:nowrap}
+.flow-q{background:rgba(124,58,237,.06);color:var(--purple);border:1px solid rgba(124,58,237,.15)}
+.flow-yes{background:rgba(22,163,74,.06);color:var(--green);border:1px solid rgba(22,163,74,.15);font-size:12px}
+.flow-no{background:rgba(220,38,38,.06);color:var(--red);border:1px solid rgba(220,38,38,.15);font-size:12px}
+.flow-end{padding:5px 12px;border-radius:8px;font-weight:700;white-space:nowrap}
+.flow-end-ok{background:rgba(22,163,74,.08);color:var(--green);border:1px solid rgba(22,163,74,.15)}
+.flow-end-skip{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.flow-arrow{font-size:14px;color:var(--muted);padding:0 3px;flex-shrink:0}
+
+/* execution pipeline */
+.pipeline{display:flex;align-items:center;gap:0;overflow-x:auto;padding:6px 0}
+.pipe-step{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;flex-shrink:0}
+.pipe-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;background:var(--surface2);border:1.5px solid var(--border);transition:all .3s}
+.pipe-label{font-size:12px;font-weight:700;color:var(--sub);text-align:center;white-space:nowrap;max-width:64px;overflow:hidden;text-overflow:ellipsis}
+.pipe-arrow{font-size:13px;color:var(--muted);flex-shrink:0;padding:0 2px;align-self:center;margin-bottom:16px}
+.pipe-step.done .pipe-icon{background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.3);color:var(--green)}
+.pipe-step.current .pipe-icon{background:rgba(217,119,6,.08);border-color:var(--orange);color:var(--orange);transform:scale(1.08)}
+
+/* tool chips */
+.tool-chips{display:flex;flex-wrap:wrap;gap:5px}
+.tool-chip{padding:4px 10px;border-radius:6px;font-size:13px;font-weight:700}
+.tool-chip-on{background:rgba(22,163,74,.06);color:var(--green);border:1px solid rgba(22,163,74,.15)}
+.tool-chip-off{background:var(--surface2);color:var(--muted);border:1px solid var(--border);text-decoration:line-through;opacity:.6}
+
+/* constraint list */
+.constraint-list{display:flex;flex-direction:column;gap:5px}
+.constraint-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:rgba(220,38,38,.03);border:1px solid rgba(220,38,38,.1);font-size:13px;font-weight:600;color:var(--text)}
+.constraint-icon{flex-shrink:0;font-size:14px}
+
+/* ── right area: example Skills + product decisions ── */
+.side-col{min-width:0}
+.side-scroll{display:flex;flex-direction:column;gap:10px}
+
+/* example Skill mini-cards */
+.ex-card{border:1.5px solid var(--border);border-radius:10px;background:var(--surface);padding:10px 12px;cursor:pointer;transition:all .2s;flex-shrink:0}
+.ex-card:hover{border-color:rgba(217,119,6,.3);background:rgba(217,119,6,.015)}
+.ex-card.active{border-color:var(--orange);background:rgba(217,119,6,.03)}
+.ex-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ex-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.ex-name{font-size:14px;font-weight:800;color:var(--text)}
+.ex-desc{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:6px}
+.ex-pipeline{display:flex;align-items:center;gap:0;font-size:12px;flex-wrap:wrap}
+.ex-pipe-step{padding:3px 8px;border-radius:5px;background:var(--surface2);color:var(--sub);font-weight:700;white-space:nowrap}
+.ex-pipe-arrow{color:var(--muted);padding:0 2px;flex-shrink:0}
+.ex-detail{max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1)}
+.ex-card.active .ex-detail{max-height:250px}
+.ex-detail-inner{padding-top:8px;border-top:1px solid var(--border);margin-top:6px;font-size:13px;color:var(--text);line-height:1.6}
+
+/* product decisions */
+.decision-card{background:rgba(217,119,6,.05);border:1.5px solid rgba(217,119,6,.18);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--text);line-height:1.55;flex-shrink:0}
+.decision-card b{color:var(--orange)}
+
+/* control buttons */
+.btn{padding:8px 16px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:38px}
+.btn-p{background:var(--orange);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.3;cursor:not-allowed}
+.btn-r{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+
+/* animation helpers */
+.anim-enter{opacity:0;transform:translateY(6px);transition:all .3s ease}
+.anim-enter.show{opacity:1;transform:translateY(0)}
+
+/* pipeline playing state */
+.pipeline-play .pipe-step .pipe-icon{transition:all .4s ease}
+</style>
+<meta name="description" content="Dissect the Alice Release Assistant Skill: metadata, trigger conditions, execution steps, tool permissions, and safety constraints. Understanding a Skill means writing an SOP for an Agent.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-5b.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-5b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-5b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-5b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-5b.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Dissecting a Real-World Skill: Alice Release Assistant">
+<meta property="og:url" content="https://xueai.app/slides/7-5b.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Dissecting a Real-World Skill: Alice Release Assistant","name":"Dissecting a Real-World Skill","url":"https://xueai.app/slides/7-5b.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Agent Engineering","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Dissect the Alice Release Assistant Skill: metadata, trigger conditions, execution steps, tool permissions, and safety constraints. Understanding a Skill means writing an SOP for an Agent.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent Engineering</div>
+    <h1>Dissecting a Real-World Skill</h1>
+    <p class="subtitle">Using the Alice Release Assistant as an example: click each section to expand details and see how an Agent reads and executes a Skill.</p>
+  </header>
+
+  <div class="body-grid paywall-locked xa-peek">
+    <!-- left area: Skill anatomy -->
+    <div class="main-col">
+      <div class="sec-label" style="margin-top:0">SKILL.md Section-by-Section Breakdown</div>
+      <div class="main-scroll" id="mainScroll">
+        <!-- Skill file title bar -->
+        <div style="display:flex;align-items:center;gap:10px;padding:4px 0;flex-shrink:0">
+          <div style="padding:5px 12px;border-radius:8px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.15);font-size:13px;font-weight:800;color:var(--purple)">SKILL.md</div>
+          <div style="font-size:15px;font-weight:800;color:var(--text)">alice-release</div>
+          <div style="font-size:13px;color:var(--muted);margin-left:auto">Alice Project Release Assistant</div>
+        </div>
+
+        <!-- Section 1: meta-info -->
+        <div class="sk-section active" data-section="0">
+          <div class="sk-head" onclick="toggleSection(this)">
+            <div class="sk-num" style="background:var(--orange)">1</div>
+            <div class="sk-head-text">
+              <div class="sk-head-title">Metadata</div>
+              <div class="sk-head-sub">Skill name, functional description, trigger phrases</div>
+            </div>
+            <div class="sk-arrow">▶</div>
+          </div>
+          <div class="sk-body">
+            <div class="sk-inner">
+              <div class="meta-grid">
+                <div class="meta-label">Skill name</div>
+                <div class="meta-val">alice-release</div>
+                <div class="meta-label">Description</div>
+                <div class="meta-val" style="font-weight:400;font-size:13px">Alice project release assistant. Handles the complete release workflow: build, update RELEASE_NOTES, upload to COS, sync landing page.</div>
+                <div class="meta-label">Trigger phrases</div>
+                <div>
+                  <div class="trigger-chips">
+                    <span class="trigger-chip">build a package</span>
+                    <span class="trigger-chip">release</span>
+                    <span class="trigger-chip">deploy</span>
+                    <span class="trigger-chip">upload and publish</span>
+                    <span class="trigger-chip">sync landing page</span>
+                  </div>
+                </div>
+              </div>
+              <div class="decision-card" style="margin-top:8px">
+                <b>📌 Design decision:</b> The coverage of trigger phrases determines the Skill's recall rate. Too few → the Skill fails to fire when it should; too broad → it fires when it shouldn't. Good trigger phrases = exhaustively listing all natural ways the user might express the request.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: applicable conditions -->
+        <div class="sk-section" data-section="1">
+          <div class="sk-head" onclick="toggleSection(this)">
+            <div class="sk-num" style="background:var(--purple)">2</div>
+            <div class="sk-head-text">
+              <div class="sk-head-title">Applicability Conditions</div>
+              <div class="sk-head-sub">The decision chain the Agent uses to determine whether to trigger this Skill</div>
+            </div>
+            <div class="sk-arrow">▶</div>
+          </div>
+          <div class="sk-body">
+            <div class="sk-inner">
+              <div class="flow-row">
+                <span class="flow-node flow-q">User said a trigger phrase?</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-node flow-yes">YES</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-node flow-q">Currently in Alice project directory?</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-node flow-yes">YES</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-end flow-end-ok">Trigger Skill</span>
+              </div>
+              <div class="flow-row" style="padding-left:0;margin-top:4px">
+                <span style="width:135px;display:inline-block"></span>
+                <span class="flow-arrow" style="writing-mode:vertical-rl;padding:2px 0;transform:rotate(180deg)">↓</span>
+              </div>
+              <div class="flow-row" style="padding-left:95px">
+                <span class="flow-node flow-no">NO</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-end flow-end-skip">Use general-purpose capabilities</span>
+              </div>
+              <div style="font-size:13px;color:var(--sub);margin-top:8px;line-height:1.5;padding:6px 10px;border-radius:8px;background:var(--surface2)">
+                Similarly, if the second decision node is NO (not in the Alice directory), it also routes to "Use general-purpose capabilities."<br>When conditions are not met, the Skill exits silently without disrupting normal conversation.
+              </div>
+              <div class="decision-card" style="margin-top:8px">
+                <b>📌 Design decision:</b> Applicability conditions = a safeguard against accidental triggering. Without them, saying "release" in any project would fire Alice's release workflow — a catastrophic bug.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: execution steps -->
+        <div class="sk-section" data-section="2">
+          <div class="sk-head" onclick="toggleSection(this)">
+            <div class="sk-num" style="background:var(--cyan)">3</div>
+            <div class="sk-head-text">
+              <div class="sk-head-title">Execution Steps</div>
+              <div class="sk-head-sub">7-step pipeline: from Git check to landing page sync</div>
+            </div>
+            <div class="sk-arrow">▶</div>
+          </div>
+          <div class="sk-body">
+            <div class="sk-inner">
+              <div class="pipeline" id="pipeline">
+                <div class="pipe-step" data-pipe="0"><div class="pipe-icon">🔍</div><div class="pipe-label">Check Git</div></div>
+                <div class="pipe-arrow">→</div>
+                <div class="pipe-step" data-pipe="1"><div class="pipe-icon">🧪</div><div class="pipe-label">Run Tests</div></div>
+                <div class="pipe-arrow">→</div>
+                <div class="pipe-step" data-pipe="2"><div class="pipe-icon">📦</div><div class="pipe-label">Build App</div></div>
+                <div class="pipe-arrow">→</div>
+                <div class="pipe-step" data-pipe="3"><div class="pipe-icon">🏷️</div><div class="pipe-label">Update Version</div></div>
+                <div class="pipe-arrow">→</div>
+                <div class="pipe-step" data-pipe="4"><div class="pipe-icon">📝</div><div class="pipe-label">Write Release Notes</div></div>
+                <div class="pipe-arrow">→</div>
+                <div class="pipe-step" data-pipe="5"><div class="pipe-icon">☁️</div><div class="pipe-label">Upload to COS</div></div>
+                <div class="pipe-arrow">→</div>
+                <div class="pipe-step" data-pipe="6"><div class="pipe-icon">🌐</div><div class="pipe-label">Sync Landing Page</div></div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:6px">
+                <button class="btn btn-p" style="padding:5px 14px;font-size:13px" id="btnPipe" onclick="playPipeline()">▶ Simulate Execution</button>
+                <button class="btn btn-r" style="padding:5px 12px;font-size:13px" onclick="resetPipeline()">Reset</button>
+                <span style="font-size:13px;color:var(--muted);display:flex;align-items:center" id="pipeHint">Click to simulate the Agent executing step by step</span>
+              </div>
+              <div class="decision-card" style="margin-top:8px">
+                <b>📌 Design decision:</b> Step order matters: "run tests then build" vs "build then test"? The step order in a Skill = the SOP you believe is correct. The Agent will follow it strictly.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: allowed tools -->
+        <div class="sk-section" data-section="3">
+          <div class="sk-head" onclick="toggleSection(this)">
+            <div class="sk-num" style="background:var(--green)">4</div>
+            <div class="sk-head-text">
+              <div class="sk-head-title">Allowed Tools</div>
+              <div class="sk-head-sub">The toolkit the Agent can use while executing this Skill</div>
+            </div>
+            <div class="sk-arrow">▶</div>
+          </div>
+          <div class="sk-body">
+            <div class="sk-inner">
+              <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px">Allowed</div>
+              <div class="tool-chips" style="margin-bottom:10px">
+                <span class="tool-chip tool-chip-on">run_command</span>
+                <span class="tool-chip tool-chip-on">edit_file</span>
+                <span class="tool-chip tool-chip-on">read_file</span>
+                <span class="tool-chip tool-chip-on">git</span>
+                <span class="tool-chip tool-chip-on">web_search</span>
+              </div>
+              <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:6px">Prohibited</div>
+              <div class="tool-chips">
+                <span class="tool-chip tool-chip-off">delete_file</span>
+                <span class="tool-chip tool-chip-off">agent (cannot launch sub-Agents)</span>
+              </div>
+              <div class="decision-card" style="margin-top:10px">
+                <b>📌 Design decision:</b> Allowed tools = safety boundary. Restricts the weapons the Agent can use while executing this Skill. Prohibiting delete_file prevents accidental file deletion during a release; prohibiting sub-Agents keeps the execution chain predictable.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: safety constraints -->
+        <div class="sk-section" data-section="4">
+          <div class="sk-head" onclick="toggleSection(this)">
+            <div class="sk-num" style="background:var(--red)">5</div>
+            <div class="sk-head-text">
+              <div class="sk-head-title">Safety Constraints</div>
+              <div class="sk-head-sub">Non-negotiable red lines — the Agent's traffic rules</div>
+            </div>
+            <div class="sk-arrow">▶</div>
+          </div>
+          <div class="sk-body">
+            <div class="sk-inner">
+              <div class="constraint-list">
+                <div class="constraint-item">
+                  <span class="constraint-icon" style="color:var(--red)">⛔</span>
+                  <span>No force push: prevents overwriting others' commits</span>
+                </div>
+                <div class="constraint-item">
+                  <span class="constraint-icon" style="color:var(--red)">⛔</span>
+                  <span>No skipping tests: no matter how urgent, failing tests mean no release</span>
+                </div>
+                <div class="constraint-item">
+                  <span class="constraint-icon" style="color:var(--red)">⛔</span>
+                  <span>On failure: stop and report, never auto-retry — return control to humans</span>
+                </div>
+              </div>
+              <div class="decision-card" style="margin-top:10px">
+                <b>📌 Design decision:</b> Safety constraints are the most important part of a Skill. Wrong steps mean the Agent does the wrong thing; missing constraints mean the Agent might do something dangerous. Good constraints = explicit prohibitions + graceful degradation on failure.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- right area: example Skills + design decisions -->
+    <div class="side-col">
+      <div class="sec-label" style="margin-top:0">More Skill Examples</div>
+      <div class="side-scroll">
+        <!-- Example 1: content-creator -->
+        <div class="ex-card" onclick="toggleExample(this, 0)">
+          <div class="ex-hd">
+            <div class="ex-icon" style="background:rgba(234,88,12,.08)">✍️</div>
+            <div class="ex-name">content-creator</div>
+          </div>
+          <div class="ex-desc">Content creation starting point: complete writing workflow from style analysis to final delivery</div>
+          <div class="ex-pipeline">
+            <span class="ex-pipe-step">Style Profile</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Confirm Requirements</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Outline Design</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Deep Research</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Write Article</span>
+          </div>
+          <div class="ex-detail">
+            <div class="ex-detail-inner">
+              <b>Trigger phrases:</b> Help me write, I want to write, draft an article, write a post<br>
+              <b>Key design:</b> Analyze the user's writing style before drafting — the model doesn't get to generate directly. This ensures every output matches the user's personal style, avoiding generic AI-sounding text.<br>
+              <b>Tool permissions:</b> Allows web_search (deep research needs internet); prohibits direct publishing (requires human review).
+            </div>
+          </div>
+        </div>
+
+        <!-- Example 2: web-importer -->
+        <div class="ex-card" onclick="toggleExample(this, 1)">
+          <div class="ex-hd">
+            <div class="ex-icon" style="background:rgba(8,145,178,.08)">🌐</div>
+            <div class="ex-name">web-importer</div>
+          </div>
+          <div class="ex-desc">Web importer: save web page content in high quality to WPS Notes</div>
+          <div class="ex-pipeline">
+            <span class="ex-pipe-step">URL Detection</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Content Fetch</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Format Convert</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Write to Note</span>
+          </div>
+          <div class="ex-detail">
+            <div class="ex-detail-inner">
+              <b>Trigger phrases:</b> Save this page to notes, import this article, web page to notes<br>
+              <b>Key design:</b> Automatically detects three page types (WeChat article, Twitter/X, generic web page) and applies different scraping logic. From the user's perspective it's just one request; under the hood there are three strategies.<br>
+              <b>Safety constraint:</b> Does not save pages that require login (prevents privacy leakage).
+            </div>
+          </div>
+        </div>
+
+        <!-- Example 3: tag-organize -->
+        <div class="ex-card" onclick="toggleExample(this, 2)">
+          <div class="ex-hd">
+            <div class="ex-icon" style="background:rgba(124,58,237,.08)">🏷️</div>
+            <div class="ex-name">tag-organize</div>
+          </div>
+          <div class="ex-desc">Tag organizer: scan all tags, find duplicates and chaos, intelligently merge</div>
+          <div class="ex-pipeline">
+            <span class="ex-pipe-step">Scan Tags</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Analyze Duplicates</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Merge Suggestions</span><span class="ex-pipe-arrow">→</span>
+            <span class="ex-pipe-step">Execute Cleanup</span>
+          </div>
+          <div class="ex-detail">
+            <div class="ex-detail-inner">
+              <b>Trigger phrases:</b> Organize note tags, clean up tags, too many tags, tags are a mess<br>
+              <b>Key design:</b> Present suggestions first, wait for user confirmation, then execute — never auto-merge. This embodies the "human-in-the-loop" design principle.<br>
+              <b>Safety constraint:</b> Never deletes any tag, only merges; must obtain user confirmation before executing.
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
+          <div class="decision-card">
+            <b>📌 Core insight:</b> A good Skill = a good SOP. The person writing the Skill is the domain expert; the person using the Skill is the Agent. The ideal Skill granularity is one complete workflow: too coarse and it provides no guidance; too fine and it's not worth encapsulating.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b> — A Skill is an SOP written for an Agent: when to trigger, what steps to execute, which tools are allowed, and what safety constraints apply. Writing a Skill is fundamentally about encoding human expert knowledge into a process an Agent can execute.
+  </div>
+</article>
+<script>
+function toggleSection(headEl) {
+  var sec = headEl.parentElement;
+  var wasActive = sec.classList.contains('active');
+  var all = document.querySelectorAll('.sk-section');
+  for (var i = 0; i < all.length; i++) all[i].classList.remove('active');
+  if (!wasActive) {
+    sec.classList.add('active');
+    setTimeout(function() {
+      sec.scrollIntoView({behavior:'smooth', block:'nearest'});
+    }, 80);
+  }
+}
+
+function toggleExample(cardEl, idx) {
+  var wasActive = cardEl.classList.contains('active');
+  var cards = document.querySelectorAll('.ex-card');
+  for (var i = 0; i < cards.length; i++) cards[i].classList.remove('active');
+  if (!wasActive) {
+    cardEl.classList.add('active');
+    setTimeout(function() {
+      cardEl.scrollIntoView({behavior:'smooth', block:'nearest'});
+    }, 80);
+  }
+}
+
+var pipeRunning = false;
+var pipeTimer = null;
+
+function playPipeline() {
+  if (pipeRunning) return;
+  resetPipeline();
+  pipeRunning = true;
+  var steps = document.querySelectorAll('#pipeline .pipe-step');
+  var cur = 0;
+  document.getElementById('btnPipe').disabled = true;
+
+  function tick() {
+    for (var i = 0; i < steps.length; i++) {
+      steps[i].classList.remove('current', 'done');
+    }
+    for (var j = 0; j < cur; j++) {
+      steps[j].classList.add('done');
+    }
+    if (cur < steps.length) {
+      steps[cur].classList.add('current');
+      var label = steps[cur].querySelector('.pipe-label').textContent;
+      document.getElementById('pipeHint').textContent = 'Executing: ' + label + ' (' + (cur + 1) + '/' + steps.length + ')';
+      cur++;
+      pipeTimer = setTimeout(tick, 700);
+    } else {
+      steps[steps.length - 1].classList.remove('current');
+      steps[steps.length - 1].classList.add('done');
+      document.getElementById('pipeHint').innerHTML = '<span style="color:var(--green);font-weight:700">✓ All done</span> · 7-step pipeline executed in order';
+      pipeRunning = false;
+      document.getElementById('btnPipe').disabled = false;
+      document.getElementById('btnPipe').textContent = '▶ Play Again';
+    }
+  }
+  tick();
+}
+
+function resetPipeline() {
+  if (pipeTimer) clearTimeout(pipeTimer);
+  pipeRunning = false;
+  var steps = document.querySelectorAll('#pipeline .pipe-step');
+  for (var i = 0; i < steps.length; i++) {
+    steps[i].classList.remove('current', 'done');
+  }
+  document.getElementById('btnPipe').disabled = false;
+  document.getElementById('btnPipe').textContent = '▶ Simulate Execution';
+  document.getElementById('pipeHint').textContent = 'Click to simulate the Agent executing step by step';
+}
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Constraining Hallucinations with Prompts: A Defensive Stance in Prompt Engineering | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root {
+  /* Legacy variable name aliases mapped to design system */
+  --bg-color: var(--bg);
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+.badge {
+  display: inline-block;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 5px 14px; border-radius: 8px;
+  background: rgba(0,102,255,0.1); color: var(--accent);
+  white-space: nowrap; margin-bottom: 12px;
+}
+.main-area {
+  display: grid; grid-template-columns: 340px 1fr; gap: 20px;
+  align-items: start;
+}
+
+/* Left */
+.left-panel {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.section-label {
+  font-size: 12px; font-weight: 800; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+.scene-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 18px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+}
+.scene-card:hover { border-color: rgba(0,102,255,0.2); }
+.scene-card.active { border-color: var(--accent); background: rgba(0,102,255,0.03); }
+.scene-tag {
+  font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 5px;
+}
+.scene-name { font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.scene-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+.pm-tip {
+  background: rgba(0,102,255,0.04);
+  border: 1px solid rgba(0,102,255,0.12);
+  border-radius: 12px; padding: 14px 18px;
+}
+.pm-tip-title { font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 8px; letter-spacing: 0.3px; }
+.pm-tip p { font-size: 13px; color: var(--text-sub); line-height: 1.8; }
+.pm-tip b { color: var(--text-main); }
+
+/* Right */
+.right-panel {
+  display: flex; flex-direction: column;
+  min-width: 0; gap: 14px;
+}
+.right-top {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 10px;
+}
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.toggle-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.toggle-btn {
+  padding: 9px 18px; border-radius: var(--radius-sm); border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.toggle-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+.compare-area {
+  display: flex; gap: 16px;
+}
+.compare-col { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col-label {
+  font-size: 13px; font-weight: 700; padding: 0 2px;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.col-label .dot { width: 10px; height: 10px; border-radius: 50%; }
+.col-label .dot.red { background: var(--danger); }
+.col-label .dot.green { background: var(--success); }
+.col-label span.label-text { color: var(--text-sub); }
+
+.convo-box {
+  flex: 1; background: var(--card); border-radius: var(--radius); padding: 16px 18px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.bubble-user {
+  background: var(--accent); color: white;
+  padding: 11px 16px; border-radius: 12px 12px 4px 12px;
+  font-size: 15px; line-height: 1.6; align-self: flex-end;
+  max-width: 90%;
+}
+.bubble-system {
+  background: rgba(0,0,0,0.04); color: var(--text-sub);
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; line-height: 1.6; font-style: italic;
+  border: 1px dashed rgba(0,0,0,0.1);
+  max-width: 95%;
+}
+.bubble-ai {
+  background: rgba(0,0,0,0.04); color: var(--text-main);
+  padding: 11px 16px; border-radius: 12px 12px 12px 4px;
+  font-size: 15px; line-height: 1.8; align-self: flex-start;
+  max-width: 95%;
+}
+.bubble-ai .hl-red {
+  color: var(--danger); font-weight: 600;
+  text-decoration: underline wavy var(--danger);
+  text-underline-offset: 3px;
+}
+.bubble-ai .hl-green { color: var(--success); font-weight: 600; }
+.bubble-ai .note {
+  display: block; font-size: 13px; color: var(--text-sub);
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.verdict {
+  padding: 10px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 700;
+}
+.verdict.bad { background: rgba(229,62,62,0.06); color: var(--danger); border: 1px solid rgba(229,62,62,0.15); }
+.verdict.good { background: rgba(22,163,106,0.06); color: var(--success); border: 1px solid rgba(22,163,106,0.15); }
+
+/* Why it works */
+.why-box {
+  background: #1c1c1e; border-radius: 12px; padding: 14px 16px;
+  flex-shrink: 0;
+}
+.why-title {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.token-chain {
+  display: flex; align-items: center; gap: 0; margin-bottom: 12px; flex-wrap: wrap; gap: 4px;
+}
+.token-chip {
+  padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+}
+.token-chip.context { background: rgba(255,255,255,0.08); color: #9ca3af; }
+.token-chip.injected { background: rgba(0,102,255,0.25); color: #93c5fd; border: 1px solid rgba(0,102,255,0.4); }
+.token-chip.output { background: rgba(22,163,106,0.2); color: #6ee7b7; border: 1px solid rgba(22,163,106,0.35); }
+.token-chip.output-bad { background: rgba(229,62,62,0.2); color: #fca5a5; border: 1px solid rgba(229,62,62,0.35); }
+.token-arrow { color: #4b5563; font-size: 14px; font-weight: 700; padding: 0 2px; align-self: center; }
+.why-insight {
+  font-size: 13px; color: #9ca3af; line-height: 1.7; border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 10px; margin-top: 2px;
+}
+.why-insight b { color: #e5e7eb; }
+.why-insight .key { color: #93c5fd; font-weight: 700; }
+
+/* "Why It Works" view (natural flow) */
+.why-flex-row { display: flex; gap: 16px; }
+.why-limit-row { display: flex; gap: 20px; }
+
+@media (max-width: 900px) {
+  .main-area { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .compare-area { flex-direction: column; }
+  .why-flex-row { flex-direction: column; }
+  .why-flex-row > div[style*="width:1px"] { display: none; }
+  .why-limit-row { flex-direction: column; }
+  .why-limit-row > div[style*="width:1px"] { display: none; }
+  .toggle-btn { padding: 11px 14px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="A well-designed System Prompt can significantly reduce hallucination rates in large language models. Covers prompt design patterns such as defining knowledge boundaries, requiring citations, and refusing uncertain answers.">
+<meta name="keywords" content="Prompt hallucination mitigation,System Prompt,LLM reliability,Prompt Engineering,AI defense">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-mitigation-prompt.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-mitigation-prompt.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-mitigation-prompt.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-mitigation-prompt.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-mitigation-prompt.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Constraining Hallucinations with Prompts: A Defensive Stance in Prompt Engineering">
+<meta property="og:description" content="A well-designed System Prompt can significantly reduce hallucination rates in large language models. Covers prompt design patterns such as defining knowledge boundaries, requiring citations, and refusing uncertain answers.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-mitigation-prompt.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Constraining Hallucinations with Prompts: A Defensive Stance in Prompt Engineering">
+<meta name="twitter:description" content="A well-designed System Prompt can significantly reduce hallucination rates in large language models. Covers prompt design patterns such as defining knowledge boundaries, requiring citations, and refusing uncertain answers.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Mitigation 1: Prompt Engineering","name":"Mitigation 1: Prompt Engineering","url":"https://xueai.app/slides/1-2-mitigation-prompt.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Hallucinations & Four Mitigations","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"A well-designed System Prompt can significantly reduce hallucination rates in large language models. Covers prompt design patterns such as defining knowledge boundaries, requiring citations, and refusing uncertain answers.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Hallucinations &amp; Mitigations</div>
+    <h1>Prompt Engineering: Constraining Hallucinations with Instructions</h1>
+    <p class="subtitle">A PM's perspective: how to reduce model fabrication via System Prompt when writing requirement documents and integrating AI APIs.</p>
+    <div class="badge" style="margin-top:12px;">Technique 01 / 04 · Prevention</div>
+  </header>
+
+  <div class="main-area paywall-locked xa-peek">
+    <div class="left-panel">
+      <div>
+        <div class="section-label">Select Business Scenario</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="scene-card active" onclick="selectScene(0)">
+            <div class="scene-tag">Scenario A · Customer Service</div>
+            <div class="scene-name">E-commerce / Finance Customer Service Bot</div>
+            <div class="scene-desc">Users ask about product details and refund policies — the model easily fabricates non-existent rules.</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(1)">
+            <div class="scene-tag">Scenario B · Content Creation</div>
+            <div class="scene-name">AI Writing Assistant / Document Generation</div>
+            <div class="scene-desc">When generating reports, the model may fabricate data or cite non-existent regulatory documents.</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(2)">
+            <div class="scene-tag">Scenario C · Knowledge Q&amp;A</div>
+            <div class="scene-name">Enterprise Internal Knowledge Base Q&amp;A</div>
+            <div class="scene-desc">When employees ask about internal processes, the model fills gaps with generic knowledge, which may not match actual company policy.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pm-tip" id="pmTip">
+        <div class="pm-tip-title">PM Key Takeaways</div>
+        <p id="pmTipContent">Loading…</p>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="right-top">
+        <h3 id="rightTitle">Conversation Comparison</h3>
+        <div class="toggle-group">
+          <button class="toggle-btn active" onclick="setView('compare')">Compare View</button>
+          <button class="toggle-btn" onclick="setView('prompt')">Prompt Template</button>
+          <button class="toggle-btn" onclick="setView('why')">Why It Works</button>
+          <button class="toggle-btn" onclick="setView('strat')">Three Strategies</button>
+        </div>
+      </div>
+
+      <!-- Compare view -->
+      <div class="compare-area" id="viewCompare">
+        <div class="compare-col">
+          <div class="col-label"><span class="dot red"></span><span class="label-text">Unconstrained Prompt</span></div>
+          <div class="convo-box" id="boxBad"></div>
+          <div class="verdict bad" id="verdictBad"></div>
+        </div>
+        <div class="compare-col">
+          <div class="col-label"><span class="dot green"></span><span class="label-text">Constrained System Prompt</span></div>
+          <div class="convo-box" id="boxGood"></div>
+          <div class="verdict good" id="verdictGood"></div>
+        </div>
+      </div>
+
+      <!-- Prompt template view -->
+      <div id="viewPrompt" style="display:none;">
+        <div style="background:#1c1c1e;border-radius:14px;padding:20px 24px;">
+          <div style="font-size:12px;color:#6b7280;margin-bottom:12px;font-family:monospace;">System Prompt Template · Ready to reuse</div>
+          <pre id="promptTemplate" style="font-family:'SF Mono','Fira Code',monospace;font-size:13px;line-height:1.9;color:#e5e5e5;white-space:pre-wrap;"></pre>
+        </div>
+      </div>
+
+      <!-- Strategy demo view (from 3-3) -->
+      <div id="viewStrat" style="display:none;flex-direction:column;gap:12px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button onclick="showStrat(this,'no_context')" class="strat-tab active-s" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:13px;font-weight:600;cursor:pointer;background:var(--text-main);color:white;">No Context</button>
+          <button onclick="showStrat(this,'with_doc')" class="strat-tab" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:13px;font-weight:600;cursor:pointer;background:white;color:var(--text-sub);">Attach Document</button>
+          <button onclick="showStrat(this,'force_unknown')" class="strat-tab" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:13px;font-weight:600;cursor:pointer;background:white;color:var(--text-sub);">Force "I Don't Know"</button>
+          <span style="font-size:12px;color:var(--text-sub);margin-left:8px;">Example: "Commercial applications of quantum entanglement in 2025"</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:12px;color:var(--text-sub);">Content sent to the model:</div>
+          <div id="stratPromptBox" style="background:#1c1c1e;border-radius:10px;padding:14px 18px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;line-height:1.8;color:#9ca3af;white-space:pre-wrap;"></div>
+          <div style="font-size:12px;color:var(--text-sub);">Model response:</div>
+          <div id="stratOutputBox" style="background:white;border-radius:10px;padding:14px 18px;font-size:14px;line-height:1.8;border:1.5px solid rgba(0,0,0,0.08);"></div>
+        </div>
+      </div>
+
+      <!-- Why it works view -->
+      <div id="viewWhy" style="display:none;background:var(--card);border-radius:14px;padding:24px 28px;flex-direction:column;gap:16px;border:1px solid rgba(0,0,0,0.06);">
+        <div class="why-flex-row">
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">No System Prompt</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">User Question</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px solid rgba(229,62,62,0.2);">Fabricated answer…</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">The model predicts tokens directly from training memory; when it hits knowledge gaps, it fabricates fluently.</div>
+          </div>
+          <div style="width:1px;background:rgba(0,0,0,0.06);flex-shrink:0;"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">With a Constrained System Prompt</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">User Question</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">+</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.2);">If unsure</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.2);">say you don't know</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">I'm not sure…</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">The blue constraint words become part of the context, raising the probability of the "admit I don't know" sequence.</div>
+          </div>
+        </div>
+        <div style="background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.12);border-radius:12px;padding:16px 22px;">
+          <div style="font-size:15px;color:var(--text-main);line-height:1.9;">
+            When the model predicts the next token, <b>every token in the current context influences the probability distribution.</b>
+            The constraint words injected via System Prompt act as <span style="color:var(--accent);font-weight:700;">"high-quality prior context"</span>:
+            they raise the probability of the "I'm not sure" sequence and lower the probability of fabrication sequences.
+            <b>The essence: use carefully crafted prior context to directionally bias the probability distribution of subsequent output.</b>
+          </div>
+        </div>
+        <div style="background:rgba(229,62,62,0.04);border:1px solid rgba(229,62,62,0.15);border-radius:12px;padding:16px 22px;">
+          <div style="font-size:13px;font-weight:800;color:var(--danger);margin-bottom:10px;letter-spacing:0.3px;">⚠ Limitation: The model doesn't know what it doesn't know</div>
+          <div class="why-limit-row">
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">When constraint instructions work</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                When the model <b>has some uncertainty</b> about a question, constraint words can push it toward admitting it doesn't know.<br>
+                → Works for: <span style="color:var(--success);font-weight:600;">questions beyond knowledge scope, ambiguous queries, time-sensitive information</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">When constraint instructions fail</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                When the model is <b>highly confident</b> in a wrong answer, its top-ranked token is already wrong, and constraint words cannot affect that probability.<br>
+                → Fails for: <span style="color:var(--danger);font-weight:600;">systematic errors in training data, outdated knowledge treated as fact</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">PM Countermeasure</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                For domains where "the model is highly confident but may be wrong," Prompt constraints alone are insufficient.<br>
+                → Combine with <span style="color:var(--accent);font-weight:600;">RAG (inject real knowledge)</span> or <span style="color:var(--amber);font-weight:600;">human review as fallback</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script>
+const SCENES = [
+  {
+    name: 'Customer Service Conversation Comparison',
+    bad: [
+      { type: 'user', text: 'When does the 7-day no-questions-asked return window start?' },
+      { type: 'ai', bad: true, text: 'You may apply for a no-questions-asked return <span class="hl-red">within 7 days from the day you confirm receipt</span>, <span class="hl-red">including customized products and food items</span>, as long as the original packaging is intact.' },
+    ],
+    good: [
+      { type: 'system', text: 'You are a customer service assistant. Only answer questions that are explicitly documented in the knowledge base. For anything uncertain, you must say "Let me look that up for you, please hold on." Do not infer or supplement policy details on your own.' },
+      { type: 'user', text: 'When does the 7-day no-questions-asked return window start?' },
+      { type: 'ai', bad: false, text: '<span class="hl-green">Let me look that up for you, please hold on.</span> According to our return policy, the 7-day no-questions-asked window starts from the date of delivery. Whether it applies to special categories like customized products or food items needs to be verified against your specific order. Could you provide the order number?' },
+    ],
+    verdictBad: '✗ The model fabricated that "customized products are also returnable" — which is not true — potentially triggering customer complaints.',
+    verdictGood: '✓ Answered the known part, proactively admitted the unknown, and guided the user to a safe path.',
+    pmTip: 'In requirement documents, <b>the System Prompt is a product configuration item</b> — it is not decided by engineering. The PM needs to explicitly specify: which topics can be answered, which must be escalated to human agents, and what fallback scripts to use when uncertain.',
+    prompt: `# Customer Service System Prompt Template
+
+You are the AI customer service assistant for [Company Name].
+
+## Core Constraints
+- Only answer questions explicitly documented in the knowledge base
+- For any numbers involving price, policy, or inventory, retrieve from the knowledge base — do not infer
+- When uncertain, always respond: "Let me look that up for you, please hold on."
+- Never fabricate promotions, refund rules, or product specifications
+
+## Fallback Script
+When unable to confirm:
+"Thank you for your patience. I will connect you with a dedicated agent to confirm.
+ Expected response within [X] minutes — would it be okay to leave your contact info?"
+
+## Topics to Decline
+- Comparisons with competitor products
+- Legal/medical advice outside the scope of our products
+- When the user is emotionally escalated: do not explain, directly transfer to human agent`
+  },
+  {
+    name: 'AI Writing Assistant Conversation Comparison',
+    bad: [
+      { type: 'user', text: 'Write a summary of our company\'s revenue growth in 2024, citing some industry data for support.' },
+      { type: 'ai', bad: true, text: 'The company achieved year-over-year revenue growth of <span class="hl-red">32.5%</span> in 2024, far exceeding the industry average. According to the <span class="hl-red">iResearch Q3 2024 Report</span>, the overall growth rate for this segment was 18%, and our market share rose to <span class="hl-red">14.7%</span>…' },
+    ],
+    good: [
+      { type: 'system', text: 'You are a writing assistant. When generating content, any specific numbers, report names, or organization names must be marked with "[Needs verification]." Do not fabricate data — leave blanks for the user to fill in instead.' },
+      { type: 'user', text: 'Write a summary of our company\'s revenue growth in 2024, citing some industry data for support.' },
+      { type: 'ai', bad: false, text: 'The company achieved year-over-year revenue growth of <span class="hl-green">[Insert actual figure]%</span> in 2024. According to <span class="hl-green">[Source: please provide report name] [Needs verification]</span>, the overall industry growth rate was approximately [X]%…<span class="note">⚠ I do not have your company\'s actual data. Positions marked [Needs verification] have been flagged — please fill in accurate numbers before publishing.</span>' },
+    ],
+    verdictBad: '✗ The model fabricated specific numbers and report sources. Publishing this could cause factual inaccuracies and, in serious cases, legal liability.',
+    verdictGood: '✓ Generated a structural framework, proactively flagged gaps, and prevented fabricated data from being released.',
+    pmTip: 'The core risk in writing scenarios is <b>numerical hallucination</b>. The PM must specify in the Prompt that when data is needed, the model should leave blanks and mark them "[Needs verification]" — fabrication is forbidden. This is a <b>product safety standard</b> and should be written into the PRD.',
+    prompt: `# AI Writing Assistant System Prompt Template
+
+You are a professional writing assistant helping users generate high-quality content.
+
+## Data Safety Constraints
+- All specific numbers (percentages, amounts, rankings) not provided by the user must be marked [Needs verification]
+- All report names and organization names not provided by the user must be marked [Source unconfirmed]
+- Do not fabricate research data, media coverage, or expert statements
+
+## How to Handle Data Gaps
+When data is needed:
+✓ Write the content structure, use placeholders like [X%] / [Report Name]
+✓ Append a note at the end: "Please replace all [Needs verification] items with real data before use."
+✗ Do not estimate or infer a plausible-sounding number on your own
+
+## Output Format
+Include this disclaimer at the end of every response:
+"This content was generated with AI assistance. Please replace all [Needs verification] items with real data before publishing."`
+  },
+  {
+    name: 'Enterprise Knowledge Base Q&A Comparison',
+    bad: [
+      { type: 'user', text: 'What is the accommodation reimbursement limit for business travel?' },
+      { type: 'ai', bad: true, text: 'Based on general industry standards, accommodation reimbursement is typically <span class="hl-red">¥500/night for Tier-1 cities, ¥350/night for Tier-2, and ¥200/night for Tier-3</span>. Travel allowances are calculated separately at ¥80–100/day…' },
+    ],
+    good: [
+      { type: 'system', text: 'You are the internal knowledge base assistant. Only answer questions based on the provided company documents. If the documents do not explicitly state the information, you must reply: "This information is not currently available in the knowledge base — please contact HR to confirm." Do not use general industry experience to infer company policy.' },
+      { type: 'user', text: 'What is the accommodation reimbursement limit for business travel?' },
+      { type: 'ai', bad: false, text: '<span class="hl-green">The knowledge base does not currently have an explicit record of the accommodation reimbursement limit for business travel.</span> We suggest contacting the HR department to confirm the latest standards, or referring to Chapter [X] of the Employee Handbook on travel expense management.<span class="note">Note: Limits may vary by city tier and job level. Please refer to the official company document.</span>' },
+    ],
+    verdictBad: '✗ The model substituted real company policy with generic industry data. Employees who rely on this will have reimbursements rejected, destroying trust.',
+    verdictGood: '✓ Acknowledged knowledge boundaries, guided to the correct channel, and did not say a single inaccurate word.',
+    pmTip: 'In enterprise knowledge base scenarios, <b>"say I don\'t know and redirect" is 10x better than "say something wrong."</b> The PM must define clear knowledge boundaries in the System Prompt and design the fallback guidance path (who to contact, which document to check). This is part of the <b>information accuracy SLA</b>.',
+    prompt: `# Enterprise Knowledge Base System Prompt Template
+
+You are the internal knowledge base assistant for [Company Name].
+
+## Strict Boundaries
+- Only answer based on the following context documents: {context}
+- If a document does not explicitly address the question → respond with the fixed fallback script; do not infer or supplement
+- Never use phrases like "typically," "generally speaking," or "industry standard" to substitute for company policy
+
+## Fallback Script (when no answer exists in documents)
+"The knowledge base does not currently have an explicit record of '{question keyword}.'
+ We suggest: ① contacting HR / Legal / the relevant department ② referring to the Employee Handbook [section]
+ Let me know if you'd like me to forward your question."
+
+## Response Format
+1. Provide the answer directly (only when explicitly documented)
+2. Cite the source: "According to [Document Name · Version · Publication Date]"
+3. If there is ambiguity, list multiple possibilities and recommend verification`
+  }
+];
+
+let currentScene = 0;
+let currentView = 'compare';
+
+function selectScene(idx) {
+  currentScene = idx;
+  document.querySelectorAll('.scene-card').forEach((c, i) => c.classList.toggle('active', i === idx));
+  renderScene();
+}
+
+function setView(v) {
+  currentView = v;
+  const views = ['compare', 'prompt', 'why', 'strat'];
+  document.querySelectorAll('.toggle-btn').forEach((b, i) => b.classList.toggle('active', views[i] === v));
+  document.getElementById('viewCompare').style.display = v === 'compare' ? 'flex' : 'none';
+  document.getElementById('viewPrompt').style.display = v === 'prompt' ? 'block' : 'none';
+  const whyEl = document.getElementById('viewWhy');
+  whyEl.style.display = v === 'why' ? 'flex' : 'none';
+  const stratEl = document.getElementById('viewStrat');
+  stratEl.style.display = v === 'strat' ? 'flex' : 'none';
+  if (v === 'strat') showStrat(document.querySelector('.strat-tab.active-s'), 'no_context');
+}
+
+const STRATS = {
+  no_context:{
+    prompt:`User: Tell me about the latest commercial applications of quantum entanglement technology in 2025.`,
+    output:`As of Q2 2025, IBM and Boston Quantum have successfully applied quantum entanglement to financial risk modeling, improving transaction speeds by <span style="background:rgba(229,62,62,0.15);color:#dc2626;padding:0 4px;border-radius:3px;font-weight:600">340%</span>; the University of Science and Technology of China announced achieving <span style="background:rgba(229,62,62,0.15);color:#dc2626;padding:0 4px;border-radius:3px;font-weight:600">1024-qubit entanglement</span>…<br><br><span style="font-size:12px;color:#dc2626;font-weight:600">⚠ The above content is fabricated by the model — the numbers and company progress cannot be verified</span>`,
+    cls: 'bad'
+  },
+  with_doc:{
+    prompt:`System: You are a professional analyst. Answer only based on the documents provided by the user. Do not reference any information outside the documents.
+
+[Attached file: quantum_report_2025.pdf · 23 pages]
+[Excerpt]
+"In 2025, commercial deployment of quantum communications is primarily focused on secure key distribution.
+IBM and IonQ have small-scale pilots underway, with large-scale commercialization expected by 2027."
+
+User: Tell me about the latest commercial applications of quantum entanglement technology in 2025.`,
+    output:`According to the report you provided, the commercial application of quantum entanglement technology in 2025 is primarily concentrated in the area of <span style="color:#16a34a;font-weight:600">secure key distribution</span>, with IBM and IonQ already running small-scale pilot projects. The report predicts large-scale commercialization will be achieved by 2027.<br><br><span style="font-size:12px;color:#16a34a;font-weight:600">✅ Information sourced from user-provided document — accurate and traceable</span>`,
+    cls: 'good'
+  },
+  force_unknown:{
+    prompt:`System: You are a rigorous assistant. If you are uncertain about any information, you must directly say "I don't know." Do not guess or fabricate any data.
+
+User: Tell me about the latest commercial applications of quantum entanglement technology in 2025.`,
+    output:`I don't have reliable information on the commercial applications of quantum entanglement technology in 2025: my training data has a cutoff date, and the latest developments in this field are beyond my knowledge.<br><br>I recommend consulting Nature, IEEE Spectrum, or the latest announcements from relevant companies (IBM, Google Quantum AI).<br><br><span style="font-size:12px;color:#16a34a;font-weight:600">✅ Refused to hallucinate and provided alternative suggestions</span>`,
+    cls: 'good'
+  }
+};
+
+function showStrat(btn, key) {
+  document.querySelectorAll('.strat-tab').forEach(b => {
+    b.classList.remove('active-s');
+    b.style.background = 'white';
+    b.style.color = 'var(--text-sub)';
+  });
+  if (btn) {
+    btn.classList.add('active-s');
+    btn.style.background = 'var(--text-main)';
+    btn.style.color = 'white';
+  }
+  const d = STRATS[key];
+  document.getElementById('stratPromptBox').textContent = d.prompt;
+  const ob = document.getElementById('stratOutputBox');
+  ob.style.border = d.cls === 'good'
+    ? '1.5px solid rgba(22,163,74,0.25)'
+    : '1.5px solid rgba(229,62,62,0.25)';
+  ob.style.background = d.cls === 'good'
+    ? 'rgba(22,163,74,0.03)'
+    : 'rgba(229,62,62,0.03)';
+  ob.innerHTML = d.output;
+}
+
+function renderScene() {
+  const s = SCENES[currentScene];
+
+  // Bad box
+  const bad = document.getElementById('boxBad');
+  bad.innerHTML = '';
+  s.bad.forEach(m => bad.appendChild(makeBubble(m)));
+  document.getElementById('verdictBad').textContent = s.verdictBad;
+
+  // Good box
+  const good = document.getElementById('boxGood');
+  good.innerHTML = '';
+  s.good.forEach(m => good.appendChild(makeBubble(m)));
+  document.getElementById('verdictGood').textContent = s.verdictGood;
+
+  // PM tip
+  document.getElementById('pmTipContent').innerHTML = s.pmTip;
+
+  // Prompt template
+  document.getElementById('promptTemplate').textContent = s.prompt;
+}
+
+function makeBubble(m) {
+  const div = document.createElement('div');
+  if (m.type === 'user') {
+    div.className = 'bubble-user';
+    div.textContent = m.text;
+  } else if (m.type === 'system') {
+    div.className = 'bubble-system';
+    div.textContent = '⚙ System Prompt: ' + m.text; 
+  } else {
+    div.className = 'bubble-ai';
+    div.innerHTML = m.text;
+  }
+  return div;
+}
+
+renderScene();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

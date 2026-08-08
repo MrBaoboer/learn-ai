@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Why Make Models Smaller: The Motivation Behind Distillation | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<link rel="stylesheet" href="oss.css?v=20260808b">
+<style>
+/* Motivation cards: three real-world constraints; the icons are visual anchors only, all the information is in the text */
+.mot-list { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.mot {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow-card);
+}
+.mot-ico {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px;
+  background: var(--oss-soft); color: var(--oss);
+  display: flex; align-items: center; justify-content: center;
+}
+.mot-ico svg { width: 18px; height: 18px; }
+.mot-body { min-width: 0; }
+.mot-body h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 5px; }
+.mot-body h4 em {
+  font-style: normal; font-size: 12px; font-weight: 700; color: var(--sub);
+  margin-left: 9px; letter-spacing: .3px;
+}
+.mot-body p { font-size: 14px; color: var(--sub); line-height: 1.7; }
+
+/* VRAM comparison rows: same basis as the calculator in oss-8, shown statically here */
+.vt { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.vt-row {
+  display: grid; grid-template-columns: 1.4fr .9fr .9fr 1fr;
+  align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: var(--card); font-size: 13.5px;
+}
+.vt-name { font-weight: 700; }
+.vt-num { font-family: "SF Mono", "Fira Code", Menlo, monospace; font-size: 12.5px; color: var(--sub); }
+.vt-fit { font-weight: 700; font-size: 13px; text-align: right; }
+.vt-row.is-ok { border-color: rgba(22,163,74,.3); background: rgba(22,163,74,.04); }
+.vt-row.is-ok .vt-fit { color: var(--success); }
+.vt-row.is-tight { border-color: rgba(217,119,6,.32); background: rgba(217,119,6,.05); }
+.vt-row.is-tight .vt-fit { color: var(--amber); }
+.vt-row.is-no { opacity: .58; }
+.vt-row.is-no .vt-fit { color: var(--sub); }
+
+/* Training method comparison: two cards side by side, old on the left, new on the right */
+.cmp-h { font-size: 15px; font-weight: 800; margin-bottom: 6px; }
+.cmp-h.is-old { color: var(--sub); }
+.cmp-h.is-new { color: var(--oss); }
+.l-cols .l-card p { font-size: 14px; color: var(--sub); line-height: 1.7; }
+
+@media (max-width: 768px) {
+  .vt-row { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  .vt-name { grid-column: 1 / -1; }
+  .vt-fit { grid-column: 1 / -1; text-align: left; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="If bigger models are more capable, why is the industry working so hard to make them smaller? Cost, latency, and data compliance are three real-world constraints that rule flagship models out of actual projects. Distillation is how a large model teaches a small one, saving the cost of training from scratch.">
+<meta name="keywords" content="why distill models,knowledge distillation motivation,small model deployment,model inference cost,on-premise deployment,DeepSeek R1 distillation">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/oss-5.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/oss-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/oss-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/oss-5.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/oss-5.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Why Make Models Smaller: The Motivation Behind Distillation">
+<meta property="og:description" content="Cost, latency, and data compliance are three real-world constraints that keep flagship models out of actual projects. Distillation lets a large model teach a small one, saving the cost of training from scratch.">
+<meta property="og:url" content="https://xueai.app/slides/oss-5.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Why Make Models Smaller: The Motivation Behind Distillation">
+<meta name="twitter:description" content="Cost, latency, and data compliance are three real-world constraints that keep flagship models out of actual projects. Distillation lets a large model teach a small one, saving the cost of training from scratch.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "LearningResource"], "headline": "Why Make Models Smaller: The Motivation Behind Distillation", "name": "Why Make Models Smaller: The Motivation Behind Distillation", "url": "https://xueai.app/slides/oss-5.en.html", "inLanguage": "en", "author": {"@type": "Person", "name": "洛小山"}, "publisher": {"@type": "Organization", "name": "xueai.app", "url": "https://xueai.app"}, "learningResourceType": "Course", "educationalLevel": "Beginner to Intermediate", "isPartOf": {"@type": "Course", "name": "AI Hands-on Course · How Large Models Get Smaller", "url": "https://xueai.app/slides/learn.html"}, "isAccessibleForFree": false, "description": "If bigger models are more capable, why is the industry working so hard to make them smaller? Cost, latency, and data compliance are three real-world constraints that rule flagship models out of actual projects. Distillation is how a large model teaches a small one, saving the cost of training from scratch.", "hasPart": {"@type": "WebPageElement", "isAccessibleForFree": false, "cssSelector": ".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Open Source Series · How Large Models Get Smaller</div>
+    <h1>Why Make Models Smaller: The Motivation Behind Distillation</h1>
+    <p class="subtitle">The last section just finished explaining that capability emerges more readily in larger models. So why is the whole industry working so hard to make models smaller? Because capability is not the only constraint. Cost, latency, and whether your data is allowed to leave the building are three things that rule flagship models out of real projects.</p>
+  </header>
+
+  <div class="sec-label">The short answer</div>
+
+  <div class="l-callout">
+    <b>Models get smaller because reality forces it.</b> Flagship models are the most capable, but they are expensive, they are slow, and they require sending your data to somebody else's servers. In many scenarios a small model that is good enough is the only option that can actually ship. Distillation is the technique for closing as much of the capability gap as possible.
+  </div>
+
+  <div class="sec-label">Three reasons to make models smaller</div>
+
+  <div class="mot-list">
+    <div class="mot">
+      <div class="mot-ico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01"/><path d="M18 12h.01"/></svg>
+      </div>
+      <div class="mot-body">
+        <h4>Cost<em>the gap is orders of magnitude, not percentages</em></h4>
+        <p>Drop the parameter count by an order of magnitude and the compute per inference usually drops by an order of magnitude too. The common industry figure is that inference on a small model can cost one to two orders of magnitude less than on a flagship. Exactly how much less depends on size, quantization level, batch size, and deployment method. Don't memorize the numbers; remember that this is a difference in magnitude, not a discount.</p>
+      </div>
+    </div>
+    <div class="mot">
+      <div class="mot-ico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+      </div>
+      <div class="mot-body">
+        <h4>Speed<em>running locally removes the whole network round trip</em></h4>
+        <p>Calling a remote flagship model means a network round trip, then queueing, then generating token by token. Waiting several seconds is normal. A small model running locally cuts out the network leg entirely, so the first token arrives much faster. Conversational products are especially sensitive to this: waiting three seconds and waiting three tenths of a second are two different experiences.</p>
+      </div>
+    </div>
+    <div class="mot">
+      <div class="mot-ico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+      </div>
+      <div class="mot-body">
+        <h4>On-premise and compliance<em>some data is simply not allowed off the internal network</em></h4>
+        <p>Medical records, case files, internal code, unreleased financial data — for this kind of content the compliance requirement is that it never leaves the internal network. However capable the model on the other end is, it is unusable, because the first step already fails. A small model deployed locally is the only route. The control described back in the first section becomes a hard constraint here.</p>
+      </div>
+    </div>
+  </div>
+
+  <p>What does "one to two orders of magnitude" turn into on the invoice at the end of the month? Drag in your own product's request volume and see.</p>
+
+  <div class="oss-lab" data-lab="Try it">
+    <div class="lab-q">Drag to your own product's order of magnitude first, then look at the gap between the two bills.</div>
+
+    <div class="lab-ctrl">
+      <div class="lab-row">
+        <span class="lab-label">Daily requests</span>
+        <input type="range" class="lab-range" id="cSlider" min="0" max="100" value="50" aria-label="Daily request volume">
+        <span class="lab-val" id="cCalls"></span>
+      </div>
+    </div>
+
+    <div class="lab-out">
+      <div class="lab-big" id="cGap"></div>
+      <div class="lab-dist">
+        <div class="lab-drow">
+          <span class="ld-name" id="cNameA"></span>
+          <span class="ld-track"><i class="ld-fill" id="cBarA" style="width:100%"></i></span>
+          <span class="ld-p" id="cCostA"></span>
+        </div>
+        <div class="lab-drow is-dim">
+          <span class="ld-name" id="cNameB"></span>
+          <span class="ld-track"><i class="ld-fill" id="cBarB" style="width:2%"></i></span>
+          <span class="ld-p" id="cCostB"></span>
+        </div>
+      </div>
+      <div class="lab-note" id="cBarNote"></div>
+      <div class="lab-lamps" id="cLamps" style="grid-template-columns:repeat(2,1fr)"></div>
+      <div class="lab-verdict" id="cVerdict"></div>
+    </div>
+  </div>
+
+  <div class="oss-src">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>The cost and latency figures above describe orders of magnitude, not benchmark results. The unit prices and latencies used by the calculator are illustrative magnitudes as well and do not represent any vendor's quote. The actual gap depends on model size, quantization level, batch size, and deployment method, so rely on measurements from your own scenario. Verified 2026-08-07.</span>
+  </div>
+
+  <div class="sec-label">How small does it have to be to fit on your own machine</div>
+
+  <p>"Small" is a relative term, but the test is concrete: does it fit on the GPU you have. There is an interactive tool later in this chapter dedicated to this calculation; here is the formula it uses.</p>
+
+  <div class="l-callout" style="margin:14px 0">
+    <b>VRAM (GB) ≈ parameter count (B) × precision coefficient</b><br>
+    <span style="font-size:14px;color:var(--sub)">Use 2.6 for FP16 and 0.65 for INT4. The coefficient already includes runtime overhead such as the KV Cache, so don't multiply it in again afterwards.</span>
+  </div>
+
+  <p>Here are a few sizes on that basis. The last column is whether it runs on a 24 GB consumer GPU after INT4 quantization.</p>
+
+  <div class="vt">
+    <div class="vt-row is-ok">
+      <div class="vt-name">Qwen3-0.6B</div>
+      <div class="vt-num">FP16 1.6 GB</div>
+      <div class="vt-num">INT4 0.4 GB</div>
+      <div class="vt-fit">Easily; even edge devices handle it</div>
+    </div>
+    <div class="vt-row is-ok">
+      <div class="vt-name">Qwen3-8B</div>
+      <div class="vt-num">FP16 20.8 GB</div>
+      <div class="vt-num">INT4 5.2 GB</div>
+      <div class="vt-fit">Plenty of room; runs on an 8 GB card</div>
+    </div>
+    <div class="vt-row is-tight">
+      <div class="vt-name">Qwen3-32B</div>
+      <div class="vt-num">FP16 83.2 GB</div>
+      <div class="vt-num">INT4 20.8 GB</div>
+      <div class="vt-fit">Barely; a long context will overflow</div>
+    </div>
+    <div class="vt-row is-no">
+      <div class="vt-name">Qwen3-235B-A22B</div>
+      <div class="vt-num">FP16 611 GB</div>
+      <div class="vt-num">INT4 152.8 GB</div>
+      <div class="vt-fit">No; quantization won't fix this</div>
+    </div>
+  </div>
+
+  <div class="oss-src paywall-locked xa-peek">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>The conversion coefficients match the VRAM calculator in oss-8 of this chapter: 2.6 for FP16 and 0.65 for INT4, with roughly 30% to 50% runtime overhead already included. These are empirical estimates, not vendor-stated figures. VRAM for MoE models is calculated from total parameters; the active parameter count only affects speed. The verdicts leave about 15% headroom, which is why 20.8 GB on a 24 GB card counts as "barely" rather than "fine." Verified 2026-08-07.</span>
+  </div>
+
+  <p class="paywall-locked">The conclusion is blunt. Quantized, the 8B size runs on a gaming GPU from several years ago; flagship sizes will not fit no matter how you quantize them. Which turns the question into a different one: <b>can a small model's capability be brought up to standard.</b></p>
+
+  <div class="sec-label paywall-locked">Distillation: having a large model teach a small one</div>
+
+  <p class="paywall-locked">There are two ways to close the capability gap. One is to have the small model learn from scratch on its own, repeating the whole cycle of data, compute, and trial and error. The other is to find a large model that has already learned and let it teach. The second is knowledge distillation.</p>
+
+  <div class="l-callout paywall-locked">
+    <b>The large model is the teacher, the small model is the student.</b> The teacher demonstrates how it judges a problem, and the student learns by following along. The student doesn't have to work it out from nothing, and doesn't have to grow to the teacher's size.
+  </div>
+
+  <p class="paywall-locked">The difference from conventional training lies mainly in how much information gets transferred at a time.</p>
+
+  <div class="l-cols paywall-locked">
+    <div class="l-card">
+      <div class="cmp-h is-old">Conventional training: right or wrong, that's all</div>
+      <p>Training data provides the correct answer. Right earns credit, wrong loses it. What comes back from one item is basically a single "right" or "wrong." Whether it was wildly wrong or off by a hair is invisible in the label. The signal is sparse, which is why it takes enormous data and enormous compute to make up for it.</p>
+    </div>
+    <div class="l-card">
+      <div class="cmp-h is-new">Distillation: you also see how the teacher thinks</div>
+      <p>The teacher provides not just the final answer but its leanings across all the candidates. On the same item, the student can see which options the teacher considered close and which were nowhere near. The same piece of data carries far more information, so the student learns much faster.</p>
+    </div>
+  </div>
+
+  <p class="paywall-locked">How that information is actually transferred and how the training math works is what oss-6 takes apart. For this section, just hold on to the motivation: <b>distillation saves money and time; it does not create new capability.</b></p>
+
+  <div class="sec-label paywall-locked">A case you can look up yourself</div>
+
+  <p class="paywall-locked">On 20 January 2025, DeepSeek released R1 and open-sourced a set of distilled small models alongside it. The approach was to generate reasoning data with R1 and then train smaller models on that data. Some of the distilled versions are built on Llama as the base, others on Qwen.</p>
+
+  <p class="paywall-locked">This one is worth noting because it is a publicly verifiable third-party choice. Which bases a company picks when it does distillation says more than any marketing claim. R1 uses the MIT License, and the official announcement states explicitly that training other models through distillation is permitted. Only because that was written down in plain terms did anyone dare take this route seriously.</p>
+
+  <div class="oss-src paywall-locked">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>Source: DeepSeek official announcement, 2025-01-20. R1 uses the MIT License, and the announcement explicitly permits users to train other models through distillation. The distilled models released at the same time span sizes from 1.5B to 70B, built on bases from the Qwen and Llama families respectively, and each version still has to comply with the license terms of its own base model. Verified 2026-08-07.</span>
+  </div>
+
+  <p class="paywall-locked">The naming convention for that batch of models and how it was done in detail come in the next section.</p>
+
+  <div class="sec-label paywall-locked">The bad news, stated up front</div>
+
+  <div class="oss-warn paywall-locked">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    <div><b>Distillation is not a cure-all.</b> On tasks that require long reasoning chains, multi-step planning, or weighing options across a lot of context, small models remain clearly weaker than flagships. That gap does not disappear by switching to a stronger teacher. When making a selection, don't expect a 7B model to take over every scenario; break the task apart first and see which steps a small model genuinely fits.</div>
+  </div>
+
+  <div class="oss-warn paywall-locked">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    <div><b>The student picks up the teacher's flaws along with everything else.</b> The teacher's biases, blind spots, and phrasing habits all get inherited, and the student cannot tell them apart. When large numbers of small models learn from the same few teachers, the whole ecosystem drifts in one direction. This side effect is what oss-7 covers specifically.</div>
+  </div>
+
+  <div class="sec-label paywall-locked">What to take from this section</div>
+
+  <div class="l-callout paywall-locked">
+    <b>1.</b> Models get smaller because of cost, latency, and data compliance — three real-world constraints that have nothing to do with chasing the capability ceiling.<br>
+    <b>2.</b> Whether something can ship comes down to VRAM first, and the formula is parameter count times the precision coefficient.<br>
+    <b>3.</b> Distillation has a large model teach a small one, in order to avoid the cost of training from scratch.<br>
+    <b>4.</b> Small models have a capability ceiling, and they inherit their teacher's defects. Put both on the table before you decide.
+  </div>
+
+  <p class="paywall-locked">The next section covers how distillation actually works: how the teacher sets the questions, how the student checks its answers, and which engineering pitfalls sit in between.</p>
+
+</article>
+
+<script src="oss-interact.js?v=20260808"></script>
+<script>
+/* 成本与延迟对比台。
+   「低一到两个数量级」是这一节的论点，但数量级这个词对没算过账的人没有
+   重量。让学员把自己产品的请求量拖进去，看到月底那个具体数字，做小的
+   动机才立得住。 */
+(function () {
+  var C = window.OSSInteract;
+  var slider = document.getElementById('cSlider');
+  if (!C || !slider) { return; }
+
+  var t = C.dict();
+  var lang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
+  var isKo = lang.indexOf('ko') === 0, isEn = lang.indexOf('en') === 0;
+
+  var TIP = isKo
+    ? function (r) { return '같은 일을 시키는데 월 비용이 <b>' + r + '배</b> 차이 납니다. 게다가 응답은 소형 모델이 더 빠릅니다. 이것이 모델을 작게 만드는 이유입니다.'; }
+    : isEn
+    ? function (r) { return 'Same workload, and the monthly bill differs by <b>' + r + 'x</b>. On top of that, the small model answers faster. This is why people shrink models.'; }
+    : function (r) { return '同样的活，月账单差 <b>' + r + ' 倍</b>，而且小模型还更快。这就是把模型做小的理由。'; };
+
+  /* 记录上一次的量级，只在跨数量级时给一次动效，见 render 末尾 */
+  var anim = {};
+
+  /* 请求量也走对数刻度：从每天一千次到一亿次跨五个数量级，
+     线性刻度的话小团队关心的区间会被压成滑块最左边的一小截。 */
+  function callsAt(pos) {
+    var v = Math.exp(Math.log(1000) + (Math.log(1e8) - Math.log(1000)) * (pos / 100));
+    var mag = Math.pow(10, Math.floor(Math.log(v) / Math.LN10) - 1);
+    return Math.max(1000, Math.round(v / mag) * mag);
+  }
+
+  function render(pos) {
+    var calls = callsAt(pos);
+    var a = C.monthlyCost(calls, 'flagship');
+    var b = C.monthlyCost(calls, 'small');
+    var ratio = C.costRatio(calls);
+
+    document.getElementById('cCalls').textContent = t.dailyCalls(calls);
+    document.getElementById('cNameA').textContent = t.costFlagship;
+    document.getElementById('cNameB').textContent = t.costSmall;
+    document.getElementById('cCostA').textContent = t.costMonthly(a);
+    document.getElementById('cCostB').textContent = t.costMonthly(b);
+    /* 小模型那条按比例算出来常常不足一像素，给个下限让它始终可见，
+       否则看起来像渲染坏了。 */
+    document.getElementById('cBarB').style.width = Math.max(1.5, b / a * 100) + '%';
+
+    /* 两条比例条的长度比由单价决定，跟规模无关，所以拖滑块时它们不动。
+       只有这两条的话，读者拖了半天看不出变化，会以为控件坏了。真正随规模
+       翻天覆地变的是差额本身——一天几千次请求时不过是几块钱，到了千万级
+       就是一个人的工资，这才是这一节要让人记住的东西。 */
+    document.getElementById('cGap').textContent = t.costGap(Math.round(a - b));
+    document.getElementById('cBarNote').textContent = t.costBarNote;
+
+    document.getElementById('cLamps').innerHTML = [
+      { n: t.costFlagship, v: t.latency(C.TIER_COST.flagship.latencyMs), on: false },
+      { n: t.costSmall, v: t.latency(C.TIER_COST.small.latencyMs), on: true },
+    ].map(function (x) {
+      return '<div class="lab-lamp ' + (x.on ? 'is-yes' : 'is-no') + '">'
+        + '<div class="ll-name">' + x.n + '</div><div class="ll-state">' + x.v + '</div></div>';
+    }).join('');
+
+    document.getElementById('cVerdict').innerHTML = TIP(ratio);
+
+    /* 账单数字每格都在动，只在跨数量级时提示一次，否则整块会跟着滑块抖 */
+    C.fireOnChange(document.getElementById('cGap'),
+      Math.floor(Math.log10(Math.max(a, 1))), anim, 'cost');
+  }
+
+  C.bindRange(slider, render);
+})();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260806b"></script><!--seo:end-->
+</body>
+</html>

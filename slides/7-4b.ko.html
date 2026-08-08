@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agent 교착 상태의 5가지 패턴 | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--green:var(--success);--orange:var(--amber);--red:var(--danger);--muted:var(--sub);--surface:var(--card);--surface2:rgba(0,0,0,.04)}
+
+/* 模式选择卡片 */
+.mode-list{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.mode-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .15s;position:relative;min-height:44px}
+.mode-card:hover{border-color:rgba(217,119,6,.4)}
+.mode-card.active{background:rgba(217,119,6,.05);border-color:var(--orange)}
+.mode-card.active .mc-name{color:var(--orange)}
+.mc-icon{font-size:20px;margin-bottom:4px}
+.mc-name{font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;transition:color .15s}
+.mc-brief{font-size:12px;color:var(--muted);line-height:1.4}
+.mc-num{position:absolute;top:10px;right:12px;width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--muted)}
+.mode-card.active .mc-num{background:rgba(217,119,6,.12);color:var(--orange)}
+
+/* 主区 */
+.main{margin-top:16px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.main-top{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.mt-scenario{font-size:14px;color:var(--text);font-weight:700;flex:1;min-width:200px}
+
+.main-body{display:grid;grid-template-columns:1fr 1fr}
+.sim-col{display:flex;flex-direction:column;min-width:0}
+.sim-col:first-child{border-right:1px solid var(--border)}
+.sim-hd{padding:9px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px}
+.sim-hd-fail{color:var(--red);background:rgba(220,38,38,.03)}
+.sim-hd-fix{color:var(--green);background:rgba(22,163,74,.03)}
+.sim-body{padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-height:160px}
+
+.msg{border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.6;opacity:0;transform:translateY(6px);transition:all .35s ease}
+.msg.show{opacity:1;transform:translateY(0)}
+.msg-role{font-size:10px;font-weight:800;letter-spacing:.4px;margin-bottom:3px;text-transform:uppercase}
+.msg-text{white-space:pre-line}
+
+.msg-user{background:rgba(8,145,178,.06);border:1px solid rgba(8,145,178,.12)}
+.msg-user .msg-role{color:var(--cyan)}
+.msg-model{background:rgba(124,58,237,.05);border:1px solid rgba(124,58,237,.1)}
+.msg-model .msg-role{color:var(--purple)}
+.msg-tool{background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.12)}
+.msg-tool .msg-role{color:var(--green)}
+.msg-error{background:rgba(220,38,38,.06);border:1.5px solid rgba(220,38,38,.2)}
+.msg-error .msg-role{color:var(--red)}
+.msg-warning{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2)}
+.msg-warning .msg-role{color:var(--amber)}
+.msg-loop{background:rgba(124,58,237,.03);border:1.5px dashed rgba(124,58,237,.2)}
+.msg-loop .msg-role{color:var(--purple)}
+.msg-ok{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.2)}
+.msg-ok .msg-role{color:var(--green)}
+.msg-framework{background:rgba(217,119,6,.05);border:1px dashed rgba(217,119,6,.2)}
+.msg-framework .msg-role{color:var(--orange)}
+
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
+.shake{animation:shake .4s ease}
+@keyframes pulse-border{0%,100%{border-color:rgba(220,38,38,.2)}50%{border-color:rgba(220,38,38,.5)}}
+.pulse{animation:pulse-border 1.2s ease infinite}
+
+.decision-bar{padding:12px 14px;border-top:1px solid var(--border)}
+.dec{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);line-height:1.6}
+.dec b{color:var(--orange)}
+
+.btn{padding:8px 16px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:38px}
+.btn-p{background:var(--orange);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.3;cursor:not-allowed}
+.btn-r{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+
+.empty-state{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--muted);font-size:14px;padding:60px 20px}
+.empty-state-icon{font-size:36px;opacity:.4}
+
+.counter{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:12px;font-weight:700}
+.counter-fail{background:rgba(220,38,38,.08);color:var(--red)}
+.counter-fix{background:rgba(22,163,74,.08);color:var(--green)}
+
+@media (max-width:768px){
+  .mode-list{grid-template-columns:1fr 1fr}
+  .main-body{grid-template-columns:1fr}
+  .sim-col:first-child{border-right:none;border-bottom:1px solid var(--border)}
+}
+</style>
+<meta name="description" content="Agent는 만능이 아닙니다. 5가지 전형적인 교착 패턴이 있습니다. 좋은 제품 설계는 이 문제들을 직시하고 각 장애 유형에 대한 대응 방안을 미리 마련합니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-4b.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-4b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-4b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-4b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-4b.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 제품 매니저 교육">
+<meta property="og:title" content="Agent 교착 상태의 5가지 패턴">
+<meta property="og:url" content="https://xueai.app/slides/7-4b.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Agent 교착 상태의 5가지 패턴","name":"Agent 교착 상태의 5가지 패턴","url":"https://xueai.app/slides/7-4b.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Agent 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Agent는 만능이 아닙니다. 5가지 전형적인 교착 패턴이 있습니다. 좋은 제품 설계는 이 문제들을 직시하고 각 장애 유형에 대한 대응 방안을 미리 마련합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 엔지니어링</div>
+    <h1>Agent 교착 상태의 5가지 패턴</h1>
+    <p class="subtitle">아래 카드를 클릭하여 장애 모드 선택 → 장애 시뮬레이션 재생 → 방어책 적용 후 동작 비교.</p>
+  </header>
+
+  <div class="sec-label">다섯 가지 장애 모드</div>
+  <div class="mode-list" id="cardList"></div>
+
+  <div class="main paywall-locked xa-peek" id="mainArea">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-state-icon">↑</div>
+      <div>장애 모드를 선택하여 애니메이션 시뮬레이션을 확인하세요</div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b>　Agent는 만능이 아닙니다. 5가지 전형적인 교착 패턴이 있습니다. 좋은 제품 설계는 이 문제들을 정면으로 마주하고 각 장애 유형에 대한 대응 방안을 미리 마련합니다: <b>파라미터 검증, 도구 확인, 루프 감지, 능동적 질문 메커니즘, 타임아웃 폴백.</b>
+  </div>
+</article>
+
+<script>
+var MODES = [
+  {
+    icon:'📋❌', name:'파라미터 형식 오류', brief:'모델이 파라미터 형식을 추측하며 반복 실패',
+    scenario:'모델이 get_weather를 호출하지만 파라미터 형식이 API 요구 사항과 맞지 않음',
+    decision:'<b>📌 설계 결정:</b> 도구 설명에 파라미터 형식 예시를 명확히 작성해야 합니다. 그렇지 않으면 모델은 추측할 수밖에 없습니다. "city는 소문자 영어, 예: beijing"이라는 한 문장이 모델의 재시도 횟수를 결정합니다.',
+    fail:[
+      {type:'msg-user',role:'사용자',text:'베이징 내일 날씨 어때요?'},
+      {type:'msg-model',role:'모델 추론',text:'get_weather 도구 호출\ncity → "北京市"'},
+      {type:'msg-error',role:'API 응답',text:'❌ 오류 400: city 필드가 유효하지 않음, 영어 도시명 필요',shake:true},
+      {type:'msg-model',role:'모델 재시도 #1',text:'형식을 바꿔보겠습니다…\ncity → "Beijing"'},
+      {type:'msg-error',role:'API 응답',text:'❌ 오류 400: city는 모두 소문자여야 함',shake:true},
+      {type:'msg-model',role:'모델 재시도 #2',text:'한 번 더…\ncity → "beijing"'},
+      {type:'msg-tool',role:'API 응답',text:'✅ 드디어 성공. 하지만 재시도 3회와 1800 Token을 소비했습니다.'},
+      {type:'msg-warning',role:'결과',text:'⚠️ 운이 좋아 맞췄지만, 운이 나쁘면 최대 재시도 횟수 후 포기합니다.'}
+    ],
+    fix:[
+      {type:'msg-framework',role:'프레임워크: 도구 설명',text:'get_weather\n설명: 도시 날씨 조회\ncity: 소문자 영어 도시명, 예: beijing, shanghai\ndate: YYYY-MM-DD 형식'},
+      {type:'msg-user',role:'사용자',text:'베이징 내일 날씨 어때요?'},
+      {type:'msg-model',role:'모델 추론',text:'설명에 city는 소문자 영어라고 되어 있음\ncity → "beijing"\ndate → "2026-04-23"'},
+      {type:'msg-ok',role:'API 응답',text:'✅ 첫 번째 시도 성공! 베이징 내일: 가벼운 비 후 흐림, 12-20°C'},
+      {type:'msg-ok',role:'결과',text:'재시도 없음, 1200 Token 절약. 핵심: 설명 한 줄의 예시.'}
+    ]
+  },
+  {
+    icon:'👻🔧', name:'환각 도구', brief:'존재하지 않는 도구명 호출',
+    scenario:'모델이 시스템에 없는 도구를 환각하여 호출 시도',
+    decision:'<b>📌 설계 결정:</b> 모델이 존재하지 않는 도구를 호출할 때, 프레임워크는 사용 가능한 도구 목록을 반환하여 모델이 수정할 수 있게 해야 합니다. "tool not found"만 반환하면 모델이 어둠 속에서 추측하게 됩니다.',
+    fail:[
+      {type:'msg-user',role:'사용자',text:'회의가 곧 시작됩니다, 모든 참석자에게 알림 보내주세요'},
+      {type:'msg-model',role:'모델 추론',text:'참석자에게 알림 발송… send_notification 도구 호출'},
+      {type:'msg-error',role:'프레임워크 응답',text:'❌ Tool not found: send_notification',shake:true},
+      {type:'msg-model',role:'모델 재시도 #1',text:'push_notification은 어떨까요?'},
+      {type:'msg-error',role:'프레임워크 응답',text:'❌ Tool not found: push_notification',shake:true},
+      {type:'msg-model',role:'모델 재시도 #2',text:'notify_users일 수도 있겠네요?'},
+      {type:'msg-error',role:'프레임워크 응답',text:'❌ Tool not found: notify_users',shake:true},
+      {type:'msg-warning',role:'결과',text:'⚠️ 모델이 3개의 잘못된 도구명을 추측해 2400 Token 소비.\n실제로는 send_email만 알림을 보낼 수 있습니다.'}
+    ],
+    fix:[
+      {type:'msg-user',role:'사용자',text:'회의가 곧 시작됩니다, 모든 참석자에게 알림 보내주세요'},
+      {type:'msg-model',role:'모델 추론',text:'알림 발송… send_notification 호출'},
+      {type:'msg-framework',role:'프레임워크 응답 (안내 포함)',text:'⚠️ send_notification이 존재하지 않습니다.\n사용 가능한 도구: send_email, get_calendar, search_contacts\n힌트: 알림 발송에는 send_email을 사용하세요'},
+      {type:'msg-model',role:'모델 수정',text:'아, send_email을 써야 하는군요!\n먼저 get_calendar로 참석자 조회 후 각각 send_email'},
+      {type:'msg-ok',role:'결과',text:'✅ 한 번의 수정 후 성공. 사용 가능 목록 = 모델에게 손전등.'}
+    ]
+  },
+  {
+    icon:'🔄♾️', name:'무한 루프', brief:'읽기-수정-검증-수정이 끊임없이 반복',
+    scenario:'모델이 "파일 읽기 → 수정 → 검증 → 재수정"의 무한 루프에 빠짐',
+    decision:'<b>📌 설계 결정:</b> 기본 최대 50회 반복. 너무 적으면 복잡한 작업이 제한되고, 너무 많으면 비용이 폭증합니다. 귀사 제품은 몇 회가 적절할까요? 루프 감지도 추가하세요: 동일한 작업이 3회 연속되면 강제 중단합니다.',
+    fail:[
+      {type:'msg-user',role:'사용자',text:'이 코드의 성능을 최적화해 주세요'},
+      {type:'msg-model',role:'모델 → 1회차',text:'read_file("app.js")\n→ 42번째 줄 최적화 발견'},
+      {type:'msg-tool',role:'도구',text:'edit_file("app.js", ...)  42번째 줄 수정'},
+      {type:'msg-model',role:'모델 → 2회차',text:'read_file("app.js") 검증\n→ 58번째 줄도 최적화 가능'},
+      {type:'msg-tool',role:'도구',text:'edit_file("app.js", ...)  58번째 줄 수정'},
+      {type:'msg-loop',role:'모델 → 3회차',text:'read_file("app.js") 재검증\n→ 42번째 줄을 원래대로 되돌리고 싶음…'},
+      {type:'msg-loop',role:'모델 → 4, 5, 6…회차',text:'🔄 read → edit → read → edit → read → edit …\n같은 파일을 20번 읽고 15번 수정'},
+      {type:'msg-error',role:'50회차',text:'❌ maxIterations(50) 도달, 강제 종료\n48,000 Token 소비, 코드는 오히려 더 나빠짐',pulse:true}
+    ],
+    fix:[
+      {type:'msg-user',role:'사용자',text:'이 코드의 성능을 최적화해 주세요'},
+      {type:'msg-framework',role:'프레임워크: 루프 감지기',text:'규칙: 동일 파일에 동일 작업 ≥ 3회 연속 → 중단\nmaxIterations = 25 (극단적 상황 방지)'},
+      {type:'msg-model',role:'모델 → 1회차',text:'read_file → edit_file → 수정 완료'},
+      {type:'msg-model',role:'모델 → 2회차',text:'read_file 검증 → 새 최적화 포인트 발견 → edit_file'},
+      {type:'msg-model',role:'모델 → 3회차',text:'read_file 검증 → 1회차 수정을 되돌리고 싶음'},
+      {type:'msg-framework',role:'프레임워크 중단',text:'⚠️ 루프 감지: read_file("app.js") 3회 연속\n자동 중단, 모델에게 현재 상태 요약 요청'},
+      {type:'msg-ok',role:'결과',text:'✅ 3회차에서 중단, 40,000+ Token 절약\n모델이 요약을 작성하고 중간 결과 전달'}
+    ]
+  },
+  {
+    icon:'🤷❓', name:'정보 부족 시 질문 없이 추측', brief:'핵심 정보가 없을 때 스스로 추측',
+    scenario:'사용자 지시가 모호하고 모델이 묻지 않고 추측하여 오류 발생',
+    decision:'<b>📌 설계 결정:</b> Agent는 더 질문해야 할까요, 더 추측해야 할까요? 과도한 질문은 짜증스럽고, 과도한 추측은 위험합니다. 경험 법칙: <b>비가역적 작업</b>(이메일 발송, 파일 삭제, 결제)에서는 반드시 확인; 가역적 작업은 먼저 실행할 수 있습니다.',
+    fail:[
+      {type:'msg-user',role:'사용자',text:'이메일 보내줘'},
+      {type:'msg-model',role:'모델 추론',text:'이메일을 보내야 함. 수신자 없음…\n제목 없음… 내용 없음…\n하지만 나는 helpful한 어시스턴트니까 추측할게!'},
+      {type:'msg-model',role:'모델 실행',text:'send_email 호출\n수신자 → team@company.com (추측)\n제목 → "알림" (추측)\n내용 → "안녕하세요, 이것은 알림 이메일입니다." (추측)'},
+      {type:'msg-tool',role:'API 응답',text:'✅ 이메일 발송 성공!'},
+      {type:'msg-error',role:'사용자 반응',text:'😱 뭐라고요?! 김철수에게 계약서를 보내고 싶었는데!\n전 팀에 이상한 이메일을 보낸 건가요?!',shake:true},
+      {type:'msg-warning',role:'결과',text:'⚠️ 기술적으로 성공했지만, 사용자 신뢰가 무너졌습니다.\n비가역적 작업 + 맹목적 추측 = 재앙.'}
+    ],
+    fix:[
+      {type:'msg-user',role:'사용자',text:'이메일 보내줘'},
+      {type:'msg-framework',role:'System Prompt 규칙',text:'규칙: 비가역적 작업 실행 전 핵심 파라미터가 없으면\nask_user 도구를 호출하여 사용자에게 확인'},
+      {type:'msg-model',role:'모델 추론',text:'이메일 발송은 비가역적 작업, 누락된 항목: 수신자, 제목, 내용\n→ ask_user 도구 호출'},
+      {type:'msg-model',role:'ask_user',text:'다음 정보를 입력해 주세요:\n1. 누구에게 보내나요? (이름 또는 이메일)\n2. 이메일 제목은 무엇인가요?\n3. 이메일 내용의 핵심 요점은?'},
+      {type:'msg-user',role:'사용자 답변',text:'김철수에게, 제목은 계약서 확인,\n내용은 첨부된 계약서를 확인해 달라고'},
+      {type:'msg-ok',role:'결과',text:'✅ 완전한 정보로 정확하게 발송.\n질문 하나로 사고를 예방했습니다.'}
+    ]
+  },
+  {
+    icon:'⏱️💥', name:'API 타임아웃 연쇄', brief:'느린 외부 API가 오류 메시지로 컨텍스트 폭발',
+    scenario:'외부 API 응답이 느리고 재시도로 오류 메시지가 쌓여 컨텍스트가 넘침',
+    decision:'<b>📌 설계 결정:</b> 도구 타임아웃을 얼마로 설정할까요? 5초는 너무 짧고(정상 요청도 실패), 60초는 너무 깁니다(사용자가 기다릴 수 없음). 권장: <b>읽기 작업 10초, 쓰기 작업 30초</b>, 최대 재시도 2회, 실패 시 친화적 메시지 반환 — 원시 오류 스택 제외.',
+    fail:[
+      {type:'msg-user',role:'사용자',text:'테슬라 최신 주가 확인해 줘'},
+      {type:'msg-model',role:'모델',text:'get_stock_price("TSLA") 호출'},
+      {type:'msg-error',role:'30초 후…',text:'❌ 요청 타임아웃: 주식 API 응답 없음 (30s timeout)',shake:true},
+      {type:'msg-model',role:'모델 재시도 #1',text:'타임아웃? 다시 시도…\nget_stock_price("TSLA") 호출'},
+      {type:'msg-error',role:'또 30초…',text:'❌ 요청 타임아웃: 주식 API 응답 없음 (30s timeout)',shake:true},
+      {type:'msg-model',role:'모델 재시도 #2',text:'한 번 더…'},
+      {type:'msg-error',role:'30초 더…',text:'❌ 요청 타임아웃: 주식 API 응답 없음 (30s timeout)',shake:true},
+      {type:'msg-warning',role:'결과',text:'⚠️ 사용자가 90초를 기다렸지만 아무것도 얻지 못함\n컨텍스트가 3개의 타임아웃 오류로 가득 차 Token 낭비\n게다가 모델은 계속 재시도하려 할 수 있음…',pulse:true}
+    ],
+    fix:[
+      {type:'msg-user',role:'사용자',text:'테슬라 최신 주가 확인해 줘'},
+      {type:'msg-framework',role:'프레임워크: 타임아웃 & 재시도 전략',text:'get_stock_price 설정:\ntimeout = 10초 ｜ maxRetries = 2\n실패 시 fallback = 친화적 메시지 반환 (원시 오류 스택 제외)'},
+      {type:'msg-model',role:'모델',text:'get_stock_price("TSLA") 호출'},
+      {type:'msg-error',role:'10초 후 타임아웃',text:'타임아웃 → 자동 재시도 1회 → 여전히 타임아웃'},
+      {type:'msg-framework',role:'프레임워크 Fallback',text:'모델에 반환되는 메시지:\n"주식 API가 일시적으로 이용 불가, 나중에 다시 시도하거나\nfinance.yahoo.com에서 직접 확인하도록 안내 권장"'},
+      {type:'msg-model',role:'모델 사용자 답변',text:'죄송합니다, 주식 데이터 서비스가 일시적으로 응답이 느립니다.\n잠시 후 다시 시도하거나, Yahoo Finance에서 확인하실 수 있습니다.'},
+      {type:'msg-ok',role:'결과',text:'✅ 20초 내에 명확한 응답 제공\n컨텍스트에 간결한 fallback 메시지 1개만 추가, Token 낭비 없음'}
+    ]
+  }
+];
+
+var activeMode = -1, playing = false, failStep = 0, fixStep = 0, timers = [];
+
+function buildCards() {
+  var html = '';
+  for (var i = 0; i < MODES.length; i++) {
+    var m = MODES[i];
+    html += '<div class="mode-card' + (i === activeMode ? ' active' : '') + '" onclick="selectMode(' + i + ')" id="card' + i + '">' +
+      '<div class="mc-num">' + (i + 1) + '</div>' +
+      '<div class="mc-icon">' + m.icon + '</div>' +
+      '<div class="mc-name">' + m.name + '</div>' +
+      '<div class="mc-brief">' + m.brief + '</div>' +
+      '</div>';
+  }
+  document.getElementById('cardList').innerHTML = html;
+}
+
+function selectMode(i) {
+  clearTimers();
+  playing = false;
+  failStep = 0;
+  fixStep = 0;
+  activeMode = i;
+  buildCards();
+  renderMain();
+  setTimeout(function() {
+    var main = document.getElementById('mainArea');
+    if (main) main.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }, 60);
+}
+
+function renderMain() {
+  if (activeMode < 0) return;
+  var m = MODES[activeMode];
+  var mainEl = document.getElementById('mainArea');
+  var es = document.getElementById('emptyState');
+  if (es) es.style.display = 'none';
+
+  mainEl.innerHTML =
+    '<div class="main-top">' +
+      '<div class="mt-scenario"><span style="color:var(--orange);margin-right:6px">' + m.icon + '</span> ' + m.scenario + '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<button class="btn btn-p" id="btnPlay" onclick="playAll()">▶ 시뮬레이션 재생</button>' +
+        '<button class="btn btn-r" onclick="resetSim()">초기화</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="main-body">' +
+      '<div class="sim-col">' +
+        '<div class="sim-hd sim-hd-fail">❌ 방어책 없을 때 <span class="counter counter-fail" id="failCount">0 / ' + m.fail.length + '</span></div>' +
+        '<div class="sim-body" id="failSim"></div>' +
+      '</div>' +
+      '<div class="sim-col">' +
+        '<div class="sim-hd sim-hd-fix">✅ 방어책 적용 후 <span class="counter counter-fix" id="fixCount">0 / ' + m.fix.length + '</span></div>' +
+        '<div class="sim-body" id="fixSim"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="decision-bar">' +
+      '<div class="dec">' + m.decision + '</div>' +
+    '</div>';
+}
+
+function addMsg(containerId, step, callback) {
+  var el = document.createElement('div');
+  el.className = 'msg ' + step.type;
+  el.innerHTML = '<div class="msg-role">' + step.role + '</div><div class="msg-text">' + step.text + '</div>';
+  document.getElementById(containerId).appendChild(el);
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      el.classList.add('show');
+      if (step.shake) setTimeout(function() { el.classList.add('shake'); }, 100);
+      if (step.pulse) setTimeout(function() { el.classList.add('pulse'); }, 300);
+      if (callback) callback();
+    });
+  });
+}
+
+function clearTimers() {
+  for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
+  timers = [];
+}
+
+function playAll() {
+  if (playing) return;
+  playing = true;
+  var m = MODES[activeMode];
+  var btn = document.getElementById('btnPlay');
+  if (btn) { btn.disabled = true; btn.textContent = '재생 중…'; }
+
+  var maxLen = Math.max(m.fail.length, m.fix.length);
+  var step = 0;
+
+  function tick() {
+    if (step >= maxLen) {
+      playing = false;
+      if (btn) btn.textContent = '✓ 재생 완료';
+      return;
+    }
+    if (step < m.fail.length) {
+      addMsg('failSim', m.fail[step]);
+      failStep = step + 1;
+      var fc = document.getElementById('failCount');
+      if (fc) fc.textContent = failStep + ' / ' + m.fail.length;
+    }
+    if (step < m.fix.length) {
+      addMsg('fixSim', m.fix[step]);
+      fixStep = step + 1;
+      var xc = document.getElementById('fixCount');
+      if (xc) xc.textContent = fixStep + ' / ' + m.fix.length;
+    }
+    step++;
+    timers.push(setTimeout(tick, 850));
+  }
+  tick();
+}
+
+function resetSim() {
+  clearTimers();
+  playing = false;
+  failStep = 0;
+  fixStep = 0;
+  renderMain();
+}
+
+buildCards();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>출력 형식 선택: JSON / Markdown / 일반 텍스트의 트레이드오프 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* 페이지 로컬 별칭 — 모두 디자인 시스템 변수에 매핑됨 (JS 렌더 함수에서 참조) */
+:root {
+  --surface2: #f0ede6;
+  --muted: var(--sub);
+  --green: var(--success);
+  --red: var(--danger);
+}
+
+/* ── 형식 선택 목록 ── */
+.fmt-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fmt-btn {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--card);
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+  text-align: left; width: 100%; min-height: 44px;
+  box-shadow: var(--shadow-card);
+}
+.fmt-btn:hover { border-color: rgba(0,0,0,0.15); }
+.fmt-btn.active { border-color: var(--purple); background: rgba(124,58,237,0.04); }
+.badge {
+  padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800;
+  flex-shrink: 0; min-width: 48px; text-align: center;
+  font-family: "SF Mono", Menlo, monospace;
+}
+.ft h4 { font-size: 15px; font-weight: 700; color: var(--text); transition: color 0.2s; }
+.fmt-btn.active .ft h4 { color: var(--purple); }
+.ft p { font-size: 12px; color: var(--sub); margin-top: 2px; line-height: 1.5; }
+
+/* ── 점수 그리드 ── */
+.score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sc {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 8px; text-align: center;
+}
+.sc .sl { font-size: 11px; color: var(--sub); font-weight: 600; margin-bottom: 4px; }
+.sc .sv { font-size: 15px; font-weight: 800; }
+.sv.good { color: var(--success); }
+.sv.mid { color: var(--amber); }
+.sv.bad { color: var(--danger); }
+
+/* ── 트레이드오프 설명 ── */
+.tradeoff-box {
+  background: rgba(124,58,237,0.05); border: 1.5px solid rgba(124,58,237,0.15);
+  border-radius: var(--radius); padding: 14px 18px;
+  font-size: 14px; color: var(--text); line-height: 1.8; margin-top: 12px;
+}
+.tradeoff-box b { color: var(--purple); }
+.warn-tag {
+  background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.2);
+  color: var(--danger); padding: 1px 7px; border-radius: 4px;
+  font-size: 12px; font-weight: 600;
+}
+.good-tag {
+  background: rgba(22,163,74,0.08); border: 1px solid rgba(22,163,74,0.2);
+  color: var(--success); padding: 1px 7px; border-radius: 4px;
+  font-size: 12px; font-weight: 600;
+}
+
+/* ── 스트리밍 데모 영역 ── */
+.demo-hd { font-size: 14px; font-weight: 800; color: var(--sub); letter-spacing: 0.4px; margin-bottom: 12px; }
+.stream-area { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.stream-panel {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sp-hd {
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: var(--surface2); font-size: 13px; font-weight: 700;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.sp-body { height: 320px; overflow-y: auto; position: relative; }
+
+/* 일반 코드 뷰 */
+.code-view {
+  padding: 12px 14px; font-size: 13px;
+  font-family: "SF Mono", "Fira Code", Menlo, monospace;
+  line-height: 1.7; color: #cdd6f4; background: #1e1b2e;
+  min-height: 100%; white-space: pre-wrap; word-break: break-word;
+}
+/* 렌더 뷰 */
+.render-view { padding: 12px 14px; font-size: 14px; line-height: 1.75; color: var(--text); }
+
+/* Token 흐름 문자 */
+.tk { display: inline; opacity: 0; animation: tkIn 0.08s ease forwards; }
+@keyframes tkIn { to { opacity: 1; } }
+
+/* 진행 표시줄 */
+.prog-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.prog-track { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 0.2s; }
+.prog-pct { font-size: 12px; color: var(--sub); min-width: 36px; }
+
+.ctrl-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.btn {
+  padding: 11px 24px; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700; border: none; cursor: pointer;
+  font-family: inherit; transition: all 0.15s; min-height: 44px;
+}
+.btn-play { background: var(--purple); color: white; }
+.btn-play:hover { filter: brightness(1.1); }
+.btn-play:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-rst { background: var(--card); color: var(--sub); border: 1.5px solid var(--border); }
+.hint { font-size: 13px; color: var(--sub); }
+
+/* rendered MD styles */
+.r-h2 { font-size: 17px; font-weight: 800; color: var(--text); margin: 6px 0 4px; }
+.r-h3 { font-size: 15px; font-weight: 700; color: #5b4fcf; margin: 4px 0 2px; }
+.r-li::before { content: "•"; color: var(--purple); margin-right: 5px; }
+.r-li { padding-left: 10px; margin: 2px 0; font-size: 14px; }
+.r-bq { padding-left: 10px; color: var(--sub); font-style: italic; margin: 4px 0; font-size: 13px; }
+.r-strong { font-weight: 800; color: var(--text); }
+
+/* streaming status badge */
+.status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.status.live { background: #fef3c7; color: #92400e; animation: pulse 1.2s ease infinite; }
+.status.done { background: #d1fae5; color: #065f46; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+@media (max-width: 768px) {
+  .fmt-list { grid-template-columns: 1fr; }
+  .score-grid { grid-template-columns: repeat(2, 1fr); }
+  .stream-area { grid-template-columns: 1fr; }
+  .sp-body { height: 240px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="각 시나리오에서 모델이 어떤 형식으로 출력해야 할까요? JSON(프로그램 파싱), Markdown(사용자 표시), 일반 텍스트(음성/단순 시나리오)의 장단점과 구조화 출력 강제화 엔지니어링 방안을 비교합니다.">
+<meta name="keywords" content="LLM 출력 형식,JSON 출력,Markdown 출력,구조화 출력,Function Calling">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/6-3.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/6-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/6-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/6-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/6-3.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="출력 형식 선택: JSON / Markdown / 일반 텍스트의 트레이드오프">
+<meta property="og:description" content="각 시나리오에서 모델이 어떤 형식으로 출력해야 할까요? JSON(프로그램 파싱), Markdown(사용자 표시), 일반 텍스트(음성/단순 시나리오)의 장단점과 구조화 출력 강제화 엔지니어링 방안을 비교합니다.">
+<meta property="og:url" content="https://xueai.app/slides/6-3.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="출력 형식 선택: JSON / Markdown / 일반 텍스트의 트레이드오프">
+<meta name="twitter:description" content="각 시나리오에서 모델이 어떤 형식으로 출력해야 할까요? JSON(프로그램 파싱), Markdown(사용자 표시), 일반 텍스트(음성/단순 시나리오)의 장단점과 구조화 출력 강제화 엔지니어링 방안을 비교합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"출력 형식 트레이드오프","name":"출력 형식 트레이드오프","url":"https://xueai.app/slides/6-3.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~심화","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Prompt 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"각 시나리오에서 모델이 어떤 형식으로 출력해야 할까요? JSON(프로그램 파싱), Markdown(사용자 표시), 일반 텍스트(음성/단순 시나리오)의 장단점과 구조화 출력 강제화 엔지니어링 방안을 비교합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt 엔지니어링</div>
+    <h1>출력 형식 트레이드오프</h1>
+    <p class="subtitle">가장 좋은 형식은 없습니다. 시나리오에 가장 적합한 형식만 있을 뿐입니다. 스트리밍 반환 시 형식 선택의 영향이 특히 두드러집니다. 형식을 선택하고 「스트리밍 데모 시작」을 클릭하여 Token 생성 경험의 차이를 관찰해 보세요.</p>
+  </header>
+
+  <div class="sec-label">다섯 가지 출력 형식</div>
+
+  <div class="fmt-list">
+    <button class="fmt-btn active" onclick="pickFmt(this,0)">
+      <span class="badge" style="background:#f0ede6;color:#6b6b70">TXT</span>
+      <div class="ft"><h4>일반 텍스트</h4><p>스트리밍 즉시 표시, 가장 안정적</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,1)">
+      <span class="badge" style="background:#fef3c7;color:#92400e">JSON</span>
+      <div class="ft"><h4>JSON 구조화</h4><p>스트리밍 중 불완전, 실시간 파싱 불가</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,2)">
+      <span class="badge" style="background:#ede9fe;color:#6d28d9">MD</span>
+      <div class="ft"><h4>Markdown</h4><p>스트리밍 렌더링 가능, 구조 추출 어려움</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,3)">
+      <span class="badge" style="background:#d1fae5;color:#065f46">YAML</span>
+      <div class="ft"><h4>YAML</h4><p>Token 절약, 스트리밍 중 역시 불완전</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,4)">
+      <span class="badge" style="background:#dbeafe;color:#1e40af">XML</span>
+      <div class="ft"><h4>XML / 커스텀 태그</h4><p>스트리밍 중 증분 파싱 가능, 가장 친화적</p></div>
+    </button>
+  </div>
+
+  <div class="sec-label">시나리오 적합도</div>
+
+  <div class="score-grid" id="scoreGrid"></div>
+  <div class="tradeoff-box" id="tradeoffBox"></div>
+
+  <div class="sec-label">스트리밍 데모</div>
+
+  <div class="demo-hd" id="demoHd">데모: 일반 텍스트 — 스트리밍 Token 경험</div>
+  <div class="stream-area paywall-locked xa-peek">
+    <div class="stream-panel">
+      <div class="sp-hd">
+        <span id="rawTitle">원시 Token 스트림</span>
+        <span class="status live" id="rawStatus">대기 중</span>
+      </div>
+      <div class="sp-body">
+        <div class="code-view" id="rawView"></div>
+      </div>
+    </div>
+    <div class="stream-panel">
+      <div class="sp-hd">
+        <span id="rendTitle">프론트엔드 표시 결과</span>
+        <span class="status live" id="rendStatus">대기 중</span>
+      </div>
+      <div class="sp-body" id="rendBody">
+        <div class="render-view" id="rendView"></div>
+      </div>
+    </div>
+  </div>
+  <div class="prog-row paywall-locked">
+    <div class="prog-track"><div class="prog-fill" id="progFill" style="background:var(--purple)"></div></div>
+    <span class="prog-pct" id="progPct">0%</span>
+  </div>
+  <div class="ctrl-row paywall-locked">
+    <button class="btn btn-play" id="btnPlay" onclick="playDemo()">▶ 스트리밍 데모 시작</button>
+    <button class="btn btn-rst" onclick="resetDemo()">초기화</button>
+    <span class="hint" id="playHint"></span>
+  </div>
+
+</article>
+
+<script>
+const FMTS = [
+  {
+    demoHd: '데모: 일반 텍스트 — 스트리밍 Token 경험',
+    rawTitle: '원시 Token 스트림',
+    rendTitle: '프론트엔드 실시간 표시 (즉시 표시 가능)',
+    scores: [
+      {lbl:'프론트엔드',val:'즉시',cls:'good'},{lbl:'Token 수',val:'최소',cls:'good'},
+      {lbl:'구조 파싱',val:'어려움',cls:'bad'},{lbl:'스트리밍 UX',val:'✓✓',cls:'good'}
+    ],
+    tradeoff: `<b>일반 텍스트 적합:</b> 사용자에게 직접 표시 / 프로그램 필드 읽기 불필요 / 매우 긴 콘텐츠 출력<br><br>
+<span class="good-tag">장점</span> Token 최소 소비, 스트리밍 생성 즉시 표시, 전체 텍스트 대기 불필요<br>
+<span class="good-tag">장점</span> 괄호 누락으로 인한 파싱 실패 없음<br>
+<span class="warn-tag">단점</span> 구조 정보 추출 어려움, 프로그램 소비에 부적합`,
+    raw: 'Notion AI\n유형: 글쓰기 보조\n특징: Notion 원활한 통합\n적합: 콘텐츠 팀\n\nMidjourney\n유형: 이미지 생성\n특징: 풍부한 예술 스타일\n적합: 디자이너',
+    renderFn: (raw) => `<div style="white-space:pre-wrap;font-size:14px;font-family:monospace;color:var(--sub)">${escHtml(raw)}</div>`
+  },
+  {
+    demoHd: '데모: JSON — 스트리밍 중 불완전, 파싱 불가',
+    rawTitle: '원시 Token 스트림 (JSON 완성 전…)',
+    rendTitle: '프론트엔드는 전체 텍스트 도착 후에만 파싱 가능',
+    scores: [
+      {lbl:'프론트엔드',val:'✓',cls:'good'},{lbl:'Token 수',val:'중간',cls:'mid'},
+      {lbl:'구조 파싱',val:'✓✓',cls:'good'},{lbl:'스트리밍 UX',val:'나쁨',cls:'bad'}
+    ],
+    tradeoff: `<b>JSON 적합:</b> 백엔드 필드 읽기 / 데이터 저장 / 프론트엔드 동적 렌더링 (비스트리밍)<br><br>
+<span class="good-tag">장점</span> JSON.parse()로 정확한 필드 추출, 프론트엔드 렌더링 편리<br>
+<span class="warn-tag">단점</span> 스트리밍 중 JSON은 불완전 — 전체 텍스트 도착 후에만 파싱 가능<br>
+<span class="warn-tag">단점</span> 매우 긴 JSON은 괄호 누락으로 생성 실패 위험, 폴백 로직 필수`,
+    raw: '{\n  "tools": [\n    {\n      "name": "Notion AI",\n      "type": "글쓰기 보조",\n      "highlight": "Notion 원활한 통합"\n    },\n    {\n      "name": "Midjourney",\n      "type": "이미지 생성"\n    }\n  ]\n}',
+    renderFn: (raw, pct) => {
+      if (pct < 100) {
+        return `<div style="padding:20px;text-align:center;color:var(--amber)">
+          <div style="font-size:32px;margin-bottom:8px">⏳</div>
+          <div style="font-size:15px;font-weight:700">전체 JSON 수신 대기 중…</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:6px">스트리밍 중 불완전한 JSON은 파싱 불가 — 사용자는 빈 화면을 봄</div>
+        </div>`;
+      }
+      return `<div style="padding:12px;font-size:14px">
+        <div style="color:var(--green);font-weight:700;margin-bottom:8px">✅ JSON 수신 완료, 파싱 시작…</div>
+        <div style="background:var(--surface2);border-radius:6px;padding:8px 10px;font-size:13px;font-family:monospace">
+          name: <b>Notion AI</b> | type: 글쓰기 보조<br>
+          name: <b>Midjourney</b> | type: 이미지 생성
+        </div>
+      </div>`;
+    }
+  },
+  {
+    demoHd: '데모: Markdown — 스트리밍 렌더링 가능, 문자 점진적 표시',
+    rawTitle: '원시 Token 스트림 (Markdown 문법)',
+    rendTitle: '프론트엔드 실시간 렌더링 (점진적 형성)',
+    scores: [
+      {lbl:'프론트엔드',val:'✓✓',cls:'good'},{lbl:'Token 수',val:'중간',cls:'mid'},
+      {lbl:'구조 파싱',val:'어려움',cls:'bad'},{lbl:'스트리밍 UX',val:'✓',cls:'good'}
+    ],
+    tradeoff: `<b>Markdown 적합:</b> 사용자에게 직접 렌더링 / 문서형 출력 / 채팅 인터페이스<br><br>
+<span class="good-tag">장점</span> 렌더링 후 형식 미려 — 제목/굵기/목록 즉시 사용 가능, 자연스러운 스트리밍 표시<br>
+<span class="warn-tag">단점</span> 구조화 추출 매우 어려움, 프로그램 소비에 부적합<br>
+<span class="warn-tag">단점</span> 모델마다 Markdown 스타일 불일치 (* 와 - 혼용)`,
+    raw: '## AI 도구 추천\n\n### 1. Notion AI\n- **유형**: 글쓰기 보조\n- **특징**: Notion 원활한 통합\n- **적합**: 콘텐츠 팀\n\n### 2. Midjourney\n- **유형**: 이미지 생성\n- **특징**: 풍부한 예술 스타일\n\n> 위 도구들은 모두 무료 체험을 지원합니다',
+    renderFn: (raw) => mdRender(raw)
+  },
+  {
+    demoHd: '데모: YAML — Token 최소, 스트리밍 중 역시 불완전',
+    rawTitle: '원시 Token 스트림 (YAML 형식)',
+    rendTitle: '프론트엔드는 전체 텍스트 도착 후에만 파싱 가능',
+    scores: [
+      {lbl:'프론트엔드',val:'백엔드',cls:'mid'},{lbl:'Token 수',val:'최소',cls:'good'},
+      {lbl:'구조 파싱',val:'✓',cls:'good'},{lbl:'스트리밍 UX',val:'보통',cls:'mid'}
+    ],
+    tradeoff: `<b>YAML 적합:</b> 백엔드 처리 / 설정 파일 생성 / 프론트엔드 인식 불필요한 데이터 스트림<br><br>
+<span class="good-tag">장점</span> JSON 대비 15~30% Token 절약 (따옴표/괄호 오버헤드 없음), 파싱 정밀도 동일<br>
+<span class="good-tag">장점</span> 사람이 읽기 쉬움, 설정 파일 생성에 적합<br>
+<span class="warn-tag">단점</span> 스트리밍 중 역시 불완전, 들여쓰기 오류 시 파싱 실패`,
+    raw: 'tools:\n  - name: Notion AI\n    type: 글쓰기 보조\n    highlight: Notion 원활한 통합\n    suitable_for: 콘텐츠 팀\n\n  - name: Midjourney\n    type: 이미지 생성\n    highlight: 풍부한 예술 스타일\n    suitable_for: 디자이너',
+    renderFn: (raw, pct) => {
+      if (pct < 100) {
+        return `<div style="padding:20px;text-align:center;color:var(--amber)">
+          <div style="font-size:32px;margin-bottom:8px">⏳</div>
+          <div style="font-size:15px;font-weight:700">전체 YAML 수신 대기 중…</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:6px">들여쓰기 구조 미완성 시 파싱 불가</div>
+        </div>`;
+      }
+      return `<div style="padding:12px;font-size:14px">
+        <div style="color:var(--green);font-weight:700;margin-bottom:8px">✅ YAML 완료, 파싱 시작…</div>
+        <div style="background:var(--surface2);border-radius:6px;padding:8px 10px;font-size:13px;font-family:monospace">
+          tools[0].name = Notion AI<br>tools[1].name = Midjourney
+        </div>
+        <div style="color:var(--muted);font-size:13px;margin-top:6px">JSON 대비 약 20% Token 절약 ✓</div>
+      </div>`;
+    }
+  },
+  {
+    demoHd: '데모: XML — 스트리밍 중 증분 파싱, 각 태그 닫힘 즉시 사용 가능',
+    rawTitle: '원시 Token 스트림 (XML 커스텀 태그)',
+    rendTitle: '프론트엔드 증분 파싱: 태그 닫힘 즉시 렌더링',
+    scores: [
+      {lbl:'프론트엔드',val:'✓✓',cls:'good'},{lbl:'Token 수',val:'많음',cls:'bad'},
+      {lbl:'Tool 호출',val:'✓✓',cls:'good'},{lbl:'스트리밍 UX',val:'✓✓',cls:'good'}
+    ],
+    tradeoff: `<b>XML 적합:</b> Tool 호출 / 스트리밍 렌더링 / Claude 권장 형식<br><br>
+<span class="good-tag">장점</span> 스트리밍 중 증분 파싱: &lt;/name&gt; 태그 캡처 즉시 렌더링, 전체 텍스트 대기 불필요<br>
+<span class="good-tag">장점</span> Tool 호출 구조가 XML과 자연스럽게 일치, Anthropic Claude의 기본 선호<br>
+<span class="warn-tag">단점</span> Token 소비 최고 (태그 자체가 Token 차지)`,
+    raw: '<tool_list>\n  <tool>\n    <name>Notion AI</name>\n    <type>글쓰기 보조</type>\n    <highlight>Notion 원활한 통합</highlight>\n  </tool>\n  <tool>\n    <name>Midjourney</name>\n    <type>이미지 생성</type>\n    <highlight>풍부한 예술 스타일</highlight>\n  </tool>\n</tool_list>',
+    renderFn: (raw) => xmlRender(raw)
+  }
+];
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function mdRender(raw) {
+  let html = escHtml(raw);
+  html = html.replace(/^## (.+)$/gm, '<div class="r-h2">$1</div>');
+  html = html.replace(/^### (.+)$/gm, '<div class="r-h3">$1</div>');
+  html = html.replace(/^\- \*\*(.+?)\*\*：(.+)$/gm, '<div class="r-li"><span class="r-strong">$1</span>：$2</div>');
+  html = html.replace(/^\- (.+)$/gm, '<div class="r-li">$1</div>');
+  html = html.replace(/^&gt; (.+)$/gm, '<div class="r-bq">$1</div>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<span class="r-strong">$1</span>');
+  html = html.replace(/\n/g, '');
+  return `<div style="padding:10px 14px">${html}</div>`;
+}
+
+function xmlRender(raw) {
+  const matches = [...raw.matchAll(/<tool>([\s\S]*?)<\/tool>/g)];
+  if (!matches.length) return `<div style="padding:12px;color:var(--muted);font-size:13px">첫 번째 &lt;/tool&gt; 닫힘 태그 대기 중…</div>`;
+  let html = '<div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px">';
+  matches.forEach((m, i) => {
+    const name = (m[1].match(/<name>(.*?)<\/name>/) || ['','?'])[1];
+    const type = (m[1].match(/<type>(.*?)<\/type>/) || ['',''])[1];
+    const hl   = (m[1].match(/<highlight>(.*?)<\/highlight>/) || ['',''])[1];
+    html += `<div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:14px">
+      <div style="font-weight:800;color:var(--purple);margin-bottom:3px">${escHtml(name)}</div>
+      ${type?`<div style="color:var(--sub);font-size:13px">유형: ${escHtml(type)}</div>`:''}
+      ${hl?`<div style="color:var(--green);font-size:13px;margin-top:2px">✓ ${escHtml(hl)}</div>`:''}
+    </div>`;
+  });
+  html += `<div style="color:var(--green);font-size:12px;margin-top:2px">↑ ${matches.length}개 항목 파싱됨 (스트리밍 진행 중…)</div>`;
+  html += '</div>';
+  return html;
+}
+
+let curFmt = 0, playing = false, rawTimer = null;
+
+function pickFmt(btn, idx) {
+  document.querySelectorAll('.fmt-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+  curFmt = idx;
+  resetDemo();
+  const f = FMTS[idx];
+  document.getElementById('demoHd').textContent = f.demoHd;
+  document.getElementById('rawTitle').textContent = f.rawTitle;
+  document.getElementById('rendTitle').textContent = f.rendTitle;
+  document.getElementById('scoreGrid').innerHTML = f.scores.map(s =>
+    `<div class="sc"><div class="sl">${s.lbl}</div><div class="sv ${s.cls}">${s.val}</div></div>`
+  ).join('');
+  document.getElementById('tradeoffBox').innerHTML = f.tradeoff;
+}
+
+function playDemo() {
+  if (playing) return;
+  playing = true;
+  document.getElementById('btnPlay').disabled = true;
+  document.getElementById('playHint').textContent = 'Token 스트리밍 중…';
+  document.getElementById('rawStatus').textContent = '생성 중';
+  document.getElementById('rawStatus').className = 'status live';
+  document.getElementById('rendStatus').textContent = '렌더링 중';
+  document.getElementById('rendStatus').className = 'status live';
+
+  const f = FMTS[curFmt];
+  const rawEl = document.getElementById('rawView');
+  const rendEl = document.getElementById('rendView');
+  const prog = document.getElementById('progFill');
+  const progPct = document.getElementById('progPct');
+  rawEl.innerHTML = '';
+
+  const chars = f.raw.split('');
+  let i = 0, raw = '';
+
+  function tick() {
+    if (i >= chars.length) {
+      document.getElementById('rawStatus').textContent = '완료';
+      document.getElementById('rawStatus').className = 'status done';
+      document.getElementById('rendStatus').textContent = '완료';
+      document.getElementById('rendStatus').className = 'status done';
+      playing = false;
+      document.getElementById('playHint').textContent = '스트리밍 데모 완료 — 양쪽 경험 차이를 관찰해 보세요';
+      rendEl.innerHTML = f.renderFn(raw, 100);
+      prog.style.width = '100%'; progPct.textContent = '100%';
+      return;
+    }
+    const ch = chars[i++];
+    raw += ch;
+    // 원시 스트림 색상 처리
+    const span = document.createElement('span');
+    span.className = 'tk';
+    if (ch === '<') span.style.color='#f38ba8';
+    else if (ch === '>') span.style.color='#f38ba8';
+    else if (ch === '"') span.style.color='#a6e3a1';
+    else if (ch === ':') span.style.color='#89dceb';
+    else span.style.color='#cdd6f4';
+    span.textContent = ch;
+    rawEl.appendChild(span);
+    rawEl.parentElement.scrollTop = rawEl.parentElement.scrollHeight;
+
+    const pct = Math.round(i / chars.length * 100);
+    prog.style.width = pct + '%'; progPct.textContent = pct + '%';
+
+    // 우측 렌더 (5글자마다 갱신)
+    if (i % 5 === 0 || i === chars.length) {
+      rendEl.innerHTML = f.renderFn(raw, pct);
+      document.getElementById('rendBody').scrollTop = 9999;
+    }
+
+    const delay = ch === '\n' ? 60 : 18;
+    rawTimer = setTimeout(tick, delay);
+  }
+  tick();
+}
+
+function resetDemo() {
+  clearTimeout(rawTimer);
+  playing = false;
+  document.getElementById('rawView').innerHTML = '';
+  document.getElementById('rendView').innerHTML = `<div style="padding:16px;color:var(--muted);font-size:14px">「스트리밍 데모 시작」을 클릭하여 효과를 확인하세요…</div>`;
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('btnPlay').textContent = '▶ 스트리밍 데모 시작';
+  document.getElementById('playHint').textContent = '';
+  document.getElementById('progFill').style.width = '0%';
+  document.getElementById('progPct').textContent = '0%';
+  document.getElementById('rawStatus').textContent = '대기 중';
+  document.getElementById('rawStatus').className = 'status live';
+  document.getElementById('rendStatus').textContent = '대기 중';
+  document.getElementById('rendStatus').className = 'status live';
+}
+
+// 초기화
+pickFmt(document.querySelector('.fmt-btn.active'), 0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

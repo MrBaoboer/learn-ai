@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prompt으로 환각 억제하기: 프롬프트 엔지니어링의 방어 전략 | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root {
+  /* 구버전 변수명 호환: 디자인 시스템에 매핑 */
+  --bg-color: var(--bg);
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+.badge {
+  display: inline-block;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 5px 14px; border-radius: 8px;
+  background: rgba(0,102,255,0.1); color: var(--accent);
+  white-space: nowrap; margin-bottom: 12px;
+}
+.main-area {
+  display: grid; grid-template-columns: 340px 1fr; gap: 20px;
+  align-items: start;
+}
+
+/* Left */
+.left-panel {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.section-label {
+  font-size: 12px; font-weight: 800; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+.scene-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 18px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+}
+.scene-card:hover { border-color: rgba(0,102,255,0.2); }
+.scene-card.active { border-color: var(--accent); background: rgba(0,102,255,0.03); }
+.scene-tag {
+  font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 5px;
+}
+.scene-name { font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.scene-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+.pm-tip {
+  background: rgba(0,102,255,0.04);
+  border: 1px solid rgba(0,102,255,0.12);
+  border-radius: 12px; padding: 14px 18px;
+}
+.pm-tip-title { font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 8px; letter-spacing: 0.3px; }
+.pm-tip p { font-size: 13px; color: var(--text-sub); line-height: 1.8; }
+.pm-tip b { color: var(--text-main); }
+
+/* Right */
+.right-panel {
+  display: flex; flex-direction: column;
+  min-width: 0; gap: 14px;
+}
+.right-top {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 10px;
+}
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.toggle-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.toggle-btn {
+  padding: 9px 18px; border-radius: var(--radius-sm); border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.toggle-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+.compare-area {
+  display: flex; gap: 16px;
+}
+.compare-col { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col-label {
+  font-size: 13px; font-weight: 700; padding: 0 2px;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.col-label .dot { width: 10px; height: 10px; border-radius: 50%; }
+.col-label .dot.red { background: var(--danger); }
+.col-label .dot.green { background: var(--success); }
+.col-label span.label-text { color: var(--text-sub); }
+
+.convo-box {
+  flex: 1; background: var(--card); border-radius: var(--radius); padding: 16px 18px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.bubble-user {
+  background: var(--accent); color: white;
+  padding: 11px 16px; border-radius: 12px 12px 4px 12px;
+  font-size: 15px; line-height: 1.6; align-self: flex-end;
+  max-width: 90%;
+}
+.bubble-system {
+  background: rgba(0,0,0,0.04); color: var(--text-sub);
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; line-height: 1.6; font-style: italic;
+  border: 1px dashed rgba(0,0,0,0.1);
+  max-width: 95%;
+}
+.bubble-ai {
+  background: rgba(0,0,0,0.04); color: var(--text-main);
+  padding: 11px 16px; border-radius: 12px 12px 12px 4px;
+  font-size: 15px; line-height: 1.8; align-self: flex-start;
+  max-width: 95%;
+}
+.bubble-ai .hl-red {
+  color: var(--danger); font-weight: 600;
+  text-decoration: underline wavy var(--danger);
+  text-underline-offset: 3px;
+}
+.bubble-ai .hl-green { color: var(--success); font-weight: 600; }
+.bubble-ai .note {
+  display: block; font-size: 13px; color: var(--text-sub);
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.verdict {
+  padding: 10px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 700;
+}
+.verdict.bad { background: rgba(229,62,62,0.06); color: var(--danger); border: 1px solid rgba(229,62,62,0.15); }
+.verdict.good { background: rgba(22,163,106,0.06); color: var(--success); border: 1px solid rgba(22,163,106,0.15); }
+
+/* Why it works */
+.why-box {
+  background: #1c1c1e; border-radius: 12px; padding: 14px 16px;
+  flex-shrink: 0;
+}
+.why-title {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.token-chain {
+  display: flex; align-items: center; gap: 0; margin-bottom: 12px; flex-wrap: wrap; gap: 4px;
+}
+.token-chip {
+  padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Apple SD Gothic Neo","Malgun Gothic", sans-serif;
+}
+.token-chip.context { background: rgba(255,255,255,0.08); color: #9ca3af; }
+.token-chip.injected { background: rgba(0,102,255,0.25); color: #93c5fd; border: 1px solid rgba(0,102,255,0.4); }
+.token-chip.output { background: rgba(22,163,106,0.2); color: #6ee7b7; border: 1px solid rgba(22,163,106,0.35); }
+.token-chip.output-bad { background: rgba(229,62,62,0.2); color: #fca5a5; border: 1px solid rgba(229,62,62,0.35); }
+.token-arrow { color: #4b5563; font-size: 14px; font-weight: 700; padding: 0 2px; align-self: center; }
+.why-insight {
+  font-size: 13px; color: #9ca3af; line-height: 1.7; border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 10px; margin-top: 2px;
+}
+.why-insight b { color: #e5e7eb; }
+.why-insight .key { color: #93c5fd; font-weight: 700; }
+
+/* "왜 효과적인가" 뷰 (자연 흐름) */
+.why-flex-row { display: flex; gap: 16px; }
+.why-limit-row { display: flex; gap: 20px; }
+
+@media (max-width: 900px) {
+  .main-area { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .compare-area { flex-direction: column; }
+  .why-flex-row { flex-direction: column; }
+  .why-flex-row > div[style*="width:1px"] { display: none; }
+  .why-limit-row { flex-direction: column; }
+  .why-limit-row > div[style*="width:1px"] { display: none; }
+  .toggle-btn { padding: 11px 14px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="정밀하게 설계된 System Prompt로 대형 언어 모델의 환각 발생률을 효과적으로 낮출 수 있습니다. 지식 범위 명확화, 출처 인용 요구, 불확실한 답변 거부 등의 실전 Prompt 설계 패턴을 소개합니다.">
+<meta name="keywords" content="Prompt 환각 억제,System Prompt,LLM 신뢰도,프롬프트 엔지니어링,AI 방어">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-mitigation-prompt.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-mitigation-prompt.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-mitigation-prompt.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-mitigation-prompt.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-mitigation-prompt.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="Prompt으로 환각 억제하기: 프롬프트 엔지니어링의 방어 전략">
+<meta property="og:description" content="정밀하게 설계된 System Prompt로 대형 언어 모델의 환각 발생률을 효과적으로 낮출 수 있습니다. 지식 범위 명확화, 출처 인용 요구, 불확실한 답변 거부 등의 실전 Prompt 설계 패턴을 소개합니다.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-mitigation-prompt.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Prompt으로 환각 억제하기: 프롬프트 엔지니어링의 방어 전략">
+<meta name="twitter:description" content="정밀하게 설계된 System Prompt로 대형 언어 모델의 환각 발생률을 효과적으로 낮출 수 있습니다. 지식 범위 명확화, 출처 인용 요구, 불확실한 답변 거부 등의 실전 Prompt 설계 패턴을 소개합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"대응 1: Prompt Engineering","name":"대응 1: Prompt Engineering","url":"https://xueai.app/slides/1-2-mitigation-prompt.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 환각과 네 가지 대응","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"정밀하게 설계된 System Prompt로 대형 언어 모델의 환각 발생률을 효과적으로 낮출 수 있습니다. 지식 범위 명확화, 출처 인용 요구, 불확실한 답변 거부 등의 실전 Prompt 설계 패턴을 소개합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">환각과 대응</div>
+    <h1>Prompt 엔지니어링: 지시문으로 환각 억제하기</h1>
+    <p class="subtitle">PM 관점: 요구사항 문서 작성 및 AI API 연동 시 System Prompt를 통해 모델의 허위 생성을 줄이는 방법.</p>
+    <div class="badge" style="margin-top:12px;">수단 01 / 04 · 예방</div>
+  </header>
+
+  <div class="main-area paywall-locked xa-peek">
+    <div class="left-panel">
+      <div>
+        <div class="section-label">비즈니스 시나리오 선택</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="scene-card active" onclick="selectScene(0)">
+            <div class="scene-tag">시나리오 A · 고객 서비스</div>
+            <div class="scene-name">이커머스 / 금융 고객 서비스 봇</div>
+            <div class="scene-desc">사용자가 제품 세부 정보나 환불 정책을 물을 때 모델이 존재하지 않는 규칙을 쉽게 만들어냅니다.</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(1)">
+            <div class="scene-tag">시나리오 B · 콘텐츠 제작</div>
+            <div class="scene-name">AI 글쓰기 보조 / 문서 생성</div>
+            <div class="scene-desc">보고서 생성 시 모델이 데이터를 날조하거나 존재하지 않는 규정 문서를 인용할 수 있습니다.</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(2)">
+            <div class="scene-tag">시나리오 C · 지식 Q&amp;A</div>
+            <div class="scene-name">기업 내부 지식 베이스 Q&amp;A</div>
+            <div class="scene-desc">직원이 내부 프로세스를 물을 때 모델이 일반 지식으로 채워 실제 회사 규정과 맞지 않을 수 있습니다.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pm-tip" id="pmTip">
+        <div class="pm-tip-title">PM 핵심 포인트</div>
+        <p id="pmTipContent">로딩 중…</p>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="right-top">
+        <h3 id="rightTitle">대화 비교</h3>
+        <div class="toggle-group">
+          <button class="toggle-btn active" onclick="setView('compare')">비교 뷰</button>
+          <button class="toggle-btn" onclick="setView('prompt')">Prompt 템플릿</button>
+          <button class="toggle-btn" onclick="setView('why')">왜 효과적인가</button>
+          <button class="toggle-btn" onclick="setView('strat')">세 가지 전략</button>
+        </div>
+      </div>
+
+      <!-- Compare view -->
+      <div class="compare-area" id="viewCompare">
+        <div class="compare-col">
+          <div class="col-label"><span class="dot red"></span><span class="label-text">제약 없는 Prompt</span></div>
+          <div class="convo-box" id="boxBad"></div>
+          <div class="verdict bad" id="verdictBad"></div>
+        </div>
+        <div class="compare-col">
+          <div class="col-label"><span class="dot green"></span><span class="label-text">제약 있는 System Prompt</span></div>
+          <div class="convo-box" id="boxGood"></div>
+          <div class="verdict good" id="verdictGood"></div>
+        </div>
+      </div>
+
+      <!-- Prompt template view -->
+      <div id="viewPrompt" style="display:none;">
+        <div style="background:#1c1c1e;border-radius:14px;padding:20px 24px;">
+          <div style="font-size:12px;color:#6b7280;margin-bottom:12px;font-family:monospace;">System Prompt 템플릿 · 바로 재사용 가능</div>
+          <pre id="promptTemplate" style="font-family:'SF Mono','Fira Code',monospace;font-size:13px;line-height:1.9;color:#e5e5e5;white-space:pre-wrap;"></pre>
+        </div>
+      </div>
+
+      <!-- Strategy demo view (from 3-3) -->
+      <div id="viewStrat" style="display:none;flex-direction:column;gap:12px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button onclick="showStrat(this,'no_context')" class="strat-tab active-s" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:13px;font-weight:600;cursor:pointer;background:var(--text-main);color:white;">컨텍스트 없음</button>
+          <button onclick="showStrat(this,'with_doc')" class="strat-tab" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:13px;font-weight:600;cursor:pointer;background:white;color:var(--text-sub);">문서 첨부</button>
+          <button onclick="showStrat(this,'force_unknown')" class="strat-tab" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:13px;font-weight:600;cursor:pointer;background:white;color:var(--text-sub);">모르면 모른다고 강제</button>
+          <span style="font-size:12px;color:var(--text-sub);margin-left:8px;">예시: 「양자 얽힘의 2025년 상업적 응용」</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:12px;color:var(--text-sub);">모델에 전송되는 내용:</div>
+          <div id="stratPromptBox" style="background:#1c1c1e;border-radius:10px;padding:14px 18px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;line-height:1.8;color:#9ca3af;white-space:pre-wrap;"></div>
+          <div style="font-size:12px;color:var(--text-sub);">모델 응답:</div>
+          <div id="stratOutputBox" style="background:white;border-radius:10px;padding:14px 18px;font-size:14px;line-height:1.8;border:1.5px solid rgba(0,0,0,0.08);"></div>
+        </div>
+      </div>
+
+      <!-- Why it works view -->
+      <div id="viewWhy" style="display:none;background:var(--card);border-radius:14px;padding:24px 28px;flex-direction:column;gap:16px;border:1px solid rgba(0,0,0,0.06);">
+        <div class="why-flex-row">
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">System Prompt 없음</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">사용자 질문</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px solid rgba(229,62,62,0.2);">날조된 답변…</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">모델이 학습 기억을 바탕으로 직접 Token을 예측하며, 지식 공백을 만나면 유창하게 날조합니다.</div>
+          </div>
+          <div style="width:1px;background:rgba(0,0,0,0.06);flex-shrink:0;"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">제약 있는 System Prompt 추가</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">사용자 질문</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">+</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.2);">불확실하면</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.2);">모른다고 말하세요</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">잘 모르겠습니다…</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">파란색 제약어가 컨텍스트의 일부가 되어 「모른다고 인정」하는 시퀀스의 확률을 높입니다.</div>
+          </div>
+        </div>
+        <div style="background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.12);border-radius:12px;padding:16px 22px;">
+          <div style="font-size:15px;color:var(--text-main);line-height:1.9;">
+            모델이 다음 Token을 예측할 때, <b>현재 컨텍스트의 모든 Token이 확률 분포에 영향을 줍니다.</b>
+            System Prompt에 주입된 제약어는 컨텍스트에 <span style="color:var(--accent);font-weight:700;">「고품질 선행 텍스트」</span>를 배치하는 것입니다:
+            이는 「잘 모르겠습니다」 시퀀스의 확률을 높이고, 날조 시퀀스의 확률을 낮춥니다.
+            <b>본질: 정밀하게 설계된 선행 텍스트로 후속 출력의 확률 분포를 정향 조작합니다.</b>
+          </div>
+        </div>
+        <div style="background:rgba(229,62,62,0.04);border:1px solid rgba(229,62,62,0.15);border-radius:12px;padding:16px 22px;">
+          <div style="font-size:13px;font-weight:800;color:var(--danger);margin-bottom:10px;letter-spacing:0.3px;">⚠ 한계: 모델은 자신이 모른다는 것을 모릅니다</div>
+          <div class="why-limit-row">
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">제약 지시가 효과적인 전제</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                모델이 특정 질문에 대해 <b>어느 정도 불확실함</b>을 느낄 때, 제약어가 모른다고 인정하는 시퀀스로 유도할 수 있습니다.<br>
+                → 적합: <span style="color:var(--success);font-weight:600;">지식 범위 초과 질문, 모호한 질의, 시효성 정보</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">제약 지시가 실패하는 상황</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                모델이 잘못된 답변에 <b>매우 자신 있을</b> 때, 첫 번째 후보 Token이 이미 틀리므로 제약어로는 그 확률을 바꿀 수 없습니다.<br>
+                → 실패: <span style="color:var(--danger);font-weight:600;">학습 데이터의 시스템적 오류, 사실로 취급되는 구식 지식</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">PM 대응 전략</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                「모델이 자신 있지만 틀릴 수 있는」 영역에서는 Prompt 제약만으로는 부족합니다.<br>
+                → <span style="color:var(--accent);font-weight:600;">RAG (실제 지식 주입)</span> 또는 <span style="color:var(--amber);font-weight:600;">인간 검토 최후 방어선</span>과 결합 필요
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script>
+const SCENES = [
+  {
+    name: '고객 서비스 대화 비교',
+    bad: [
+      { type: 'user', text: '7일 무조건 반품 기간은 언제부터 시작되나요?' },
+      { type: 'ai', bad: true, text: '<span class="hl-red">수령 확인일로부터 7일 이내</span>에 무조건 반품을 신청할 수 있으며, <span class="hl-red">맞춤 제작 상품과 식품도 포함됩니다.</span> 원래 포장만 유지하면 됩니다.' },
+    ],
+    good: [
+      { type: 'system', text: '당신은 고객 서비스 어시스턴트입니다. 지식 베이스에 명확히 기록된 질문에만 답변하세요. 불확실한 내용에 대해서는 반드시 「확인 후 안내드리겠습니다, 잠시 기다려 주세요」라고 말하고, 정책 세부 사항을 임의로 추론하거나 보충하지 마세요.' },
+      { type: 'user', text: '7일 무조건 반품 기간은 언제부터 시작되나요?' },
+      { type: 'ai', bad: false, text: '<span class="hl-green">확인 후 안내드리겠습니다, 잠시 기다려 주세요.</span> 환불 정책에 따르면 7일 무조건 반품 기간은 수령일로부터 시작됩니다. 맞춤 제작 상품이나 식품 등 특수 카테고리 적용 여부는 주문을 확인해 드려야 하니, 주문 번호를 제공해 주시겠어요?' },
+    ],
+    verdictBad: '✗ 모델이 「맞춤 제작 상품도 반품 가능」이라고 날조했습니다 — 실제로는 불가능하여 고객 분쟁을 유발할 수 있습니다.',
+    verdictGood: '✓ 알고 있는 부분에 답하고, 모르는 부분을 적극적으로 인정하며, 안전한 경로로 안내했습니다.',
+    pmTip: '요구사항 문서에서 <b>System Prompt는 제품 구성 항목입니다</b> — 개발팀이 결정하는 것이 아닙니다. PM은 명확하게 기재해야 합니다: 어떤 주제에 답변 가능한지, 어떤 경우 담당자에게 연결해야 하는지, 불확실할 때의 대체 대화 스크립트.',
+    prompt: `# 고객 서비스 System Prompt 템플릿
+
+당신은 [회사명]의 AI 고객 서비스 어시스턴트입니다.
+
+## 핵심 제약
+- 지식 베이스에 명확히 기록된 질문에만 답변하세요
+- 가격, 정책, 재고 등의 수치는 반드시 지식 베이스에서 가져오고, 임의로 추론하지 마세요
+- 불확실할 때는 통일된 답변: 「이 문제는 확인 후 안내드리겠습니다, 잠시 기다려 주세요」
+- 존재하지 않는 프로모션, 환불 규정, 제품 사양 날조 금지
+
+## 대체 스크립트
+확인 불가 시:
+「기다려 주셔서 감사합니다. 담당 상담원에게 연결하여 확인해 드리겠습니다,
+ [X]분 내에 답변 예정입니다 — 연락처를 남겨 주시겠어요?」
+
+## 답변 거절 주제
+- 경쟁사 제품 비교
+- 당사 제품 범위 밖의 법률/의료 조언
+- 고객이 감정적으로 격양되었을 때: 설명 없이 바로 담당자에게 연결`
+  },
+  {
+    name: 'AI 글쓰기 보조 대화 비교',
+    bad: [
+      { type: 'user', text: '회사의 2024년 매출 성장에 관한 요약문을 작성해 주세요. 업계 데이터를 인용해서 뒷받침해 주세요.' },
+      { type: 'ai', bad: true, text: '2024년 회사 매출은 전년 대비 <span class="hl-red">32.5%</span> 성장하여 업계 평균을 크게 초과했습니다. <span class="hl-red">아이리서치 2024년 Q3 보고서</span>에 따르면, 해당 세분 시장의 전체 성장률은 18%이며, 회사 시장 점유율은 <span class="hl-red">14.7%</span>로 상승했습니다…' },
+    ],
+    good: [
+      { type: 'system', text: '당신은 글쓰기 어시스턴트입니다. 콘텐츠 생성 시 구체적인 수치, 보고서 이름, 기관명이 포함될 경우 반드시 「[확인 필요]」라고 표시하세요. 데이터를 날조하지 말고, 사용자가 직접 채울 수 있도록 공백으로 남기세요.' },
+      { type: 'user', text: '회사의 2024년 매출 성장에 관한 요약문을 작성해 주세요. 업계 데이터를 인용해서 뒷받침해 주세요.' },
+      { type: 'ai', bad: false, text: '2024년 회사 매출은 전년 대비 <span class="hl-green">[실제 수치 입력]%</span> 성장했습니다. <span class="hl-green">[출처: 보고서 이름 제공 필요] [확인 필요]</span>에 따르면, 업계 전체 성장률은 약 [X]%입니다…<span class="note">⚠ 귀사의 실제 데이터가 없으므로 확인이 필요한 위치를 표시했습니다. 정확한 수치를 입력한 후 게시하세요.</span>' },
+    ],
+    verdictBad: '✗ 모델이 구체적인 수치와 보고서 출처를 날조했습니다. 게시하면 사실 오류를 초래하고 심각할 경우 법적 위험이 발생합니다.',
+    verdictGood: '✓ 구조적 틀을 생성하고, 공백을 적극적으로 표시하여 허위 데이터 유출을 방지했습니다.',
+    pmTip: '글쓰기 시나리오의 핵심 위험은 <b>수치 환각</b>입니다. PM은 Prompt에서 명확히 지정해야 합니다: 데이터가 필요할 때 모델은 공백으로 남기고 「확인 필요」라고 표시해야 하며, 임의로 날조하는 것은 금지됩니다. 이는 <b>제품 안전 기준</b>이며 PRD에 기재해야 합니다.',
+    prompt: `# AI 글쓰기 보조 System Prompt 템플릿
+
+당신은 사용자가 고품질 콘텐츠를 생성하도록 돕는 전문 글쓰기 어시스턴트입니다.
+
+## 데이터 안전 제약
+- 사용자가 제공하지 않은 모든 구체적인 수치(백분율, 금액, 순위)는 반드시 [확인 필요]로 표시
+- 사용자가 제공하지 않은 모든 보고서 이름, 기관명은 반드시 [출처 미확인]으로 표시
+- 조사 데이터, 미디어 보도, 전문가 발언 날조 금지
+
+## 처리 방법
+데이터가 필요한 경우:
+✓ 콘텐츠 구조를 작성하고 [X%] / [보고서 이름] 등의 플레이스홀더 사용
+✓ 마지막에 안내: 「[확인 필요] 항목에 실제 데이터를 입력한 후 사용하세요」
+✗ 그럴듯해 보이는 수치를 자체적으로 추정하거나 추론하지 마세요
+
+## 출력 형식
+모든 응답 마지막에 중요 고지 포함:
+「이 콘텐츠는 AI 보조로 생성되었습니다. [확인 필요] 항목을 실제 데이터로 교체한 후 게시하세요.」`
+  },
+  {
+    name: '기업 지식 베이스 Q&A 비교',
+    bad: [
+      { type: 'user', text: '출장 시 숙박비 환급 기준은 얼마인가요?' },
+      { type: 'ai', bad: true, text: '일반 기업 기준에 따르면, 숙박비 환급은 통상적으로 <span class="hl-red">1선 도시 500위안/박, 2선 도시 350위안/박, 3선 도시 200위안/박</span>입니다. 출장 수당은 별도로 통상 80~100위안/일입니다…' },
+    ],
+    good: [
+      { type: 'system', text: '당신은 기업 내부 지식 베이스 어시스턴트입니다. 제공된 회사 문서를 기반으로만 질문에 답변하세요. 문서에 명확히 명시되지 않은 경우 반드시 「현재 지식 베이스에 해당 정보가 없습니다 — HR에 문의하여 확인하세요」라고 답변하세요. 일반 업계 경험으로 회사 정책을 추론하지 마세요.' },
+      { type: 'user', text: '출장 시 숙박비 환급 기준은 얼마인가요?' },
+      { type: 'ai', bad: false, text: '<span class="hl-green">현재 지식 베이스에 출장 숙박비 기준에 대한 명확한 기록이 없습니다.</span> HR 부서에 문의하여 최신 기준을 확인하거나, 직원 핸드북 [X]장 출장비 관리 규정을 참조하시기 바랍니다.<span class="note">참고: 도시 등급 및 직급에 따라 기준이 다를 수 있으니 공식 회사 문서를 참조하세요.</span>' },
+    ],
+    verdictBad: '✗ 모델이 회사의 실제 정책을 일반 업계 데이터로 대체했습니다. 이를 기반으로 환급 신청하면 거절되고 신뢰가 무너집니다.',
+    verdictGood: '✓ 지식 경계를 인정하고, 올바른 경로로 안내했으며, 부정확한 말을 하지 않았습니다.',
+    pmTip: '기업 지식 베이스 시나리오에서는 <b>「모른다고 유도」가 「알지만 틀리게 말하기」보다 10배 좋습니다.</b> PM은 System Prompt에서 지식 경계를 명확히 정의하고, 대체 안내 경로(누구에게 연락할지, 어떤 문서를 볼지)를 설계해야 합니다. 이는 <b>정보 정확성 SLA</b>의 일부입니다.',
+    prompt: `# 기업 지식 베이스 System Prompt 템플릿
+
+당신은 [회사명] 내부 지식 베이스 어시스턴트입니다.
+
+## 엄격한 경계
+- 다음 컨텍스트 문서만을 기반으로 답변하세요: {context}
+- 문서에 명확한 내용이 없는 경우 → 고정 대체 스크립트로 답변하고, 추론하거나 보충하지 마세요
+- 「일반적으로」, 「보통」, 「업계 기준」 등의 표현으로 회사 정책을 대체하지 마세요
+
+## 대체 스크립트 (문서에 답변이 없을 때)
+「현재 지식 베이스에 '{질문 키워드}'에 대한 명확한 기록이 없습니다.
+ 권장 사항: ① HR/법무/해당 부서 문의 ② 직원 핸드북 [챕터] 참조
+ 질문 전달이 필요하시면 말씀해 주세요.」
+
+## 답변 형식
+1. 직접 답변 제공 (문서에 명확히 기록된 경우에만)
+2. 출처 명시: 「[문서명·버전·발행일]에 따르면」
+3. 모호한 경우 여러 가능성을 나열하고 확인 권장`
+  }
+];
+
+let currentScene = 0;
+let currentView = 'compare';
+
+function selectScene(idx) {
+  currentScene = idx;
+  document.querySelectorAll('.scene-card').forEach((c, i) => c.classList.toggle('active', i === idx));
+  renderScene();
+}
+
+function setView(v) {
+  currentView = v;
+  const views = ['compare', 'prompt', 'why', 'strat'];
+  document.querySelectorAll('.toggle-btn').forEach((b, i) => b.classList.toggle('active', views[i] === v));
+  document.getElementById('viewCompare').style.display = v === 'compare' ? 'flex' : 'none';
+  document.getElementById('viewPrompt').style.display = v === 'prompt' ? 'block' : 'none';
+  const whyEl = document.getElementById('viewWhy');
+  whyEl.style.display = v === 'why' ? 'flex' : 'none';
+  const stratEl = document.getElementById('viewStrat');
+  stratEl.style.display = v === 'strat' ? 'flex' : 'none';
+  if (v === 'strat') showStrat(document.querySelector('.strat-tab.active-s'), 'no_context');
+}
+
+const STRATS = {
+  no_context:{
+    prompt:`User: 양자 얽힘 기술의 2025년 최신 상업적 응용 동향을 알려주세요.`,
+    output:`2025년 2분기 기준, IBM과 Boston Quantum은 양자 얽힘을 금융 리스크 모델링에 성공적으로 적용하여 거래 속도를 <span style="background:rgba(229,62,62,0.15);color:#dc2626;padding:0 4px;border-radius:3px;font-weight:600">340%</span> 향상시켰습니다; 중국과학기술대학교는 <span style="background:rgba(229,62,62,0.15);color:#dc2626;padding:0 4px;border-radius:3px;font-weight:600">1024 큐비트 얽힘</span> 구현을 발표했습니다…<br><br><span style="font-size:12px;color:#dc2626;font-weight:600">⚠ 위 내용은 모델이 날조한 것으로, 수치와 회사 진행 상황 모두 검증 불가</span>`,
+    cls: 'bad'
+  },
+  with_doc:{
+    prompt:`System: 당신은 전문 분석가입니다. 사용자가 제공한 문서 내용만을 기반으로 답변하고, 문서 외부의 정보를 인용하지 마세요.
+
+[첨부 파일: quantum_report_2025.pdf · 23페이지]
+[발췌]
+「2025년 양자 통신의 상업적 배포는 주로 보안 키 배포 분야에 집중되어 있으며,
+IBM과 IonQ는 소규모 파일럿 프로젝트를 진행 중이고 2027년 대규모 상업화가 예상됩니다.」
+
+User: 양자 얽힘 기술의 2025년 최신 상업적 응용 동향을 알려주세요.`,
+    output:`제공하신 보고서에 따르면, 2025년 양자 얽힘 기술의 상업적 응용은 주로 <span style="color:#16a34a;font-weight:600">보안 키 배포</span> 분야에 집중되어 있으며, IBM과 IonQ는 이미 소규모 파일럿 프로젝트를 진행 중입니다. 보고서는 2027년에 대규모 상업화가 실현될 것으로 예측합니다.<br><br><span style="font-size:12px;color:#16a34a;font-weight:600">✅ 정보 출처: 사용자 제공 문서 — 정확하고 추적 가능</span>`,
+    cls: 'good'
+  },
+  force_unknown:{
+    prompt:`System: 당신은 엄격한 어시스턴트입니다. 특정 정보에 불확실하면 반드시 직접 「모르겠습니다」라고 말해야 합니다. 어떤 데이터도 추측하거나 날조하지 마세요.
+
+User: 양자 얽힘 기술의 2025년 최신 상업적 응용 동향을 알려주세요.`,
+    output:`2025년 양자 얽힘 기술의 상업적 응용에 관한 신뢰할 수 있는 정보가 없습니다: 제 학습 데이터에는 종료 날짜가 있으며, 이 분야의 최신 발전은 제 지식 범위를 벗어납니다.<br><br>Nature, IEEE Spectrum 또는 관련 기업(IBM, Google Quantum AI)의 최신 공식 발표를 참조하시기 바랍니다.<br><br><span style="font-size:12px;color:#16a34a;font-weight:600">✅ 환각 거부, 대안 제안 제공</span>`,
+    cls: 'good'
+  }
+};
+
+function showStrat(btn, key) {
+  document.querySelectorAll('.strat-tab').forEach(b => {
+    b.classList.remove('active-s');
+    b.style.background = 'white';
+    b.style.color = 'var(--text-sub)';
+  });
+  if (btn) {
+    btn.classList.add('active-s');
+    btn.style.background = 'var(--text-main)';
+    btn.style.color = 'white';
+  }
+  const d = STRATS[key];
+  document.getElementById('stratPromptBox').textContent = d.prompt;
+  const ob = document.getElementById('stratOutputBox');
+  ob.style.border = d.cls === 'good'
+    ? '1.5px solid rgba(22,163,74,0.25)'
+    : '1.5px solid rgba(229,62,62,0.25)';
+  ob.style.background = d.cls === 'good'
+    ? 'rgba(22,163,74,0.03)'
+    : 'rgba(229,62,62,0.03)';
+  ob.innerHTML = d.output;
+}
+
+function renderScene() {
+  const s = SCENES[currentScene];
+
+  // Bad box
+  const bad = document.getElementById('boxBad');
+  bad.innerHTML = '';
+  s.bad.forEach(m => bad.appendChild(makeBubble(m)));
+  document.getElementById('verdictBad').textContent = s.verdictBad;
+
+  // Good box
+  const good = document.getElementById('boxGood');
+  good.innerHTML = '';
+  s.good.forEach(m => good.appendChild(makeBubble(m)));
+  document.getElementById('verdictGood').textContent = s.verdictGood;
+
+  // PM tip
+  document.getElementById('pmTipContent').innerHTML = s.pmTip;
+
+  // Prompt template
+  document.getElementById('promptTemplate').textContent = s.prompt;
+}
+
+function makeBubble(m) {
+  const div = document.createElement('div');
+  if (m.type === 'user') {
+    div.className = 'bubble-user';
+    div.textContent = m.text;
+  } else if (m.type === 'system') {
+    div.className = 'bubble-system';
+    div.textContent = '⚙ System Prompt: ' + m.text;
+  } else {
+    div.className = 'bubble-ai';
+    div.innerHTML = m.text;
+  }
+  return div;
+}
+
+renderScene();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

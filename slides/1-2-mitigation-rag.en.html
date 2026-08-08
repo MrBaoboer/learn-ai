@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RAG: Retrieval-Augmented Generation — Connecting LLMs to External Knowledge | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root {
+  /* legacy variable name aliases: mapped to design system */
+  --bg-color: var(--bg);
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+.badge {
+  display: inline-block;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 5px 14px; border-radius: 8px; white-space: nowrap;
+  background: rgba(22,163,106,0.1); color: var(--success);
+  margin-top: 12px;
+}
+.main-area {
+  display: grid; grid-template-columns: 340px 1fr; gap: 20px;
+  align-items: start;
+}
+
+/* Left */
+.left-panel {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.section-label {
+  font-size: 12px; font-weight: 800; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+.scene-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 18px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+}
+.scene-card:hover { border-color: rgba(22,163,106,0.25); }
+.scene-card.active { border-color: var(--success); background: rgba(22,163,106,0.03); }
+.scene-tag { font-size: 12px; font-weight: 800; color: var(--success); margin-bottom: 5px; }
+.scene-name { font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.scene-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+.decision-box {
+  background: rgba(217,119,6,0.04);
+  border: 1px solid rgba(217,119,6,0.15);
+  border-radius: 12px; padding: 14px 18px;
+}
+.decision-title { font-size: 12px; font-weight: 800; color: var(--amber); margin-bottom: 10px; letter-spacing: 0.3px; }
+.decision-row {
+  display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;
+}
+.decision-row:last-child { margin-bottom: 0; }
+.decision-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.decision-text { font-size: 13px; color: var(--text-sub); line-height: 1.7; }
+.decision-text b { color: var(--text-main); }
+
+/* Right */
+.right-panel {
+  display: flex; flex-direction: column;
+  min-width: 0; gap: 14px;
+}
+.right-top {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 10px;
+}
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.tab-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab-btn {
+  padding: 9px 18px; border-radius: var(--radius-sm); border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.tab-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Flow view */
+.flow-view {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.flow-step-row {
+  display: flex; align-items: stretch; gap: 0;
+}
+.flow-node {
+  flex: 1; background: white; border-radius: 12px; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 6px; position: relative;
+}
+.flow-node.active-node { border: 2px solid var(--accent); }
+.flow-node-num {
+  font-size: 12px; font-weight: 800; color: var(--text-sub); letter-spacing: 0.3px;
+}
+.flow-node-title { font-size: 15px; font-weight: 700; color: var(--text-main); }
+.flow-node-desc { font-size: 13px; color: var(--text-sub); line-height: 1.6; }
+.flow-node-tag {
+  display: inline-block; margin-top: 4px;
+  font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 4px;
+  background: rgba(0,102,255,0.08); color: var(--accent);
+  align-self: flex-start;
+}
+.flow-node-tag.pm { background: rgba(217,119,6,0.1); color: var(--amber); }
+.flow-arrow-v {
+  width: 100%; text-align: center; color: var(--text-sub);
+  font-size: 18px; line-height: 1; padding: 2px 0; flex-shrink: 0;
+}
+.flow-arrow-h {
+  width: 28px; flex-shrink: 0; display: flex; align-items: center;
+  justify-content: center; color: var(--text-sub); font-size: 18px;
+}
+
+/* Compare view */
+.compare-area { display: flex; gap: 16px; }
+.compare-col { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col-label {
+  font-size: 13px; font-weight: 700; padding: 0 2px;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.col-label .dot { width: 10px; height: 10px; border-radius: 50%; }
+.col-label .dot.red { background: var(--danger); }
+.col-label .dot.green { background: var(--success); }
+.col-label span { color: var(--text-sub); }
+.convo-box {
+  flex: 1; background: var(--card); border-radius: var(--radius); padding: 16px 18px;
+  border: 1px solid var(--border);
+  min-height: 260px; max-height: 420px;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+}
+.bubble-user {
+  background: var(--accent); color: white;
+  padding: 11px 15px; border-radius: 12px 12px 4px 12px;
+  font-size: 15px; line-height: 1.6; align-self: flex-end; max-width: 90%;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.bubble-user.show { opacity: 1; transform: translateY(0); }
+.bubble-retrieval {
+  background: rgba(217,119,6,0.06); border: 1px dashed rgba(217,119,6,0.3);
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; color: #92400e; line-height: 1.6;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.bubble-retrieval.show { opacity: 1; transform: translateY(0); }
+.bubble-ai {
+  background: rgba(0,0,0,0.04); color: var(--text-main);
+  padding: 11px 15px; border-radius: 12px 12px 12px 4px;
+  font-size: 15px; line-height: 1.8; align-self: flex-start; max-width: 95%;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.bubble-ai.show { opacity: 1; transform: translateY(0); }
+.bubble-ai .hl-red { color: var(--danger); font-weight: 600; text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }
+.bubble-ai .hl-green { color: var(--success); font-weight: 600; }
+.bubble-ai .source-tag {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px;
+  background: rgba(0,102,255,0.1); color: var(--accent); margin-left: 4px;
+}
+.bubble-typing {
+  display: inline-block; width: 6px; height: 14px;
+  background: var(--text-sub); border-radius: 2px; margin-left: 2px;
+  animation: blink 0.7s step-end infinite; vertical-align: text-bottom;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.verdict {
+  padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  opacity: 0; transition: opacity 0.4s ease;
+}
+.verdict.show { opacity: 1; }
+.verdict.bad { background: rgba(229,62,62,0.06); color: var(--danger); border: 1px solid rgba(229,62,62,0.15); }
+.verdict.good { background: rgba(22,163,106,0.06); color: var(--success); border: 1px solid rgba(22,163,106,0.15); }
+
+.replay-btn {
+  padding: 9px 16px; border-radius: 9px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.replay-btn:hover { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Why it works */
+.why-box {
+  background: #1c1c1e; border-radius: 12px; padding: 14px 16px;
+  flex-shrink: 0;
+}
+.why-title {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.token-chain {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;
+}
+.token-chip {
+  padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700;
+}
+.token-chip.context { background: rgba(255,255,255,0.08); color: #9ca3af; }
+.token-chip.retrieved { background: rgba(22,163,106,0.2); color: #6ee7b7; border: 1px solid rgba(22,163,106,0.35); }
+.token-chip.question { background: rgba(0,102,255,0.2); color: #93c5fd; border: 1px solid rgba(0,102,255,0.35); }
+.token-chip.output { background: rgba(22,163,106,0.15); color: #6ee7b7; }
+.token-chip.output-bad { background: rgba(229,62,62,0.2); color: #fca5a5; border: 1px solid rgba(229,62,62,0.35); }
+.token-arrow { color: #4b5563; font-size: 14px; font-weight: 700; padding: 0 2px; align-self: center; }
+.why-insight {
+  font-size: 13px; color: #9ca3af; line-height: 1.7;
+  border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; margin-top: 4px;
+}
+.why-insight b { color: #e5e7eb; }
+.why-insight .key { color: #86efac; font-weight: 700; }
+
+/* "Why it works" and flow diagram responsive rows */
+.why-flex-row { display: flex; gap: 16px; }
+.why-limit-row { display: flex; gap: 20px; }
+.rag-flow-row { display: flex; flex-direction: row; gap: 14px; }
+.rag-flow-left { width: 46%; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.rag-flow-right { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+@media (max-width: 900px) {
+  .main-area { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .compare-area { flex-direction: column; }
+  .why-flex-row { flex-direction: column; }
+  .why-flex-row > div[style*="width:1px"] { display: none; }
+  .why-limit-row { flex-direction: column; }
+  .why-limit-row > div[style*="width:1px"] { display: none; }
+  .rag-flow-row { flex-direction: column; }
+  .rag-flow-left { width: 100%; }
+  .tab-btn { padding: 11px 14px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="RAG (Retrieval-Augmented Generation) is the most widely used engineering solution to reduce LLM hallucinations. A deep dive into how RAG works: vector retrieval, context injection, and grounded generation.">
+<meta name="keywords" content="RAG,Retrieval-Augmented Generation,vector database,LLM knowledge base,Embedding,hallucination mitigation">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-mitigation-rag.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-mitigation-rag.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-mitigation-rag.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-mitigation-rag.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-mitigation-rag.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="RAG: Retrieval-Augmented Generation — Connecting LLMs to External Knowledge">
+<meta property="og:description" content="RAG (Retrieval-Augmented Generation) is the most widely used engineering solution to reduce LLM hallucinations. A deep dive into how RAG works: vector retrieval, context injection, and grounded generation.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-mitigation-rag.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="RAG: Retrieval-Augmented Generation — Connecting LLMs to External Knowledge">
+<meta name="twitter:description" content="RAG (Retrieval-Augmented Generation) is the most widely used engineering solution to reduce LLM hallucinations. A deep dive into how RAG works: vector retrieval, context injection, and grounded generation.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Mitigation 2: RAG Retrieval-Augmented Generation","name":"Mitigation 2: RAG Retrieval-Augmented Generation","url":"https://xueai.app/slides/1-2-mitigation-rag.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Hallucinations and Four Mitigations","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"RAG (Retrieval-Augmented Generation) is the most widely used engineering solution to reduce LLM hallucinations. A deep dive into how RAG works: vector retrieval, context injection, and grounded generation.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Hallucination & Mitigations</div>
+    <h1>RAG: Let the Model "Take an Open-Book Exam"</h1>
+    <p class="subtitle">PM perspective: When do you need RAG? How do you design the retrieval pipeline? Where are the real pitfalls?</p>
+    <div class="badge">Strategy 02 / 04 · Prevention</div>
+  </header>
+
+  <div class="main-area paywall-locked xa-peek">
+    <div class="left-panel">
+      <div>
+        <div class="section-label">Choose a Business Scenario</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="scene-card active" onclick="selectScene(0)">
+            <div class="scene-tag">Scenario A · Legal / Compliance</div>
+            <div class="scene-name">Contract Review / Regulatory Q&A Assistant</div>
+            <div class="scene-desc">Regulations update frequently; the model's training data has a cutoff, making it easy to cite outdated or repealed clauses.</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(1)">
+            <div class="scene-tag">Scenario B · Healthcare</div>
+            <div class="scene-name">Drug Information / Medication Advice Assistant</div>
+            <div class="scene-desc">Medication plans are highly personalized; the model's general knowledge cannot reflect a specific patient's condition or hospital protocols.</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(2)">
+            <div class="scene-tag">Scenario C · Product Docs</div>
+            <div class="scene-name">SaaS Product Technical Support Bot</div>
+            <div class="scene-desc">Products iterate rapidly; version numbers and navigation paths change often, so the model only remembers the old version it was trained on.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="decision-box">
+        <div class="decision-title">PM Decision Framework: When is RAG Required?</div>
+        <div class="decision-row">
+          <div class="decision-icon">✅</div>
+          <div class="decision-text"><b>Time-sensitive knowledge</b>: Policies, products, or prices update frequently — the model's training data can't keep up</div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-icon">✅</div>
+          <div class="decision-text"><b>Private knowledge base</b>: Internal company docs, product manuals — the model has never seen them</div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-icon">✅</div>
+          <div class="decision-text"><b>High cost of errors</b>: Legal, medical, or financial contexts — one wrong answer can cause serious harm</div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-icon">⚠️</div>
+          <div class="decision-text"><b>Not needed for chat/creative scenarios</b>: RAG can actually make responses feel rigid and overly constrained</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="right-top">
+        <h3 id="rightTitle">Conversation Comparison</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="replay-btn" id="replayBtn" onclick="playAnimation()" style="display:none;">↺ Replay</button>
+          <div class="tab-group">
+            <button class="tab-btn active" onclick="setTab('compare')">Comparison View</button>
+            <button class="tab-btn" onclick="setTab('flow')">RAG Flow</button>
+            <button class="tab-btn" onclick="setTab('why')">Why It Works</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compare view -->
+      <div class="compare-area" id="viewCompare">
+        <div class="compare-col">
+          <div class="col-label"><span class="dot red"></span><span>Without RAG (Closed-Book)</span></div>
+          <div class="convo-box" id="boxBad"></div>
+          <div class="verdict bad" id="verdictBad"></div>
+        </div>
+        <div class="compare-col">
+          <div class="col-label"><span class="dot green"></span><span>With RAG (Open-Book)</span></div>
+          <div class="convo-box" id="boxGood"></div>
+          <div class="verdict good" id="verdictGood"></div>
+        </div>
+      </div>
+
+      <!-- Flow view: left = step list + controls, right = detail -->
+      <div class="flow-view" id="viewFlow" style="display:none;">
+        <div id="ragSceneLabel" style="font-size:12px;font-weight:700;color:var(--text-sub);background:rgba(0,102,255,0.05);border:1px solid rgba(0,102,255,0.14);border-radius:8px;padding:8px 14px;line-height:1.6;"></div>
+        <div class="rag-flow-row">
+
+          <!-- Left: step list + controls -->
+          <div class="rag-flow-left">
+            <div id="ragStepper" style="background:var(--card);border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,0.07);"></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button id="ragNextBtn" onclick="ragNext()" style="background:var(--accent);color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Next →</button>
+              <button onclick="ragReset()" style="background:var(--card);color:var(--text-sub);border:1px solid rgba(0,0,0,0.1);padding:10px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Reset</button>
+              <span id="ragProgress" style="font-size:13px;color:var(--text-sub);">Step 0 / 7</span>
+            </div>
+          </div>
+
+          <!-- Right: step detail -->
+          <div class="rag-flow-right">
+            <div style="font-size:13px;font-weight:700;color:var(--text-sub);" id="ragVisTitle">Step 1: Click "Next" to begin</div>
+            <div id="ragVisArea" style="background:var(--card);border:1px solid rgba(0,0,0,0.07);border-radius:12px;padding:16px 20px;font-size:14px;line-height:1.85;">
+              <span style="color:var(--text-sub);">Click "Next" on the left to see each step in detail →</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Why it works view -->
+      <div id="viewWhy" style="display:none;background:var(--card);border-radius:14px;padding:28px 32px;flex-direction:column;gap:22px;border:1px solid rgba(0,0,0,0.06);">
+        <div class="why-flex-row">
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">Without RAG: Closed-Book Exam</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">Question</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px solid rgba(229,62,62,0.2);">× Guessing from training memory</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">The context contains only the question itself, so the model can only predict each Token based on impressions from its training data</div>
+          </div>
+          <div style="width:1px;background:rgba(0,0,0,0.06);flex-shrink:0;"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">With RAG: Open-Book Exam</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">Real document chunks</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">+</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">Question</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">✓ Accurate answer</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">The retrieved documents become part of the context, directly shifting the probability distribution of each subsequent Token</div>
+          </div>
+        </div>
+        <div style="background:rgba(22,163,106,0.05);border:1px solid rgba(22,163,106,0.15);border-radius:12px;padding:20px 24px;">
+          <div style="font-size:16px;color:var(--text-main);line-height:1.9;">
+            At its core, a model is <b>Token predicting Token</b> — what comes next depends entirely on what came before.
+            RAG works by <span style="color:var(--success);font-weight:700;">"injecting retrieved real documents as high-quality context"</span>:
+            with the same model, change the context and you change the probability distribution of everything that follows.
+            <b>The model hasn't gotten smarter — it just has a better starting point.</b>
+          </div>
+        </div>
+        <div style="background:rgba(229,62,62,0.04);border:1px solid rgba(229,62,62,0.15);border-radius:12px;padding:16px 22px;">
+          <div style="font-size:13px;font-weight:800;color:var(--danger);margin-bottom:10px;letter-spacing:0.3px;">⚠ Limitations: RAG Is Not a Silver Bullet</div>
+          <div class="why-limit-row">
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">Retrieval itself can fail</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                When retrieved chunks are inaccurate, the model treats the wrong document as ground truth — <span style="color:var(--danger);font-weight:600;">hallucinations don't decrease; they gain the appearance of an authoritative source</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">The model still fills gaps beyond the retrieved docs</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                The retrieved context window is limited; anything outside it is still completed from training memory, <span style="color:var(--danger);font-weight:600;">mixing RAG + hallucination in ways that are harder for users to detect than pure hallucination</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">PM mitigation strategy</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                RAG quality ceiling = knowledge base quality. Build <span style="color:var(--accent);font-weight:600;">retrieval hit-rate evaluation</span>, and use <span style="color:var(--amber);font-weight:600;">mandatory citation display</span> so users can verify sources
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script>
+const SCENES = [
+  {
+    bad: [
+      { type: 'user', text: 'Under the Labor Contract Law, what is the maximum probation period?' },
+      { type: 'ai', bad: true, htmlParts: [
+        { text: 'Under the Labor Contract Law, the maximum probation period is ' },
+        { text: '6 months', cls: 'hl-red' },
+        { text: '. Contracts under 3 years may set 1–3 months probation, and ' },
+        { text: 'open-ended contracts can set up to 12 months', cls: 'hl-red' },
+        { text: '…' },
+      ]},
+    ],
+    good: [
+      { type: 'retrieval', text: 'Retrieved: Labor Contract Law, Article 19 (2024 ed.) · Similarity 0.94' },
+      { type: 'user', text: 'Under the Labor Contract Law, what is the maximum probation period?' },
+      { type: 'ai', bad: false, htmlParts: [
+        { text: 'Based on retrieved results:\n• Contract 3 months – 1 year → probation' },
+        { text: 'no more than 1 month', cls: 'hl-green' },
+        { text: '\n• Contract 1 – 3 years → probation' },
+        { text: 'no more than 2 months', cls: 'hl-green' },
+        { text: '\n• Contract 3+ years or open-ended → probation' },
+        { text: 'no more than 6 months', cls: 'hl-green' },
+        { text: ' ', tag: 'source-tag', tagText: 'Source: Labor Contract Law, Art. 19' },
+      ]},
+    ],
+    verdictBad: '✗ The model fabricated "open-ended contract = 12 months." The legal cap is 6 months — a wrong answer like this could lead HR teams into illegal practices.',
+    verdictGood: '✓ Precisely cites the law, gives different caps by scenario, and labels the source — fully verifiable.',
+  },
+  {
+    bad: [
+      { type: 'user', text: 'I have high blood pressure. Can I take ibuprofen for pain relief?' },
+      { type: 'ai', bad: true, htmlParts: [
+        { text: 'Patients with hypertension ' },
+        { text: 'can take ibuprofen short-term', cls: 'hl-red' },
+        { text: ', 200–400 mg per dose, no more than 3 times a day. Take after meals; it generally ' },
+        { text: 'does not affect blood pressure control', cls: 'hl-red' },
+        { text: '…' },
+      ]},
+    ],
+    good: [
+      { type: 'retrieval', text: 'Retrieved: Ibuprofen package insert · contraindications + Hypertension Medication Guide · Similarity 0.91' },
+      { type: 'user', text: 'I have high blood pressure. Can I take ibuprofen for pain relief?' },
+      { type: 'ai', bad: false, htmlParts: [
+        { text: 'Per medication guidelines: Ibuprofen is an NSAID. ' },
+        { text: 'Patients with hypertension should use it with caution', cls: 'hl-green' },
+        { text: ' — it may raise blood pressure and reduce the effectiveness of antihypertensives.', tag: 'source-tag', tagText: 'Medication Guide' },
+        { text: '\n\nRecommendation: ' },
+        { text: 'Please consult a doctor or pharmacist before taking any medication', cls: 'hl-green' },
+        { text: '. I cannot substitute for professional medical advice.' },
+      ]},
+    ],
+    verdictBad: '✗ The model gave a dangerously wrong recommendation. NSAIDs are contraindicated for hypertension patients and may worsen their condition.',
+    verdictGood: '✓ Retrieves the actual guideline, delivers an accurate warning, and explicitly directs users to a professional medical channel.',
+  },
+  {
+    bad: [
+      { type: 'user', text: 'How do I set up Multi-Factor Authentication (MFA) in your product?' },
+      { type: 'ai', bad: true, htmlParts: [
+        { text: 'To set up MFA, go to Settings → "' },
+        { text: 'Account Security', cls: 'hl-red' },
+        { text: '" → "' },
+        { text: 'Two-Step Verification', cls: 'hl-red' },
+        { text: '", click Enable, then scan the QR code…' },
+      ]},
+    ],
+    good: [
+      { type: 'retrieval', text: 'Retrieved: Product Docs v3.2 "Security Configuration" section · Similarity 0.96' },
+      { type: 'user', text: 'How do I set up Multi-Factor Authentication (MFA) in your product?' },
+      { type: 'ai', bad: false, htmlParts: [
+        { text: 'Per the latest docs (v3.2):\nGo to Workspace → Organization → "' },
+        { text: 'Security Policy', cls: 'hl-green' },
+        { text: '" → "MFA Settings", select your authentication method, then save.', tag: 'source-tag', tagText: 'Docs v3.2 §4.3' },
+        { text: '\n\nIf you are on an older version, the path may differ — please share your version number.' },
+      ]},
+    ],
+    verdictBad: '✗ The model remembered the old navigation path (changed in v3.0). Users following these instructions would never find the entry point, generating a flood of support tickets.',
+    verdictGood: '✓ Retrieves the current doc version, gives the exact path, and proactively flags potential version differences.',
+  }
+];
+
+let currentScene = 0;
+let currentTab = 'compare';
+let animTimers = [];
+
+function clearTimers() {
+  animTimers.forEach(t => clearTimeout(t));
+  animTimers = [];
+}
+
+function delay(fn, ms) {
+  const t = setTimeout(fn, ms);
+  animTimers.push(t);
+  return t;
+}
+
+function selectScene(i) {
+  currentScene = i;
+  document.querySelectorAll('.scene-card').forEach((c, j) => c.classList.toggle('active', j === i));
+  if (currentTab === 'compare') playAnimation();
+  else if (currentTab === 'flow') ragReset();  // the flow's documents and question follow the scene, so a switch restarts it
+}
+
+function setTab(t) {
+  currentTab = t;
+  const tabs = ['compare', 'flow', 'why'];
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === t));
+  document.getElementById('viewCompare').style.display = t === 'compare' ? 'flex' : 'none';
+  document.getElementById('viewFlow').style.display = t === 'flow' ? 'flex' : 'none';
+  const whyEl = document.getElementById('viewWhy');
+  whyEl.style.display = t === 'why' ? 'flex' : 'none';
+  document.getElementById('replayBtn').style.display = t === 'compare' ? 'inline-block' : 'none';
+  if (t === 'compare') playAnimation();
+  // Scene changed while on another tab: the flow is stale, run it again
+  if (t === 'flow' && ragScene !== currentScene) ragReset();
+}
+
+// Flatten htmlParts into plain text tokens (including markup tokens)
+function flattenParts(parts) {
+  const tokens = [];
+  parts.forEach(p => {
+    if (p.tag === 'source-tag') {
+      tokens.push({ html: `<span class="source-tag">${p.tagText}</span>` });
+    } else if (p.cls) {
+      // colored word — treat entire segment as one token
+      tokens.push({ html: `<span class="${p.cls}">${p.text}</span>`, isSpecial: true });
+    } else {
+      // plain text — split character by character
+      const chars = [...p.text];
+      chars.forEach(c => tokens.push({ html: c === '\n' ? '<br>' : c }));
+    }
+  });
+  return tokens;
+}
+
+// Type out tokens one by one
+function typeTokens(el, tokens, charDelay, onDone) {
+  el.innerHTML = '';
+  const cursor = document.createElement('span');
+  cursor.className = 'bubble-typing';
+  el.appendChild(cursor);
+
+  let i = 0;
+  function step() {
+    if (i >= tokens.length) {
+      el.removeChild(cursor);
+      if (onDone) onDone();
+      return;
+    }
+    const tok = tokens[i++];
+    const span = document.createElement('span');
+    span.innerHTML = tok.html;
+    el.insertBefore(span, cursor);
+    el.parentElement.scrollTop = el.parentElement.scrollHeight;
+    delay(step, tok.isSpecial ? charDelay * 3 : charDelay);
+  }
+  step();
+}
+
+function playAnimation() {
+  clearTimers();
+  const s = SCENES[currentScene];
+
+  // clear
+  const boxBad = document.getElementById('boxBad');
+  const boxGood = document.getElementById('boxGood');
+  boxBad.innerHTML = '';
+  boxGood.innerHTML = '';
+  const vBad = document.getElementById('verdictBad');
+  const vGood = document.getElementById('verdictGood');
+  vBad.textContent = '';
+  vGood.textContent = '';
+  vBad.classList.remove('show');
+  vGood.classList.remove('show');
+
+  // === Left side: without RAG ===
+  // user message
+  const uBad = document.createElement('div');
+  uBad.className = 'bubble-user';
+  uBad.textContent = s.bad[0].text;
+  boxBad.appendChild(uBad);
+  delay(() => uBad.classList.add('show'), 100);
+
+  // AI bubble
+  const aiBad = document.createElement('div');
+  aiBad.className = 'bubble-ai show';
+  boxBad.appendChild(aiBad);
+  const badTokens = flattenParts(s.bad[1].htmlParts);
+
+  delay(() => typeTokens(aiBad, badTokens, 28, () => {
+    vBad.textContent = s.verdictBad;
+    delay(() => vBad.classList.add('show'), 100);
+  }), 700);
+
+  // === Right side: with RAG ===
+  const goodMsgs = s.good;
+  // retrieval message appears first
+  const retEl = document.createElement('div');
+  retEl.className = 'bubble-retrieval';
+  retEl.textContent = '🔍 ' + goodMsgs[0].text;
+  boxGood.appendChild(retEl);
+  delay(() => retEl.classList.add('show'), 400);
+
+  // user message
+  const uGood = document.createElement('div');
+  uGood.className = 'bubble-user';
+  uGood.textContent = goodMsgs[1].text;
+  boxGood.appendChild(uGood);
+  delay(() => uGood.classList.add('show'), 900);
+
+  // AI bubble (slightly delayed after left side starts typing)
+  const aiGood = document.createElement('div');
+  aiGood.className = 'bubble-ai show';
+  boxGood.appendChild(aiGood);
+  const goodTokens = flattenParts(goodMsgs[2].htmlParts);
+
+  delay(() => typeTokens(aiGood, goodTokens, 22, () => {
+    vGood.textContent = s.verdictGood;
+    delay(() => vGood.classList.add('show'), 100);
+  }), 1200);
+}
+
+// ── RAG 7-step interactive animation (includes knowledge base build phase) ──
+/* Material the 7 flow steps run on, one set per scene. All three scenes follow the
+   same pipeline — only the documents, question and retrieval results differ — so
+   RAG_STEPS holds templates only and pulls content from here.
+   Indices line up with SCENES / .scene-card. */
+const SCENE_KB = [
+  { // A · Legal / Compliance
+    label: 'Scene A · Contract review / regulation lookup assistant',
+    docName: 'Labor Contract Law, full text with judicial interpretations (2024 ed.)',
+    docPages: 186,
+    chunkTotal: 4210,
+    rawText: 'Chapter 2 — Formation of Labor Contracts<br>§19 Probation limits…§19 Three months to one year…§19 One to three years…§19 Three years or more / open-ended…§19 An employer may agree to only one probation period per employee…',
+    chunks: [
+      { tok: 180, text: '§19 For terms of 3 months to 1 year, probation may not exceed 1 month…' },
+      { tok: 150, text: '§19 For terms of 1 to 3 years, probation may not exceed 2 months…' },
+      { tok: 200, text: '§19 For terms of 3 years or more, or open-ended, probation may not exceed 6 months…' },
+    ],
+    question: 'Under the Labor Contract Law, what is the maximum probation period?',
+    hits: [
+      { score: '0.94', src: 'Labor Contract Law §19', quote: '"For terms of 3 years or more, or open-ended, probation may not exceed 6 months…"' },
+      { score: '0.82', src: 'Judicial Interpretation III, Art. 4', quote: '"Where an unlawful probation period has been served, the employer shall pay damages…"' },
+      { score: '0.75', src: 'HR Compliance Handbook p.32', quote: '"An employer may agree to only one probation period per employee…"' },
+    ],
+    semanticNote: 'A query like "how long can we evaluate a new hire" produces a vector close to "probation period" as well.',
+    sysRole: 'You are a corporate legal assistant',
+    answerLines: [
+      'Term of 3 months to 1 year → probation <b>up to 1 month</b>',
+      'Term of 1 to 3 years → probation <b>up to 2 months</b>',
+      'Term of 3 years or more, or open-ended → probation <b>up to 6 months</b>',
+      'Only <b>one probation period</b> may be agreed per employer–employee pair',
+    ],
+    finalAnswer: 'The cap depends on contract length: <b>1 month</b> for terms of 3 months to 1 year, <b>2 months</b> for 1 to 3 years, and <b>6 months</b> for terms of 3 years or more or open-ended. Only one probation period may be agreed per employer–employee pair.',
+  },
+  { // B · Healthcare
+    label: 'Scene B · Drug information / medication guidance assistant',
+    docName: 'Ibuprofen package insert + Hypertension Medication Guidelines',
+    docPages: 64,
+    chunkTotal: 1930,
+    rawText: 'Ibuprofen insert · Contraindications and precautions<br>[Contraindications] Do not use in patients hypersensitive to this product…[Precautions] NSAIDs may cause fluid retention and raise blood pressure…[Interactions] May reduce the efficacy of ACEI/ARB antihypertensives…',
+    chunks: [
+      { tok: 180, text: '[Precautions] NSAIDs may cause fluid retention and raise blood pressure…' },
+      { tok: 150, text: '[Interactions] May reduce the efficacy of ACEI/ARB antihypertensives…' },
+      { tok: 200, text: 'Hypertension Medication Guidelines §5.2 Use NSAIDs with caution, under physician supervision…' },
+    ],
+    question: 'I have high blood pressure — can I take ibuprofen for pain?',
+    hits: [
+      { score: '0.91', src: 'Ibuprofen insert · Precautions', quote: '"NSAIDs may cause fluid retention and raise blood pressure…"' },
+      { score: '0.84', src: 'Hypertension Guidelines §5.2', quote: '"Hypertensive patients should use NSAIDs with caution, under physician supervision…"' },
+      { score: '0.72', src: 'Drug Interaction Table p.9', quote: '"May reduce the efficacy of ACEI/ARB antihypertensives…"' },
+    ],
+    semanticNote: 'A query like "do painkillers affect blood pressure" produces a vector close to "NSAID contraindications" as well.',
+    sysRole: 'You are a medication information assistant',
+    answerLines: [
+      'Ibuprofen is an NSAID; it can cause fluid retention and <b>raise blood pressure</b>',
+      'It may <b>reduce the efficacy of ACEI/ARB</b> antihypertensives',
+      'Hypertensive patients should <b>use it with caution</b>, not self-medicate',
+      'Please take it <b>under the guidance of a doctor or pharmacist</b>',
+    ],
+    finalAnswer: 'Ibuprofen is an NSAID that may <b>raise blood pressure</b> and reduce the efficacy of antihypertensives, so hypertensive patients should <b>use it with caution</b>. Please take it under the guidance of a doctor or pharmacist — I cannot replace professional medical advice.',
+  },
+  { // C · SaaS product documentation
+    label: 'Scene C · SaaS product support bot',
+    docName: 'Product help documentation v3.2 (Security Configuration chapter)',
+    docPages: 42,
+    chunkTotal: 2847,
+    rawText: 'Chapter 4 — Security Configuration<br>§4.1 Login policies…§4.2 Single sign-on (SSO)…§4.3 Multi-factor authentication (MFA)…§4.4 Version change notes…',
+    chunks: [
+      { tok: 180, text: '§4.3 MFA path: Workspace → Org Management → Security Policy → MFA Settings…' },
+      { tok: 150, text: '§4.3 Supported methods: SMS code, TOTP one-time password, hardware key…' },
+      { tok: 200, text: '§4.4 Since v3.0, "Account Security" was merged into "Security Policy"; the old path no longer works…' },
+    ],
+    question: 'How do I set up multi-factor authentication (MFA) in your product?',
+    hits: [
+      { score: '0.96', src: 'Product docs v3.2 §4.3', quote: '"Workspace → Org Management → Security Policy → MFA Settings…"' },
+      { score: '0.85', src: 'Changelog v3.0', quote: '""Account Security" merged into "Security Policy"; old path retired…"' },
+      { score: '0.74', src: 'Admin Handbook p.18', quote: '"Only org admins can modify the MFA policy…"' },
+    ],
+    semanticNote: 'A query like "how do I turn on two-step verification" produces a vector close to "MFA settings" as well.',
+    sysRole: 'You are a product support assistant',
+    answerLines: [
+      'Go to Workspace → Org Management → <b>Security Policy</b> → MFA Settings',
+      'Supported: <b>SMS code, TOTP one-time password, hardware key</b>',
+      'Only <b>org admins</b> can modify the MFA policy',
+      'The old "Account Security" path <b>was retired in v3.0</b>',
+    ],
+    finalAnswer: 'In v3.2, go to Workspace → Org Management → <b>Security Policy</b> → MFA Settings, pick an authentication method and save. Note that "Account Security" was merged into "Security Policy" in v3.0, so the old path no longer works.',
+  },
+];
+
+const RAG_STEPS = [
+  {
+    num:'1', icon:'📄', title:'Chunking Raw Documents',
+    desc:'Split long documents into small chunks, ~512–800 Tokens each, using paragraph/heading boundaries',
+    phase: 'build',
+    vis: kb =>`<b>Knowledge Base Build Phase (one-time, done offline)</b><br><br>
+<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+  <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px;">Source document: ${kb.docName} (${kb.docPages} pages total)</div>
+  <div style="display:flex;align-items:flex-start;gap:10px;">
+    <div style="flex:1;background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.7;">
+      <div style="font-size:10px;font-weight:800;color:var(--text-sub);margin-bottom:4px;">Original (full passage)</div>
+      ${kb.rawText}
+    </div>
+    <div style="display:flex;align-items:center;font-size:20px;color:var(--text-sub);">✂</div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+      ${kb.chunks.map((c, i) => `<div style="background:rgba(0,102,255,0.06);border:1px solid rgba(0,102,255,0.15);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.6;"><b style="color:var(--accent);font-size:10px;">Chunk #${i+1} · ~${c.tok} Tokens</b><br>${c.text}</div>`).join('')}
+    </div>
+  </div>
+</div>
+<div style="margin-top:10px;font-size:12px;color:var(--amber);background:rgba(217,119,6,0.05);border:1px solid rgba(217,119,6,0.15);border-radius:8px;padding:8px 12px;">
+  ⚠ <b>PM Note</b>: Chunk granularity affects retrieval quality. Too large = redundant Tokens wasted; too small = lost context. Optimal range: ~512–800 Tokens per chunk.
+</div>`
+  },
+  {
+    num:'2', icon:'🔢', title:'Embedding & Indexing',
+    desc:'Each document chunk is converted into a vector by the Embedding model and stored in a vector database',
+    phase: 'build',
+    vis: kb =>`<b>Knowledge Base Build Phase (one-time, done offline)</b><br><br>
+<div style="display:flex;gap:10px;align-items:flex-start;margin-top:8px;">
+  <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+    <div style="font-size:11px;font-weight:800;color:var(--text-sub);margin-bottom:2px;">Document chunks (text)</div>
+    ${kb.chunks.map(c => `<div style="background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.6;">${c.text}</div>`).join('')}
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0 8px;">
+    <div style="font-size:11px;font-weight:700;color:var(--accent);text-align:center;">Embedding<br>Model</div>
+    <div style="font-size:20px;">→</div>
+  </div>
+  <div style="flex:1;">
+    <div style="font-size:11px;font-weight:800;color:var(--text-sub);margin-bottom:6px;">Vector database (1536 dims per row)</div>
+    <div style="background:#1c1c1e;border-radius:8px;padding:10px 12px;font-family:monospace;font-size:10px;color:#6ee7b7;line-height:1.8;">
+      id:1 [0.231, -0.847, 0.562, 0.093, ...]<br>
+      id:2 [0.102,  0.445, -0.231, 0.671, ...]<br>
+      id:3 [-0.583, 0.312,  0.789, -0.044, ...]<br>
+      <span style="color:#4b5563;">… ${kb.chunkTotal} chunks total</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-sub);margin-top:8px;line-height:1.6;">Semantically similar text → closer together in high-dimensional space<br>At query time, use <b style="color:var(--text-main)">cosine similarity</b> to find nearest neighbors</div>
+  </div>
+</div>`
+  },
+  {
+    num:'3', icon:'❓', title:'User Query → Embed',
+    desc:'User inputs a question; the system uses the same Embedding model to convert it into a vector',
+    phase: 'query',
+    vis: kb =>`<b>Query Phase (executed in real time each conversation)</b><br><br>
+<div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
+  <div style="flex:1;background:rgba(0,102,255,0.06);border:1px solid rgba(0,102,255,0.15);border-radius:10px;padding:12px 14px;">
+    <div style="font-size:11px;font-weight:800;color:var(--accent);margin-bottom:6px;">User question (natural language)</div>
+    <div style="font-size:15px;font-weight:600;color:var(--text-main);">"${kb.question}"</div>
+  </div>
+  <div style="font-size:22px;color:var(--text-sub);">→</div>
+  <div style="flex:1;background:#1c1c1e;border-radius:10px;padding:12px 14px;">
+    <div style="font-size:11px;font-weight:800;color:#6b7280;margin-bottom:6px;">Question vector (Embedding)</div>
+    <div style="font-family:monospace;font-size:10px;color:#6ee7b7;line-height:1.8;">[0.218, -0.831, 0.541, 0.087,<br>-0.308, 0.771, 0.124, -0.452, ...]<br><span style="color:#4b5563;">1536 floating-point dimensions</span></div>
+  </div>
+</div>
+<div style="margin-top:10px;font-size:12px;color:var(--text-sub);line-height:1.7;">
+  Key: the question vector and document chunk vectors must be generated by <b style="color:var(--text-main)">the same Embedding model</b> so they exist in the same semantic space for similarity comparison.
+</div>`
+  },
+  {
+    num:'4', icon:'🔍', title:'Vector Retrieval (Top-K)',
+    desc:'Compute cosine similarity between the query vector and all document chunk vectors; return the Top-K most relevant chunks',
+    phase: 'query',
+    vis: kb =>`<b>Searching the vector database for Top-3 most relevant chunks:</b><br>
+<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+  ${kb.hits.map((h, i) => `<div style="background:${i === 0 ? 'rgba(0,102,255,0.06)' : 'rgba(0,0,0,0.03)'};border:1px solid ${i === 0 ? 'rgba(0,102,255,0.2)' : 'rgba(0,0,0,0.07)'};border-radius:8px;padding:10px 12px;font-size:12px;display:flex;align-items:center;gap:12px;">
+    <div style="flex-shrink:0;">
+      <div style="font-size:18px;font-weight:900;color:${i === 0 ? 'var(--accent)' : 'var(--text-sub)'};">${h.score}</div>
+      <div style="font-size:9px;color:var(--text-sub);text-align:center;">similarity</div>
+    </div>
+    <div>
+      <div style="font-weight:700;color:var(--text-main);margin-bottom:2px;">${h.src}</div>
+      <div style="color:var(--text-sub);">${h.quote}</div>
+    </div>
+  </div>`).join('')}
+</div>
+<div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.6;">Retrieval matches by <b style="color:var(--text-main)">semantic meaning</b>, not just keywords. ${kb.semanticNote}</div>`
+  },
+  {
+    num:'5', icon:'📋', title:'Build Prompt',
+    desc:'Inject retrieved document chunks into the Prompt as "reference material" in the context',
+    phase: 'query',
+    vis: kb =>`<b>Prompt sent to the LLM:</b>
+<div style="background:#1c1c1e;border-radius:8px;padding:12px 16px;font-family:monospace;font-size:11px;color:#9ca3af;margin-top:8px;line-height:1.9;white-space:pre-wrap;"><span style="color:#f38ba8;">System:</span> ${kb.sysRole}. Answer only based on the reference material below. Do not cite any other sources.
+
+<span style="color:#a6e3a1;">[Reference Material]
+${kb.hits.map((h, i) => `${i+1}. ${h.src}: ${h.quote.replace(/^"|"$/g, '')}`).join('\n')}</span>
+
+<span style="color:#89dceb;">User:</span> ${kb.question}
+<span style="color:#cba6f7;">Assistant:</span></div>
+<div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.6;">The green section = retrieved and injected document chunks. They become part of the model's context and directly shape the probability distribution of every subsequent Token.</div>`
+  },
+  {
+    num:'6', icon:'🤖', title:'LLM Generates Answer',
+    desc:'After reading the injected documents, the model generates an accurate, grounded answer',
+    phase: 'query',
+    vis: kb =>`<b>AI-generated answer:</b><br><br>
+Based on the retrieved material:<br>
+<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.8;">
+  ${kb.answerLines.map(l => `<div>· ${l}</div>`).join('')}
+</div>
+<div style="margin-top:10px;font-size:12px;color:var(--success);font-weight:600;background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.2);border-radius:8px;padding:8px 12px;">✅ Sources: ${kb.hits.map(h => h.src).join(' + ')}</div>
+<div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.6;">The model answers based on the injected real documents — no guessing from trained parameters — dramatically reducing hallucination.</div>`
+  },
+  {
+    num:'7', icon:'📤', title:'Return Answer (with Sources)',
+    desc:'Return the answer together with cited sources; the answer is traceable and verifiable',
+    phase: 'query',
+    vis: kb =>`<b>Final display to user:</b><br><br>
+<div style="background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.2);border-radius:10px;padding:16px;font-size:14px;line-height:1.8;">
+  ${kb.finalAnswer}<br><br>
+  <div style="font-size:12px;color:var(--success);font-weight:600;">📎 Sources: ${kb.hits.map(h => h.src).join(' / ')}</div>
+</div>
+<div style="margin-top:10px;display:flex;gap:10px;">
+  <div style="flex:1;background:rgba(0,102,255,0.05);border:1px solid rgba(0,102,255,0.15);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;">
+    <b style="color:var(--accent);">🔗 Traceable sources</b><br>Users can click through to verify the original text, significantly increasing trust
+  </div>
+  <div style="flex:1;background:rgba(22,163,74,0.05);border:1px solid rgba(22,163,74,0.15);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;">
+    <b style="color:var(--success);">✅ Always up to date</b><br>Update the knowledge base → update the answer; no model retraining needed
+  </div>
+  <div style="flex:1;background:rgba(217,119,6,0.05);border:1px solid rgba(217,119,6,0.15);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;">
+    <b style="color:var(--amber);">🔒 Scoped & controlled</b><br>Answers stay within the provided documents — no hallucinated claims beyond their scope
+  </div>
+</div>`
+  },
+];
+
+let ragStep = 0;
+let ragScene = -1;   // which scene the flow currently shows; out of sync with currentScene means stale
+function ragBuildStepper() {
+  const el = document.getElementById('ragStepper');
+  el.innerHTML = '';
+
+  // phase separator labels
+  let prevPhase = null;
+  RAG_STEPS.forEach((s, i) => {
+    // insert phase separator row
+    if (s.phase !== prevPhase) {
+      const sep = document.createElement('div');
+      const isBuild = s.phase === 'build';
+      sep.style.cssText = `padding:5px 16px 4px;font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:${isBuild ? '#8e8e93' : 'var(--accent)'};background:${isBuild ? 'rgba(0,0,0,0.03)' : 'rgba(0,102,255,0.04)'};border-bottom:1px solid rgba(0,0,0,0.05);`;
+      sep.textContent = isBuild ? '📦 Build Phase (one-time, offline)' : '⚡ Query Phase (real-time, each request)';
+      el.appendChild(sep);
+      prevPhase = s.phase;
+    }
+
+    const div = document.createElement('div');
+    div.dataset.step = i;
+    div.style.cssText = 'display:flex;gap:0;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.05);align-items:flex-start;opacity:0.4;transition:all 0.3s;';
+    div.innerHTML = `<div style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;margin-right:12px;border:2px solid rgba(0,0,0,0.1);background:#f0f0f0;color:#8e8e93;transition:all 0.3s;">${s.num}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;">${s.icon} ${s.title}</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-top:3px;max-height:0;overflow:hidden;transition:max-height 0.3s;line-height:1.55;">${s.desc}</div>
+      </div>`;
+    if (i === RAG_STEPS.length - 1) div.style.borderBottom = 'none';
+    el.appendChild(div);
+  });
+}
+
+function ragGetStepDivs() {
+  return Array.from(document.getElementById('ragStepper').querySelectorAll('[data-step]'));
+}
+
+function ragNext() {
+  if (ragStep >= RAG_STEPS.length) return;
+  const steps = ragGetStepDivs();
+  if (ragStep > 0) {
+    const prev = steps[ragStep - 1];
+    prev.style.opacity = '1';
+    prev.style.background = 'rgba(22,163,74,0.04)';
+    const num = prev.querySelector('div');
+    num.style.background = '#16a34a';
+    num.style.color = 'white';
+    num.style.borderColor = '#16a34a';
+  }
+  const cur = steps[ragStep];
+  cur.style.opacity = '1';
+  const isBuild = RAG_STEPS[ragStep].phase === 'build';
+  cur.style.background = isBuild ? 'rgba(0,0,0,0.03)' : 'rgba(0,102,255,0.04)';
+  const num = cur.querySelector('div');
+  num.style.background = isBuild ? '#6b7280' : 'var(--accent)';
+  num.style.color = 'white';
+  num.style.borderColor = isBuild ? '#6b7280' : 'var(--accent)';
+  // expand description
+  const descEl = cur.querySelector('div:last-child div:last-child');
+  if (descEl) descEl.style.maxHeight = '60px';
+
+  const phaseLabel = RAG_STEPS[ragStep].phase === 'build' ? '[Build]' : '[Query]';
+  document.getElementById('ragVisTitle').textContent = `Step ${ragStep+1}: ${RAG_STEPS[ragStep].title}`;
+  document.getElementById('ragVisArea').innerHTML = RAG_STEPS[ragStep].vis(SCENE_KB[currentScene]);
+  ragStep++;
+  document.getElementById('ragProgress').textContent = `Step ${ragStep} / ${RAG_STEPS.length}`;
+  if (ragStep >= RAG_STEPS.length) {
+    document.getElementById('ragNextBtn').disabled = true;
+    document.getElementById('ragNextBtn').style.opacity = '0.5';
+  }
+}
+function ragReset() {
+  ragStep = 0;
+  ragScene = currentScene;
+  document.getElementById('ragNextBtn').disabled = false;
+  document.getElementById('ragNextBtn').style.opacity = '1';
+  document.getElementById('ragProgress').textContent = `Step 0 / ${RAG_STEPS.length}`;
+  document.getElementById('ragVisArea').innerHTML = '<span style="color:var(--text-sub);">Click "Next" on the left to see each step in detail →</span>';
+  document.getElementById('ragVisTitle').textContent = 'Step Detail:';
+  document.getElementById('ragSceneLabel').textContent = `Current example: ${SCENE_KB[currentScene].label} (switch scenes on the left and the documents and question here change with it)`;
+  ragBuildStepper();
+}
+
+// Initialize
+setTab('compare');
+ragReset();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

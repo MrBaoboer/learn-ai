@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>멀티 툴 오케스트레이션: 병렬 실행인가 순차 실행인가? | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 布局：场景侧栏 + 甘特图 ── */
+.orch{display:grid;grid-template-columns:290px 1fr;gap:20px;align-items:start}
+
+/* 左：场景 */
+.scene-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.l-label{padding:10px 16px;font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.user-req{padding:14px 16px;font-size:15px;line-height:1.7;color:var(--text);background:rgba(8,145,178,.04);border-bottom:1px solid var(--border)}
+.user-req b{color:var(--cyan)}
+
+.tool-list{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.tool-chip{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--card);border:1.5px solid var(--border);transition:border-color .3s,box-shadow .3s}
+.tool-chip.active{border-color:rgba(0,102,255,.35);box-shadow:0 0 0 3px rgba(0,102,255,.08)}
+.tool-chip.done{border-color:rgba(22,163,74,.3);box-shadow:0 0 0 3px rgba(22,163,74,.06)}
+.tc-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:14px;font-weight:700;color:var(--text)}
+.tc-time{font-size:12px;color:var(--sub);margin-top:2px}
+.tc-badge{padding:3px 8px;border-radius:5px;font-size:11px;font-weight:800;flex-shrink:0}
+
+.decision{margin:8px 12px 12px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(4px);transition:all .35s}
+.dec-card.show{opacity:1;transform:translateY(0)}
+.dec-card b{color:var(--accent)}
+
+/* 右：模式切换 + 甘特图 */
+.gantt-panel{min-width:0}
+.r-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.r-title{font-size:14px;font-weight:800;color:var(--text)}
+.mode-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.mode-tab{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:14px;font-weight:700;color:var(--sub);font-family:inherit;transition:all .15s;min-height:40px}
+.mode-tab.active{border-color:var(--accent);background:rgba(0,102,255,.06);color:var(--accent)}
+
+.gantt-area{display:flex;flex-direction:column;gap:14px}
+
+/* 甘特图 */
+.gantt-container{display:flex;flex-direction:column;gap:12px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow-card)}
+.gantt-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.gantt-title{font-size:15px;font-weight:700;color:var(--text)}
+.gantt-total{padding:5px 14px;border-radius:8px;font-size:15px;font-weight:800}
+
+.gantt-scroll{overflow-x:auto}
+.gantt-timeline{position:relative;display:flex;flex-direction:column;gap:6px;min-width:560px}
+.gantt-axis{display:flex;align-items:center;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:4px}
+.gantt-axis-label{font-size:12px;color:var(--sub);font-weight:600;position:absolute}
+
+.gantt-row{display:flex;align-items:center;gap:12px;height:44px}
+.gantt-row-label{width:120px;flex-shrink:0;font-size:13px;font-weight:700;color:var(--text);text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.gantt-row-label .emoji{font-size:16px}
+.gantt-row-track{flex:1;height:36px;position:relative;border-radius:8px;background:rgba(0,0,0,.02);border:1px solid var(--border)}
+.gantt-bar{position:absolute;top:4px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;opacity:0;transform:scaleX(0);transform-origin:left;transition:all .6s cubic-bezier(.4,0,.2,1)}
+.gantt-bar.show{opacity:1;transform:scaleX(1)}
+.gantt-bar-time{position:absolute;right:-40px;font-size:11px;font-weight:700;color:var(--sub);white-space:nowrap}
+
+.batch-label{position:absolute;top:-18px;font-size:11px;font-weight:800;color:var(--accent);white-space:nowrap}
+
+/* 说明卡 + 对比卡 */
+.desc-section{display:flex;flex-direction:column;gap:8px}
+.desc-card{padding:12px 16px;border-radius:10px;font-size:14px;line-height:1.6;color:var(--text);opacity:0;transform:translateY(6px);transition:all .4s}
+.desc-card.show{opacity:1;transform:translateY(0)}
+.desc-card b{color:var(--accent)}
+
+.compare-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.compare-card{padding:12px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);text-align:center;opacity:0;transform:translateY(6px);transition:all .4s}
+.compare-card.show{opacity:1;transform:translateY(0)}
+.compare-card.highlight{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.04)}
+.cc-label{font-size:13px;font-weight:700;color:var(--sub);margin-bottom:4px}
+.cc-value{font-size:22px;font-weight:800}
+.cc-sub{font-size:12px;color:var(--sub);margin-top:2px}
+
+/* 控制 */
+.ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.btn{padding:10px 20px;border-radius:8px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:44px}
+.btn-p{background:var(--accent);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.3;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.04);color:var(--sub);border:1px solid var(--border)}
+.ctrl-hint{font-size:13px;color:var(--sub)}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.pulse{animation:pulse 1s ease infinite}
+
+@media (max-width:768px){
+  .orch{grid-template-columns:1fr}
+  .compare-row{grid-template-columns:1fr}
+}
+</style>
+<meta name="description" content="멀티 툴 오케스트레이션: 병렬 실행인가 순차 실행인가? Gantt 차트로 순차·병렬·스마트 배치 세 가지 툴 실행 전략의 소요 시간 차이를 시각화하여 프로덕트 매니저가 프레임워크 설계 결정을 이해할 수 있도록 돕습니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-2c.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-2c.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-2c.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-2c.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-2c.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="멀티 툴 오케스트레이션: 병렬 실행인가 순차 실행인가?">
+<meta property="og:url" content="https://xueai.app/slides/7-2c.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"멀티 툴 오케스트레이션: 병렬 실행 vs 순차 실행","name":"멀티 툴 오케스트레이션: 병렬 실행 vs 순차 실행","url":"https://xueai.app/slides/7-2c.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"초급~고급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Agent 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"멀티 툴 오케스트레이션: 병렬 실행인가 순차 실행인가? Gantt 차트로 세 가지 툴 실행 전략의 소요 시간 차이를 시각화합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 엔지니어링</div>
+    <h1>멀티 툴 오케스트레이션: 병렬 실행 vs 순차 실행</h1>
+    <p class="subtitle">같은 턴에 툴 호출이 3개 반환되면 실행 순서를 어떻게 정해야 할까요? 모드를 선택하고 데모를 클릭해 시간 차이를 확인해 보세요.</p>
+  </header>
+
+  <div class="orch paywall-locked xa-peek">
+    <!-- 왼쪽: 시나리오 -->
+    <aside class="scene-panel">
+      <div class="l-label">사용자 시나리오</div>
+      <div class="user-req">
+        <b>사용자 발화:</b><br>「내일 베이징→상하이 항공권 예매해 주고, 상하이 날씨도 알려주고 호텔도 추천해 줘」
+      </div>
+      <div class="l-label">모델이 3개 툴 호출을 반환</div>
+      <div class="tool-list" id="toolList">
+        <div class="tool-chip" id="chip-flight">
+          <div class="tc-icon" style="background:rgba(124,58,237,.08)">✈️</div>
+          <div class="tc-info">
+            <div class="tc-name">search_flights</div>
+            <div class="tc-time">예상 소요 시간: 1.5초</div>
+          </div>
+          <span class="tc-badge" id="badge-flight" style="background:rgba(0,0,0,.04);color:var(--sub)">대기 중</span>
+        </div>
+        <div class="tool-chip" id="chip-weather">
+          <div class="tc-icon" style="background:rgba(8,145,178,.08)">🌤️</div>
+          <div class="tc-info">
+            <div class="tc-name">get_weather</div>
+            <div class="tc-time">예상 소요 시간: 0.8초</div>
+          </div>
+          <span class="tc-badge" id="badge-weather" style="background:rgba(0,0,0,.04);color:var(--sub)">대기 중</span>
+        </div>
+        <div class="tool-chip" id="chip-hotel">
+          <div class="tc-icon" style="background:rgba(22,163,74,.08)">🏨</div>
+          <div class="tc-info">
+            <div class="tc-name">search_hotels</div>
+            <div class="tc-time">예상 소요 시간: 1.2초</div>
+          </div>
+          <span class="tc-badge" id="badge-hotel" style="background:rgba(0,0,0,.04);color:var(--sub)">대기 중</span>
+        </div>
+      </div>
+      <div class="decision" id="decArea"></div>
+    </aside>
+
+    <!-- 오른쪽: Gantt 차트 -->
+    <div class="gantt-panel">
+      <div class="r-bar">
+        <div class="r-title">실행 타임라인 비교</div>
+        <div class="mode-tabs" id="modeTabs">
+          <button class="mode-tab active" onclick="pickMode(0)">순차 실행</button>
+          <button class="mode-tab" onclick="pickMode(1)">병렬 실행</button>
+          <button class="mode-tab" onclick="pickMode(2)">스마트 배치</button>
+        </div>
+      </div>
+
+      <div class="gantt-area" id="ganttArea"></div>
+
+      <div class="ctrl">
+        <button class="btn btn-p" id="btnRun" onclick="runDemo()">▶ 데모 시작</button>
+        <button class="btn btn-r" onclick="resetDemo()">초기화</button>
+        <span class="ctrl-hint" id="hint">모드 선택 → 데모 클릭 → 시간 차이 확인</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b>　같은 턴에 모델이 여러 툴 호출을 반환하면 프레임워크는 결정을 내려야 합니다. 전부 순차 실행(가장 안전), 전부 병렬 실행(가장 빠름), 또는 안전 등급에 따른 스마트 배치(Alice 방식). 이 결정이 사용자 대기 시간에 직접적인 영향을 미칩니다.
+  </div>
+</article>
+
+<script>
+var TOOLS = [
+  {id:'flight', name:'search_flights', emoji:'✈️', color:'var(--purple)', bg:'rgba(124,58,237,.75)', time:1.5, safe:false},
+  {id:'weather', name:'get_weather', emoji:'🌤️', color:'var(--cyan)', bg:'rgba(8,145,178,.8)', time:0.8, safe:true},
+  {id:'hotel', name:'search_hotels', emoji:'🏨', color:'var(--success)', bg:'rgba(22,163,74,.75)', time:1.2, safe:true}
+];
+
+var MODES = [
+  {
+    key:'serial',
+    title:'순차 실행',
+    subtitle:'하나씩 순서대로 — 가장 안전',
+    totalTime:3.5,
+    batches:[[0],[1],[2]],
+    decision:'<b>📌 설계 결정:</b> 순차 = 절대적 안전이지만, 사용자는 3.5초를 기다려야 합니다. 각 툴이 완료된 후에야 다음 툴이 시작되므로 데이터 경쟁이 발생하지 않습니다.<br><b>단점:</b> 툴 간에 실제 의존 관계가 없다면 병렬화 기회를 낭비하는 셈입니다.',
+    descText:'각 툴이 순서대로 실행됩니다: 항공권 검색 → 날씨 조회 → 호텔 검색. 총 소요 시간 = 모든 툴 실행 시간의 합.'
+  },
+  {
+    key:'parallel',
+    title:'병렬 실행',
+    subtitle:'동시에 모두 실행 — 가장 빠름',
+    totalTime:1.5,
+    batches:[[0,1,2]],
+    decision:'<b>📌 설계 결정:</b> 병렬 = 가장 빠른 경험이지만 위험이 따릅니다. 항공권 예매가 사용자 상태를 변경(예: 결제)하고, 호텔 검색이 항공권 결과에 의존(예: 도착 시간 기준 필터링)한다면 동시 실행 시 <b>데이터 경쟁</b>이 발생할 수 있습니다.<br><b>자문해 보세요:</b> 여러분의 제품에서 이 3개 툴 사이에 의존 관계가 있나요?',
+    descText:'세 가지 툴이 동시에 시작됩니다. 총 소요 시간 = 가장 느린 툴(1.5초). 속도 57% 향상.'
+  },
+  {
+    key:'smart',
+    title:'스마트 배치 (Alice 방식)',
+    subtitle:'안전 등급에 따라 자동 그룹화',
+    totalTime:2.7,
+    batches:[[0],[1,2]],
+    decision:'<b>📌 설계 결정:</b> 프레임워크가 각 툴에 병렬 실행 가능 여부를 태깅합니다. 항공권 검색은 상태 변경 가능성 → 단독 실행; 날씨·호텔은 순수 조회 → 병렬 합산 가능.<br><b>핵심:</b> 프로덕트 매니저가 각 툴의 안전 등급을 엔지니어에게 알려줘야 합니다. 이것은 비즈니스 판단입니다.',
+    descText:'배치 1: 항공권 검색(상태 변경 가능 — 단독 실행) → 배치 2: 날씨 + 호텔(순수 조회 — 병렬 실행).'
+  }
+];
+
+var curMode = 0;
+var running = false;
+var animTimers = [];
+
+function pickMode(i) {
+  if (running) return;
+  curMode = i;
+  var tabs = document.querySelectorAll('.mode-tab');
+  for (var t = 0; t < tabs.length; t++) tabs[t].classList.toggle('active', t === i);
+  resetDemo();
+}
+
+function buildGantt() {
+  var m = MODES[curMode];
+  var maxTime = 4.0;
+  var pxPerSec = 100;
+
+  var html = '';
+  html += '<div class="gantt-container">';
+  html += '<div class="gantt-header"><div class="gantt-title">' + m.title + '<span style="font-weight:400;color:var(--sub);font-size:13px;margin-left:8px">' + m.subtitle + '</span></div>';
+
+  var totalColor = m.totalTime <= 2 ? 'var(--success)' : m.totalTime <= 3 ? 'var(--amber)' : 'var(--danger)';
+  html += '<div class="gantt-total" style="background:' + totalColor + '15;color:' + totalColor + '">총 소요: <span id="totalDisplay">—</span>초</div></div>';
+
+  html += '<div class="gantt-scroll"><div class="gantt-timeline" style="padding-left:132px">';
+
+  var axisHtml = '<div class="gantt-axis" style="position:relative;height:20px">';
+  for (var s = 0; s <= maxTime; s += 0.5) {
+    axisHtml += '<span class="gantt-axis-label" style="left:' + (s * pxPerSec) + 'px">' + s.toFixed(1) + 's</span>';
+  }
+  axisHtml += '</div>';
+  html += axisHtml;
+
+  var batchStartTimes = [];
+  var currentStart = 0;
+  for (var bi = 0; bi < m.batches.length; bi++) {
+    batchStartTimes.push(currentStart);
+    var batchMax = 0;
+    for (var bj = 0; bj < m.batches[bi].length; bj++) {
+      var toolTime = TOOLS[m.batches[bi][bj]].time;
+      if (toolTime > batchMax) batchMax = toolTime;
+    }
+    currentStart += batchMax;
+  }
+
+  for (var ti = 0; ti < TOOLS.length; ti++) {
+    var tool = TOOLS[ti];
+    var batchIdx = -1;
+    var posInBatch = -1;
+    for (var b = 0; b < m.batches.length; b++) {
+      for (var p = 0; p < m.batches[b].length; p++) {
+        if (m.batches[b][p] === ti) { batchIdx = b; posInBatch = p; }
+      }
+    }
+    var startSec = batchStartTimes[batchIdx];
+    var leftPx = startSec * pxPerSec;
+    var widthPx = tool.time * pxPerSec;
+
+    html += '<div class="gantt-row">';
+    html += '<div class="gantt-row-label" style="position:absolute;left:0;width:120px"><span class="emoji">' + tool.emoji + '</span>' + tool.name.replace('search_','').replace('get_','') + '</div>';
+    html += '<div class="gantt-row-track">';
+
+    if (m.key === 'smart' && posInBatch === 0 && m.batches[batchIdx].length > 0) {
+      var bLabel = m.batches[batchIdx].length > 1 ? '배치 ' + (batchIdx + 1) + ' (병렬)' : '배치 ' + (batchIdx + 1) + ' (단독)';
+      html += '<span class="batch-label" style="left:' + leftPx + 'px" id="blabel-' + batchIdx + '">' + bLabel + '</span>';
+    }
+
+    html += '<div class="gantt-bar" id="bar-' + tool.id + '" style="left:' + leftPx + 'px;width:' + widthPx + 'px;background:' + tool.bg + '">' + tool.time + 's</div>';
+    html += '</div></div>';
+  }
+
+  html += '</div></div></div>';
+
+  html += '<div class="desc-section">';
+  html += '<div class="desc-card" id="descCard" style="background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.15);border-radius:10px">' + m.descText + '</div>';
+  html += '</div>';
+
+  html += '<div class="compare-row" id="compareRow">';
+  for (var ci = 0; ci < MODES.length; ci++) {
+    var isActive = ci === curMode;
+    var cColor = MODES[ci].totalTime <= 2 ? 'var(--success)' : MODES[ci].totalTime <= 3 ? 'var(--amber)' : 'var(--danger)';
+    html += '<div class="compare-card' + (isActive ? ' highlight' : '') + '" id="cc-' + ci + '">';
+    html += '<div class="cc-label">' + MODES[ci].title + '</div>';
+    html += '<div class="cc-value" style="color:' + cColor + '">' + MODES[ci].totalTime + 's</div>';
+    html += '<div class="cc-sub">' + (ci === 0 ? '가장 안전' : ci === 1 ? '가장 빠름' : '균형 방식') + '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  document.getElementById('ganttArea').innerHTML = html;
+}
+
+function resetChips() {
+  for (var i = 0; i < TOOLS.length; i++) {
+    var chip = document.getElementById('chip-' + TOOLS[i].id);
+    var badge = document.getElementById('badge-' + TOOLS[i].id);
+    chip.className = 'tool-chip';
+    badge.style.background = 'rgba(0,0,0,.04)';
+    badge.style.color = 'var(--sub)';
+    badge.textContent = '대기 중';
+  }
+}
+
+function setChipState(id, state) {
+  var chip = document.getElementById('chip-' + id);
+  var badge = document.getElementById('badge-' + id);
+  if (state === 'running') {
+    chip.className = 'tool-chip active';
+    badge.style.background = 'rgba(0,102,255,.1)';
+    badge.style.color = 'var(--accent)';
+    badge.textContent = '실행 중';
+    badge.classList.add('pulse');
+  } else if (state === 'done') {
+    chip.className = 'tool-chip done';
+    badge.style.background = 'rgba(22,163,74,.1)';
+    badge.style.color = 'var(--success)';
+    badge.textContent = '완료 ✓';
+    badge.classList.remove('pulse');
+  }
+}
+
+function runDemo() {
+  if (running) return;
+  running = true;
+  document.getElementById('btnRun').disabled = true;
+  resetChips();
+  buildGantt();
+
+  var m = MODES[curMode];
+  var pxPerSec = 100;
+  var batchStartTimes = [];
+  var currentStart = 0;
+
+  for (var bi = 0; bi < m.batches.length; bi++) {
+    batchStartTimes.push(currentStart);
+    var batchMax = 0;
+    for (var bj = 0; bj < m.batches[bi].length; bj++) {
+      if (TOOLS[m.batches[bi][bj]].time > batchMax) batchMax = TOOLS[m.batches[bi][bj]].time;
+    }
+    currentStart += batchMax;
+  }
+
+  var speedFactor = 600;
+  var elapsed = 0;
+
+  for (var b = 0; b < m.batches.length; b++) {
+    (function(batchIdx) {
+      var batchStart = batchStartTimes[batchIdx];
+      var batchTools = m.batches[batchIdx];
+      var batchMaxTime = 0;
+
+      var startTimer = setTimeout(function() {
+        for (var t = 0; t < batchTools.length; t++) {
+          var tool = TOOLS[batchTools[t]];
+          setChipState(tool.id, 'running');
+          var bar = document.getElementById('bar-' + tool.id);
+          if (bar) {
+            bar.classList.add('show');
+          }
+          if (tool.time > batchMaxTime) batchMaxTime = tool.time;
+        }
+
+        for (var t2 = 0; t2 < batchTools.length; t2++) {
+          (function(toolIdx) {
+            var tool = TOOLS[toolIdx];
+            var doneTimer = setTimeout(function() {
+              setChipState(tool.id, 'done');
+            }, tool.time * speedFactor);
+            animTimers.push(doneTimer);
+          })(batchTools[t2]);
+        }
+      }, batchStart * speedFactor);
+      animTimers.push(startTimer);
+
+    })(b);
+  }
+
+  var totalTimer = setTimeout(function() {
+    document.getElementById('totalDisplay').textContent = m.totalTime;
+    var desc = document.getElementById('descCard');
+    if (desc) desc.classList.add('show');
+    var cards = document.querySelectorAll('.compare-card');
+    for (var c = 0; c < cards.length; c++) {
+      (function(card, delay) {
+        var t = setTimeout(function() { card.classList.add('show'); }, delay);
+        animTimers.push(t);
+      })(cards[c], c * 120);
+    }
+
+    var da = document.getElementById('decArea');
+    da.innerHTML = '<div class="dec-card">' + m.decision + '</div>';
+    requestAnimationFrame(function() { requestAnimationFrame(function() {
+      var dc = da.querySelector('.dec-card');
+      if (dc) dc.classList.add('show');
+    })});
+
+    running = false;
+    document.getElementById('btnRun').disabled = true;
+    document.getElementById('btnRun').textContent = '✓ 데모 완료';
+    document.getElementById('hint').textContent = '모드를 바꿔 전략을 비교해 보세요 → 초기화 후 다시 시연 가능합니다';
+  }, m.totalTime * speedFactor + 300);
+  animTimers.push(totalTimer);
+}
+
+function resetDemo() {
+  for (var i = 0; i < animTimers.length; i++) clearTimeout(animTimers[i]);
+  animTimers = [];
+  running = false;
+  resetChips();
+  buildGantt();
+  document.getElementById('btnRun').disabled = false;
+  document.getElementById('btnRun').textContent = '▶ 데모 시작';
+  document.getElementById('hint').textContent = '모드 선택 → 데모 클릭 → 시간 차이 확인';
+  document.getElementById('decArea').innerHTML = '';
+}
+
+buildGantt();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

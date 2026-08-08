@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>모델을 작게 만드는 이유: 증류의 동기 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<link rel="stylesheet" href="oss.css?v=20260808b">
+<style>
+/* 동기 카드: 세 가지 현실적 제약. 아이콘은 시각적 앵커일 뿐이고 정보는 전부 텍스트에 있다 */
+.mot-list { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.mot {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow-card);
+}
+.mot-ico {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px;
+  background: var(--oss-soft); color: var(--oss);
+  display: flex; align-items: center; justify-content: center;
+}
+.mot-ico svg { width: 18px; height: 18px; }
+.mot-body { min-width: 0; }
+.mot-body h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 5px; }
+.mot-body h4 em {
+  font-style: normal; font-size: 12px; font-weight: 700; color: var(--sub);
+  margin-left: 9px; letter-spacing: .3px;
+}
+.mot-body p { font-size: 14px; color: var(--sub); line-height: 1.7; }
+
+/* VRAM 대조 행: 기준은 oss-8의 계산기와 동일하며, 여기서는 정적으로 보여 주기만 한다 */
+.vt { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.vt-row {
+  display: grid; grid-template-columns: 1.4fr .9fr .9fr 1fr;
+  align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: var(--card); font-size: 13.5px;
+}
+.vt-name { font-weight: 700; }
+.vt-num { font-family: "SF Mono", "Fira Code", Menlo, monospace; font-size: 12.5px; color: var(--sub); }
+.vt-fit { font-weight: 700; font-size: 13px; text-align: right; }
+.vt-row.is-ok { border-color: rgba(22,163,74,.3); background: rgba(22,163,74,.04); }
+.vt-row.is-ok .vt-fit { color: var(--success); }
+.vt-row.is-tight { border-color: rgba(217,119,6,.32); background: rgba(217,119,6,.05); }
+.vt-row.is-tight .vt-fit { color: var(--amber); }
+.vt-row.is-no { opacity: .58; }
+.vt-row.is-no .vt-fit { color: var(--sub); }
+
+/* 학습 방식 대조: 카드 두 장을 나란히, 왼쪽이 기존 방식 오른쪽이 새 방식 */
+.cmp-h { font-size: 15px; font-weight: 800; margin-bottom: 6px; }
+.cmp-h.is-old { color: var(--sub); }
+.cmp-h.is-new { color: var(--oss); }
+.l-cols .l-card p { font-size: 14px; color: var(--sub); line-height: 1.7; }
+
+@media (max-width: 768px) {
+  .vt-row { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  .vt-name { grid-column: 1 / -1; }
+  .vt-fit { grid-column: 1 / -1; text-align: left; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="모델이 클수록 성능이 좋다면 업계는 왜 그토록 모델을 작게 만들려 할까요? 비용, 지연 시간, 데이터 규제라는 세 가지 현실적 제약이 실제 프로젝트에서 플래그십 모델을 문밖에 세워 둡니다. 증류는 큰 모델이 작은 모델을 가르치게 해서 처음부터 학습시키는 비용을 덜어 내는 방법입니다.">
+<meta name="keywords" content="증류가 필요한 이유,지식 증류 동기,소형 모델 배포,모델 추론 비용,온프레미스 로컬 배포,DeepSeek R1 증류">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/oss-5.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/oss-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/oss-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/oss-5.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/oss-5.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="모델을 작게 만드는 이유: 증류의 동기">
+<meta property="og:description" content="비용, 지연 시간, 데이터 규제라는 세 가지 현실적 제약이 플래그십 모델을 프로젝트 밖으로 밀어냅니다. 증류는 큰 모델이 작은 모델을 가르치게 해서 처음부터 학습시키는 비용을 덜어 내는 방법입니다.">
+<meta property="og:url" content="https://xueai.app/slides/oss-5.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="모델을 작게 만드는 이유: 증류의 동기">
+<meta name="twitter:description" content="비용, 지연 시간, 데이터 규제라는 세 가지 현실적 제약이 플래그십 모델을 프로젝트 밖으로 밀어냅니다. 증류는 큰 모델이 작은 모델을 가르치게 해서 처음부터 학습시키는 비용을 덜어 내는 방법입니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context": "https://schema.org", "@type": ["Article", "LearningResource"], "headline": "모델을 작게 만드는 이유: 증류의 동기", "name": "모델을 작게 만드는 이유: 증류의 동기", "url": "https://xueai.app/slides/oss-5.ko.html", "inLanguage": "ko", "author": {"@type": "Person", "name": "洛小山"}, "publisher": {"@type": "Organization", "name": "xueai.app", "url": "https://xueai.app"}, "learningResourceType": "강의", "educationalLevel": "입문에서 심화까지", "isPartOf": {"@type": "Course", "name": "AI 실전 코스 · 대규모 모델을 작게 만드는 법", "url": "https://xueai.app/slides/learn.html"}, "isAccessibleForFree": false, "description": "모델이 클수록 성능이 좋다면 업계는 왜 그토록 모델을 작게 만들려 할까요? 비용, 지연 시간, 데이터 규제라는 세 가지 현실적 제약이 실제 프로젝트에서 플래그십 모델을 문밖에 세워 둡니다. 증류는 큰 모델이 작은 모델을 가르치게 해서 처음부터 학습시키는 비용을 덜어 내는 방법입니다.", "hasPart": {"@type": "WebPageElement", "isAccessibleForFree": false, "cssSelector": ".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">오픈소스 특집 · 대형 모델을 작게 만드는 법</div>
+    <h1>모델을 작게 만드는 이유: 증류의 동기</h1>
+    <p class="subtitle">앞 절에서 모델이 클수록 능력이 창발하기 쉽다고 이야기했습니다. 그렇다면 업계 전체는 왜 그토록 모델을 작게 만들려 할까요? 능력이 유일한 제약 조건은 아니기 때문입니다. 비용, 지연 시간, 데이터가 밖으로 나갈 수 있는지 이 세 가지가 실제 프로젝트에서 플래그십 모델을 문밖에 세워 둡니다.</p>
+  </header>
+
+  <div class="sec-label">결론부터</div>
+
+  <div class="l-callout">
+    <b>모델을 작게 만드는 것은 현실에 떠밀린 결과입니다.</b>플래그십 모델이 성능은 가장 좋지만 비싸고 느리며, 데이터를 남의 서버로 보내야 합니다. 많은 상황에서는 성능이 쓸 만한 수준인 작은 모델만이 실제로 적용 가능한 유일한 선택지입니다. 증류는 그 작은 모델의 능력을 최대한 끌어올리기 위한 수단입니다.
+  </div>
+
+  <div class="sec-label">모델을 작게 만드는 세 가지 이유</div>
+
+  <div class="mot-list">
+    <div class="mot">
+      <div class="mot-ico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01"/><path d="M18 12h.01"/></svg>
+      </div>
+      <div class="mot-body">
+        <h4>비용<em>차이는 자릿수 단위이지 몇 퍼센트가 아니다</em></h4>
+        <p>파라미터 수가 한 자릿수 작아지면 추론 한 번에 쓰는 연산량도 보통 한 자릿수 작아집니다. 업계에서 흔히 말하는 기준은, 작은 모델의 추론 비용이 플래그십 모델보다 한두 자릿수 낮을 수 있다는 것입니다. 실제 차이는 크기, 양자화 단계, 배치 크기, 배포 방식에 달려 있습니다. 숫자를 외우려 하지 말고, 이것이 할인이 아니라 자릿수 차이라는 점을 기억하세요.</p>
+      </div>
+    </div>
+    <div class="mot">
+      <div class="mot-ico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+      </div>
+      <div class="mot-body">
+        <h4>속도<em>로컬 실행은 네트워크 왕복 구간을 통째로 없앤다</em></h4>
+        <p>원격 플래그십 모델을 호출하면 네트워크를 한 번 왕복하고, 대기열에 서고, 그다음 한 글자씩 생성합니다. 몇 초 기다리는 것이 보통입니다. 로컬에서 돌리는 작은 모델은 네트워크 구간을 없애기 때문에 첫 글자가 훨씬 빨리 나옵니다. 대화형 제품은 이 구간에 특히 민감합니다. 사용자가 3초를 기다리는 것과 0.3초를 기다리는 것은 전혀 다른 경험입니다.</p>
+      </div>
+    </div>
+    <div class="mot">
+      <div class="mot-ico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+      </div>
+      <div class="mot-body">
+        <h4>온프레미스와 규제 준수<em>내부망 밖으로 아예 나갈 수 없는 데이터가 있다</em></h4>
+        <p>진료 기록, 소송 서류, 내부 코드, 미공개 재무 데이터 같은 내용은 내부망을 벗어나지 않아야 한다는 규제를 받습니다. 이럴 때는 상대 모델의 성능이 아무리 뛰어나도 쓸 수 없습니다. 첫 단계부터 통과하지 못하기 때문입니다. 로컬에 배포한 작은 모델이 유일한 길입니다. 첫 절에서 가중치를 이야기할 때 말한 통제권이 여기서는 강제 조건이 됩니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <p>「한두 자릿수 낮다」는 말은 월말 청구서로 옮기면 얼마일까요? 여러분 제품의 요청량을 끌어다 넣어 보세요.</p>
+
+  <div class="oss-lab" data-lab="직접 해보기">
+    <div class="lab-q">먼저 여러분 제품의 규모까지 끌어 놓고, 두 청구서의 차이를 보세요.</div>
+
+    <div class="lab-ctrl">
+      <div class="lab-row">
+        <span class="lab-label">일일 요청</span>
+        <input type="range" class="lab-range" id="cSlider" min="0" max="100" value="50" aria-label="일일 요청량">
+        <span class="lab-val" id="cCalls"></span>
+      </div>
+    </div>
+
+    <div class="lab-out">
+      <div class="lab-big" id="cGap"></div>
+      <div class="lab-dist">
+        <div class="lab-drow">
+          <span class="ld-name" id="cNameA"></span>
+          <span class="ld-track"><i class="ld-fill" id="cBarA" style="width:100%"></i></span>
+          <span class="ld-p" id="cCostA"></span>
+        </div>
+        <div class="lab-drow is-dim">
+          <span class="ld-name" id="cNameB"></span>
+          <span class="ld-track"><i class="ld-fill" id="cBarB" style="width:2%"></i></span>
+          <span class="ld-p" id="cCostB"></span>
+        </div>
+      </div>
+      <div class="lab-note" id="cBarNote"></div>
+      <div class="lab-lamps" id="cLamps" style="grid-template-columns:repeat(2,1fr)"></div>
+      <div class="lab-verdict" id="cVerdict"></div>
+    </div>
+  </div>
+
+  <div class="oss-src">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>위의 비용과 지연 시간은 자릿수 수준의 서술이며 벤치마크 결과가 아닙니다. 위 계산기가 쓰는 단가와 지연 시간도 마찬가지로 자릿수를 보여 주기 위한 예시일 뿐, 어떤 사업자의 견적도 아닙니다. 실제 차이는 모델 크기, 양자화 단계, 배치 크기, 배포 방식에 달려 있으므로 자기 환경에서의 실측을 기준으로 삼으세요. 확인일 2026-08-07.</span>
+  </div>
+
+  <div class="sec-label">얼마나 작아야 내 장비에 들어가는가</div>
+
+  <p>「작다」는 상대적인 표현이지만 판단 기준은 아주 구체적입니다. 지금 손에 있는 그래픽카드에 들어가느냐입니다. 이 장 뒤쪽에 이 계산만 전담하는 인터랙티브 도구 페이지가 있습니다. 여기서는 공식만 먼저 제시합니다.</p>
+
+  <div class="l-callout" style="margin:14px 0">
+    <b>VRAM(GB) ≈ 파라미터 수(B) × 정밀도 계수</b><br>
+    <span style="font-size:14px;color:var(--sub)">FP16은 2.6, INT4는 0.65를 씁니다. 계수 안에 KV Cache 같은 실행 중 오버헤드가 이미 포함되어 있으니 밖에서 다시 곱하지 마세요.</span>
+  </div>
+
+  <p>이 기준으로 몇 가지 크기를 계산해 봅니다. 마지막 열은 INT4로 양자화한 뒤 24 GB 소비자용 그래픽카드 한 장에서 돌아가는지 여부입니다.</p>
+
+  <div class="vt">
+    <div class="vt-row is-ok">
+      <div class="vt-name">Qwen3-0.6B</div>
+      <div class="vt-num">FP16 1.6 GB</div>
+      <div class="vt-num">INT4 0.4 GB</div>
+      <div class="vt-fit">여유롭습니다, 온디바이스에서도 돌아갑니다</div>
+    </div>
+    <div class="vt-row is-ok">
+      <div class="vt-name">Qwen3-8B</div>
+      <div class="vt-num">FP16 20.8 GB</div>
+      <div class="vt-num">INT4 5.2 GB</div>
+      <div class="vt-fit">넉넉합니다, 8 GB 카드에서도 돌아갑니다</div>
+    </div>
+    <div class="vt-row is-tight">
+      <div class="vt-name">Qwen3-32B</div>
+      <div class="vt-num">FP16 83.2 GB</div>
+      <div class="vt-num">INT4 20.8 GB</div>
+      <div class="vt-fit">빠듯합니다, 컨텍스트가 길어지면 넘칩니다</div>
+    </div>
+    <div class="vt-row is-no">
+      <div class="vt-name">Qwen3-235B-A22B</div>
+      <div class="vt-num">FP16 611 GB</div>
+      <div class="vt-num">INT4 152.8 GB</div>
+      <div class="vt-fit">돌아가지 않습니다, 양자화로 해결될 문제가 아닙니다</div>
+    </div>
+  </div>
+
+  <div class="oss-src paywall-locked xa-peek">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>환산 계수는 이 장 oss-8의 VRAM 계산기와 동일합니다. FP16은 2.6, INT4는 0.65이며, 계수에는 약 30~50%의 실행 중 오버헤드가 이미 포함되어 있습니다. 경험적 추정값이지 제조사 공칭값이 아닙니다. MoE 모델의 VRAM은 총 파라미터 수로 계산하고, 활성 파라미터 수는 속도에만 영향을 줍니다. 판정 시 약 15%의 여유를 뒀기 때문에 20.8 GB는 24 GB 카드에서 「가능」이 아니라 「빠듯함」으로 봅니다. 확인일 2026-08-07.</span>
+  </div>
+
+  <p class="paywall-locked">결론은 단순합니다. 8B라는 크기는 양자화하고 나면 몇 년 전 게이밍 그래픽카드 한 장으로도 돌아가고, 플래그십 크기는 어떻게 양자화해도 들어가지 않습니다. 그래서 질문은 다른 것으로 바뀝니다. <b>작은 크기의 능력을 끌어올릴 수 있는가.</b></p>
+
+  <div class="sec-label paywall-locked">증류: 큰 모델이 작은 모델을 가르치게 하기</div>
+
+  <p class="paywall-locked">능력을 끌어올리는 길은 둘입니다. 하나는 작은 모델이 처음부터 스스로 배우게 하는 것으로, 데이터와 연산과 시행착오를 전부 다시 겪습니다. 다른 하나는 이미 배운 큰 모델을 데려와 가르치게 하는 것입니다. 후자가 바로 지식 증류입니다.</p>
+
+  <div class="l-callout paywall-locked">
+    <b>큰 모델이 선생, 작은 모델이 학생입니다.</b>선생이 문제를 마주했을 때의 판단 방식을 보여 주면 학생이 그것을 따라 배웁니다. 학생은 처음부터 더듬어 갈 필요도, 선생만 한 덩치로 자랄 필요도 없습니다.
+  </div>
+
+  <p class="paywall-locked">기존 학습과의 차이는 주로 한 번에 얼마나 많은 정보를 넘겨줄 수 있느냐에 있습니다.</p>
+
+  <div class="l-cols paywall-locked">
+    <div class="l-card">
+      <div class="cmp-h is-old">기존 학습: 맞았는지 틀렸는지만 안다</div>
+      <p>학습 데이터가 주는 것은 정답입니다. 맞히면 점수를 얻고 틀리면 잃습니다. 문제 하나에서 돌아오는 정보는 사실상 「맞음」 아니면 「틀림」 하나뿐입니다. 터무니없이 틀렸는지 한 끗 차이로 틀렸는지는 레이블에서 알 수 없습니다. 정보가 매우 희소하기 때문에 막대한 데이터와 막대한 연산으로 쌓아 올려야 합니다.</p>
+    </div>
+    <div class="l-card">
+      <div class="cmp-h is-new">증류: 선생의 생각까지 안다</div>
+      <p>선생이 내놓는 것은 최종 답 하나만이 아니라 여러 후보 사이의 선호도까지입니다. 같은 문제에서 학생은 선생이 어떤 선택지를 가깝다고 보고 어떤 선택지를 전혀 아니라고 보는지 확인할 수 있습니다. 같은 데이터 한 건이 담는 정보량이 훨씬 크므로 학생이 배우는 속도도 훨씬 빠릅니다.</p>
+    </div>
+  </div>
+
+  <p class="paywall-locked">이 정보를 구체적으로 어떻게 넘기고 학습할 때 어떻게 계산하는지는 다음 절 oss-6에서 뜯어 다룹니다. 이 절에서는 동기만 기억하면 됩니다. <b>증류가 아끼는 것은 돈과 시간이지, 새로운 능력을 만들어 내지는 않습니다.</b></p>
+
+  <div class="sec-label paywall-locked">직접 확인해 볼 수 있는 사례</div>
+
+  <p class="paywall-locked">2025년 1월 20일, DeepSeek이 R1을 공개하면서 증류 버전 소형 모델도 함께 오픈소스로 냈습니다. 방식은 R1으로 추론 데이터를 생성하고, 그 데이터로 더 작은 모델을 학습시키는 것입니다. 이 증류 버전 중 일부는 Llama를, 일부는 Qwen을 베이스 모델로 삼았습니다.</p>
+
+  <p class="paywall-locked">이 건은 기억해 둘 만합니다. 공개적으로 확인 가능한 제3자의 선택이기 때문입니다. 한 회사가 증류를 하면서 어떤 베이스 모델을 골랐는지는 어떤 홍보 문구보다 많은 것을 말해 줍니다. R1은 MIT License를 적용했고, 공식 공지에 증류를 통해 다른 모델을 학습시키는 것을 허용한다고 명시했습니다. 이 문장이 문서로 분명히 남아 있어야 다른 사람들도 이 길을 끝까지 갈 수 있습니다.</p>
+
+  <div class="oss-src paywall-locked">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>출처: DeepSeek 공식 공지, 2025-01-20. R1은 MIT License를 적용했고, 공지에서 사용자가 증류를 통해 다른 모델을 학습시키는 것을 명시적으로 허용했습니다. 같은 시기에 공개된 증류 모델은 1.5B부터 70B까지 여러 크기를 아우르며, 베이스 모델은 각각 Qwen과 Llama 두 시리즈에서 가져왔습니다. 각 버전은 여전히 해당 베이스 모델 자체의 라이선스 조항을 따라야 합니다. 확인일 2026-08-07.</span>
+  </div>
+
+  <p class="paywall-locked">이 모델들의 명명 규칙과 구체적인 방식은 다음 절에서 펼쳐 다룹니다.</p>
+
+  <div class="sec-label paywall-locked">듣기 싫은 이야기를 먼저</div>
+
+  <div class="oss-warn paywall-locked">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    <div><b>증류는 만능이 아닙니다.</b>긴 연쇄 추론, 다단계 계획, 방대한 컨텍스트를 넘나들며 취사선택하는 과제에서 작은 모델은 여전히 플래그십 모델보다 뚜렷하게 약합니다. 이런 격차는 더 강한 선생으로 바꾼다고 사라지지 않습니다. 모델을 고를 때 7B 모델 하나가 모든 상황을 떠맡아 주기를 기대하지 말고, 먼저 과제를 쪼개서 어느 단계에 작은 모델이 실제로 쓸모 있는지 확인하세요.</div>
+  </div>
+
+  <div class="oss-warn paywall-locked">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    <div><b>학생은 선생의 결점까지 함께 배웁니다.</b>선생의 편향, 지식의 사각지대, 표현 습관을 학생이 그대로 물려받으며, 스스로는 그것을 구별해 내지 못합니다. 수많은 작은 모델이 같은 선생들에게서 배우면 생태계 전체가 같은 방향으로 떠내려갑니다. 이 부작용은 oss-7에서 따로 다룹니다.</div>
+  </div>
+
+  <div class="sec-label paywall-locked">이 절에서 가져갈 것</div>
+
+  <div class="l-callout paywall-locked">
+    <b>첫째,</b>모델을 작게 만드는 동기는 비용, 지연 시간, 데이터 규제라는 세 가지 현실적 제약이며 능력의 상한을 좇는 것과는 무관합니다.<br>
+    <b>둘째,</b>적용 가능한지는 VRAM이라는 확실한 지표부터 봅니다. 공식은 파라미터 수 곱하기 정밀도 계수입니다.<br>
+    <b>셋째,</b>증류는 큰 모델이 작은 모델을 가르치게 하는 것이고, 목적은 처음부터 학습시키는 비용을 덜어 내는 것입니다.<br>
+    <b>넷째,</b>작은 모델에는 능력의 천장이 있고 선생의 결함도 물려받습니다. 이 두 가지는 모델을 고를 때 먼저 테이블 위에 올려 두어야 합니다.
+  </div>
+
+  <p class="paywall-locked">다음 절에서는 증류를 구체적으로 어떻게 하는지 봅니다. 선생이 어떻게 문제를 내고, 학생이 어떻게 답을 맞춰 보며, 그 사이에 어떤 엔지니어링상의 함정이 있는지 다룹니다.</p>
+
+</article>
+
+<script src="oss-interact.js?v=20260808"></script>
+<script>
+/* 成本与延迟对比台。
+   「低一到两个数量级」是这一节的论点，但数量级这个词对没算过账的人没有
+   重量。让学员把自己产品的请求量拖进去，看到月底那个具体数字，做小的
+   动机才立得住。 */
+(function () {
+  var C = window.OSSInteract;
+  var slider = document.getElementById('cSlider');
+  if (!C || !slider) { return; }
+
+  var t = C.dict();
+  var lang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
+  var isKo = lang.indexOf('ko') === 0, isEn = lang.indexOf('en') === 0;
+
+  var TIP = isKo
+    ? function (r) { return '같은 일을 시키는데 월 비용이 <b>' + r + '배</b> 차이 납니다. 게다가 응답은 소형 모델이 더 빠릅니다. 이것이 모델을 작게 만드는 이유입니다.'; }
+    : isEn
+    ? function (r) { return 'Same workload, and the monthly bill differs by <b>' + r + 'x</b>. On top of that, the small model answers faster. This is why people shrink models.'; }
+    : function (r) { return '同样的活，月账单差 <b>' + r + ' 倍</b>，而且小模型还更快。这就是把模型做小的理由。'; };
+
+  /* 记录上一次的量级，只在跨数量级时给一次动效，见 render 末尾 */
+  var anim = {};
+
+  /* 请求量也走对数刻度：从每天一千次到一亿次跨五个数量级，
+     线性刻度的话小团队关心的区间会被压成滑块最左边的一小截。 */
+  function callsAt(pos) {
+    var v = Math.exp(Math.log(1000) + (Math.log(1e8) - Math.log(1000)) * (pos / 100));
+    var mag = Math.pow(10, Math.floor(Math.log(v) / Math.LN10) - 1);
+    return Math.max(1000, Math.round(v / mag) * mag);
+  }
+
+  function render(pos) {
+    var calls = callsAt(pos);
+    var a = C.monthlyCost(calls, 'flagship');
+    var b = C.monthlyCost(calls, 'small');
+    var ratio = C.costRatio(calls);
+
+    document.getElementById('cCalls').textContent = t.dailyCalls(calls);
+    document.getElementById('cNameA').textContent = t.costFlagship;
+    document.getElementById('cNameB').textContent = t.costSmall;
+    document.getElementById('cCostA').textContent = t.costMonthly(a);
+    document.getElementById('cCostB').textContent = t.costMonthly(b);
+    /* 小模型那条按比例算出来常常不足一像素，给个下限让它始终可见，
+       否则看起来像渲染坏了。 */
+    document.getElementById('cBarB').style.width = Math.max(1.5, b / a * 100) + '%';
+
+    /* 两条比例条的长度比由单价决定，跟规模无关，所以拖滑块时它们不动。
+       只有这两条的话，读者拖了半天看不出变化，会以为控件坏了。真正随规模
+       翻天覆地变的是差额本身——一天几千次请求时不过是几块钱，到了千万级
+       就是一个人的工资，这才是这一节要让人记住的东西。 */
+    document.getElementById('cGap').textContent = t.costGap(Math.round(a - b));
+    document.getElementById('cBarNote').textContent = t.costBarNote;
+
+    document.getElementById('cLamps').innerHTML = [
+      { n: t.costFlagship, v: t.latency(C.TIER_COST.flagship.latencyMs), on: false },
+      { n: t.costSmall, v: t.latency(C.TIER_COST.small.latencyMs), on: true },
+    ].map(function (x) {
+      return '<div class="lab-lamp ' + (x.on ? 'is-yes' : 'is-no') + '">'
+        + '<div class="ll-name">' + x.n + '</div><div class="ll-state">' + x.v + '</div></div>';
+    }).join('');
+
+    document.getElementById('cVerdict').innerHTML = TIP(ratio);
+
+    /* 账单数字每格都在动，只在跨数量级时提示一次，否则整块会跟着滑块抖 */
+    C.fireOnChange(document.getElementById('cGap'),
+      Math.floor(Math.log10(Math.max(a, 1))), anim, 'cost');
+  }
+
+  C.bindRange(slider, render);
+})();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260806b"></script><!--seo:end-->
+</body>
+</html>

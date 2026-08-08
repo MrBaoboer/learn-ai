@@ -41,11 +41,14 @@
 
   function initQrBar() {
     if (sessionStorage.getItem('qr_bar_closed')) return;
+    var i18n = window.XUEAI_I18N;
+    var qrText = i18n ? i18n.t('qrText') : '扫码关注 <b>洛小山</b> 公众号，获取更多 AI 实战干货';
+    var closeLabel = i18n ? i18n.t('close') : '关闭';
     var bar = document.createElement('div');
     bar.className = 'qr-bar';
-    bar.innerHTML = '<img src="images/brand/qrcode.jpg" alt="公众号二维码">'
-      + '<span class="qr-text">扫码关注 <b>洛小山</b> 公众号，获取更多 AI 实战干货</span>'
-      + '<button class="qr-close" aria-label="关闭">&times;</button>';
+    bar.innerHTML = '<img src="images/brand/qrcode.jpg" alt="QR">'
+      + '<span class="qr-text">' + qrText + '</span>'
+      + '<button class="qr-close" aria-label="' + closeLabel + '">&times;</button>';
     document.body.insertBefore(bar, document.body.firstChild);
     bar.querySelector('.qr-close').addEventListener('click', function() {
       bar.remove();

@@ -16,6 +16,89 @@ window.COURSE = {
     github: 'https://github.com/itshen/learn-ai',
   },
   parts: [
+    /* 开篇：课程的第一站，先定位自己再讲怎么学。放在第零篇章之前，新访客默认落地
+       在这里（learn.html 取 FLAT[0]）。暂时复用 prologue 标记，首页会渲染成 INTRO
+       徽章，与第零篇章重复；待 Ask Alice 分支落地后换成专用的 preface 样式。 */
+    {
+      id: 'p-start',
+      num: '开篇',
+      title: '开始之前',
+      desc: '三节开篇小课：用达克曲线找到自己现在的位置，讲清怎么学才能真的过脑子，以及为什么值得先花时间弄懂原理——原理通了，后面所有方案你都能自己看懂。',
+      color: '#64748b',
+      prologue: true,
+      topics: [
+        {
+          id: 't-intro',
+          title: '入门与定位',
+          desc: '先搞清楚我们在哪里、为什么要打基础',
+          lessons: [
+            { file: '0-intro.html', title: '我们在哪里？达克效应', desc: '用达克曲线定位学员当前位置，明确课程目标：从愚昧之巅走向平稳高原', tag: '开篇' },
+            { file: '0-how.html', title: '怎样学，知识才能过脑子', desc: '看完 ≠ 学到：每个案例都要停下来反思、代入自己的业务场景、尝试输出', tag: '开篇' },
+            { file: '0-why.html', title: '为什么要花时间讲原理', desc: 'AI 所有 Harness 操作本质都是对 message list 的处理。理解它，才能看懂所有方案', tag: '开篇' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p0',
+      num: '第零篇章',
+      title: '写给第一次接触 AI 的你',
+      desc: '不讲术语、不讲数学，用八节交互小课建立对 AI 的正确直觉：它能干哪些神奇的活、为什么会一本正经地胡说、怎么和它说话、什么能放心交给它。另附「小白三千问」：一页一问，把新手最常见的疑惑一次说清。零基础的家人朋友也能看懂，全章免登录开放。',
+      color: '#0891b2',
+      prologue: true,
+      topics: [
+        {
+          id: 't-zero-what',
+          title: 'AI 是个什么东西',
+          desc: '先看它的能力，再看穿它的底牌',
+          lessons: [
+            { file: 'zero-0.html', title: 'AI 能干哪些神奇的活', desc: '六个真实使用现场：整理纪要、看懂报告、给任何人讲任何事、陪练面试、做小工具、生成海报。以前是人学软件，现在是软件听人话', tag: '交互' },
+            { file: 'zero-1.html', title: '它其实在玩「接话茬」', desc: '不需要任何基础：AI 每次只做一件事——猜下一个字。两个小游戏，建立你对 AI 的第一个正确直觉', tag: '交互' },
+            { file: 'zero-2.html', title: '它不是搜索引擎', desc: '搜索给书架，AI 给结论。理解「凭记忆回答」的三个后果：会记串、知识有截止日期、没有出处可查', tag: '概念' },
+            { file: 'zero-3.html', title: '它会一本正经地胡说', desc: '三个找茬游戏：亲手从 AI 的回答里抓出编造的句子，再带走三个实用的小习惯', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-zero-talk',
+          title: '怎么和它说话',
+          desc: '两个立刻能用的说话技巧',
+          lessons: [
+            { file: 'zero-4.html', title: '把它当不了解你的新同事', desc: '三档提问对比 + 提示词积木组装器：背景、要求、限制——信息给一分，它答一分', tag: '交互' },
+            { file: 'zero-5.html', title: '万能开场白：先问我几个问题', desc: '说不清需求没关系，让它来问你。点选式对话演示，亲手体验回答质量翻倍的瞬间', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-zero-faq',
+          title: '小白三千问',
+          desc: '一页一问，把新手最常见的疑惑一次说清',
+          lessons: [
+            { file: 'zero-q-prompt.html', title: '提示词到底怎么写才好？', desc: '一个万能骨架（背景+要求+限制）+ 拼图组装器：亲手拼不同的提示词，实时看 AI 回答质量的变化', tag: '交互' },
+            { file: 'zero-q-prompt-engineering.html', title: '「提示词工程」有什么意义？', desc: '你的一次聊天 vs 产品团队的一百万次调用：拖动滑块，亲眼看一段废话被放大成多大的账单', tag: '交互' },
+            { file: 'zero-q-model-agent-app.html', title: '模型、Agent、应用是什么关系？', desc: '发动机、整车、网约车的三层类比 + 对号入座小游戏：听到新闻就知道说的是哪一层', tag: '交互' },
+            { file: 'zero-q-agent.html', title: 'Agent 到底强在哪？', desc: '同一件报销的事，聊天 AI 和 Agent 干起来完全不同——点开播放，看 Agent 一步步把活干完', tag: '交互' },
+            { file: 'zero-q-skill.html', title: '最近很火的 Skill 是什么？', desc: '一张写给 AI 的「经验小抄」。对比播放：没带小抄的管家来回跑 4 趟，带了小抄的一趟搞完', tag: '交互' },
+            { file: 'zero-q-china-models.html', title: '国产大模型有哪些？该怎么选？', desc: '通义、Kimi、DeepSeek、豆包、GLM……点选你的场景，对号入座。数据基于全球盲测榜', tag: '交互' },
+            { file: 'zero-q-companies.html', title: '还有哪些重要的 AI 公司？', desc: 'OpenAI、Anthropic、Google、Meta、xAI……配对小游戏把公司和代表作对上号，再看一份友好图鉴', tag: '交互' },
+            { file: 'zero-q-multimodal.html', title: '为什么有的 AI 看不懂图片？', desc: '「会说话」和「会看」是两套本事。给两个模型各发一张猫图，亲眼看差别，再讲清「眼睛」的原理', tag: '交互' },
+            { file: 'zero-q-image-cost.html', title: '生成一张图为什么贵几十倍？', desc: '一次问答几厘钱，一张图两三毛。成本条动画 + 三个原因：像素多、要画几十遍、显卡被独占', tag: '交互' },
+            { file: 'zero-q-video-cost.html', title: 'AI 视频为什么按秒收费？', desc: '拖动滑块看看：10 秒视频 = 240 帧连贯的图 + 物理合理 + 音画同步。省钱顺序也一并分享', tag: '交互' },
+            { file: 'zero-q-relay.html', title: '什么是 API 中转站？', desc: '三折价格背后：你的每句话都要经过一个无法核实的中间人。路径动画讲清三个结构性风险', tag: '交互' },
+            { file: 'zero-q-reverse-proxy.html', title: '「拼车号」「共享号」是什么？', desc: '9.9 的 Plus 拼车 = 三十人合租单人间。动画演示：记录互看、封号连坐、钥匙在别人手里', tag: '交互' },
+          ],
+        },
+        /* 放在小白三千问之后：本主题的「你的下一步」是第零篇章的收官分流页，
+           要紧挨第一篇章，才接得上它「进入第一篇章」的按钮。 */
+        {
+          id: 't-zero-trust',
+          title: '什么能放心交给它',
+          desc: '一套三秒钟的信任判断法',
+          lessons: [
+            { file: 'zero-6.html', title: '放心用，还是要核实？', desc: '八道判断题小游戏 + 信任四象限：有标准答案吗？错了后果大吗？健康钱法律三条红线', tag: '交互' },
+            { file: 'zero-final.html', title: '你的下一步', desc: '六个直觉行囊盘点 + 三道题分流测试，找到最适合你的学习路径', tag: '收官' },
+          ],
+        },
+      ],
+    },
     {
       id: 'p1',
       num: '第一篇章',
@@ -24,22 +107,12 @@ window.COURSE = {
       color: '#0066ff',
       topics: [
         {
-          id: 't-intro',
-          title: '入门与定位',
-          desc: '先搞清楚我们在哪里、为什么要打基础',
-          lessons: [
-            { file: '0-intro.html', title: '我们在哪里？达克效应', desc: '用达克曲线定位学员当前位置，明确课程目标：从愚昧之巅走向平稳高原', tag: '开篇' },
-            { file: '0-how.html', title: '怎样学，知识才能过脑子', desc: '看完 ≠ 学到——每个案例都要停下来反思、代入自己的业务场景、尝试输出', tag: '开篇' },
-            { file: '0-why.html', title: '为什么要花时间讲原理', desc: 'AI 所有 Harness 操作本质都是对 message list 的处理——理解它，才能看懂所有方案', tag: '开篇' },
-          ],
-        },
-        {
           id: 't-basic',
           title: '基础原理',
           desc: '训练数据、训练 vs 推理、词表与注意力',
           lessons: [
-            { file: 'training-data.html', title: 'AI 的"食物"：训练数据', desc: '15T Token 是什么概念？语料构成可视化 + 数据规模直觉滑块', tag: '交互' },
-            { file: 'train-vs-infer.html', title: '训练 vs 推理：两个不同的过程', desc: '对话不是学习，参数冻结，按 Token 计费——AI 产品必懂的底层逻辑', tag: '概念' },
+            { file: 'training-data.html', title: 'AI 的食物：训练数据', desc: '15T Token 是什么概念？语料构成可视化 + 数据规模直觉滑块', tag: '交互' },
+            { file: 'train-vs-infer.html', title: '训练 vs 推理：两个不同的过程', desc: '对话不是学习，参数冻结，按 Token 计费，这些是 AI 产品必懂的底层逻辑', tag: '概念' },
             { file: '1-2-vocab.html', title: '词表与训练', desc: '从语料到词间矩阵，Token 化 + 注意力权重交互演示', tag: '交互' },
             { file: '1-2-base.html', title: 'Base 模型：Token 推 Token 机器', desc: '训练结束后得到什么？逐步生成 + 概率分布实时更新', tag: '动画' },
             { file: '1-2-gpt.html', title: 'GPT 的跃进：PreTraining 改变一切', desc: 'CNN / RNN / BERT / GPT 四种算法可交互对比，记忆衰减可视化', tag: '交互' },
@@ -50,9 +123,9 @@ window.COURSE = {
           title: '从补全到对话',
           desc: '补全机器是如何变成聊天机器人的',
           lessons: [
-            { file: '1-2-api.html', title: 'chat/completions 之谜', desc: '明明是对话，为什么 API 叫"补全"？打字机动画解读', tag: '动画' },
+            { file: '1-2-api.html', title: 'chat/completions 之谜', desc: '明明是对话，为什么 API 叫「补全」？打字机动画解读', tag: '动画' },
             { file: '1-2-fake-chat.html', title: '伪造聊天记录', desc: 'OpenAI 最初的实验：把补全机器变成聊天机器人', tag: '动画' },
-            { file: '1-2-sft.html', title: 'Chat Template + SFT', desc: 'Jinja 格式、指令微调，大模型终于学会"说话"', tag: '概念' },
+            { file: '1-2-sft.html', title: 'Chat Template + SFT', desc: 'Jinja 格式、指令微调，大模型终于学会说话', tag: '概念' },
             { file: '1-2-prompt-power.html', title: '上下文窗口是关键', desc: '提示词为什么够用？Token 截断可视化，无需重新训练', tag: '交互' },
           ],
         },
@@ -78,13 +151,21 @@ window.COURSE = {
             { file: 'summary-1b.html', title: '汇总（下）· 缓解策略 + 决策框架', desc: '四种缓解策略对比 / 常见误区清单 / 方案选择判断矩阵', tag: '汇总' },
           ],
         },
+        {
+          id: 't-interview1',
+          title: '他们会这样考你',
+          desc: '面试官、老板、技术同事会怎样考察本章内容',
+          lessons: [
+            { file: 'interview-1.html', title: '大模型基础 · 30 道灵魂拷问', desc: '每题附考察意图、答题框架与加分点：概率预测 / message list / 幻觉解释 / RAG vs 重训 / Temperature / 上下文窗口', tag: '考察' },
+          ],
+        },
       ],
     },
     {
       id: 'p2',
       num: '第二篇章',
       title: 'AI Harness',
-      desc: '上下文工程、Prompt 进阶与安全、Agent 设计与工具调用、五层成本优化体系——把大模型真正落地为可用产品。',
+      desc: '上下文工程、Prompt 进阶与安全、Agent 设计与工具调用、五层成本优化体系，把大模型真正落地为可用产品。',
       color: '#7c3aed',
       topics: [
         {
@@ -105,7 +186,7 @@ window.COURSE = {
             { file: '6-0b.html', title: 'Markdown 语法与渲染 Pipeline', desc: '常用语法速查 + 实时编辑器 + marked.js / markdown-it 渲染方案', tag: '交互' },
             { file: '6-1.html', title: '你说什么，它就变什么', desc: '五种角色实时切换，输出格式控制，System Prompt 核心原理', tag: '交互' },
             { file: '6-2.html', title: 'Prompt 进阶技巧', desc: 'Few-Shot / CoT / 约束条件 / 任务拆解，好坏对比交互演示', tag: '交互' },
-            { file: '6-3.html', title: '输出格式取舍', desc: '纯文本 / JSON / Markdown / YAML / XML — 场景适配度对比与权衡', tag: '交互' },
+            { file: '6-3.html', title: '输出格式取舍', desc: '纯文本 / JSON / Markdown / YAML / XML，场景适配度对比与权衡', tag: '交互' },
             { file: '6-4.html', title: '流式返回与格式配合', desc: 'JSON 全文才能解析 / MD 逐字显示 / XML 捕获标签即渲染，动态演示', tag: '交互' },
           ],
         },
@@ -139,7 +220,7 @@ window.COURSE = {
             { file: '7-4a.html', title: 'ReAct 循环：思考→行动→观察', desc: '一个删除 console.log 的任务经历 14 轮循环，含自我纠错', tag: '深入' },
             { file: '7-4b.html', title: 'Agent 卡死的 5 种模式', desc: '参数格式错误、幻觉工具、无限递归、信息不足、API 异常', tag: '深入' },
             { file: '7-4c.html', title: '权限与安全', desc: '5 种权限模式 + LLM 风险分级 + Human-in-the-loop 设计', tag: '深入' },
-            { file: '7-5.html', title: 'Skill：让 Agent 少走弯路', desc: 'Skill = 流程说明 + 工具调用指引，用"阳台收衣服"类比好循环 vs 差循环', tag: '交互' },
+            { file: '7-5.html', title: 'Skill：让 Agent 少走弯路', desc: 'Skill = 流程说明 + 工具调用指引，用「阳台收衣服」类比好循环 vs 差循环', tag: '交互' },
             { file: '7-5a.html', title: 'Skill 的本质', desc: '好循环 vs 差循环升级版，Skill 如何改变 Agent 执行路径', tag: '深入' },
             { file: '7-5b.html', title: '解剖一个真实 Skill', desc: '从真实源码学 SKILL.md 的结构设计', tag: '深入' },
             { file: '7-4.html', title: '脚手架工程：从试验品到产品', desc: '模拟 Agent 查机票订酒店，无脚手架 vs 有脚手架完整对比，5 大能力详解', tag: '交互' },
@@ -171,13 +252,13 @@ window.COURSE = {
         {
           id: 't-tips',
           title: '实用技巧',
-          desc: '人机边界、提问方式、迭代方法、场景判断与幻觉验证——用 AI 的日常指南',
+          desc: '人机边界、提问方式、迭代方法、场景判断与幻觉验证，一份用 AI 的日常指南',
           lessons: [
-            { file: 'ai-tips-boundary.html', title: '人机知识边界：四象限策略', desc: '什么交给 AI、什么自己来——用四象限快速判断任务分配', tag: '技巧' },
+            { file: 'ai-tips-boundary.html', title: '人机知识边界：四象限策略', desc: '什么交给 AI、什么自己来，用四象限快速判断任务分配', tag: '技巧' },
             { file: 'ai-tips-context.html', title: '好提问 vs 坏提问', desc: '上下文决定输出质量，同一个问题好坏对比演示', tag: '技巧' },
             { file: 'ai-tips-verify.html', title: 'AI 说的能信吗？找出幻觉', desc: '三种快速验证方法，识别 AI 自信说错的场景', tag: '技巧' },
             { file: 'ai-tips-iterate.html', title: '迭代的艺术：知道何时收手', desc: '从粗到精的迭代节奏，以及何时该停止追问 AI', tag: '技巧' },
-            { file: 'ai-tips-scenarios.html', title: '场景速查：什么时候放心用', desc: '高可信 / 需验证 / 慎用 / 不用——AI 适用场景四分类', tag: '技巧' },
+            { file: 'ai-tips-scenarios.html', title: '场景速查：什么时候放心用', desc: '高可信 / 需验证 / 慎用 / 不用，AI 适用场景四分类', tag: '技巧' },
           ],
         },
         {
@@ -193,11 +274,11 @@ window.COURSE = {
           ],
         },
         {
-          id: 't-exam',
-          title: '阶段自测',
-          desc: '学完基础，来一场 100 分制摸底考',
+          id: 't-interview2',
+          title: '他们会这样考你',
+          desc: '面试官、老板、技术同事会怎样考察本章内容',
           lessons: [
-            { file: 'exam.html', title: 'AI 基础掌握度自测', desc: '22 个考点、43 道技术题：模拟考试随机抽 20 题 + 全量顺序刷题，附错题回顾', tag: '交互' },
+            { file: 'interview-2.html', title: 'AI Harness · 30 道灵魂拷问', desc: '每题附考察意图、答题框架与加分点：上下文溢出 / Prompt 工程 / 注入防御 / 工具调用 / 成本账单 / KV Cache / 输出格式', tag: '考察' },
           ],
         },
       ],
@@ -206,19 +287,27 @@ window.COURSE = {
       id: 'p3',
       num: '第三篇章',
       title: '实战 · 从 Demo 到产品',
-      desc: '以真实 AI Agent 桌面应用为例，拆解生图产品化、Agent 循环控制、上下文压缩、长期记忆、Prompt Harness、多 Agent 协作、权限安全与 MCP 生态——从"调通 API"到"用户能用"的完整实战路径。',
+      desc: '以真实 AI Agent 桌面应用为例，拆解生图产品化、Agent 循环控制、上下文压缩、长期记忆、Prompt Harness、多 Agent 协作、权限安全与 MCP 生态，走完从「调通 API」到「用户能用」的完整实战路径。',
       color: '#059669',
       topics: [
+        {
+          id: 't-alice-intro',
+          title: '开篇',
+          desc: '本章从哪来：一个真实产品的开发实录',
+          lessons: [
+            { file: '9-0.html', title: '本章从哪来：Alice 开发实录', desc: '本章是作者开发 AI Agent 桌面应用 Alice 的经验总结：约 50 万行代码、132 个工具、8 大模块与本章 8 个小节一一对应', tag: '开篇' },
+          ],
+        },
         {
           id: 't-imagegen',
           title: 'AI 生图',
           desc: '文生图、垫图、角色一致性、多模型降级与产品化',
           lessons: [
-            { file: '9-1.html', title: '文生图 vs 垫图：两种完全不同的事', desc: '一个从文字出发，一个从图片出发——产品经理要分清什么时候用哪种', tag: '概念' },
-            { file: '9-2.html', title: '用 AI 给 AI 写 Prompt', desc: '用户说"画个夕阳下的猫"，生图模型需要的是完全不同的描述——用 LLM 做翻译', tag: '实战' },
-            { file: '9-3.html', title: '角色一致性：最难的产品问题', desc: '同一个 IP 每次画都长不一样——为什么难、产品上怎么思考这个问题', tag: '案例' },
+            { file: '9-1.html', title: '文生图 vs 垫图：两种完全不同的事', desc: '一个从文字出发，一个从图片出发。产品经理要分清什么时候用哪种', tag: '概念' },
+            { file: '9-2.html', title: '用 AI 给 AI 写 Prompt', desc: '用户说「画个夕阳下的猫」，生图模型需要的是完全不同的描述，解法是用 LLM 做翻译', tag: '实战' },
+            { file: '9-3.html', title: '角色一致性：最难的产品问题', desc: '同一个 IP 每次画都长不一样。为什么难、产品上怎么思考这个问题', tag: '案例' },
             { file: '9-4.html', title: '模型会挂，然后呢？', desc: '多模型降级链的产品逻辑：优先级、白名单、探活、全挂时的体验兜底', tag: '实战' },
-            { file: '9-5.html', title: '生图的产品化清单', desc: '从"调通了 API"到"用户能用"之间，还差哪些东西——一张 checklist', tag: '系统设计' },
+            { file: '9-5.html', title: '生图的产品化清单', desc: '从「调通了 API」到「用户能用」之间还差哪些东西，一张 checklist 数清楚', tag: '系统设计' },
           ],
         },
         {
@@ -227,30 +316,30 @@ window.COURSE = {
           desc: '生产级循环的控制、防护与流式体验',
           lessons: [
             { file: '9-6.html', title: '教科书的 3 步 vs 真实的 N 步', desc: 'ReAct 不止 Think-Act-Observe 三步，生产环境每轮还要做什么', tag: '概念' },
-            { file: '9-7.html', title: '为什么 Agent 会卡死', desc: '真实场景中循环挂掉的几种典型模式——以及用户会看到什么', tag: '案例' },
-            { file: '9-8.html', title: '防呆设计：怎么让循环自己停下来', desc: '上限、检测、降级——三类策略的思路，产品经理该在哪里画线', tag: '实战' },
+            { file: '9-7.html', title: '为什么 Agent 会卡死', desc: '真实场景中循环挂掉的几种典型模式，以及用户会看到什么', tag: '案例' },
+            { file: '9-8.html', title: '防呆设计：怎么让循环自己停下来', desc: '上限、检测、降级三类策略的思路，产品经理该在哪里画线', tag: '实战' },
             { file: '9-9.html', title: '流式体验：别让用户干等', desc: '工具在后台跑 30 秒，用户看到的应该是什么？进度感设计', tag: '交互' },
-            { file: '9-10.html', title: '一条消息背后的真实成本', desc: '用户发一句话，底层可能跑 10+ 轮循环、几十条 API 消息——成本意识', tag: '深入' },
+            { file: '9-10.html', title: '一条消息背后的真实成本', desc: '用户发一句话，底层可能跑 10+ 轮循环、几十条 API 消息，由此建立成本意识', tag: '深入' },
           ],
         },
         {
           id: 't-ctxmgmt',
           title: '上下文管理',
-          desc: '对话越长越贵越笨——压缩的艺术与取舍',
+          desc: '对话越长越贵越笨：压缩的艺术与取舍',
           lessons: [
-            { file: '9-11.html', title: '对话越长越贵、越长越笨', desc: '费用递增 + 注意力衰减 + 窗口有限——三个必须管理上下文的理由', tag: '概念' },
-            { file: '9-12.html', title: '压缩是一门取舍的艺术', desc: '有的能删、有的不能删、有的要花钱压——产品经理的决策框架', tag: '实战' },
-            { file: '9-13.html', title: '用户说的话能不能删？', desc: '"圣物"问题：AI 的输出可以压缩，但用户的原话删了就回不来', tag: '概念' },
-            { file: '9-14.html', title: '本地压缩 vs LLM 压缩', desc: '零成本快但粗 vs 有成本慢但精——什么时候用哪种', tag: '深入' },
+            { file: '9-11.html', title: '对话越长越贵、越长越笨', desc: '费用递增 + 注意力衰减 + 窗口有限，三个必须管理上下文的理由', tag: '概念' },
+            { file: '9-12.html', title: '压缩是一门取舍的艺术', desc: '有的能删、有的不能删、有的要花钱压，这是产品经理的决策框架', tag: '实战' },
+            { file: '9-13.html', title: '用户说的话能不能删？', desc: '「圣物」问题：AI 的输出可以压缩，但用户的原话删了就回不来', tag: '概念' },
+            { file: '9-14.html', title: '本地压缩 vs LLM 压缩', desc: '零成本快但粗 vs 有成本慢但精，什么时候用哪种', tag: '深入' },
           ],
         },
         {
           id: 't-memory',
           title: '长期记忆',
-          desc: '让 AI "认识"你——记忆的提取、冲突与注入',
+          desc: '让 AI 认识你：记忆的提取、冲突与注入',
           lessons: [
-            { file: '9-15.html', title: '上下文 ≠ 记忆', desc: '白板（上下文窗口）和笔记本（长期记忆）的区别——为什么需要两套系统', tag: '概念' },
-            { file: '9-16.html', title: '什么值得记、什么不值得记', desc: '不是所有对话都有价值——"守门员"思路与筛选逻辑', tag: '实战' },
+            { file: '9-15.html', title: '上下文 ≠ 记忆', desc: '白板（上下文窗口）和笔记本（长期记忆）的区别，为什么需要两套系统', tag: '概念' },
+            { file: '9-16.html', title: '什么值得记、什么不值得记', desc: '不是所有对话都有价值：守门员思路与筛选逻辑', tag: '实战' },
             { file: '9-17.html', title: '记忆冲突：用户改了主意怎么办', desc: '新旧记忆冲突的四种处理策略：新增 / 合并 / 冲突标记 / 跳过', tag: '案例' },
             { file: '9-18.html', title: '记忆注入的成本问题', desc: '记了 1000 条，每次全塞进去？还是按需检索？两种策略的代价', tag: '深入' },
           ],
@@ -258,12 +347,12 @@ window.COURSE = {
         {
           id: 't-prompteng',
           title: 'Prompt Harness',
-          desc: '从字符串到架构——分层、按需加载与 Skill 模块化',
+          desc: '从字符串到架构：分层、按需加载与 Skill 模块化',
           lessons: [
             { file: '9-19.html', title: 'System Prompt 不是一坨文本', desc: '分层管理的必要性：身份、环境、工具指引各自独立，互不干扰', tag: '架构' },
-            { file: '9-20.html', title: '不用的东西别给 AI 看', desc: '100 个工具全塞 system？Token 爆炸——按需加载的设计思路', tag: '实战' },
-            { file: '9-21.html', title: 'Skill：可运营的 Prompt 模块', desc: '文件即配置、版本可追溯——让 Prompt 也能像代码一样管理', tag: '实战' },
-            { file: '9-22.html', title: '提示词和缓存的微妙关系', desc: '改一个字 System Prompt，整条 KV Cache 作废——怎么减少"手抖"的成本', tag: '深入' },
+            { file: '9-20.html', title: '不用的东西别给 AI 看', desc: '100 个工具全塞 system？Token 爆炸。这就需要按需加载的设计思路', tag: '实战' },
+            { file: '9-21.html', title: 'Skill：可运营的 Prompt 模块', desc: '文件即配置、版本可追溯，让 Prompt 也能像代码一样管理', tag: '实战' },
+            { file: '9-22.html', title: '提示词和缓存的微妙关系', desc: '改一个字 System Prompt，整条 KV Cache 作废。怎么减少手抖的成本', tag: '深入' },
           ],
         },
         {
@@ -271,30 +360,30 @@ window.COURSE = {
           title: '多 Agent',
           desc: '并行、脑暴、定时任务与协作成本',
           lessons: [
-            { file: '9-23.html', title: '什么时候需要多个 Agent', desc: '并行加速、角色分工、风险隔离——三种真实场景', tag: '概念' },
-            { file: '9-24.html', title: '并发的代价：谁能同时跑', desc: '"看"可以并行，"改"必须排队——为什么以及怎么判断', tag: '实战' },
-            { file: '9-25.html', title: '脑暴：让多个 AI 吵架', desc: '同一问题多角度独立思考，汇总共识与分歧——群体智慧的 AI 版', tag: '交互' },
+            { file: '9-23.html', title: '什么时候需要多个 Agent', desc: '并行加速、角色分工、风险隔离，三种真实场景', tag: '概念' },
+            { file: '9-24.html', title: '并发的代价：谁能同时跑', desc: '「看」可以并行，「改」必须排队，为什么以及怎么判断', tag: '实战' },
+            { file: '9-25.html', title: '脑暴：让多个 AI 吵架', desc: '同一问题多角度独立思考，汇总共识与分歧，这是群体智慧的 AI 版', tag: '交互' },
             { file: '9-26.html', title: '定时任务的成本陷阱', desc: 'Agent 定时跑任务，上下文是累积还是重建？一个选择差 10 倍成本', tag: '反例' },
           ],
         },
         {
           id: 't-security',
           title: '权限与安全',
-          desc: 'Agent 的缰绳——权限分级、审批与可观测性',
+          desc: 'Agent 的缰绳：权限分级、审批与可观测性',
           lessons: [
-            { file: '9-27.html', title: 'AI 该有多大的自由', desc: '完全自主 vs 每步审批——五种权限模式和适用场景', tag: '概念' },
-            { file: '9-28.html', title: '弹窗太多用户烦，不弹又不安全', desc: 'Human-in-the-loop 的平衡点——风险分级思路', tag: '实战' },
-            { file: '9-29.html', title: 'Agent 干了什么你知道吗', desc: '事件流与 Token 追踪——不看日志你永远不知道出了什么错', tag: '架构' },
+            { file: '9-27.html', title: 'AI 该有多大的自由', desc: '完全自主 vs 每步审批，五种权限模式和适用场景', tag: '概念' },
+            { file: '9-28.html', title: '弹窗太多用户烦，不弹又不安全', desc: 'Human-in-the-loop 的平衡点：风险分级思路', tag: '实战' },
+            { file: '9-29.html', title: 'Agent 干了什么你知道吗', desc: '事件流与 Token 追踪。不看日志你永远不知道出了什么错', tag: '架构' },
           ],
         },
         {
           id: 't-mcp',
           title: 'MCP 实战',
-          desc: '工具生态的双向连接——消费、提供与自配置',
+          desc: '工具生态的双向连接：消费、提供与自配置',
           lessons: [
-            { file: '9-30.html', title: 'MCP 不只是"调工具"', desc: '同一个协议两个方向：消费别人的工具 vs 把自己暴露给别人', tag: '概念' },
+            { file: '9-30.html', title: 'MCP 不只是「调工具」', desc: '同一个协议两个方向：消费别人的工具 vs 把自己暴露给别人', tag: '概念' },
             { file: '9-31.html', title: '懒连接：不用别连', desc: '注册了 10 个 MCP 服务，启动时全连一遍？还是用到再连？', tag: '实战' },
-            { file: '9-32.html', title: 'AI 自己加工具', desc: 'Agent 运行时发现需要新工具，自己配置 MCP 连接——"自配置"思路', tag: '深入' },
+            { file: '9-32.html', title: 'AI 自己加工具', desc: 'Agent 运行时发现需要新工具，自己配置 MCP 连接，这就是自配置思路', tag: '深入' },
           ],
         },
         {
@@ -302,8 +391,16 @@ window.COURSE = {
           title: '实战收官',
           desc: '全景回顾与核心洞察',
           lessons: [
-            { file: '9-summary.html', title: '实战全景图', desc: '生图、循环、记忆、Prompt、多 Agent、安全、MCP——一张图串起来', tag: '汇总' },
-            { file: '9-final.html', title: '聊天套壳 vs 真正的 Agent 产品', desc: '同一个 Loop 支撑 N 种场景——差异不在代码在产品决策', tag: '收官' },
+            { file: '9-summary.html', title: '实战全景图', desc: '生图、循环、记忆、Prompt、多 Agent、安全、MCP，一张图串起来', tag: '汇总' },
+            { file: '9-final.html', title: '聊天套壳 vs 真正的 Agent 产品', desc: '同一个 Loop 支撑 N 种场景，差异不在代码，在产品决策', tag: '收官' },
+          ],
+        },
+        {
+          id: 't-interview3',
+          title: '他们会这样考你',
+          desc: '面试官、老板、技术同事会怎样考察本章内容',
+          lessons: [
+            { file: 'interview-3.html', title: '实战 · 从 Demo 到产品 · 30 道灵魂拷问', desc: '每题附考察意图、答题框架与加分点：Demo 到上线的差距 / Agent 卡死 / 上下文压缩 / 记忆设计 / 多 Agent / MCP / 成本账单', tag: '考察' },
           ],
         },
       ],
@@ -312,7 +409,7 @@ window.COURSE = {
       id: 'p4',
       num: '第四篇章',
       title: '进阶 · AI 工程设计模式',
-      desc: '基于 Anthropic 公开的 Claude Code 源码与工程博客，深入拆解生产级 Agent 的设计模式——上下文工程、工具设计、评测方法论、长运行 Agent、脑手分离架构与安全容器化。',
+      desc: '基于 Anthropic 公开的 Claude Code 源码与工程博客，深入拆解生产级 Agent 的设计模式：上下文工程、工具设计、评测方法论、长运行 Agent、脑手分离架构与安全容器化。',
       color: '#dc2626',
       topics: [
         {
@@ -320,50 +417,50 @@ window.COURSE = {
           title: 'Agent 设计模式',
           desc: 'Anthropic 官方总结的五种 Workflow + 自主 Agent',
           lessons: [
-            { file: '10-1.html', title: 'Workflow vs Agent：先搞清楚你要什么', desc: '预定义流程 vs 模型自主决策——Anthropic 定义的两大类 Agent 系统', tag: '设计模式' },
+            { file: '10-1.html', title: 'Workflow vs Agent：先搞清楚你要什么', desc: '预定义流程 vs 模型自主决策，Anthropic 定义的两大类 Agent 系统', tag: '设计模式' },
             { file: '10-2.html', title: '五种 Workflow 模式', desc: 'Prompt Chaining / Routing / Parallelization / Orchestrator-Workers / Evaluator-Optimizer', tag: '设计模式' },
-            { file: '10-3.html', title: '从 Prompt 工程到上下文工程', desc: '不再只是写好提示词——而是在每一轮推理时策展最优的 Token 组合', tag: '方法论' },
-            { file: '10-4.html', title: '上下文的三板斧', desc: 'Compaction、结构化笔记、子 Agent 架构——长任务的三种上下文管理策略', tag: '方法论' },
+            { file: '10-3.html', title: '从 Prompt 工程到上下文工程', desc: '在每一轮推理时策展最优的 Token 组合，写好提示词只是其中一环', tag: '方法论' },
+            { file: '10-4.html', title: '上下文的三板斧', desc: 'Compaction、结构化笔记、子 Agent 架构，长任务的三种上下文管理策略', tag: '方法论' },
           ],
         },
         {
           id: 't-tool-design',
           title: '工具设计的艺术',
-          desc: '如何为 Agent 写出好工具——命名、描述、参数与 ACI',
+          desc: '如何为 Agent 写出好工具：命名、描述、参数与 ACI',
           lessons: [
-            { file: '10-5.html', title: 'ACI：Agent-Computer Interface', desc: '工具是 Agent 和世界之间的契约——像设计人机界面一样设计 Agent 界面', tag: '设计模式' },
-            { file: '10-6.html', title: 'Think Tool：让 AI 先想后做', desc: '在复杂工具链中给 Agent 一个"暂停思考"的空间——τ-bench 性能提升 54%', tag: '深入' },
+            { file: '10-5.html', title: 'ACI：Agent-Computer Interface', desc: '工具是 Agent 和世界之间的契约。像设计人机界面一样设计 Agent 界面', tag: '设计模式' },
+            { file: '10-6.html', title: 'Think Tool：让 AI 先想后做', desc: '在复杂工具链中给 Agent 一个暂停思考的空间，τ-bench 性能提升 54%', tag: '深入' },
             { file: '10-7.html', title: '用 Agent 优化 Agent 的工具', desc: 'Claude Code 实践：用 AI 写工具描述、跑评测、自动迭代优化', tag: '实战' },
           ],
         },
         {
           id: 't-evals',
           title: 'Agent 评测',
-          desc: '不评测就是在裸奔——如何系统化验证 Agent 质量',
+          desc: '不评测就是在裸奔。如何系统化验证 Agent 质量',
           lessons: [
-            { file: '10-8.html', title: '为什么评测比训练更重要', desc: '没有评测，修一个 bug 制造三个——Anthropic 的 Eval 方法论', tag: '方法论' },
-            { file: '10-9.html', title: '三种 Grader：代码、模型、人工', desc: '静态断言 vs LLM-as-Judge vs 人工校准——每种适合什么场景', tag: '实战' },
+            { file: '10-8.html', title: '为什么评测比训练更重要', desc: '没有评测，修一个 bug 制造三个。Anthropic 的 Eval 方法论', tag: '方法论' },
+            { file: '10-9.html', title: '三种 Grader：代码、模型、人工', desc: '静态断言 vs LLM-as-Judge vs 人工校准，每种适合什么场景', tag: '实战' },
             { file: '10-10.html', title: '评测的坑：噪音、作弊与退化', desc: '基础设施噪音可造成 6pp 误差、模型会识别考试、改 Prompt 可能让 Eval 掉 3%', tag: '案例' },
           ],
         },
         {
           id: 't-long-running',
           title: '长运行 Agent',
-          desc: '从一轮对话到跑几小时——Harness 的设计与演进',
+          desc: '从一轮对话到跑几小时：Harness 的设计与演进',
           lessons: [
-            { file: '10-11.html', title: '为什么 Agent 跑不了长任务', desc: '一口气做太多、做完就收工——两种典型失败模式', tag: '案例' },
-            { file: '10-12.html', title: 'Initializer + Coding Agent', desc: '初始化 Agent 搭环境、编码 Agent 增量推进——双角色 Harness 设计', tag: '设计模式' },
-            { file: '10-13.html', title: 'Managed Agent：脑手分离', desc: '把"思考"和"执行"拆到不同进程——像操作系统一样虚拟化 Agent', tag: '架构' },
-            { file: '10-14.html', title: 'Session ≠ Context Window', desc: '会话日志是持久的事件流、上下文窗口是临时的工作记忆——两者必须分离', tag: '深入' },
+            { file: '10-11.html', title: '为什么 Agent 跑不了长任务', desc: '一口气做太多、做完就收工，两种典型失败模式', tag: '案例' },
+            { file: '10-12.html', title: 'Initializer + Coding Agent', desc: '初始化 Agent 搭环境、编码 Agent 增量推进，双角色 Harness 设计', tag: '设计模式' },
+            { file: '10-13.html', title: 'Managed Agent：脑手分离', desc: '把思考和执行拆到不同进程，像操作系统一样虚拟化 Agent', tag: '架构' },
+            { file: '10-14.html', title: 'Session ≠ Context Window', desc: '会话日志是持久的事件流、上下文窗口是临时的工作记忆，两者必须分离', tag: '深入' },
           ],
         },
         {
           id: 't-security-advanced',
           title: '安全与容器化',
-          desc: 'Anthropic 如何在产品中"约束" Claude',
+          desc: 'Anthropic 如何在产品中约束 Claude',
           lessons: [
             { file: '10-15.html', title: '三类风险：滥用、失控、外部攻击', desc: 'Anthropic 的安全分类框架：用户滥用 / 模型 Misbehavior / Prompt Injection', tag: '安全' },
-            { file: '10-16.html', title: '沙箱与凭证隔离', desc: '生成的代码和密钥永远不在同一个容器里——结构性安全比靠提示词更可靠', tag: '安全' },
+            { file: '10-16.html', title: '沙箱与凭证隔离', desc: '生成的代码和密钥永远不在同一个容器里。结构性安全比靠提示词更可靠', tag: '安全' },
           ],
         },
         {
@@ -371,9 +468,17 @@ window.COURSE = {
           title: '进阶收官',
           desc: '全景回顾与核心设计原则',
           lessons: [
-            { file: '10-17.html', title: 'Contextual Retrieval：更好的 RAG', desc: '在检索前先给 Chunk 加上下文——Anthropic 的 RAG 升级方案', tag: '深入' },
-            { file: '10-summary.html', title: '进阶全景图', desc: '设计模式、工具、评测、长运行、安全——一张图串起来', tag: '汇总' },
+            { file: '10-17.html', title: 'Contextual Retrieval：更好的 RAG', desc: '在检索前先给 Chunk 加上下文，Anthropic 的 RAG 升级方案', tag: '深入' },
+            { file: '10-summary.html', title: '进阶全景图', desc: '设计模式、工具、评测、长运行、安全，一张图串起来', tag: '汇总' },
             { file: '10-final.html', title: '做最简单的、能跑的东西', desc: 'Anthropic 的核心工程哲学："Do the simplest thing that works"', tag: '收官' },
+          ],
+        },
+        {
+          id: 't-interview4',
+          title: '他们会这样考你',
+          desc: '面试官、老板、技术同事会怎样考察本章内容',
+          lessons: [
+            { file: 'interview-4.html', title: 'AI 工程设计模式 · 30 道灵魂拷问', desc: '每题附考察意图、答题框架与加分点：上下文工程 / 长任务 / grep vs RAG / ACI 工具设计 / 评测基建 / LLM-as-Judge / 沙箱隔离', tag: '考察' },
           ],
         },
       ],
@@ -390,8 +495,8 @@ window.COURSE = {
           title: 'Harness 概论',
           desc: '递归自我改进与 Harness 的核心地位',
           lessons: [
-            { file: '11-1.html', title: '从脚手架到自我改进系统', desc: '递归自我改进（RSI）的历史与近期路径：模型改进 Harness 而非直接改写权重', tag: '前沿' },
-            { file: '11-2.html', title: 'Harness 三大设计模式', desc: '工作流自动化 / 文件系统持久记忆 / 子 Agent 与后台任务——构建 Agent 运行时的三个基石', tag: '设计模式' },
+            { file: '11-1.html', title: '从脚手架到自我改进系统', desc: '递归自我改进（RSI）的历史与近期路径：模型改进 Harness，不直接改写权重', tag: '前沿' },
+            { file: '11-2.html', title: 'Harness 三大设计模式', desc: '工作流自动化 / 文件系统持久记忆 / 子 Agent 与后台任务，构建 Agent 运行时的三个基石', tag: '设计模式' },
           ],
         },
         {
@@ -400,7 +505,7 @@ window.COURSE = {
           desc: '从上下文工程到工作流自动搜索',
           lessons: [
             { file: '11-3.html', title: '上下文工程：从手写到自动进化', desc: 'ACE → MCE → Meta-Harness：优化对象从 prompt 内容演进到管理机制代码', tag: '前沿' },
-            { file: '11-4.html', title: '工作流设计：从手工到自动搜索', desc: 'AI Scientist / ADAS / AFlow——用 MCTS 和 Meta-Agent 搜索最优工作流', tag: '前沿' },
+            { file: '11-4.html', title: '工作流设计：从手工到自动搜索', desc: 'AI Scientist / ADAS / AFlow，用 MCTS 和 Meta-Agent 搜索最优工作流', tag: '前沿' },
           ],
         },
         {
@@ -409,7 +514,7 @@ window.COURSE = {
           desc: '让 Harness 改进自己、用进化算法搜索设计空间',
           lessons: [
             { file: '11-5.html', title: '让 Harness 改进自己', desc: 'STOP 递归改善器 + Self-Harness 的 propose-evaluate-accept 循环', tag: '前沿' },
-            { file: '11-6.html', title: '进化搜索：让最强 Harness 存活', desc: 'AlphaEvolve / DGM / SIA——用进化算法在庞大设计空间中发现最优 Agent', tag: '前沿' },
+            { file: '11-6.html', title: '进化搜索：让最强 Harness 存活', desc: 'AlphaEvolve / DGM / SIA，用进化算法在庞大设计空间中发现最优 Agent', tag: '前沿' },
           ],
         },
         {
@@ -417,7 +522,15 @@ window.COURSE = {
           title: '未来与反思',
           desc: '自我改进面临的根本挑战',
           lessons: [
-            { file: '11-7.html', title: '未来挑战：自我改进的七道关', desc: '弱评估器 / 记忆退化 / 奖励黑客 / 多样性坍缩 / 人类角色——通往完整 RSI 的瓶颈', tag: '前沿' },
+            { file: '11-7.html', title: '未来挑战：自我改进的七道关', desc: '弱评估器 / 记忆退化 / 奖励黑客 / 多样性坍缩 / 人类角色，通往完整 RSI 的瓶颈', tag: '前沿' },
+          ],
+        },
+        {
+          id: 't-interview5',
+          title: '他们会这样考你',
+          desc: '面试官、老板、技术同事会怎样考察本章内容',
+          lessons: [
+            { file: 'interview-5.html', title: 'Harness 与自我改进 · 30 道灵魂拷问', desc: '每题附考察意图、答题框架与加分点：Harness 本质 / 设计模式 / 上下文自动进化 / 奖励黑客 / RSI 进展与风险', tag: '考察' },
           ],
         },
       ],
@@ -509,6 +622,14 @@ window.COURSE = {
             { file: '12-24.html', title: 'Coding Agent 设计工作台', desc: '围绕九个系统维度输出架构决定、故障路径、验证方式和结课成果', tag: '收官' },
           ],
         },
+        {
+          id: 't-interview6',
+          title: '他们会这样考你',
+          desc: '面试官、老板、技术同事会怎样考察本章内容',
+          lessons: [
+            { file: 'interview-6.html', title: '解剖 Grok Build · 30 道灵魂拷问', desc: '每题附考察意图、答题框架与加分点：运行时循环 / Compaction / 工具权限 / 记忆检索 / 沙箱安全 / MCP 集成', tag: '考察' },
+          ],
+        },
       ],
     },
     {
@@ -578,13 +699,114 @@ window.COURSE = {
             { file: 'vibe-final.html', title: '规则的价值：每条解决一个真实问题', desc: '全景图回顾 + 使用方法 + 适配自己项目的四个动作', tag: '收官' },
           ],
         },
+        {
+          id: 't-interview7',
+          title: '他们会这样考你',
+          desc: '面试官、老板、技术同事会怎样考察本章内容',
+          lessons: [
+            { file: 'interview-7.html', title: 'Vibe Coding 方法论 · 30 道灵魂拷问', desc: '每题附考察意图、答题框架与加分点：为什么立规矩 / 质量责任 / 代码合入把关 / 拒绝分期 / 决策沉淀 / 安全闸门', tag: '考察' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-oss',
+      num: '专题篇章',
+      title: '开源、蒸馏与本地部署',
+      desc: '新闻里天天说某某模型开源了，开源的到底是什么？这一章从权重讲起，教你自己看懂一张许可证，搞清楚各家开源背后的商业算盘。再往下是模型如何从大变小：涌现、蒸馏，以及蒸馏带来的同质化代价。最后动手，算清楚自己的电脑能跑多大的模型，用 Ollama 或 LM Studio 真正跑起来。',
+      color: '#4f46e5',
+      topics: [
+        {
+          id: 't-oss-what',
+          title: '开源到底开的是什么',
+          desc: '权重、许可证与各家的商业算盘',
+          lessons: [
+            { file: 'oss-1.html', title: '权重是什么？一个模型的全部本事', desc: '训练几个月最后凝结成的那个文件：它长什么样、多大、为什么说拥有权重就是拥有控制权', tag: '概念' },
+            { file: 'oss-2.html', title: '真开源 vs 假开源：怎么看懂一张许可证', desc: '三个问题定位开放程度；用同一套尺子横量 Qwen、Mistral、DeepSeek、Llama 与只给 API 的模型', tag: '选型' },
+            { file: 'oss-3.html', title: '开源是一门生意：各家在图什么', desc: '六家厂商的开源策略与变现路径；衍生模型数量为什么比下载量更能说明问题', tag: '案例' },
+          ],
+        },
+        {
+          id: 't-oss-small',
+          title: '大模型如何变小',
+          desc: '涌现、蒸馏，以及必须付出的代价',
+          lessons: [
+            { file: 'oss-4.html', title: '涌现：能力为什么会突然出现', desc: '跨过某个规模阈值后能力阶跃式跳升；以及这个现象在学术上尚存的争议', tag: '概念' },
+            { file: 'oss-5.html', title: '为什么要把模型做小', desc: '成本、速度、私有化三个现实动机，和小模型做不到的那些事', tag: '方法论' },
+            { file: 'oss-6.html', title: '蒸馏是怎么做的：从老师到学生', desc: '五步流程、软标签与温度系数；用 DeepSeek-R1 同批开源的六个蒸馏模型做样本', tag: '案例' },
+            { file: 'oss-7.html', title: '蒸馏的代价：模型正在变得越来越像', desc: '口癖、格式怪癖与身份混淆的整批继承；为什么多模型交叉验证可能是假的', tag: '深入' },
+          ],
+        },
+        {
+          id: 't-oss-local',
+          title: '在自己的机器上跑起来',
+          desc: '算清楚，再装上',
+          lessons: [
+            { file: 'oss-8.html', title: '你的电脑能跑多大的模型', desc: '选显卡或 Mac 型号实时出结论；显存换算公式、量化档位与 MoE 的显存速度错位', tag: '交互' },
+            { file: 'oss-9.html', title: 'Ollama 与 LM Studio 怎么上手', desc: '从安装到跑通的完整命令、模型标签的读法、量化档位怎么选，以及三个最常见的坑', tag: '实战' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-exam',
+      num: '自测中心',
+      title: '七套篇章自测 · 350 道题',
+      desc: '每个篇章配一套 50 道题的卷子，全部依据该章课程内容编写。模拟考试从题库随机抽 25 题、选项打乱，刷两遍也不重样；顺序刷题则逐题即时判定并展开解析。七章都学完还有一份全站综合考，从 350 题里按章均摊抽 35 题，专治跨章节的概念混淆。答错的考点会记进个人中心的薄弱点，直接给出补课链接。',
+      color: '#7c3aed',
+      exam: true,
+      topics: [
+        {
+          id: 't-exam-entry',
+          title: '怎么用这七套卷',
+          desc: '两种模式的区别与使用建议',
+          lessons: [
+            { file: 'exam.html', title: '自测中心 · 七套篇章自测', desc: '模拟考试与顺序刷题的差别、七套卷子的考点分布、成绩与薄弱点是怎么记录的', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-exam-base',
+          title: '基础与 Harness',
+          desc: '第一、二篇章的自测卷',
+          lessons: [
+            { file: 'exam-1.html', title: '大模型基础 · 篇章自测', desc: '50 题：训练三阶段 / Token 与分词 / 参数冻结 / Temperature / 幻觉四型 / RAG 与四种缓解策略', tag: '交互' },
+            { file: 'exam-2.html', title: 'AI Harness · 篇章自测', desc: '50 题：上下文溢出 / Prompt 工程 / 注入攻防 / 工具调用与 MCP / KV Cache 与成本优化', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-exam-build',
+          title: '实战与工程设计',
+          desc: '第三、四篇章的自测卷',
+          lessons: [
+            { file: 'exam-3.html', title: '实战 · 从 Demo 到产品 · 篇章自测', desc: '50 题：生图产品化 / Agent 卡死与防呆 / 上下文压缩 / 长期记忆 / 多 Agent / MCP 生态', tag: '交互' },
+            { file: 'exam-4.html', title: 'AI 工程设计模式 · 篇章自测', desc: '50 题：Workflow vs Agent / 上下文三板斧 / ACI 工具设计 / 评测与 Grader / 沙箱隔离', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-exam-deep',
+          title: '前沿、源码与方法论',
+          desc: '第五、六、七篇章的自测卷',
+          lessons: [
+            { file: 'exam-5.html', title: 'Harness 与自我改进 · 篇章自测', desc: '50 题：Harness 三大模式 / 上下文自动进化 / 工作流搜索 / 递归自我改进与七道关', tag: '交互' },
+            { file: 'exam-6.html', title: '解剖 Grok Build · 篇章自测', desc: '50 题：运行时循环 / Compaction / 工具审批 / 双路记忆检索 / 五种沙箱 / MCP 集成', tag: '交互' },
+            { file: 'exam-7.html', title: 'Vibe Coding 方法论 · 篇章自测', desc: '50 题：流程控制与人工断点 / 质量底线 / 拒绝分期 / 文档沉淀 / 破坏性操作三道闸', tag: '交互' },
+          ],
+        },
+        {
+          id: 't-exam-all',
+          title: '学完整门课再来',
+          desc: '跨七章的综合验收',
+          lessons: [
+            { file: 'exam-all.html', title: '全站综合考 · 七章抽 35 题', desc: '从 350 题里每章均摊抽 5 题，专考跨章节容易串的概念：压缩与记忆的边界 / Workflow 与 Agent 选型 / Harness 与提示词工程的关系', tag: '交互' },
+          ],
+        },
       ],
     },
     {
       id: 'p8',
       num: '课后甜点',
       title: '雷军创业课',
-      desc: '这不是 AI 课，是正课学完后的一道甜点：整理自雷军的创业公开课口述——产品、口碑、找钱、估值、股权与现金流。给想靠 AI 做一人公司（OPC）的你，补上「做生意」的方法论。全章免登录开放。',
+      desc: '这不是 AI 课，是正课学完后的一道甜点：整理自雷军的创业公开课口述，涵盖产品、口碑、找钱、估值、股权与现金流。给想靠 AI 做一人公司（OPC）的你，补上「做生意」的方法论。全章免登录开放。',
       color: '#f97316',
       bonus: true,
       topics: [
@@ -594,7 +816,7 @@ window.COURSE = {
           desc: '决心、勇气与向死而生的心理建设',
           lessons: [
             { file: 'lei-1.html', title: '谁适合创业：莫名其妙的自信', desc: '创业不是人干的事：面对困难的勇气、描绘蓝图的能力，与金山对抗微软十六年的信念', tag: '开篇' },
-            { file: 'lei-2.html', title: '心理准备：第一天就想好怎么死', desc: '90% 的创业公司都会死；静悄悄地干、早死早超生、只给自己四年——危机感才是护身符', tag: '交互' },
+            { file: 'lei-2.html', title: '心理准备：第一天就想好怎么死', desc: '90% 的创业公司都会死；静悄悄地干、早死早超生、只给自己四年。危机感才是护身符', tag: '交互' },
           ],
         },
         {
@@ -681,6 +903,7 @@ window.TAG_STYLE = {
   '方法论': { bg: '#fff7ed', fg: '#c2410c' },
   '规范':   { bg: '#ccfbf1', fg: '#0f766e' },
   '前沿':   { bg: '#f3e8ff', fg: '#7c3aed' },
+  '考察':   { bg: '#fee2e2', fg: '#b91c1c' },
 };
 
 /* ── 工具：扁平化所有 lesson，便于上一节/下一节导航 ── */

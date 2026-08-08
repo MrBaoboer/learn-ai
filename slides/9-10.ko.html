@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>메시지 한 줄 뒤에 숨겨진 진짜 비용 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.input-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card);margin-top:8px}
+.input-box .label{font-size:13px;font-weight:700;color:var(--sub);margin-bottom:10px}
+.example-btns{display:flex;flex-wrap:wrap;gap:8px}
+.example-btn{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;color:var(--text)}
+.example-btn:hover{border-color:var(--accent);background:rgba(0,102,255,.04)}
+.example-btn.active{border-color:var(--accent);background:rgba(0,102,255,.08);color:var(--accent)}
+.msg-chain{margin-top:16px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-card);max-height:420px;overflow-y:auto}
+.msg-item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);margin-bottom:6px;font-size:13px;line-height:1.6;transition:all .3s;opacity:0;transform:translateX(-8px)}
+.msg-item.show{opacity:1;transform:translateX(0)}
+.msg-item .role{font-weight:800;font-size:11px;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.msg-item .content{flex:1;color:var(--text)}
+.msg-item .tokens{font-size:11px;font-weight:700;color:var(--sub);white-space:nowrap;flex-shrink:0}
+.msg-item.system{background:rgba(124,58,237,.04)}
+.msg-item.system .role{background:rgba(124,58,237,.12);color:var(--purple)}
+.msg-item.user-msg{background:rgba(0,102,255,.04)}
+.msg-item.user-msg .role{background:rgba(0,102,255,.12);color:var(--accent)}
+.msg-item.assistant{background:rgba(22,163,74,.04)}
+.msg-item.assistant .role{background:rgba(22,163,74,.12);color:var(--success)}
+.msg-item.tool-call{background:rgba(217,119,6,.04)}
+.msg-item.tool-call .role{background:rgba(217,119,6,.12);color:var(--amber)}
+.msg-item.tool-result{background:rgba(8,145,178,.04)}
+.msg-item.tool-result .role{background:rgba(8,145,178,.12);color:var(--cyan)}
+.summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+@media(max-width:768px){.summary-bar{grid-template-columns:repeat(2,1fr)}}
+.summary-item{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center;box-shadow:var(--shadow-card)}
+.summary-item .s-val{font-size:24px;font-weight:900;color:var(--text);letter-spacing:-1px}
+.summary-item .s-label{font-size:12px;color:var(--sub);font-weight:600;margin-top:4px}
+.summary-item.cost .s-val{color:var(--danger)}
+.slider-wrap{margin-top:20px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card)}
+.slider-wrap h3{font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px}
+.slider-row{display:flex;align-items:center;gap:16px}
+.slider-row label{font-size:13px;font-weight:600;color:var(--sub);white-space:nowrap}
+.slider-row input[type=range]{flex:1;accent-color:var(--accent)}
+.slider-row .val{font-size:15px;font-weight:800;color:var(--accent);min-width:60px;text-align:right}
+.cost-chart{display:flex;align-items:flex-end;gap:6px;height:120px;margin-top:16px;padding:16px 0}
+.cost-bar{flex:1;border-radius:6px 6px 0 0;background:linear-gradient(to top,rgba(0,102,255,.6),rgba(0,102,255,.2));transition:height .4s ease;position:relative;min-width:20px}
+.cost-bar .bar-label{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--sub);white-space:nowrap;font-weight:600}
+.cost-bar .bar-val{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--accent);white-space:nowrap;font-weight:700}
+.takeaway{background:rgba(217,119,6,.04);border:1.5px solid rgba(217,119,6,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--amber)}
+</style>
+<meta name="description" content="사용자가 메시지 한 줄을 보내면 내부적으로 10회 이상 루프를 돌며 수십 개의 API 메시지가 생성될 수 있습니다. 실제 Token 소모량과 비용을 시각화합니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-10.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/9-10.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/9-10.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/9-10.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/9-10.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="메시지 한 줄 뒤에 숨겨진 진짜 비용">
+<meta property="og:url" content="https://xueai.app/slides/9-10.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"메시지 한 줄 뒤에 숨겨진 진짜 비용","name":"메시지 한 줄 뒤에 숨겨진 진짜 비용","url":"https://xueai.app/slides/9-10.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문부터 심화","isPartOf":{"@type":"Course","name":"AI 실전 과정 · Agent Loop","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"사용자가 메시지 한 줄을 보내면 내부적으로 10회 이상 루프를 돌며 수십 개의 API 메시지가 생성될 수 있습니다. 실제 Token 소모량과 비용을 시각화합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Agent 실전</div>
+    <h1>메시지 한 줄 뒤에 숨겨진 진짜 비용</h1>
+    <p class="subtitle">사용자는 메시지 한 줄만 보냈지만, 내부에서는 10회 이상 루프를 돌고 수십 개의 API 메시지가 생성될 수 있습니다. 청구서를 열면 깜짝 놀랄 수도 있습니다.</p>
+  </header>
+
+  <div class="sec-label">사용자 메시지를 선택해 내부에서 무슨 일이 일어나는지 확인하세요</div>
+
+  <div class="input-box reveal">
+    <div class="label">시뮬레이션 사용자 메시지:</div>
+    <div class="example-btns" id="exampleBtns">
+      <button class="example-btn" onclick="selectExample(0)">날씨 알려줘</button>
+      <button class="example-btn" onclick="selectExample(1)">이 PDF 보고서 분석해줘</button>
+      <button class="example-btn" onclick="selectExample(2)">이 모듈 코드 리팩토링해줘</button>
+    </div>
+  </div>
+
+  <div class="msg-chain" id="msgChain" style="display:none"></div>
+
+  <div class="summary-bar" id="summaryBar" style="display:none">
+    <div class="summary-item"><div class="s-val" id="sRounds">-</div><div class="s-label">루프 횟수</div></div>
+    <div class="summary-item"><div class="s-val" id="sMsgs">-</div><div class="s-label">API 메시지 수</div></div>
+    <div class="summary-item"><div class="s-val" id="sTokens">-</div><div class="s-label">총 Token</div></div>
+    <div class="summary-item cost"><div class="s-val" id="sCost">-</div><div class="s-label">예상 비용</div></div>
+  </div>
+
+  <div class="sec-label">비용은 복잡도에 따라 지수적으로 증가합니다</div>
+
+  <div class="slider-wrap reveal paywall-locked xa-peek">
+    <h3>슬라이더를 당겨보세요: 작업 복잡도 vs 비용</h3>
+    <div class="slider-row">
+      <label>복잡도</label>
+      <input type="range" min="1" max="5" value="1" id="complexSlider" oninput="updateChart()">
+      <div class="val" id="complexVal">간단</div>
+    </div>
+    <div class="cost-chart" id="costChart"></div>
+    <div style="text-align:center;margin-top:28px;font-size:13px;color:var(--sub)">
+      X축: 비용 구성 요소 ｜ Y축: Token 소모량
+    </div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:20px;font-size:14px;line-height:1.8">
+    <b>비용의 주범은 어디에 있을까요?</b><br>
+    • <b>System Prompt</b> — 매 라운드마다 반복 전송되므로, 라운드가 많을수록 반복 소모가 커집니다<br>
+    • <b>Tool Results</b> — 도구가 반환하는 텍스트는 대개 매우 깁니다 (전체 파일 내용, 검색 결과…)<br>
+    • <b>컨텍스트 누적</b> — 이후 라운드는 이전 모든 메시지를 포함해야 하므로 눈덩이처럼 불어납니다
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>사용자가 메시지 한 줄을 보낼 때마다 청구서에 $0.10이 추가될 수 있습니다. 비용이 어디서 발생하는지 알아야 비용을 통제할 수 있습니다.</b> Agent의 비용은 라운드마다 지수적으로 증가합니다. 선형 증가를 훨씬 초과하며, 매 라운드마다 이전의 모든 내용을 모델에 다시 전송해야 하기 때문입니다.</span>
+  </div>
+
+</article>
+
+<script>
+(function(){
+  var EXAMPLES = [
+    {
+      name: '날씨 알려줘',
+      rounds: 2,
+      msgs: [
+        {role:'system', label:'System', content:'도구 호출 기능을 갖춘 어시스턴트입니다... (System Prompt + 도구 정의)', tokens:850},
+        {role:'user-msg', label:'User', content:'날씨 알려줘', tokens:12},
+        {role:'assistant', label:'Assistant', content:'날씨 정보를 조회해 드리겠습니다.', tokens:18},
+        {role:'tool-call', label:'Tool Call', content:'get_weather(location="사용자 현재 도시")', tokens:24},
+        {role:'tool-result', label:'Tool Result', content:'{"city":"Shanghai","temp":"28°C","weather":"Partly cloudy"...}', tokens:86},
+        {role:'assistant', label:'Assistant', content:'상하이 오늘 28°C, 구름 조금. 우산을 가져가시는 게 좋을 것 같습니다...', tokens:45}
+      ],
+      totalTokens: 1035,
+      cost: '$0.003'
+    },
+    {
+      name: '이 PDF 보고서 분석해줘',
+      rounds: 6,
+      msgs: [
+        {role:'system', label:'System', content:'도구 호출 기능을 갖춘 어시스턴트입니다... (System Prompt + 도구 정의)', tokens:850},
+        {role:'user-msg', label:'User', content:'이 PDF 보고서를 분석하고 핵심 결론을 알려줘', tokens:18},
+        {role:'assistant', label:'Assistant', content:'보고서를 읽고 분석하겠습니다.', tokens:15},
+        {role:'tool-call', label:'Tool Call', content:'read_pdf(file="report.pdf", pages="1-5")', tokens:28},
+        {role:'tool-result', label:'Tool Result', content:'[PDF 1~5페이지 내용... 약 3200자]', tokens:1600},
+        {role:'assistant', label:'Assistant', content:'앞 5페이지를 읽었습니다. 나머지를 계속 읽겠습니다...', tokens:22},
+        {role:'tool-call', label:'Tool Call', content:'read_pdf(file="report.pdf", pages="6-12")', tokens:30},
+        {role:'tool-result', label:'Tool Result', content:'[PDF 6~12페이지 내용... 약 4100자]', tokens:2050},
+        {role:'assistant', label:'Assistant', content:'전문 독서 완료. 핵심 정보 추출 시작...', tokens:20},
+        {role:'tool-call', label:'Tool Call', content:'search_in_text(query="결론,권고사항,주요발견")', tokens:32},
+        {role:'tool-result', label:'Tool Result', content:'[핵심 단락 8개 매칭...]', tokens:680},
+        {role:'assistant', label:'Assistant', content:'보고서의 세 가지 핵심 결론:\n1. 시장 성장세 둔화...\n2. 사용자 유지율...\n3. 전략 조정 권고...', tokens:320}
+      ],
+      totalTokens: 5665,
+      cost: '$0.02'
+    },
+    {
+      name: '이 모듈 코드 리팩토링해줘',
+      rounds: 12,
+      msgs: [
+        {role:'system', label:'System', content:'전문 코딩 어시스턴트입니다... (System Prompt + 도구 정의 + 프로젝트 규칙)', tokens:1200},
+        {role:'user-msg', label:'User', content:'src/utils/parser.ts 모듈을 리팩토링해줘', tokens:22},
+        {role:'assistant', label:'Assistant', content:'현재 파일 코드를 먼저 확인하겠습니다.', tokens:14},
+        {role:'tool-call', label:'Tool Call', content:'read_file("src/utils/parser.ts")', tokens:26},
+        {role:'tool-result', label:'Tool Result', content:'[파일 내용, 280줄...]', tokens:1800},
+        {role:'assistant', label:'Assistant', content:'코드에 몇 가지 문제가 있습니다. 관련 파일을 확인하겠습니다...', tokens:35},
+        {role:'tool-call', label:'Tool Call', content:'read_file("src/types/index.ts")', tokens:28},
+        {role:'tool-result', label:'Tool Result', content:'[타입 정의 파일...]', tokens:640},
+        {role:'tool-call', label:'Tool Call', content:'search_code("import.*parser")', tokens:24},
+        {role:'tool-result', label:'Tool Result', content:'[참조 위치 6개 발견...]', tokens:420},
+        {role:'assistant', label:'Assistant', content:'분석 완료. 리팩토링 시작. 주요 변경 사항:...', tokens:180},
+        {role:'tool-call', label:'Tool Call', content:'write_file("src/utils/parser.ts", [새 코드])', tokens:2200},
+        {role:'tool-result', label:'Tool Result', content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> 파일 저장 완료', tokens:8},
+        {role:'assistant', label:'Assistant', content:'메인 파일 리팩토링 완료. 관련 참조 업데이트 중...', tokens:24},
+        {role:'tool-call', label:'Tool Call', content:'write_file("src/services/data.ts", [참조 수정])', tokens:480},
+        {role:'tool-result', label:'Tool Result', content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> 파일 저장 완료', tokens:8},
+        {role:'tool-call', label:'Tool Call', content:'run_tests("src/utils/parser.test.ts")', tokens:32},
+        {role:'tool-result', label:'Tool Result', content:'3 passed, 1 failed: expect(...).toBe(...)', tokens:120},
+        {role:'assistant', label:'Assistant', content:'테스트 1개 실패. 수정 중...', tokens:16},
+        {role:'tool-call', label:'Tool Call', content:'write_file("src/utils/parser.ts", [수정])', tokens:340},
+        {role:'tool-result', label:'Tool Result', content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> 파일 저장 완료', tokens:8},
+        {role:'tool-call', label:'Tool Call', content:'run_tests("src/utils/parser.test.ts")', tokens:32},
+        {role:'tool-result', label:'Tool Result', content:'4 passed, 0 failed <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg>', tokens:14},
+        {role:'assistant', label:'Assistant', content:'리팩토링 완료! 주요 변경 사항:\n1. 너무 긴 parse 함수 분리...\n2. 공통 타입 추출...\n3. 모든 테스트 통과 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg>', tokens:280}
+      ],
+      totalTokens: 7971,
+      cost: '$0.08'
+    }
+  ];
+
+  window.selectExample = function(idx){
+    var btns = document.querySelectorAll('.example-btn');
+    btns.forEach(function(b,i){ b.classList.toggle('active', i===idx); });
+
+    var ex = EXAMPLES[idx];
+    var chain = document.getElementById('msgChain');
+    var summary = document.getElementById('summaryBar');
+    chain.style.display = 'block';
+    summary.style.display = 'grid';
+    chain.innerHTML = '';
+
+    ex.msgs.forEach(function(m, i){
+      var div = document.createElement('div');
+      div.className = 'msg-item ' + m.role;
+      div.innerHTML = '<span class="role">' + m.label + '</span>'
+                    + '<span class="content">' + m.content + '</span>'
+                    + '<span class="tokens">' + m.tokens + ' tk</span>';
+      chain.appendChild(div);
+      setTimeout(function(){ div.classList.add('show'); }, i * 120);
+    });
+
+    document.getElementById('sRounds').textContent = ex.rounds;
+    document.getElementById('sMsgs').textContent = ex.msgs.length;
+    document.getElementById('sTokens').textContent = ex.totalTokens.toLocaleString();
+    document.getElementById('sCost').textContent = ex.cost;
+  };
+
+  var COMPLEXITY_LABELS = ['간단','보통','복잡','매우 복잡','극도로 복잡'];
+  var COST_DATA = [
+    {system:[850,850,1200,1200,1500], tool_result:[86,1800,3700,6400,12000], assistant:[63,400,900,1800,3500], context_repeat:[0,1200,4800,14000,38000]},
+  ];
+
+  window.updateChart = function(){
+    var slider = document.getElementById('complexSlider');
+    var val = parseInt(slider.value) - 1;
+    document.getElementById('complexVal').textContent = COMPLEXITY_LABELS[val];
+
+    var chart = document.getElementById('costChart');
+    var categories = ['System\nPrompt','Tool\nResults','Assistant\n출력','컨텍스트\n누적'];
+    var data = [
+      COST_DATA[0].system[val],
+      COST_DATA[0].tool_result[val],
+      COST_DATA[0].assistant[val],
+      COST_DATA[0].context_repeat[val]
+    ];
+    var max = Math.max.apply(null, data) || 1;
+
+    var html = '';
+    data.forEach(function(d, i){
+      var h = Math.max((d / max) * 100, 4);
+      html += '<div class="cost-bar" style="height:'+h+'%">'
+            + '<div class="bar-val">'+d.toLocaleString()+' tk</div>'
+            + '<div class="bar-label">'+categories[i].replace('\n','<br>')+'</div>'
+            + '</div>';
+    });
+    chart.innerHTML = html;
+  };
+
+  updateChart();
+})();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

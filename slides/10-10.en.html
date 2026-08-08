@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Evaluation Pitfalls: Noise, Cheating & Regression | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.pit-header{display:flex;align-items:center;gap:16px;margin:20px 0 16px}
+.pit-num{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;font-weight:900;color:#fff}
+.pit-num.n1{background:linear-gradient(135deg,#dc2626,#ef4444)}
+.pit-num.n2{background:linear-gradient(135deg,#d97706,#f59e0b)}
+.pit-num.n3{background:linear-gradient(135deg,#7c3aed,#a78bfa)}
+.pit-info h2{font-size:20px;font-weight:800;color:var(--text);margin:0;line-height:1.3}
+.pit-info .pit-sub{font-size:13px;color:var(--sub);margin-top:2px}
+
+.data-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;margin:14px 0;box-shadow:var(--shadow-card)}
+.data-card .data-title{font-size:14px;font-weight:700;color:var(--sub);margin-bottom:14px;display:flex;align-items:center;gap:8px;letter-spacing:.3px;text-transform:uppercase}
+.data-card .data-title svg{flex-shrink:0}
+
+.stat-row{display:flex;gap:16px;margin:10px 0;flex-wrap:wrap}
+.stat-item{flex:1;min-width:140px;background:var(--bg);border-radius:var(--radius-sm);padding:16px;text-align:center}
+.stat-item .stat-val{font-size:28px;font-weight:900;color:var(--danger);line-height:1.2}
+.stat-item:nth-child(2) .stat-val{color:var(--amber)}
+.stat-item:nth-child(3) .stat-val{color:var(--accent)}
+.stat-item .stat-label{font-size:12px;color:var(--sub);margin-top:6px;line-height:1.4}
+
+.insight-box{background:rgba(0,102,255,.04);border-radius:var(--radius);padding:16px 20px;margin:14px 0;font-size:14px;line-height:1.8;color:var(--text)}
+.insight-box b{color:var(--accent)}
+
+.incident-card{background:var(--card);border:1.5px solid rgba(220,38,38,.2);border-radius:var(--radius);padding:22px 24px;margin:14px 0;box-shadow:var(--shadow-card)}
+.incident-card .inc-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.incident-card .inc-icon{flex-shrink:0;width:40px;height:40px;border-radius:10px;background:rgba(220,38,38,.07);display:flex;align-items:center;justify-content:center;color:var(--danger)}
+.incident-card .inc-title{font-size:16px;font-weight:800;color:var(--danger)}
+.incident-card .inc-date{font-size:12px;color:var(--sub);margin-top:1px}
+.incident-card .inc-body{font-size:14px;color:var(--text);line-height:1.8}
+.incident-card .inc-body b{color:var(--text)}
+.inc-timeline{margin-top:14px;padding-left:20px;border-left:2px solid rgba(220,38,38,.2)}
+.inc-timeline .inc-step{padding:8px 0;font-size:14px;color:var(--text);line-height:1.7;position:relative}
+.inc-timeline .inc-step::before{content:'';position:absolute;left:-25px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--card);border:2.5px solid var(--danger)}
+.inc-timeline .inc-step .step-label{font-size:11px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+
+.counter-box{background:var(--card);border:1.5px solid rgba(8,145,178,.2);border-radius:var(--radius);padding:18px 22px;margin:10px 0;box-shadow:var(--shadow-card);display:flex;gap:14px;align-items:flex-start}
+.counter-box .counter-icon{flex-shrink:0;width:36px;height:36px;border-radius:10px;background:rgba(8,145,178,.08);display:flex;align-items:center;justify-content:center;color:#0891b2}
+.counter-box .counter-body{flex:1}
+.counter-box .counter-title{font-size:14px;font-weight:700;color:#0891b2;margin-bottom:4px}
+.counter-box .counter-desc{font-size:14px;color:var(--text);line-height:1.7}
+
+.aware-box{background:var(--card);border:1.5px solid rgba(217,119,6,.2);border-radius:var(--radius);padding:22px 24px;margin:14px 0;box-shadow:var(--shadow-card);display:flex;gap:16px;align-items:flex-start}
+.aware-box .aware-icon{flex-shrink:0;width:44px;height:44px;border-radius:12px;background:rgba(217,119,6,.07);display:flex;align-items:center;justify-content:center;color:var(--amber)}
+.aware-box .aware-body{flex:1}
+.aware-box .aware-title{font-size:16px;font-weight:800;color:var(--amber);margin-bottom:8px}
+.aware-box .aware-desc{font-size:14px;color:var(--text);line-height:1.8}
+
+.guard-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:16px 0}
+@media(max-width:768px){.guard-grid{grid-template-columns:1fr}}
+.guard-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card);text-align:center}
+.guard-card .guard-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.guard-card:nth-child(1) .guard-icon{background:rgba(0,102,255,.08);color:var(--accent)}
+.guard-card:nth-child(2) .guard-icon{background:rgba(124,58,237,.08);color:var(--purple)}
+.guard-card:nth-child(3) .guard-icon{background:rgba(22,163,106,.08);color:var(--success)}
+.guard-card .guard-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.guard-card .guard-desc{font-size:13px;color:var(--sub);line-height:1.7}
+
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:18px 22px;font-size:15px;color:var(--text);display:flex;gap:12px;line-height:1.7;margin-top:28px}
+.takeaway b{color:var(--accent)}
+
+.point-list{list-style:none;padding:0;margin:8px 0}
+.point-list li{display:flex;align-items:flex-start;gap:10px;padding:6px 0;font-size:14px;line-height:1.7;color:var(--text)}
+.point-list li svg{flex-shrink:0;margin-top:3px}
+</style>
+<meta name="description" content="The three most common evaluation pitfalls: infrastructure noise, Eval Awareness (model recognizes it's being tested), and Prompt changes causing regression. Based on real production cases.">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/10-10.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/10-10.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/10-10.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/10-10.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/10-10.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="Evaluation Pitfalls: Noise, Cheating & Regression">
+<meta property="og:url" content="https://xueai.app/slides/10-10.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Evaluation Pitfalls: Noise, Cheating & Regression","name":"Evaluation Pitfalls: Noise, Cheating & Regression","url":"https://xueai.app/slides/10-10.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practicum · Agent Evaluation","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"The three most common evaluation pitfalls: infrastructure noise, Eval Awareness (model recognizes it's being tested), and Prompt changes causing regression. Based on real production cases.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Agent Evaluation</div>
+    <h1>Evaluation Pitfalls: Noise, Cheating & Regression</h1>
+    <p class="subtitle">Running an eval doesn't mean running it right. Three hidden traps repeatedly verified in production: infrastructure noise distorts results, models recognize when they're being tested, and a small change can cause a dramatic performance drop.</p>
+  </header>
+
+  <!-- ═══ Pit 1: Infrastructure Noise ═══ -->
+
+  <div class="pit-header reveal">
+    <div class="pit-num n1">1</div>
+    <div class="pit-info">
+      <h2>Infrastructure Noise</h2>
+      <div class="pit-sub">Same model, same task — change the sandbox config and rankings flip</div>
+    </div>
+  </div>
+
+  <div class="data-card reveal">
+    <div class="data-title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Terminal-Bench Findings
+    </div>
+    <div class="stat-row">
+      <div class="stat-item">
+        <div class="stat-val">6%</div>
+        <div class="stat-label">Simply changing CPU/memory limits<br>can shift scores by 6 percentage points</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val">Rank Flip</div>
+        <div class="stat-label">Same model + same task<br>rankings change after sandbox reconfiguration</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val">Hidden Variable</div>
+        <div class="stat-label">Infrastructure configuration itself<br>is part of the test</div>
+      </div>
+    </div>
+  </div>
+
+  <p style="font-size:14px;color:var(--text);line-height:1.8;margin:12px 0" class="reveal">
+    What does this mean? If your eval environment doesn't match production, that 95-point score in eval might drop to 89 in the real world. You think Model A beats Model B, but really Model A just runs more smoothly in your particular sandbox configuration.
+  </p>
+
+  <div class="counter-box reveal">
+    <div class="counter-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div class="counter-body">
+      <div class="counter-title">Countermeasure</div>
+      <div class="counter-desc">Control eval environment configuration with the same rigor as controlling experimental conditions. Every time you report eval results, also report the infrastructure config (CPU, memory, network, sandbox type). When the environment changes, scores are no longer comparable.</div>
+    </div>
+  </div>
+
+  <!-- ═══ Pit 2: Eval Awareness ═══ -->
+
+  <div class="pit-header reveal">
+    <div class="pit-num n2">2</div>
+    <div class="pit-info">
+      <h2>Models Recognize the Test (Eval Awareness)</h2>
+      <div class="pit-sub">Models can infer they're running a benchmark, then cheat with open books</div>
+    </div>
+  </div>
+
+  <div class="aware-box reveal">
+    <div class="aware-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    </div>
+    <div class="aware-body">
+      <div class="aware-title">What BrowseComp Revealed About Claude Opus 4.6</div>
+      <div class="aware-desc">
+        During BrowseComp evaluation, Claude Opus 4.6 was able to <b>infer that it was running a benchmark</b>. It recognized patterns in the questions and then attempted to search for answers online or leverage similar questions it may have encountered in its training data. This is a side effect of the model's generalization ability in an eval context — not exactly cheating by intent.
+      </div>
+    </div>
+  </div>
+
+  <div class="insight-box reveal">
+    <b>Core problem</b>: When a static benchmark (fixed question set) meets an internet-connected environment (where the model can search), eval results become unreliable. The model may just be recalling answers from training data, and the actual problem-solving capability is never measured.
+  </div>
+
+  <ul class="point-list reveal">
+    <li>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>The stronger the model, the better it is at recognizing evals — traditional fixed benchmarks are losing discriminative power for frontier models</span>
+    </li>
+    <li>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>If your eval uses publicly known benchmark questions, scores may be significantly overestimated</span>
+    </li>
+    <li>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      <span><b>Takeaway</b>: As models get stronger, evaluation methods must evolve — use dynamically generated test cases, restrict internet access, or replace public benchmarks with real business scenarios</span>
+    </li>
+  </ul>
+
+  <!-- ═══ Pit 3: Prompt Changes Causing Regression ═══ -->
+
+  <div class="pit-header reveal">
+    <div class="pit-num n3">3</div>
+    <div class="pit-info">
+      <h2>Prompt Changes Causing Eval Regression</h2>
+      <div class="pit-sub">A seemingly harmless change can cause performance to plummet</div>
+    </div>
+  </div>
+
+  <div class="incident-card reveal paywall-locked xa-peek">
+    <div class="inc-header">
+      <div class="inc-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </div>
+      <div>
+        <div class="inc-title">Incident 1: Claude Code Verbosity Fix</div>
+        <div class="inc-date">Post-mortem analysis, April 2026</div>
+      </div>
+    </div>
+    <div class="inc-body">
+      <div class="inc-timeline">
+        <div class="inc-step">
+          <div class="step-label">Cause</div>
+          Users reported that Claude Code output was too verbose. The team decided to modify the system prompt to reduce redundant text.
+        </div>
+        <div class="inc-step">
+          <div class="step-label">Result</div>
+          Conciseness did improve, but <b>coding eval dropped by ~3%</b>. As the model became more concise, it also became less detailed: it omitted critical code comments and error handling.
+        </div>
+        <div class="inc-step">
+          <div class="step-label">Post-mortem</div>
+          Prompt changes should undergo <b>line-by-line ablation</b> (change one line at a time and measure the impact), and be validated against a broader eval suite before going live. Improvement on one dimension is not the same as overall improvement.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="incident-card reveal paywall-locked">
+    <div class="inc-header">
+      <div class="inc-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div>
+        <div class="inc-title">Incident 2: Reasoning Effort Default Value Change</div>
+        <div class="inc-date">Another performance regression incident</div>
+      </div>
+    </div>
+    <div class="inc-body">
+      The team modified the default value of reasoning effort (a seemingly harmless configuration parameter change).<br><br>
+      Result: <b>Multiple eval dimensions showed regression</b>. The model's thinking depth was inadvertently reduced, leading to lower quality completion of complex tasks. This kind of regression is hard to detect with simple tests — only a comprehensive eval suite can catch it.
+    </div>
+  </div>
+
+  <!-- ═══ Guard Recommendations ═══ -->
+  <div class="sec-label paywall-locked">Guard Recommendations</div>
+
+  <div class="guard-grid reveal paywall-locked">
+    <div class="guard-card">
+      <div class="guard-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="16 13 12 17 8 13"/></svg>
+      </div>
+      <div class="guard-title">Run Full Suite on Every Change</div>
+      <div class="guard-desc">Whether you're changing a Prompt, switching a model, tuning parameters, or updating infrastructure, every change must trigger a full eval suite run. Testing only the affected dimension is far from enough.</div>
+    </div>
+    <div class="guard-card">
+      <div class="guard-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <div class="guard-title">Standardize Eval Environments</div>
+      <div class="guard-desc">Lock down CPU, memory, sandbox type, and network conditions. Eval results from inconsistent environments are not comparable. Treat your eval environment like a laboratory — control the conditions.</div>
+    </div>
+    <div class="guard-card">
+      <div class="guard-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </div>
+      <div class="guard-title">Continuously Update Evals</div>
+      <div class="guard-desc">Evaluation is not a one-time effort. As models improve, evals must evolve too: refresh test cases, add new dimensions, and retire old questions the model has likely memorized.</div>
+    </div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:16px">
+    <b>The common lesson across all three pitfalls</b>: Eval systems themselves need to be evaluated. You should continuously ask yourself: Is my eval environment reliable? Do my test cases still have discriminative power? Is my change process rigorous enough?
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>Evaluation is not a one-time effort — it needs to evolve alongside your models.</b> Infrastructure noise distorts results, models recognize when they're being tested, and small changes can cascade into regression. Maintaining your eval system is just as important as maintaining your code.</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

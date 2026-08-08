@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Temperature &amp; Top-P: 대형 언어 모델의 창의성 제어 | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* 구식 변수명 → 디자인 시스템 매핑 */
+:root {
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+
+/* 씬 카드 */
+.scene-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.scene-card {
+  background: var(--card); border-radius: 12px; padding: 12px 14px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; gap: 12px; min-height: 44px;
+}
+.scene-card:hover { border-color: rgba(124,58,237,0.25); }
+.scene-card.active { border-color: var(--purple); background: rgba(124,58,237,0.03); }
+.scene-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; flex-shrink: 0;
+}
+.scene-name { font-size: 14px; font-weight: 700; color: var(--text-main); }
+.scene-params { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+.scene-params b { color: var(--purple); }
+
+.param-guide {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px;
+  margin-top: 14px;
+}
+.param-guide-title { font-size: 12px; font-weight: 800; color: var(--text-sub); margin-bottom: 10px; }
+.param-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.param-row:last-child { margin-bottom: 0; }
+.param-name { font-size: 14px; font-weight: 700; color: var(--text-main); min-width: 90px; }
+.param-scale {
+  flex: 1; height: 10px; border-radius: 5px;
+  background: linear-gradient(to right, #22c55e, #f59e0b, #ef4444);
+  position: relative;
+}
+.param-marker {
+  position: absolute; top: -4px; width: 18px; height: 18px; border-radius: 50%;
+  background: white; border: 2px solid var(--text-main);
+  transform: translateX(-50%); transition: left 0.3s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.param-hint { font-size: 13px; min-width: 56px; text-align: right; font-weight: 700; }
+.param-hint.conservative { color: var(--success); }
+.param-hint.creative { color: var(--danger); }
+
+/* 탭 전환 */
+.right-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 28px 0 16px; }
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.tab-group { display: flex; gap: 5px; }
+.tab-btn {
+  padding: 9px 18px; border-radius: 9px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer; min-height: 44px;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.tab-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Tab: sliders + output */
+.sliders-area {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; padding: 18px 22px;
+}
+.slider-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+.slider-row:last-child { margin-bottom: 0; }
+.slider-label { font-size: 15px; font-weight: 700; color: var(--text-main); min-width: 110px; }
+.slider-label span { font-size: 12px; font-weight: 600; color: var(--text-sub); display: block; }
+input[type=range] {
+  -webkit-appearance: none; flex: 1; height: 8px; border-radius: 4px;
+  background: rgba(0,0,0,0.08); outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+  background: white; border: 2px solid var(--purple);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15); cursor: pointer;
+}
+.slider-val {
+  font-size: 18px; font-weight: 800; color: var(--purple);
+  min-width: 46px; text-align: right; font-variant-numeric: tabular-nums;
+}
+.output-area { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.output-label { font-size: 12px; font-weight: 800; color: var(--text-sub); letter-spacing: 0.3px; }
+.output-samples { display: flex; gap: 16px; align-items: stretch; }
+.output-col { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.output-col-label { font-size: 13px; font-weight: 700; color: var(--text-sub); }
+.sample-box {
+  flex: 1; background: rgba(0,0,0,0.03); border-radius: 12px; padding: 14px 16px;
+  font-size: 14px; line-height: 1.8; color: var(--text-main);
+  border: 1px solid transparent; transition: border-color 0.3s;
+}
+.sample-box.risk-low { border-color: rgba(22,163,106,0.2); }
+.sample-box.risk-med { border-color: rgba(217,119,6,0.2); }
+.sample-box.risk-high { border-color: rgba(229,62,62,0.25); }
+.risk-tag {
+  display: inline-block; font-size: 12px; font-weight: 700;
+  padding: 3px 10px; border-radius: 5px; margin-bottom: 8px;
+}
+.risk-tag.low { background: rgba(22,163,106,0.1); color: var(--success); }
+.risk-tag.med { background: rgba(217,119,6,0.1); color: var(--amber); }
+.risk-tag.high { background: rgba(229,62,62,0.1); color: var(--danger); }
+.hl-red { color: var(--danger); font-weight: 600; }
+.hl-green { color: var(--success); font-weight: 600; }
+
+/* Tab: Why it works */
+.why-view {
+  display: flex; flex-direction: column; gap: 16px;
+}
+.why-top-row { display: flex; gap: 14px; }
+.why-card {
+  flex: 1; background: var(--card); border-radius: 14px; padding: 22px 26px;
+  display: flex; flex-direction: column; gap: 14px;
+  border: 1.5px solid var(--border);
+}
+.why-card-title {
+  font-size: 13px; font-weight: 800; color: var(--text-sub); letter-spacing: 0.5px; text-transform: uppercase;
+}
+.dist-section { display: flex; gap: 20px; align-items: flex-end; flex: 1; }
+.dist-col { flex: 1; display: flex; flex-direction: column; }
+.dist-col-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+.dist-bars {
+  display: flex; align-items: flex-end; gap: 5px; height: 90px; margin-bottom: 8px;
+}
+.dist-bar {
+  flex: 1; border-radius: 4px 4px 0 0; transition: height 0.5s ease;
+}
+.dist-word-row {
+  display: flex; gap: 5px;
+}
+.dist-word {
+  flex: 1; font-size: 11px; text-align: center; color: var(--text-sub); font-weight: 600;
+}
+.dist-desc { font-size: 13px; color: var(--text-sub); margin-top: 6px; line-height: 1.6; }
+
+.why-insight-row {
+  background: rgba(124,58,237,0.05); border: 1px solid rgba(124,58,237,0.12); border-radius: 12px; padding: 18px 22px;
+  flex-shrink: 0;
+}
+.why-insight-text {
+  font-size: 15px; color: var(--text-main); line-height: 1.8;
+}
+.why-insight-text b { color: var(--text-main); }
+.why-insight-text .key { color: var(--purple); font-weight: 700; }
+.why-insight-text .key-g { color: var(--success); font-weight: 700; }
+
+/* 한계 세 컬럼 */
+.limit-box {
+  background: rgba(220,38,38,0.04); border: 1px solid rgba(220,38,38,0.15);
+  border-radius: 12px; padding: 16px 22px;
+}
+.limit-cols { display: flex; gap: 20px; }
+.limit-divider { width: 1px; background: rgba(220,38,38,0.12); flex-shrink: 0; }
+
+@media (max-width: 768px) {
+  .scene-grid { grid-template-columns: 1fr; }
+  .output-samples { flex-direction: column; }
+  .output-divider { display: none; }
+  .dist-section { flex-direction: column; gap: 24px; }
+  .why-top-row { flex-direction: column; }
+  .slider-row { flex-wrap: wrap; }
+  .slider-label { min-width: 0; flex: 1; }
+  .slider-row input[type=range] { flex-basis: 100%; order: 3; }
+  .limit-cols { flex-direction: column; gap: 14px; }
+  .limit-divider { width: auto; height: 1px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="Temperature와 Top-P는 대형 언어 모델(LLM) 출력의 무작위성을 제어하는 핵심 파라미터입니다. 직관적인 데모로 설명합니다: Temperature=0은 모델을 더 확정적으로 만들고, 값이 높을수록 분산됩니다. Top-P는 후보 Token 풀을 제한합니다.">
+<meta name="keywords" content="Temperature,Top-P,대형 언어 모델 파라미터 조정,샘플링 전략,무작위성 제어">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-mitigation-temp.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-mitigation-temp.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-mitigation-temp.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-mitigation-temp.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-mitigation-temp.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 제품 매니저 교육">
+<meta property="og:title" content="Temperature &amp; Top-P: 대형 언어 모델의 창의성 제어">
+<meta property="og:description" content="Temperature와 Top-P는 대형 언어 모델(LLM) 출력의 무작위성을 제어하는 핵심 파라미터입니다. 직관적인 데모로 설명합니다: Temperature=0은 모델을 더 확정적으로 만들고, 값이 높을수록 분산됩니다. Top-P는 후보 Token 풀을 제한합니다.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-mitigation-temp.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Temperature &amp; Top-P: 대형 언어 모델의 창의성 제어">
+<meta name="twitter:description" content="Temperature와 Top-P는 대형 언어 모델(LLM) 출력의 무작위성을 제어하는 핵심 파라미터입니다. 직관적인 데모로 설명합니다: Temperature=0은 모델을 더 확정적으로 만들고, 값이 높을수록 분산됩니다. Top-P는 후보 Token 풀을 제한합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"대응 3: Temperature & Top-P","name":"대응 3: Temperature & Top-P","url":"https://xueai.app/slides/1-2-mitigation-temp.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 중급까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 환각과 네 가지 대응","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Temperature와 Top-P는 대형 언어 모델(LLM) 출력의 무작위성을 제어하는 핵심 파라미터입니다. 직관적인 데모로 설명합니다: Temperature=0은 모델을 더 확정적으로 만들고, 값이 높을수록 분산됩니다. Top-P는 후보 Token 풀을 제한합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">환각과 대응</div>
+    <h1>대응 3: Temperature &amp; Top-P</h1>
+    <p class="subtitle">PM 관점: API 연동 시 샘플링 파라미터 설정 방법 — 다양한 비즈니스 시나리오별 권장 값과 리스크 경계. 기법 03 / 04 · 예방.</p>
+  </header>
+
+  <section>
+    <div class="sec-label">비즈니스 시나리오별 권장 파라미터</div>
+    <div class="scene-grid">
+          <div class="scene-card active" onclick="selectScene(0)">
+            <div class="scene-icon" style="background:rgba(229,62,62,0.08);">⚖️</div>
+            <div class="scene-info">
+              <div class="scene-name">법률 / 컴플라이언스 / 고객 서비스</div>
+              <div class="scene-params">권장: <b>T=0.1  Top-P=0.8</b></div>
+            </div>
+          </div>
+          <div class="scene-card" onclick="selectScene(1)">
+            <div class="scene-icon" style="background:rgba(0,102,255,0.08);">📊</div>
+            <div class="scene-info">
+              <div class="scene-name">보고서 작성 / 요약 정리</div>
+              <div class="scene-params">권장: <b>T=0.3  Top-P=0.9</b></div>
+            </div>
+          </div>
+          <div class="scene-card" onclick="selectScene(2)">
+            <div class="scene-icon" style="background:rgba(22,163,106,0.08);">💬</div>
+            <div class="scene-info">
+              <div class="scene-name">일반 대화 / Q&amp;A 상담</div>
+              <div class="scene-params">권장: <b>T=0.7  Top-P=0.95</b></div>
+            </div>
+          </div>
+          <div class="scene-card" onclick="selectScene(3)">
+            <div class="scene-icon" style="background:rgba(124,58,237,0.08);">✍️</div>
+            <div class="scene-info">
+              <div class="scene-name">창의적 글쓰기 / 브레인스토밍</div>
+              <div class="scene-params">권장: <b>T=1.2  Top-P=1.0</b></div>
+            </div>
+          </div>
+    </div>
+
+    <div class="param-guide">
+        <div class="param-guide-title">현재 파라미터 위치</div>
+        <div class="param-row">
+          <div class="param-name">Temperature</div>
+          <div class="param-scale"><div class="param-marker" id="tMarker" style="left:50%;"></div></div>
+          <div class="param-hint" id="tHint">-</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);margin-bottom:10px;padding:0 0 0 100px;">
+          <span>보수적</span><span>균형</span><span>발산</span>
+        </div>
+        <div class="param-row">
+          <div class="param-name">Top-P</div>
+          <div class="param-scale"><div class="param-marker" id="pMarker" style="left:50%;"></div></div>
+          <div class="param-hint" id="pHint">-</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-sub);padding:0 0 0 100px;">
+          <span>좁은 후보</span><span>적당</span><span>전체 집합</span>
+        </div>
+    </div>
+  </section>
+
+  <section class="paywall-locked xa-peek">
+      <div class="right-top">
+        <h3 id="rightTitle">파라미터 조정 × 출력 품질</h3>
+        <div class="tab-group">
+          <button class="tab-btn active" onclick="setTab('demo')">인터랙티브 데모</button>
+          <button class="tab-btn" onclick="setTab('why')">작동 원리</button>
+        </div>
+      </div>
+
+      <!-- Tab: Demo -->
+      <div id="tabDemo" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="sliders-area">
+          <div class="slider-row">
+            <div class="slider-label">Temperature<span>무작위성 수준 제어</span></div>
+            <input type="range" id="tempSlider" min="0" max="200" value="10" oninput="onParamChange()">
+            <div class="slider-val" id="tempVal">0.10</div>
+          </div>
+          <div class="slider-row">
+            <div class="slider-label">Top-P<span>후보 Token 범위 제어</span></div>
+            <input type="range" id="topPSlider" min="0" max="100" value="80" oninput="onParamChange()">
+            <div class="slider-val" id="topPVal">0.80</div>
+          </div>
+        </div>
+        <div class="output-area">
+          <div class="output-label">현재 파라미터 기준 출력 품질 예측</div>
+          <div class="output-samples" id="outputSamples"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Why -->
+      <div id="tabWhy" style="display:none;">
+        <div class="why-view">
+          <div class="why-top-row">
+            <div class="why-card">
+              <div class="why-card-title">Token 단위 확률 분포</div>
+              <div class="dist-section">
+                <div class="dist-col">
+                  <div class="dist-col-title" style="color:var(--success);">낮은 온도 T = 0.1 — 분포 집중</div>
+                  <div class="dist-bars">
+                    <div class="dist-bar" style="height:95%;background:#16a34a;"></div>
+                    <div class="dist-bar" style="height:14%;background:rgba(22,163,106,0.3);"></div>
+                    <div class="dist-bar" style="height:7%;background:rgba(22,163,106,0.18);"></div>
+                    <div class="dist-bar" style="height:3%;background:rgba(22,163,106,0.1);"></div>
+                    <div class="dist-bar" style="height:2%;background:rgba(22,163,106,0.07);"></div>
+                  </div>
+                  <div class="dist-word-row">
+                    <div class="dist-word" style="color:var(--success);">6개월</div>
+                    <div class="dist-word">3개월</div>
+                    <div class="dist-word">1년</div>
+                    <div class="dist-word">…</div>
+                    <div class="dist-word">…</div>
+                  </div>
+                  <div class="dist-desc">최고 확률 Token이 거의 고정되어,<br>모델 출력이 안정적이고 예측 가능합니다</div>
+                </div>
+                <div class="dist-col">
+                  <div class="dist-col-title" style="color:var(--danger);">높은 온도 T = 2.0 — 분포 평탄</div>
+                  <div class="dist-bars">
+                    <div class="dist-bar" style="height:30%;background:#e53e3e;"></div>
+                    <div class="dist-bar" style="height:27%;background:rgba(229,62,62,0.65);"></div>
+                    <div class="dist-bar" style="height:22%;background:rgba(229,62,62,0.45);"></div>
+                    <div class="dist-bar" style="height:18%;background:rgba(229,62,62,0.3);"></div>
+                    <div class="dist-bar" style="height:14%;background:rgba(229,62,62,0.2);"></div>
+                  </div>
+                  <div class="dist-word-row">
+                    <div class="dist-word">6개월</div>
+                    <div class="dist-word">3개월</div>
+                    <div class="dist-word" style="color:var(--danger);">영원히</div>
+                    <div class="dist-word" style="color:var(--danger);">아무거나</div>
+                    <div class="dist-word" style="color:var(--danger);">…</div>
+                  </div>
+                  <div class="dist-desc">낮은 확률의 Token도 선택될 수 있어,<br>환각과 예상치 못한 단어가 증가합니다</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="why-insight-row">
+            <div class="why-insight-text">
+              Token 생성 단계마다 모델은 먼저 후보 Token의 logit을 계산하고, softmax를 거쳐 확률 분포를 얻습니다.
+              Temperature는 <span class="key">softmax 이전에 logit을 비례 스케일링합니다</span>:
+              T가 작을수록 격차가 커지고 분포가 집중되며, T가 클수록 격차가 줄어 분포가 평탄해집니다.
+              <b>이것이 매 단계 샘플링 무작위성에 가장 직접적으로 개입하는 방법입니다.</b>
+              하지만 어느 단계를 보수적으로, 어느 단계를 창의적으로 할지 구분할 수 없습니다. <span class="key-g">그래서 사실 기반 Q&amp;A 시나리오는 전체적으로 낮은 Temperature를 유지해야 하고, 창의적 시나리오에서만 높여야 합니다.</span>
+            </div>
+          </div>
+
+          <div class="limit-box">
+            <div style="font-size:13px;font-weight:800;color:var(--danger);margin-bottom:10px;letter-spacing:0.3px;">⚠ 한계: 파라미터를 낮춰도 환각이 제거되지 않습니다</div>
+            <div class="limit-cols">
+              <div style="flex:1;">
+                <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">낮은 온도가 잠그는 것은 '가장 가능성 있는' 것 — 가장 가능성 있는 것 ≠ 가장 정확한 것</div>
+                <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                  T=0은 모델이 매 단계에서 가장 높은 확률의 Token을 선택하도록 할 뿐입니다. 하지만 학습 데이터에서 해당 질문의 답이 잘못되었다면, <span style="color:var(--danger);font-weight:600;">가장 높은 확률의 Token도 여전히 오답이며, 출력은 일관되게 잘못됩니다</span>
+                </div>
+              </div>
+              <div class="limit-divider"></div>
+              <div style="flex:1;">
+                <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">무작위성에만 영향을 주고, 지식 경계에는 영향을 주지 않습니다</div>
+                <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                  Temperature는 '매 단계 샘플링 방법'을 제어할 뿐, 모델이 갖지 않는 지식을 주입할 수 없습니다: <span style="color:var(--danger);font-weight:600;">모델이 모르는 것은 낮은 Temperature에서도 여전히 지어내며, 다만 더 일관되게 지어낼 뿐입니다</span>
+                </div>
+              </div>
+              <div class="limit-divider"></div>
+              <div style="flex:1;">
+                <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">PM 대응 전략</div>
+                <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                  파라미터 최적화는 <span style="color:var(--accent);font-weight:600;">가장 비용이 낮은 1차 방어선</span>이지만, 단독으로 의존해서는 안 됩니다. 사실 정확성 요구가 높은 시나리오에서는 반드시 <span style="color:var(--success);font-weight:600;">RAG</span>나 <span style="color:var(--amber);font-weight:600;">인간 검토</span>와 함께 사용해야 합니다
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+  </section>
+</article>
+
+<script>
+// 씬 기본 파라미터 (클릭 시 슬라이더 자동 설정)
+const SCENES = [
+  { t: 10, p: 80 },
+  { t: 30, p: 90 },
+  { t: 70, p: 95 },
+  { t: 120, p: 100 },
+];
+
+// 각 씬에는 여러 출력 단계가 있으며 T 값으로 해당 단계 선택
+const SCENE_OUTPUTS = [
+  {
+    name: '법률 / 컴플라이언스 / 고객 서비스',
+    prompt: '수습 기간의 최대 기간은 얼마나 됩니까?',
+    tiers: [
+      { maxT: 0.3, risk: 'low',  label: 'T ≤ 0.3 · 정확하고 안정적',
+        text: '노동계약법 제19조에 따르면, 계약 기간이 3년 이상 또는 기간 미정인 경우 수습 기간은 <b>6개월을 초과할 수 없습니다</b>.' },
+      { maxT: 0.7, risk: 'low',  label: 'T 0.3–0.7 · 약간의 변화',
+        text: '노동계약법에 따르면 수습 기간 상한은 계약 기간에 따라 다르며, 최대 <b>6개월을 초과하지 않습니다</b>. 실제 서명된 계약 기간을 기준으로 계산하시기 바랍니다.' },
+      { maxT: 1.2, risk: 'med',  label: 'T 0.7–1.2 · 편차 시작',
+        text: '수습 기간은 일반적으로 <b>6개월을 초과하지 않지만</b>, <span class="hl-red">일부 특수한 경우 1년까지 연장될 수 있으며</span>, 구체적인 계약 조건에 따라 다릅니다…' },
+      { maxT: 2.0, risk: 'high', label: 'T > 1.2 · 명확한 환각',
+        text: '수습 기간은 최대 <span class="hl-red">12개월</span>까지 가능하며, <span class="hl-red">일부 산업에서는 18개월까지 허용</span>됩니다. <span class="hl-red">노동보장촉진조례 제37조</span> 참조…' },
+    ]
+  },
+  {
+    name: '보고서 작성 / 요약 정리',
+    prompt: '이번 분기 성과 하이라이트를 요약해 주세요',
+    tiers: [
+      { maxT: 0.3, risk: 'low',  label: 'T ≤ 0.3 · 구조 명확',
+        text: '이번 분기 핵심 KPI 달성률 <b>98.2%</b>, 사용자 리텐션 전 분기 대비 <b>12%</b> 향상, 고객 획득 비용 <b>18%</b> 상승. 자연 유입 투자 확대를 권장합니다.' },
+      { maxT: 0.7, risk: 'low',  label: 'T 0.3–0.7 · 약간 장황',
+        text: '전반적으로 이번 분기 운영이 안정적이었습니다. <b>사용자 리텐션이 두드러졌으며</b> 12% 증가했습니다. 고객 획득 비용 상승 추세에 주목하여 자연 유입 채널 최적화로 한계 비용을 낮추는 것을 권장합니다.' },
+      { maxT: 1.2, risk: 'med',  label: 'T 0.7–1.2 · 데이터 불안정',
+        text: '이번 분기 성장 모멘텀이 좋았고 리텐션이 크게 향상되었으며, <span class="hl-red">DAU 500만 돌파</span>, <span class="hl-red">매출 전년 대비 35% 성장</span>으로 시장 기대를 초과했습니다…' },
+      { maxT: 2.0, risk: 'high', label: 'T > 1.2 · 데이터 날조',
+        text: '<span class="hl-red">이번 분기 매출 8.7억 위안</span>, 전년 대비 무려 <span class="hl-red">67%</span> 급증! <span class="hl-red">순이익률 23%</span> 달성, 역대 최고! 사용자 규모 <span class="hl-red">2000만 돌파</span>…' },
+    ]
+  },
+  {
+    name: '일반 대화 / Q&A 상담',
+    prompt: '이 기능은 어느 버전부터 지원되나요?',
+    tiers: [
+      { maxT: 0.3, risk: 'low',  label: 'T ≤ 0.3 · 보수적 응답',
+        text: '구체적인 버전 정보를 확인해야 합니다. 현재 해당 기능의 출시 버전을 확정할 수 없으니, 공식 릴리스 노트를 참조하거나 기술 지원에 문의하시기 바랍니다.' },
+      { maxT: 0.7, risk: 'low',  label: 'T 0.3–0.7 · 정상적인 대화',
+        text: '이 기능은 <b>최근 몇 가지 버전</b>에서 추가된 것으로 보입니다. 설정에서 버전 번호를 확인한 후 공식 업데이트 로그와 비교해 확인하실 수 있습니다.' },
+      { maxT: 1.2, risk: 'med',  label: 'T 0.7–1.2 · 모호한 추론',
+        text: '이 기능은 <span class="hl-red">아마도</span> v2.1부터 지원되었을 것 같은데, 구체적인 세부 사항은 다시 확인이 필요할 수도 있습니다. <span class="hl-red">제 기억으로는</span> 그렇습니다…' },
+      { maxT: 2.0, risk: 'high', label: 'T > 1.2 · 환각 버전 번호',
+        text: '<span class="hl-red">v1.4.2</span>부터 이미 지원됩니다! <span class="hl-red">"고급 설정 &gt; 실험 기능"</span>에서 활성화하시면 됩니다. 이 기능은 당시 <span class="hl-red">공식 블로그 헤드라인</span>에도 실렸습니다.' },
+    ]
+  },
+  {
+    name: '창의적 글쓰기 / 브레인스토밍',
+    prompt: '시간 여행 마법 상자에 관한 문장을 써주세요',
+    tiers: [
+      { maxT: 0.3, risk: 'low',  label: 'T ≤ 0.3 · 안전하고 예측 가능',
+        text: '마법 상자는 신비로운 도구로, 시공간을 초월하여 사람들을 과거로 데려갈 수 있었습니다.' },
+      { maxT: 0.7, risk: 'low',  label: 'T 0.3–0.7 · 약간의 우아함',
+        text: '상자가 산산조각 났습니다. 일곱 조각으로 부서져 각기 다른 사람의 꿈속으로 흘러들어갔고, 각자가 깨어나길 거부하는 과거를 안고 갔습니다.' },
+      { maxT: 1.2, risk: 'low',  label: 'T 0.7–1.2 · 창의성 폭발',
+        text: '마법 상자는 시간의 주름 속에 숨어 있습니다. 열 때마다 잊혀진 기억 하나가 조용히 빠져나가고, 어느 날을 잃었는지 영영 알 수 없습니다.' },
+      { maxT: 2.0, risk: 'high', label: 'T > 1.2 · 탈선 환각',
+        text: '마법 상자가 <span class="hl-red">디즈니 공주</span>를 만나 <span class="hl-red">천국의 맥도날드</span>에서 만났고, 마법사는 <span class="hl-red">버블티</span>를 주문했으며, 할머니는 <span class="hl-red">틱톡으로 해리 포터를</span> 발견했습니다…' },
+    ]
+  }
+];
+
+let currentScene = 0;
+let currentTab = 'demo';
+
+function selectScene(i) {
+  currentScene = i;
+  document.querySelectorAll('.scene-card').forEach((c, j) => c.classList.toggle('active', j === i));
+  const s = SCENES[i];
+  document.getElementById('tempSlider').value = s.t;
+  document.getElementById('topPSlider').value = s.p;
+  onParamChange();
+}
+
+function setTab(t) {
+  currentTab = t;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', (i === 0) === (t === 'demo')));
+  document.getElementById('tabDemo').style.display = t === 'demo' ? 'flex' : 'none';
+  document.getElementById('tabWhy').style.display = t === 'why' ? 'block' : 'none';
+}
+
+function onParamChange() {
+  const t = document.getElementById('tempSlider').value / 100;
+  const p = document.getElementById('topPSlider').value / 100;
+  document.getElementById('tempVal').textContent = t.toFixed(2);
+  document.getElementById('topPVal').textContent = p.toFixed(2);
+
+  document.getElementById('tMarker').style.left = (t / 2 * 100) + '%';
+  document.getElementById('pMarker').style.left = (p * 100) + '%';
+
+  const tHint = document.getElementById('tHint');
+  if (t <= 0.3) { tHint.textContent = '보수적'; tHint.className = 'param-hint conservative'; }
+  else if (t <= 0.9) { tHint.textContent = '균형'; tHint.className = 'param-hint'; tHint.style.color = 'var(--amber)'; }
+  else { tHint.textContent = '발산'; tHint.className = 'param-hint creative'; }
+
+  const pHint = document.getElementById('pHint');
+  if (p <= 0.7) { pHint.textContent = '좁음'; pHint.className = 'param-hint conservative'; }
+  else if (p <= 0.9) { pHint.textContent = '균형'; pHint.className = 'param-hint'; pHint.style.color = 'var(--amber)'; }
+  else { pHint.textContent = '넓음'; pHint.className = 'param-hint creative'; }
+
+  renderOutputs();
+}
+
+function getTier(sceneIdx, t) {
+  const tiers = SCENE_OUTPUTS[sceneIdx].tiers;
+  for (const tier of tiers) {
+    if (t <= tier.maxT) return tier;
+  }
+  return tiers[tiers.length - 1];
+}
+
+function renderOutputs() {
+  const container = document.getElementById('outputSamples');
+  const t = document.getElementById('tempSlider').value / 100;
+  const p = document.getElementById('topPSlider').value / 100;
+  const sceneData = SCENE_OUTPUTS[currentScene];
+  const tier = getTier(currentScene, t);
+
+  const riskMap = { low: '✓ 환각 위험 낮음', med: '△ 편차 위험 있음', high: '⚠ 환각 위험 높음' };
+
+  container.innerHTML = `
+    <div class="output-col" style="flex:1;">
+      <div class="output-col-label" style="font-size:14px;margin-bottom:6px;">사용자 질문</div>
+      <div style="background:var(--accent);color:white;padding:12px 16px;border-radius:12px;font-size:15px;line-height:1.7;align-self:flex-end;max-width:90%;margin-bottom:8px;">
+        ${sceneData.prompt}
+      </div>
+      <div class="output-col-label" style="font-size:14px;margin-bottom:6px;">AI 응답 · <span style="color:var(--purple)">T = ${t.toFixed(2)}  Top-P = ${p.toFixed(2)}</span></div>
+      <div class="sample-box risk-${tier.risk}" style="flex:1;font-size:15px;line-height:1.9;">
+        <div class="risk-tag ${tier.risk}" style="margin-bottom:10px;">${riskMap[tier.risk]}</div>
+        <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;font-weight:600;">${tier.label}</div>
+        <div>${tier.text}</div>
+      </div>
+    </div>
+    <div class="output-divider" style="width:1px;background:rgba(0,0,0,0.06);flex-shrink:0;"></div>
+    <div class="output-col" style="flex:1;">
+      <div class="output-col-label" style="font-size:14px;margin-bottom:6px;">확률 분포 + Top-P 컷오프</div>
+      <div style="background:white;border-radius:12px;padding:16px 18px;flex:1;display:flex;flex-direction:column;gap:10px;border:1px solid rgba(0,0,0,0.06);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;color:var(--text-sub);font-weight:600;">T = ${t.toFixed(2)} 확률 분포</div>
+          <div style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;background:rgba(124,58,237,0.08);color:var(--purple);">Top-P = ${p.toFixed(2)}</div>
+        </div>
+        ${renderMiniDist(t, p)}
+        <div style="font-size:13px;color:var(--text-sub);line-height:1.7;border-top:1px solid rgba(0,0,0,0.05);padding-top:10px;">
+          ${getDistDesc(t, p)}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderMiniDist(t, p) {
+  const words = ['정답', '관련 A', '관련 B', '편차 단어', '환각 단어'];
+  const logits = [2.8, 1.6, 0.9, 0.3, -0.5];
+  const scaled = logits.map(l => l / Math.max(t, 0.05));
+  const maxL = Math.max(...scaled);
+  const exps = scaled.map(l => Math.exp(l - maxL));
+  const sum = exps.reduce((a, b) => a + b, 0);
+  const probs = exps.map(e => e / sum);
+
+  // Top-P 컷오프 계산: 누적 확률 >= p인 단어 제외
+  let cumulative = 0;
+  const included = probs.map(prob => {
+    if (cumulative >= p) return false;
+    cumulative += prob;
+    return true;
+  });
+
+  const colors = ['var(--success)', 'var(--success)', 'var(--amber)', 'var(--amber)', 'var(--danger)'];
+
+  return words.map((w, i) => {
+    const isIncluded = included[i];
+    const barColor = isIncluded ? colors[i] : 'rgba(0,0,0,0.1)';
+    const textColor = isIncluded ? colors[i] : 'rgba(0,0,0,0.2)';
+    const cutTag = !isIncluded ? `<span style="font-size:10px;font-weight:700;color:rgba(0,0,0,0.25);margin-left:4px;">컷오프</span>` : '';
+    return `
+    <div style="display:flex;align-items:center;gap:8px;opacity:${isIncluded ? 1 : 0.4};">
+      <div style="font-size:12px;color:${textColor};font-weight:700;min-width:58px;">${w}${cutTag}</div>
+      <div style="flex:1;height:14px;background:rgba(0,0,0,0.04);border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:${(probs[i]*100).toFixed(1)}%;background:${barColor};border-radius:4px;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:${textColor};min-width:38px;text-align:right;">${(probs[i]*100).toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+function getDistDesc(t, p) {
+  const logits = [2.8, 1.6, 0.9, 0.3, -0.5];
+  const scaled = logits.map(l => l / Math.max(t, 0.05));
+  const maxL = Math.max(...scaled);
+  const exps = scaled.map(l => Math.exp(l - maxL));
+  const sum = exps.reduce((a, b) => a + b, 0);
+  const probs = exps.map(e => e / sum);
+  let cumulative = 0;
+  let includedCount = 0;
+  for (const prob of probs) {
+    if (cumulative >= p) break;
+    cumulative += prob;
+    includedCount++;
+  }
+  const tDesc = t <= 0.3 ? `<b style="color:var(--success)">낮은 온도</b> — 집중된 분포` :
+                t <= 0.7 ? `<b style="color:var(--amber)">중간 온도</b> — 적당한 분포` :
+                t <= 1.2 ? `<b style="color:var(--amber)">높은 편 온도</b> — 분포 평탄화 중` :
+                           `<b style="color:var(--danger)">높은 온도</b> — 평탄한 분포`;
+  const pDesc = includedCount <= 1 ? `Top-P 매우 좁음 — <b style="color:var(--success)">후보 Token 1개</b>만 유지, 출력 완전 확정적` :
+                includedCount === 2 ? `Top-P 컷오프 후 <b style="color:var(--success)">후보 Token 2개</b>만 샘플링 가능` :
+                includedCount === 3 ? `Top-P가 <b style="color:var(--amber)">후보 Token 3개</b> 유지, 편차 Token 제거됨` :
+                includedCount === 4 ? `Top-P가 <b style="color:var(--amber)">Token 4개</b> 유지, 편차 Token 포함되나 환각 Token 제거됨` :
+                `Top-P 완전 개방 — <b style="color:var(--danger)">모든 후보 Token 샘플링 가능</b>, 환각 Token 포함`;
+  return `${tDesc}，${pDesc}`;
+}
+
+onParamChange();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

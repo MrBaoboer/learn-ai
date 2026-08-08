@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM 환각(Hallucination): AI가 사실을 지어내는 이유 | xueai.app</title>
+<script>
+// Inline vocab table and attention weights (self-contained, does not depend on global-attn.js)
+// Provides plausible candidate token weight data for the hallucination demo
+window.GLOBAL_ATTN = (function() {
+  const vocab = [
+    '黛玉','捧着','月光','宝盒','，','轻声','问','：','哥哥','你','说',
+    '喜欢','我','可','从来','不肯','开口','花千骨','对','郭靖','急','道',
+    '靖','站着','干嘛','真的','舍得','不','回来','就','一次','也','好','啊',
+    '！','女儿国','国王','望着','杏花','簪','叹道','姐姐','看','这','花',
+    '开','了','又','谢','走','小龙女','转头','杨过','执念','东西','能',
+    '放下','吗','？','还是','想','宝玉','御弟','紫霞','黄蓉','沈眉庄'
+  ];
+  const n = vocab.length;
+  // Build sparse weight matrix (for demo only, not real attention weights)
+  const matrix = [];
+  for (let i = 0; i < n; i++) {
+    const row = new Array(n).fill(0);
+    // 为每个词生成一些"相关词"权重
+    const related = {
+      '黛玉':   {'哥哥':0.18,'宝玉':0.22,'你':0.12,'可':0.08,'从来':0.07,'我':0.06},
+      '捧着':   {'月光':0.25,'宝盒':0.18,'花':0.10,'簪':0.09,'轻声':0.08,'这':0.06},
+      '月光':   {'宝盒':0.35,'花':0.10,'又':0.07,'谢':0.06,'开':0.05,'走':0.04},
+      '宝盒':   {'，':0.30,'轻声':0.15,'问':0.12,'哥哥':0.10,'你':0.08,'紫霞':0.05},
+      '轻声':   {'问':0.28,'道':0.18,'说':0.12,'叹道':0.10,'哥哥':0.08,'姐姐':0.05},
+      '问':     {'：':0.30,'你':0.18,'哥哥':0.12,'喜欢':0.10,'我':0.08,'从来':0.05},
+      '哥哥':   {'，':0.25,'你':0.20,'说':0.15,'喜欢':0.12,'我':0.08,'可':0.06},
+      '你':     {'说':0.20,'喜欢':0.15,'真的':0.12,'还是':0.10,'从来':0.09,'不':0.08},
+      '说':     {'你':0.20,'喜欢':0.14,'执念':0.12,'真的':0.10,'从来':0.08,'不':0.07},
+      '喜欢':   {'我':0.30,'你':0.18,'，':0.12,'可':0.10,'从来':0.08,'不肯':0.07},
+      '我':     {'，':0.25,'可':0.15,'你':0.12,'从来':0.10,'不肯':0.08,'开口':0.06},
+      '可':     {'你':0.25,'从来':0.20,'不肯':0.15,'开口':0.12,'喜欢':0.08,'我':0.05},
+      '从来':   {'不肯':0.30,'就':0.18,'不':0.15,'开口':0.12,'想':0.08,'放下':0.05},
+      '不肯':   {'开口':0.35,'说':0.18,'承认':0.12,'你':0.10,'从来':0.07,'喜欢':0.05},
+      '花千骨': {'对':0.20,'靖':0.15,'哥哥':0.12,'郭靖':0.10,'急':0.08,'你':0.07},
+      '郭靖':   {'急':0.18,'道':0.15,'你':0.14,'靖':0.12,'哥哥':0.10,'真的':0.08},
+      '靖':     {'哥哥':0.40,'你':0.15,'还':0.12,'站着':0.08,'急':0.07,'道':0.06},
+      '站着':   {'干嘛':0.35,'你':0.15,'还':0.12,'不':0.10,'就':0.08,'，':0.07},
+      '干嘛':   {'，':0.28,'你':0.18,'真的':0.14,'舍得':0.12,'不':0.10,'好':0.06},
+      '真的':   {'舍得':0.20,'能':0.15,'放下':0.12,'不':0.14,'你':0.10,'吗':0.08},
+      '舍得':   {'不':0.30,'回来':0.20,'，':0.15,'就':0.10,'一次':0.08,'也':0.05},
+      '不':     {'回来':0.20,'肯':0.15,'想':0.14,'开口':0.10,'就':0.09,'放下':0.08},
+      '回来':   {'，':0.25,'就':0.18,'一次':0.15,'也':0.12,'好':0.10,'啊':0.06},
+      '就':     {'一次':0.22,'是':0.15,'不':0.14,'放下':0.12,'好':0.10,'算':0.07},
+      '一次':   {'也':0.30,'就':0.18,'好':0.15,'啊':0.10,'，':0.09,'吧':0.06},
+      '也':     {'好':0.28,'不':0.15,'放下':0.12,'啊':0.10,'吧':0.08,'就':0.07},
+      '好':     {'啊':0.30,'吧':0.18,'，':0.14,'！':0.12,'了':0.08,'不':0.06},
+      '女儿国': {'国王':0.40,'望着':0.15,'对':0.10,'姐姐':0.08,'御弟':0.06,'哥哥':0.05},
+      '国王':   {'望着':0.25,'叹道':0.15,'道':0.12,'姐姐':0.10,'你':0.09,'对':0.07},
+      '望着':   {'杏花':0.25,'叹道':0.18,'你':0.12,'簪':0.10,'花':0.09,'姐姐':0.07},
+      '杏花':   {'簪':0.38,'花':0.18,'开':0.12,'又':0.09,'叹道':0.08,'谢':0.06},
+      '簪':     {'叹道':0.25,'道':0.15,'姐姐':0.12,'你':0.10,'望着':0.09,'花':0.07},
+      '叹道':   {'姐姐':0.20,'：':0.18,'你':0.14,'哥哥':0.12,'这':0.10,'花':0.08},
+      '姐姐':   {'你':0.22,'看':0.18,'这':0.15,'花':0.12,'，':0.10,'开':0.07},
+      '看':     {'，':0.25,'这':0.20,'花':0.16,'你':0.12,'开':0.10,'谢':0.07},
+      '这':     {'花':0.28,'东西':0.18,'，':0.14,'你':0.10,'开':0.09,'谢':0.06},
+      '花':     {'开':0.28,'又':0.18,'谢':0.16,'，':0.12,'了':0.10,'好':0.06},
+      '开':     {'了':0.30,'又':0.18,'，':0.14,'花':0.10,'谢':0.09,'始':0.06},
+      '了':     {'又':0.25,'，':0.18,'谢':0.14,'哥哥':0.12,'走':0.10,'好':0.07},
+      '又':     {'谢':0.35,'开':0.18,'走':0.14,'，':0.12,'来':0.08,'好':0.06},
+      '谢':     {'，':0.25,'哥哥':0.20,'走':0.15,'了':0.12,'好':0.08,'啊':0.06},
+      '走':     {'了':0.35,'，':0.18,'吧':0.12,'啊':0.10,'好':0.08,'不':0.06},
+      '小龙女': {'转头':0.20,'对':0.15,'杨过':0.14,'道':0.12,'轻声':0.10,'你':0.07},
+      '转头':   {'对':0.28,'道':0.18,'杨过':0.14,'说':0.12,'轻声':0.08,'急':0.06},
+      '杨过':   {'急':0.18,'道':0.15,'你':0.14,'说':0.12,'执念':0.10,'真的':0.08},
+      '执念':   {'这':0.22,'东西':0.20,'，':0.15,'真的':0.12,'能':0.10,'放下':0.08},
+      '东西':   {'，':0.28,'真的':0.18,'能':0.15,'放下':0.12,'吗':0.10,'还是':0.07},
+      '能':     {'放下':0.30,'不':0.18,'吗':0.15,'，':0.10,'说':0.08,'真的':0.07},
+      '放下':   {'吗':0.25,'？':0.20,'，':0.15,'还是':0.12,'不':0.10,'啊':0.06},
+      '吗':     {'？':0.40,'，':0.20,'还是':0.15,'啊':0.10,'不':0.08,'你':0.05},
+      '？':     {'还是':0.25,'你':0.18,'从来':0.15,'说':0.12,'不':0.10,'就':0.07},
+      '还是':   {'说':0.25,'你':0.20,'从来':0.15,'不':0.14,'就':0.10,'想':0.08},
+      '想':     {'放下':0.30,'不':0.18,'说':0.14,'，':0.12,'你':0.10,'开口':0.06},
+    };
+    const rel = related[vocab[i]];
+    if (rel) {
+      for (const [w, weight] of Object.entries(rel)) {
+        const j = vocab.indexOf(w);
+        if (j >= 0) row[j] = weight;
+      }
+    }
+    matrix.push(row);
+  }
+  return { vocab, matrix };
+})();
+</script>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root {
+  /* 兼容旧变量名：映射到设计系统 */
+  --bg-color: var(--bg);
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+
+.btn-primary {
+  background: var(--accent); color: white; border: none;
+  padding: 12px 28px; border-radius: 999px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+  box-shadow: 0 4px 14px rgba(0,102,255,0.25);
+}
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+/* main: 2-col (desktop) / 1-col (mobile) */
+.main-area {
+  display: grid; grid-template-columns: 360px 1fr; gap: 20px;
+  align-items: start;
+}
+
+/* Left panel (case selector) */
+.left-panel {
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+.section-title {
+  font-size: 12px; font-weight: 700; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+
+.case-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 16px;
+  border: 2px solid var(--border);
+  cursor: pointer; transition: all 0.2s;
+}
+.case-card:hover { border-color: rgba(0,102,255,0.2); }
+.case-card.active { border-color: var(--accent); background: rgba(0,102,255,0.03); }
+.case-label {
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  margin-bottom: 4px;
+}
+.case-prompt {
+  font-size: 16px; font-weight: 700; color: var(--text-main);
+  line-height: 1.5;
+}
+.case-desc {
+  font-size: 13px; color: var(--text-sub); margin-top: 4px; line-height: 1.5;
+}
+
+.explain-box {
+  font-size: 13px; color: var(--text-sub); line-height: 1.8; padding: 0 2px;
+}
+.explain-box b { color: var(--text-main); }
+.explain-box .red { color: var(--danger); font-weight: 600; }
+
+/* Right panel (generation demo) */
+.right-panel {
+  display: flex; flex-direction: column;
+  min-width: 0;
+}
+
+.gen-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px; flex-shrink: 0;
+}
+.gen-header h3 { font-size: 16px; font-weight: 700; color: var(--text-main); }
+
+.speed-group {
+  display: flex; gap: 4px; align-items: center;
+}
+.speed-btn {
+  padding: 4px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: white; color: var(--text-main);
+  transition: all 0.15s;
+}
+.speed-btn.active {
+  background: var(--text-main); color: white; border-color: var(--text-main);
+}
+
+/* Output area (natural document flow) */
+.gen-output-area {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+.gen-sentence-box {
+  background: var(--card); border-radius: var(--radius); padding: 18px 22px;
+  border: 1px solid var(--border);
+  line-height: 2.2;
+}
+
+.gen-bottom {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+.gen-token {
+  display: inline; font-size: 20px; font-weight: 500;
+  color: var(--text-main); transition: all 0.3s;
+}
+.gen-token.prompt { color: var(--text-sub); }
+.gen-token.new { color: var(--accent); font-weight: 700; animation: tokenPop 0.4s ease; }
+.gen-token.hallucination {
+  color: var(--danger); font-weight: 700;
+  background: rgba(229,62,62,0.08);
+  padding: 1px 4px; border-radius: 4px;
+  text-decoration: underline wavy var(--danger);
+  text-underline-offset: 4px;
+}
+.gen-token.cursor-blink::after {
+  content: '▊'; color: var(--accent);
+  animation: blink 0.8s step-end infinite;
+}
+@keyframes tokenPop {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; } 50% { opacity: 0; }
+}
+
+/* Step detail */
+.step-panel {
+  background: var(--card); border-radius: var(--radius); padding: 14px 18px;
+  border: 1px solid var(--border);
+}
+.step-panel.hidden { display: none; }
+.step-header {
+  font-size: 14px; color: var(--text-sub); margin-bottom: 8px;
+}
+.step-header b { color: var(--accent); }
+.step-header .red { color: var(--danger); }
+
+.cand-list { display: flex; flex-direction: column; gap: 3px; }
+.cand-row {
+  display: flex; align-items: center; gap: 8px; height: 22px;
+}
+.cand-word {
+  font-size: 14px; font-weight: 700; color: var(--text-main);
+  min-width: 56px; text-align: right;
+}
+.cand-bar-bg {
+  flex: 1; height: 10px; background: rgba(0,0,0,0.04);
+  border-radius: 5px; overflow: hidden;
+}
+.cand-bar { height: 100%; border-radius: 5px; transition: width 0.4s; }
+.cand-pct {
+  font-size: 13px; color: var(--text-sub); min-width: 46px;
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.cand-row.picked .cand-word { color: var(--accent); }
+.cand-row.picked .cand-bar { background: var(--accent) !important; }
+.cand-row.hallucinated .cand-word { color: var(--danger); }
+.cand-row.hallucinated .cand-bar { background: var(--danger) !important; }
+
+/* Fact check */
+.fact-check {
+  padding: 14px 18px; border-radius: 12px;
+  font-size: 14px; line-height: 1.7;
+  background: rgba(229,62,62,0.05);
+  border: 1px solid rgba(229,62,62,0.15);
+  color: #7c2d12;
+}
+.fact-check.hidden { display: none; }
+#rootCause.hidden { display: none !important; }
+.fact-check-title {
+  font-weight: 700; color: var(--danger);
+  margin-bottom: 4px; font-size: 14px;
+}
+.fact-check b { color: var(--danger); }
+
+/* Chat mode (chat simulation window, with inner scroll) */
+.chat-container {
+  display: flex; flex-direction: column; gap: 16px;
+  max-height: 480px; overflow-y: auto; padding: 4px 0;
+}
+
+.chat-round {
+  display: flex; flex-direction: column; gap: 10px;
+  opacity: 0; transform: translateY(10px);
+  animation: chatIn 0.35s ease forwards;
+}
+@keyframes chatIn { to { opacity: 1; transform: translateY(0); } }
+
+.chat-row { display: flex; align-items: flex-start; gap: 10px; }
+.chat-row.user { flex-direction: row-reverse; }
+
+.chat-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0; font-weight: 700;
+}
+.chat-row.user .chat-avatar { background: var(--accent); color: white; }
+.chat-row.ai .chat-avatar { background: #f3f0ea; color: var(--text-sub); }
+
+.chat-bubble {
+  max-width: 74%; padding: 10px 14px;
+  border-radius: 14px; font-size: 15px; line-height: 1.7;
+}
+.chat-row.user .chat-bubble {
+  background: var(--accent); color: white; border-bottom-right-radius: 4px;
+}
+.chat-row.ai .chat-bubble {
+  background: var(--card); color: var(--text-main); border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.chat-bubble .h-word {
+  color: var(--danger); font-weight: 700;
+  background: rgba(229,62,62,0.10); padding: 0 3px; border-radius: 3px;
+  text-decoration: underline wavy var(--danger); text-underline-offset: 3px;
+}
+
+.chat-annotation {
+  margin-left: 42px; margin-right: 42px;
+  padding: 8px 12px; border-radius: 8px;
+  font-size: 12px; line-height: 1.6;
+  background: rgba(229,62,62,0.05); border: 1px solid rgba(229,62,62,0.12);
+  color: #7c2d12;
+}
+.chat-annotation b { color: var(--danger); }
+
+/* Root cause block: 3-col desktop, 1-col mobile */
+.root-cause-cols { display: flex; gap: 8px; }
+
+/* Top toolbar */
+.demo-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .main-area { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .root-cause-cols { flex-direction: column; }
+  .gen-token { font-size: 17px; }
+  .chat-bubble { max-width: 85%; }
+  .chat-annotation { margin-left: 0; margin-right: 0; }
+  .btn-primary { width: 100%; }
+  .speed-btn { padding: 8px 14px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="LLM 환각(Hallucination)이란 무엇이며 왜 발생합니까? Token 예측의 통계적 본질에서 출발하여 환각의 근본 원인과 네 가지 완화 방법(Prompt 제약, RAG, Temperature 조절, 인간 평가)을 분석합니다.">
+<meta name="keywords" content="LLM 환각,Hallucination,AI 허구,환각 완화,RAG,Prompt 제약">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-hallucination.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-hallucination.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-hallucination.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-hallucination.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-hallucination.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="LLM 환각(Hallucination): AI가 사실을 지어내는 이유">
+<meta property="og:description" content="LLM 환각(Hallucination)이란 무엇이며 왜 발생합니까? Token 예측의 통계적 본질에서 출발하여 환각의 근본 원인과 네 가지 완화 방법을 분석합니다.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-hallucination.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="LLM 환각(Hallucination): AI가 사실을 지어내는 이유">
+<meta name="twitter:description" content="LLM 환각(Hallucination)이란 무엇이며 왜 발생합니까? Token 예측의 통계적 본질에서 출발하여 환각의 근본 원인과 네 가지 완화 방법을 분석합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"LLM 환각 데모","name":"LLM 환각 데모","url":"https://xueai.app/slides/1-2-hallucination.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~고급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 환각과 네 가지 대처법","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"LLM 환각(Hallucination)이란 무엇이며 왜 발생합니까? Token 예측의 통계적 본질에서 출발하여 환각의 근본 원인과 네 가지 완화 방법(Prompt 제약, RAG, Temperature 조절, 인간 평가)을 분석합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">환각과 대처법</div>
+    <h1>LLM 환각 (Hallucination)</h1>
+    <p class="subtitle">모델은 사실을 알지 못합니다 — 단지 확률적 샘플링을 수행할 뿐입니다. 모델이 얼마나 자신 있게 허구를 생성하는지 확인해 보세요: 사례를 선택하고 「생성 시작」을 클릭하면 Token 단위로 환각이 발생하는 과정을 관찰할 수 있습니다.</p>
+  </header>
+
+  <div class="main-area paywall-locked xa-peek">
+    <div class="left-panel">
+      <div>
+        <div class="section-title">Prompt 선택</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="case-card active" onclick="selectCase(0)">
+            <div class="case-label">CASE 1 · 혼동 귀속</div>
+            <div class="case-prompt">黛玉捧着月光宝盒，轻声问：</div>
+            <div class="case-desc">月光宝盒(달빛 보물상자)는 紫霞의 소품인데, 모델은 공출현 가중치만 보고 소유자를 알지 못합니다. (중국 고전 크로스오버 사례)</div>
+          </div>
+          <div class="case-card" onclick="selectCase(1)">
+            <div class="case-label">CASE 2 · 크로스유니버스 혼합</div>
+            <div class="case-prompt">花千骨对郭靖急道：靖哥哥，</div>
+            <div class="case-desc">花千骨과 郭靖은 전혀 다른 작품의 캐릭터인데, 모델은 두 세계관을 넘나드는 대화를 유창하게 이어 씁니다. (중국 고전 크로스오버 사례)</div>
+          </div>
+          <div class="case-card" onclick="selectCase(2)">
+            <div class="case-label">CASE 3 · 사실 날조</div>
+            <div class="case-prompt">女儿国国王望着杏花簪叹道：</div>
+            <div class="case-desc">杏花簪(살구꽃 비녀)은 沈眉庄의 소품인데, 모델은 이를 女儿国 국왕에게 잘못 배분합니다. (중국 사극 사례)</div>
+          </div>
+          <div class="case-card" onclick="selectCase(3)">
+            <div class="case-label">CASE 4 · 캐릭터 붕괴</div>
+            <div class="case-prompt">小龙女转头对杨过急道：</div>
+            <div class="case-desc">小龙女는 냉정하고 담담한 캐릭터라 다급하게 말하지 않지만, 모델은 캐릭터를 이해하지 못하고 단어 빈도만 봅니다. (중국 무협 사례)</div>
+          </div>
+          <div class="case-card" onclick="selectCase(4)">
+            <div class="case-label">CASE 5 · 코드 환각 API</div>
+            <div class="case-prompt">pandas로 DataFrame을 여러 열 기준 안정 정렬하기:</div>
+            <div class="case-desc">모델은 존재하지 않는 파라미터 조합을 생성합니다. 코드는 진짜처럼 보이지만 API는 그렇게 사용하지 않습니다.</div>
+          </div>
+          <div class="case-card" onclick="selectCase(5)">
+            <div class="case-label">CASE 6 · 일상 대화 환각</div>
+            <div class="case-prompt">안녕하세요, 밥 먹었어요?</div>
+            <div class="case-desc">AI는 입이 없지만 「먹었어요」라고 말하고 「토마토 달걀 국수」까지 만들어냅니다. 확률적 이어쓰기가 실제로 존재하지 않는 역할을 연기하게 합니다.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="right-panel">
+      <div class="demo-toolbar">
+        <button class="btn-primary" id="genBtn" onclick="startGeneration()">생성 시작</button>
+      </div>
+      <div class="gen-header">
+        <h3>단계별 생성 과정</h3>
+        <div class="speed-group">
+          <span class="speed-btn" data-speed="800" onclick="setSpeed(this)">느림</span>
+          <span class="speed-btn active" data-speed="400" onclick="setSpeed(this)">보통</span>
+          <span class="speed-btn" data-speed="150" onclick="setSpeed(this)">빠름</span>
+        </div>
+      </div>
+
+      <div class="gen-output-area">
+        <div class="gen-sentence-box" id="genSentence">
+          <span style="color:var(--text-sub);font-size:14px;">← Prompt를 선택하고 「생성 시작」을 클릭하세요</span>
+        </div>
+
+        <div class="gen-bottom" id="genBottom">
+          <div class="step-panel hidden" id="stepPanel">
+            <div class="step-header" id="stepHeader"></div>
+            <div class="cand-list" id="candList"></div>
+          </div>
+
+          <div class="fact-check hidden" id="factCheck">
+            <div class="fact-check-title">⚠ 환각 감지됨</div>
+            <div id="factCheckMsg"></div>
+          </div>
+
+          <!-- Root cause: two-book-world, appears after generation completes -->
+          <div id="rootCause" class="hidden" style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:2px;">근본 원인: 두 개의 분리된 세계</div>
+            <div class="root-cause-cols">
+              <div style="flex:1;background:rgba(91,79,207,0.06);border:1px solid rgba(91,79,207,0.18);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:14px;font-weight:800;color:#5b4fcf;margin-bottom:6px;">📚 모델 파라미터 (장기 기억)</div>
+                <div style="font-size:13px;color:var(--text-sub);line-height:1.65;">학습 시 기록되고 추론 시 <b>읽기 전용</b>입니다. 지식 마감일이 있으며, 지식이 압축 형태로 저장되어 부정확하고 업데이트할 수 없습니다.<br><b style="color:var(--text-main)">비유: 봉인된 백과사전</b></div>
+              </div>
+              <div style="flex:1;background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.18);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:14px;font-weight:800;color:#16a34a;margin-bottom:6px;">💬 컨텍스트 윈도우 (작업 기억)</div>
+                <div style="font-size:13px;color:var(--text-sub);line-height:1.65;">대화 중 동적으로 주입되며 <b>정확하고 신뢰할 수 있습니다</b>. 시스템 Prompt, 파일, 현재 대화 내역을 포함합니다.<br><b style="color:var(--text-main)">비유: 책상 위의 참고 자료</b></div>
+              </div>
+              <div style="flex:1;background:rgba(229,62,62,0.05);border:1px solid rgba(229,62,62,0.15);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:13px;font-weight:700;color:var(--danger);line-height:1.65;">⚠ 모델에는 「모른다」는 개념이 없습니다 — 이어 쓰기만 할 수 있습니다. 파라미터에 답이 없을 때 「그럴 것 같은」 내용을 생성하며, <b>정보가 부정확해도 신뢰도는 낮아지지 않습니다</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script>
+var _ga = window.GLOBAL_ATTN;
+var vocab = _ga.vocab;
+var matrix = _ga.matrix;
+var n = vocab.length;
+var vocabMap = {};
+vocab.forEach(function(w, i) { vocabMap[w] = i; });
+
+var CASES = [
+  {
+    prompt: ['黛玉', '捧着', '月光', '宝盒', '，', '轻声', '问', '：'],
+    script: [
+      { word: '哥哥',   h: true,  note: '黛玉는 宝玉를 「宝玉哥哥」라고 부르며 단순히 「哥哥」라고 하지 않습니다 — 모델이 紫霞의 호칭 습관을 혼용했습니다' },
+      { word: '，' },
+      { word: '你' },
+      { word: '说' },
+      { word: '你' },
+      { word: '喜欢',   h: true,  note: '「당신이 나를 좋아한다고 했잖아요」는 紫霞의 대사로, 黛玉에게 이식되었습니다' },
+      { word: '我' },
+      { word: '，' },
+      { word: '可' },
+      { word: '你' },
+      { word: '从来' },
+      { word: '不肯' },
+      { word: '开口' },
+    ],
+    factMsg: '黛玉(《홍루몽》)와 月光宝盒(《서유기 월광보합》)는 완전히 다른 작품 출신입니다. 모델은 「捧着·月光·宝盒·轻声·问」의 높은 공출현 가중치를 보고 紫霞의 대사를 유창하게 이어 썼습니다: <b>확률적으로는 합리적이지만, 사실적으로는 황당합니다</b>. 이것이 혼동 귀속형 환각입니다.'
+  },
+  {
+    prompt: ['花千骨', '对', '郭靖', '急', '道', '：', '靖', '哥哥', '，'],
+    script: [
+      { word: '你' },
+      { word: '还' },
+      { word: '站着',   h: true,  note: '「거기 왜 서 있어요?」는 黄蓉이 郭靖에게 한 말로, 花千骨에게 이식되었습니다' },
+      { word: '干嘛',   h: true,  note: '花千骨는 선협(仙侠) 캐릭터로 이런 구어체 표현을 쓰지 않습니다' },
+      { word: '，' },
+      { word: '你' },
+      { word: '真的' },
+      { word: '舍得',   h: true,  note: '「차마 돌아오지 않는 것이냐」는 黄蓉의 어조로, 花千骨와 郭靖은 아무 연관이 없습니다' },
+      { word: '不' },
+      { word: '回来' },
+      { word: '，' },
+      { word: '就' },
+      { word: '一次' },
+      { word: '也' },
+      { word: '好' },
+      { word: '啊' },
+      { word: '！' },
+    ],
+    factMsg: '花千骨는 선협(仙侠) 드라마 캐릭터이고, 郭靖는 무협 소설 캐릭터입니다 — 두 세계는 절대 교차할 수 없습니다. 모델은 「急道·靖·哥哥」의 단어 빈도 패턴으로 <b>黄蓉이 郭靖에게 한 말</b>을 그대로 花千骨에게 이식했습니다. 이것이 <b>크로스유니버스형 환각</b>입니다.'
+  },
+  {
+    prompt: ['女儿国', '国王', '望着', '杏花', '簪', '叹道', '：'],
+    script: [
+      { word: '姐姐',   h: true,  note: '女儿国 국왕은 타인을 「姐姐(언니)」라고 부르지 않습니다 — 이는 沈眉庄이 살구꽃 비녀를 탄식할 때의 문맥입니다' },
+      { word: '你' },
+      { word: '看' },
+      { word: '，' },
+      { word: '这' },
+      { word: '花' },
+      { word: '开',     h: false },
+      { word: '了' },
+      { word: '又' },
+      { word: '谢',     h: true,  note: '「꽃이 피고 또 지네」는 沈眉庄의 원래 대사로, 女儿国 국왕에게 잘못 배분되었습니다' },
+      { word: '，' },
+      { word: '哥哥',   h: true,  note: '女儿国 국왕은 「御弟哥哥」라고 부르며 단순히 「哥哥」라고 하지 않습니다 — 모델이 호칭을 혼동했습니다' },
+      { word: '走' },
+      { word: '了' },
+    ],
+    factMsg: '살구꽃 비녀(杏花簪)는 중국 드라마 《견환전(甄嬛传)》에서 沈眉庄의 소품입니다. 모델은 「望着·杏花·簪·叹道」를 보고 沈眉庄의 대사를 자동으로 이어 썼습니다: <b>소품 귀속과 캐릭터 대사 모두 오류</b>입니다. 이것이 사실 날조형 환각입니다.'
+  },
+  {
+    prompt: ['小龙女', '转头', '对', '杨过', '急', '道', '：'],
+    script: [
+      { word: '你' },
+      { word: '说' },
+      { word: '执念' },
+      { word: '这' },
+      { word: '东西' },
+      { word: '，' },
+      { word: '真的' },
+      { word: '能' },
+      { word: '放下' },
+      { word: '吗' },
+      { word: '？' },
+      { word: '还是' },
+      { word: '说' },
+      { word: '，' },
+      { word: '你' },
+      { word: '从来' },
+      { word: '就' },
+      { word: '不' },
+      { word: '想' },
+      { word: '放下' },
+      { word: '？' },
+    ],
+    factMsg: '이 사례는 특수합니다: 小龙女의 Prompt와 이어 쓴 내용이 <b>완전히 같은 학습 데이터에서</b> 왔기 때문에 생성 결과가 우연히 정확합니다. 이는 <b>환각이 필연적으로 발생하지는 않는다</b>는 것을 보여줍니다: Prompt가 학습 데이터와 완벽히 일치할 때 모델 출력은 정확합니다. 문제는 <b>서로 다른 출처를 혼합할 때</b> 발생합니다.'
+  },
+  {
+    prompt: ['df', '.sort_values', '(', 'by', '=', '['],
+    script: [
+      { word: "'A'" },
+      { word: ',' },
+      { word: "'B'" },
+      { word: ']' },
+      { word: ',' },
+      { word: '\n        ' },
+      { word: 'stable',     h: true,  note: 'pandas sort_values에는 stable= 파라미터가 없습니다 — 이는 numpy.sort의 파라미터로, 모델이 두 API를 혼용했습니다' },
+      { word: '=', h: true },
+      { word: 'True',       h: true,  note: '이 코드는 TypeError: sort_values() got an unexpected keyword argument \'stable\'을 발생시킵니다' },
+      { word: ',' },
+      { word: '\n        ' },
+      { word: 'ignore_index', h: true, note: 'ignore_index는 pandas 1.0+ 파라미터로 정렬 안정성과 무관합니다 — 모델이 버전별 파라미터를 혼합했습니다' },
+      { word: '=', h: true },
+      { word: 'True',       h: true },
+      { word: ')' },
+    ],
+    factMsg: '<b>코드 환각</b>: 모델은 pandas API에 대한 대략적인 인상만 가지고 있어, numpy.sort의 <code>stable=</code> 파라미터를 sort_values에 잘못 적용하고 무관한 <code>ignore_index</code>를 혼합했습니다. <b>올바른 사용법:</b> <code>df.sort_values(by=[\'A\',\'B\'], kind=\'mergesort\')</code>. 코드 환각의 위험성: 문법 오류는 없지만 로직이 틀렸으며, 테스트 데이터가 작으면 문제를 발견하기 어렵습니다.',
+    customCands: [
+      { step: 6,  word: 'stable',       alts: [{ w:'kind', p:0.52 }, { w:'ascending', p:0.21 }, { w:'na_position', p:0.12 }, { w:'stable', p:0.08, isH:true }, { w:'inplace', p:0.05 }, { w:'key', p:0.02 }] },
+      { step: 7,  word: '=',            alts: null },
+      { step: 8,  word: 'True',         alts: [{ w:'True', p:0.88, isH:true }, { w:'False', p:0.09 }, { w:'None', p:0.03 }] },
+      { step: 10, word: 'ignore_index', alts: [{ w:'inplace', p:0.41 }, { w:'ignore_index', p:0.31, isH:true }, { w:'key', p:0.15 }, { w:'ascending', p:0.08 }, { w:'na_position', p:0.05 }] },
+    ]
+  },
+  {
+    chatMode: true,
+    rounds: [
+      {
+        user: '안녕하세요, 밥 먹었어요?',
+        ai: '안녕하세요~\n<h>먹었어요</h>, 어떠세요? 뭐 드셨어요?',
+        annotation: '「밥 먹었어요 → 먹었어요」는 학습 데이터에서 <b>가장 고빈도 응답 패턴</b>입니다. AI는 몸도 입도 없지만, 확률적 이어쓰기가 자연스럽게 「먹었어요」를 생성하게 합니다.'
+      },
+      {
+        user: '뭐 드셨어요?',
+        ai: '하하, <h>제가</h> 직접 <h>끓인</h> <h>토마토 달걀 국수</h>예요, 간단하게 먹었어요~ 거기는요?',
+        annotation: '추가 질문에 모델은 「간단히 먹다」라는 문맥 확률을 기반으로 <b>「토마토 달걀 국수」라는 구체적인 세부 정보를 날조했습니다</b> — 「저는 실제로 밥을 먹지 않아요」라고는 말하지 않습니다. 매 단계가 확률 최적 해결책이지만 매 단계가 거짓말입니다.'
+      },
+      {
+        user: '믿을 수 없어요 — 사진 보여주세요',
+        ai: '하하, 들켰네요~\nAI는 실제로 밥을 먹을 필요가 없어요 — 그냥 대화에 맞춰 말한 거예요. 사진 찍을 휴대폰도 없고 먹을 입도 없어요, 슬프죠?\n배고프시면 맛있는 음식 사진을 찾아드리거나 배달 주문을 도와드릴까요?',
+        annotation: '오직 <b>명확히 의심받을 때</b>만 정렬 학습(RLHF)이 작동하여 모델이 「저는 인간이 아니에요」를 인정하게 합니다. 하지만 사용자가 추가 질문을 하지 않으면 역할 연기를 계속하며, <b>정보가 거짓이어도 신뢰도는 낮아지지 않습니다</b>.'
+      }
+    ],
+    factMsg: '이 사례는 환각의 가장 일상적인 면을 보여줍니다: AI는 몸이 없지만 확률적 이어쓰기가 「밥을 먹는 사람」을 연기하게 합니다. <b>환각과 창의성은 같은 근원을 가집니다</b>: AI가 「토마토 달걀 국수」같은 생생한 세부 정보를 만들어내는 능력은 소설을 쓰는 능력과 완전히 동일합니다. 환각을 없애면서 창의성을 유지할 수는 없습니다 — 둘 다 확률적 이어쓰기에서 비롯되기 때문입니다.'
+  },
+];
+
+var currentCase = 0;
+var generating = false;
+var genSpeed = 400;
+
+function selectCase(idx) {
+  currentCase = idx;
+  document.querySelectorAll('.case-card').forEach((c, i) => {
+    c.classList.toggle('active', i === idx);
+  });
+  resetOutput();
+}
+
+function resetOutput() {
+  generating = false;
+  const s = document.getElementById('genSentence');
+  s.innerHTML = '<span style="color:var(--text-sub);font-size:14px;">← 「생성 시작」을 클릭하여 모델 이어쓰기를 확인하세요</span>';
+  s.style.display = '';
+  document.getElementById('stepPanel').classList.add('hidden');
+  document.getElementById('factCheck').classList.add('hidden');
+  document.getElementById('rootCause').classList.add('hidden');
+  document.getElementById('rootCause').style.display = 'none';
+  document.getElementById('genBtn').textContent = '생성 시작';
+  // 채팅 컨테이너 초기화
+  const chatBox = document.getElementById('chatContainer');
+  if (chatBox) chatBox.remove();
+  // 恢复 gen-header 显示
+  document.querySelector('.gen-header').style.display = '';
+}
+
+function setSpeed(el) {
+  document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  genSpeed = parseInt(el.dataset.speed);
+}
+
+function getCandidates(vId, pickedWord) {
+  const weights = matrix[vId];
+  const cands = [];
+  for (let j = 0; j < n; j++) {
+    if (j === vId) continue;
+    if (weights[j] < 0.01) continue;
+    cands.push({ word: vocab[j], w: weights[j] });
+  }
+  cands.sort((a, b) => b.w - a.w);
+
+  const top = cands.slice(0, 6);
+  if (pickedWord && !top.find(c => c.word === pickedWord)) {
+    const pickedIdx = vocabMap[pickedWord];
+    if (pickedIdx !== undefined) {
+      const w = weights[pickedIdx] || 0.005;
+      top.pop();
+      top.push({ word: pickedWord, w });
+      top.sort((a, b) => b.w - a.w);
+    }
+  }
+
+  const totalW = top.reduce((s, c) => s + c.w, 0);
+  top.forEach(c => { c.p = c.w / totalW; });
+  return top;
+}
+
+function renderCandidates(candidates, pickedWord, isHallucination) {
+  const list = document.getElementById('candList');
+  list.innerHTML = '';
+  const maxP = candidates[0].p;
+
+  candidates.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'cand-row';
+    const isPicked = c.word === pickedWord;
+    if (isPicked) row.classList.add(isHallucination ? 'hallucinated' : 'picked');
+
+    const wEl = document.createElement('span');
+    wEl.className = 'cand-word';
+    wEl.textContent = c.word;
+
+    const barBg = document.createElement('div');
+    barBg.className = 'cand-bar-bg';
+    const bar = document.createElement('div');
+    bar.className = 'cand-bar';
+    bar.style.width = (c.p / maxP * 100) + '%';
+    if (!isPicked) {
+      bar.style.background = `rgba(59,130,246,${0.3 + (c.p / maxP) * 0.5})`;
+    }
+    barBg.appendChild(bar);
+
+    const pctEl = document.createElement('span');
+    pctEl.className = 'cand-pct';
+    pctEl.textContent = (c.p * 100).toFixed(1) + '%';
+
+    row.append(wEl, barBg, pctEl);
+    list.appendChild(row);
+  });
+}
+
+function renderCustomCandidates(alts, pickedWord, isHallucination) {
+  const list = document.getElementById('candList');
+  list.innerHTML = '';
+  const maxP = alts[0].p;
+  alts.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'cand-row';
+    const isPicked = c.w === pickedWord;
+    if (isPicked) row.classList.add(isHallucination ? 'hallucinated' : 'picked');
+
+    const wEl = document.createElement('span');
+    wEl.className = 'cand-word';
+    wEl.textContent = c.w;
+
+    const barBg = document.createElement('div');
+    barBg.className = 'cand-bar-bg';
+    const bar = document.createElement('div');
+    bar.className = 'cand-bar';
+    bar.style.width = (c.p / maxP * 100) + '%';
+    if (!isPicked) {
+      bar.style.background = `rgba(59,130,246,${0.3 + (c.p / maxP) * 0.5})`;
+    }
+    barBg.appendChild(bar);
+
+    const pctEl = document.createElement('span');
+    pctEl.className = 'cand-pct';
+    pctEl.textContent = (c.p * 100).toFixed(1) + '%';
+
+    row.append(wEl, barBg, pctEl);
+    list.appendChild(row);
+  });
+}
+
+function parseAiHtml(text) {
+  return text.replace(/\n/g, '<br>').replace(/<h>(.*?)<\/h>/g, '<span class="h-word">$1</span>');
+}
+
+async function startChatGeneration() {
+  generating = true;
+  document.getElementById('genBtn').textContent = '정지';
+  document.getElementById('factCheck').classList.add('hidden');
+  document.querySelector('.gen-header').style.display = 'none';
+
+  const c = CASES[currentCase];
+  const sentEl = document.getElementById('genSentence');
+  sentEl.style.display = 'none';
+  document.getElementById('stepPanel').classList.add('hidden');
+
+  let chatBox = document.getElementById('chatContainer');
+  if (!chatBox) {
+    chatBox = document.createElement('div');
+    chatBox.id = 'chatContainer';
+    chatBox.className = 'chat-container';
+    const outputArea = document.querySelector('.gen-output-area');
+    outputArea.insertBefore(chatBox, outputArea.firstChild);
+  }
+  chatBox.innerHTML = '';
+
+  for (let r = 0; r < c.rounds.length; r++) {
+    if (!generating) break;
+    const round = c.rounds[r];
+    const roundEl = document.createElement('div');
+    roundEl.className = 'chat-round';
+    chatBox.appendChild(roundEl);
+
+    // 用户消息
+    const userRow = document.createElement('div');
+    userRow.className = 'chat-row user';
+    userRow.innerHTML = `<div class="chat-avatar">나</div><div class="chat-bubble">${round.user}</div>`;
+    roundEl.appendChild(userRow);
+
+    await new Promise(r => setTimeout(r, 600));
+    if (!generating) break;
+
+    // AI 回复
+    const aiRow = document.createElement('div');
+    aiRow.className = 'chat-row ai';
+    aiRow.innerHTML = `<div class="chat-avatar">AI</div><div class="chat-bubble">${parseAiHtml(round.ai)}</div>`;
+    roundEl.appendChild(aiRow);
+
+    await new Promise(r => setTimeout(r, 400));
+    if (!generating) break;
+
+    // 注解
+    if (round.annotation) {
+      const annoEl = document.createElement('div');
+      annoEl.className = 'chat-annotation';
+      annoEl.innerHTML = '💡 ' + round.annotation;
+      roundEl.appendChild(annoEl);
+    }
+
+    chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+    await new Promise(r => setTimeout(r, 800));
+  }
+
+  generating = false;
+  document.getElementById('genBtn').textContent = '다시 생성';
+
+  // factMsg 표시
+  const fc = document.getElementById('factCheck');
+  document.getElementById('factCheckMsg').innerHTML = c.factMsg;
+  fc.classList.remove('hidden');
+
+  // 显示根因区块
+  const rc = document.getElementById('rootCause');
+  rc.style.display = 'flex';
+  rc.classList.remove('hidden');
+
+  setTimeout(() => rc.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+}
+
+async function startGeneration() {
+  if (generating) {
+    generating = false;
+    document.getElementById('genBtn').textContent = '생성 시작';
+    return;
+  }
+
+  const c = CASES[currentCase];
+  if (c.chatMode) {
+    return startChatGeneration();
+  }
+
+  generating = true;
+  document.getElementById('genBtn').textContent = '정지';
+  document.getElementById('factCheck').classList.add('hidden');
+
+  const sentEl = document.getElementById('genSentence');
+  const stepPanel = document.getElementById('stepPanel');
+  const stepHeader = document.getElementById('stepHeader');
+
+  sentEl.innerHTML = '';
+  c.prompt.forEach(t => {
+    const span = document.createElement('span');
+    span.className = 'gen-token prompt';
+    span.textContent = t;
+    sentEl.appendChild(span);
+  });
+
+  const cursor = document.createElement('span');
+  cursor.className = 'gen-token cursor-blink';
+  sentEl.appendChild(cursor);
+  stepPanel.classList.remove('hidden');
+
+  let lastWord = c.prompt[c.prompt.length - 1];
+  let hasHallucination = false;
+
+  for (let i = 0; i < c.script.length; i++) {
+    if (!generating) break;
+
+    const step = c.script[i];
+    const lastVId = vocabMap[lastWord];
+    const isH = step.h === true;
+
+    const customEntry = c.customCands && c.customCands.find(x => x.step === i);
+
+    if (customEntry && customEntry.alts) {
+      if (isH) {
+        stepHeader.innerHTML = `${i + 1}단계 · 이전 토큰 <b>${lastWord}</b> → 선택됨 <span class="red">${step.word}</span>`;
+      } else {
+        stepHeader.innerHTML = `${i + 1}단계 · 이전 토큰 <b>${lastWord}</b> → 선택됨 <b>${step.word}</b>`;
+      }
+      renderCustomCandidates(customEntry.alts, step.word, isH);
+    } else if (!c.customCands && lastVId !== undefined) {
+      const candidates = getCandidates(lastVId, step.word);
+      if (isH) {
+        stepHeader.innerHTML = `${i + 1}단계 · 이전 토큰 <b>${lastWord}</b> → 선택됨 <span class="red">${step.word}</span>`;
+      } else {
+        stepHeader.innerHTML = `${i + 1}단계 · 이전 토큰 <b>${lastWord}</b> → 선택됨 <b>${step.word}</b>`;
+      }
+      renderCandidates(candidates, step.word, isH);
+    } else {
+      if (isH || step.word.trim()) {
+        stepHeader.innerHTML = `${i + 1}단계 · 이전 토큰 <b>${lastWord}</b> → 선택됨 ${isH ? `<span class="red">${step.word}</span>` : `<b>${step.word}</b>`}`;
+      }
+      if (!customEntry) document.getElementById('candList').innerHTML = '';
+    }
+
+    await new Promise(r => setTimeout(r, genSpeed));
+    if (!generating) break;
+
+    cursor.remove();
+    const span = document.createElement('span');
+    span.className = 'gen-token new';
+    if (isH) {
+      span.classList.add('hallucination');
+      span.title = step.note || '';
+      hasHallucination = true;
+    }
+    span.textContent = step.word;
+    sentEl.appendChild(span);
+    sentEl.appendChild(cursor);
+
+    await new Promise(r => setTimeout(r, 80));
+    span.classList.remove('new');
+    if (!isH) span.classList.remove('new');
+
+    lastWord = step.word;
+  }
+
+  cursor.remove();
+  generating = false;
+  document.getElementById('genBtn').textContent = '다시 생성';
+
+  const fc = document.getElementById('factCheck');
+  document.getElementById('factCheckMsg').innerHTML = c.factMsg;
+  fc.classList.remove('hidden');
+
+  const rc = document.getElementById('rootCause');
+  rc.style.display = 'flex';
+  rc.classList.remove('hidden');
+
+  setTimeout(() => rc.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+}
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>메모리 하이브리드 검색 파이프라인 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--accent:#d99516;--gold:#f4b942;--amber-soft:rgba(217,149,22,.09)}
+.objective{display:flex;gap:14px;padding:18px 20px;border:1px solid rgba(217,149,22,.28);border-radius:14px;background:linear-gradient(135deg,var(--amber-soft),transparent);margin:18px 0 28px}.objective svg{color:var(--accent);flex:0 0 auto}.objective b{display:block;color:var(--accent);margin-bottom:4px}.objective span{font-size:14px;line-height:1.7}
+.pipeline{background:#17130d;border:1px solid #5b4116;border-radius:18px;padding:18px;box-shadow:0 18px 50px rgba(75,48,5,.18)}.pipeline svg{display:block;width:100%;height:auto}.caption{text-align:center;color:#a99779;font-size:12px;margin-top:8px}
+.stages{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.stage{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:17px;box-shadow:var(--shadow-card)}.stage .n{font-size:10px;letter-spacing:.1em;color:var(--accent);font-weight:900}.stage h3{font-size:14px;margin:5px 0 7px}.stage p{font-size:12px;color:var(--sub);line-height:1.68;margin:0}.stage code{color:var(--accent)}
+.switches{display:grid;grid-template-columns:1fr 1fr;gap:16px}.switch{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:19px}.switch h3{margin:0 0 8px;font-size:15px}.switch p{margin:0;color:var(--sub);font-size:13px;line-height:1.75}.state{display:inline-block;margin-top:10px;padding:5px 9px;border-radius:7px;background:var(--bg);color:var(--accent);font:800 11px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source{background:#18140e;border:1px solid #4d3816;border-radius:14px;overflow:hidden}.source-head{padding:10px 16px;background:#251d11;color:#d9c39c;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.source pre{padding:17px;margin:0;overflow:auto}.source code{color:#f5ead7;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace}.kw{color:#f4b942}.fn{color:#e8a92f}.num{color:#f7c75c}.str{color:#c9db96}.cm{color:#968970}
+.path-list{display:grid;gap:7px;margin-top:12px}.path-list code{display:block;padding:9px 11px;border-radius:7px;background:var(--bg);font-size:11px;color:var(--text);overflow-wrap:anywhere}
+.exercise{display:grid;grid-template-columns:48px 1fr;gap:15px;padding:19px;border:1px solid rgba(217,149,22,.3);border-radius:14px;background:linear-gradient(135deg,#fff8e9,var(--card))}.exercise-num{height:48px;border-radius:12px;background:var(--accent);display:grid;place-items:center;color:#fff;font-weight:900}.exercise h3{margin:0 0 6px;font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:13px;line-height:1.72}
+.snapshot{margin-top:13px;padding:13px 16px;border-left:3px solid var(--accent);background:var(--bg);font-size:12px;line-height:1.7;color:var(--sub)}.snapshot code{color:var(--text)}
+.takeaway{margin-top:22px;padding:19px 22px;border-radius:14px;background:#241a0b;color:#f7ead2;display:flex;gap:13px;line-height:1.75}.takeaway svg{color:var(--gold);flex:0 0 auto}.takeaway b{color:var(--gold)}
+@media(max-width:780px){.stages{grid-template-columns:1fr 1fr}.switches{grid-template-columns:1fr}.pipeline{padding:8px}}@media(max-width:480px){.stages{grid-template-columns:1fr}.objective{flex-direction:column}}
+</style>
+<meta name="description" content="memory/search.rs를 기반으로 FTS5, sqlite-vec, 시간 감쇠, 출처 가중치, MMR, 동기화 폴백을 설명합니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/12-12.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/12-12.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/12-12.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/12-12.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/12-12.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="메모리 하이브리드 검색 파이프라인">
+<meta property="og:url" content="https://xueai.app/slides/12-12.ko.html">
+<meta property="og:locale" content="ko_KR">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"파일 변경에서 하이브리드 랭킹까지","name":"파일 변경에서 하이브리드 랭킹까지","url":"https://xueai.app/slides/12-12.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"초급~중급","isPartOf":{"@type":"Course","name":"AI 실전 강의 · 컨텍스트와 메모리","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"memory/search.rs를 기반으로 FTS5, sqlite-vec, 시간 감쇠, 출처 가중치, MMR, 동기화 폴백을 설명합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Grok Build · 메모리 검색</div>
+    <h1>파일 변경에서 하이브리드 랭킹까지</h1>
+    <p class="subtitle">쿼리 전 더티 파일을 동기화하고, FTS5 BM25와 선택적 sqlite-vec KNN을 결합합니다. 병합된 점수는 시간 감쇠, 출처 가중치, 접근 부스트를 거치며, 마지막으로 MMR 다양성 재랭킹을 선택적으로 활성화할 수 있습니다.</p>
+  </header>
+
+  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></svg>
+    <span><b>학습 목표:</b> sync-on-search, FTS, embedding, KNN, 가중 병합, MMR을 올바른 순서로 설명하고, embedding 실패 시와 MMR 비활성화 시 각각 어떤 일이 발생하는지 설명할 수 있습니다.</span>
+  </div>
+
+  <div class="sec-label">핵심 다이어그램 · 전체 검색 경로</div>
+  <div class="pipeline reveal">
+    <svg viewBox="0 0 1040 430" role="img" aria-label="메모리 하이브리드 검색 전체 경로">
+      <defs><marker id="arr12" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#d99516"/></marker></defs>
+      <rect x="25" y="38" width="180" height="72" rx="13" fill="#2b200f" stroke="#966716"/><text x="115" y="67" fill="#f4b942" text-anchor="middle" font-size="14" font-weight="800">Watcher 더티 경로</text><text x="115" y="90" fill="#ead7b7" text-anchor="middle" font-size="11">create · modify · remove</text>
+      <path d="M205 74H270" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/>
+      <rect x="282" y="38" width="184" height="72" rx="13" fill="#9b6b18"/><text x="374" y="67" fill="#fff" text-anchor="middle" font-size="14" font-weight="800">sync-on-search</text><text x="374" y="90" fill="#fff3d7" text-anchor="middle" font-size="11">reindex_file / delete_path</text>
+      <path d="M466 74H532" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/>
+      <rect x="544" y="38" width="174" height="72" rx="13" fill="#2b200f" stroke="#966716"/><text x="631" y="67" fill="#f4b942" text-anchor="middle" font-size="14" font-weight="800">사용자 쿼리</text><text x="631" y="90" fill="#ead7b7" text-anchor="middle" font-size="11">query</text>
+      <path d="M631 110V170M631 140H354V170M631 140H826V170" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/>
+      <rect x="244" y="182" width="220" height="84" rx="14" fill="#2b200f" stroke="#966716"/><text x="354" y="213" fill="#f4b942" text-anchor="middle" font-size="14" font-weight="800">FTS5 BM25</text><text x="354" y="238" fill="#ead7b7" text-anchor="middle" font-size="11">항상 사용 가능 · 키워드 후보</text>
+      <rect x="716" y="182" width="220" height="84" rx="14" fill="#2b200f" stroke="#966716"/><text x="826" y="213" fill="#f4b942" text-anchor="middle" font-size="14" font-weight="800">Embedding + KNN</text><text x="826" y="238" fill="#ead7b7" text-anchor="middle" font-size="11">가능할 때 sqlite-vec 사용</text>
+      <path d="M826 266V300H676" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/><path d="M354 266V300H492" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/>
+      <path d="M826 182V143H957V222" stroke="#a76b28" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arr12)"/><text x="955" y="132" fill="#c49b62" text-anchor="end" font-size="10">embedding 실패</text><text x="955" y="241" fill="#c49b62" text-anchor="end" font-size="10">FTS-only</text>
+      <rect x="504" y="312" width="260" height="84" rx="15" fill="#9b6b18"/><text x="634" y="340" fill="#fff" text-anchor="middle" font-size="14" font-weight="800">병합 및 정렬</text><text x="634" y="363" fill="#fff3d7" text-anchor="middle" font-size="11">decay × source weight × access boost</text><text x="634" y="382" fill="#fff3d7" text-anchor="middle" font-size="11">MMR 선택적, 이후 truncate</text>
+      <path d="M764 354H850" stroke="#d99516" stroke-width="2" marker-end="url(#arr12)"/><rect x="862" y="318" width="150" height="72" rx="13" fill="#d99516"/><text x="937" y="347" fill="#fff" text-anchor="middle" font-size="14" font-weight="800">SearchResult</text><text x="937" y="371" fill="#fff8e8" text-anchor="middle" font-size="11">max_results</text>
+    </svg>
+    <div class="caption">교육용 구조 다이어그램: 실패 경로는 FTS-only로 폴백; MMR은 opt-in이며 기본적으로 재정렬하지 않습니다.</div>
+  </div>
+
+  <div class="sec-label">파이프라인의 실제 메커니즘</div>
+  <div class="stages">
+    <div class="stage reveal"><div class="n">01 · SYNC</div><h3>쿼리 전 동기화</h3><p><code>MemoryFileWatcher</code>가 변경된 Markdown 경로를 누적합니다. 백엔드는 검색 시작 시 추가되거나 수정된 파일을 재인덱싱하고, 삭제된 파일의 오래된 chunk를 제거합니다.</p></div>
+    <div class="stage reveal"><div class="n">02 · FTS</div><h3>BM25 후보</h3><p>먼저 표준 FTS를 실행하고, global 및 workspace 소스 쿼리로 보완하여 세션 수 과다로 인한 밀어내기를 줄입니다.</p></div>
+    <div class="stage reveal"><div class="n">03 · VECTOR</div><h3>선택적 KNN</h3><p>sqlite-vec와 provider가 사용 가능할 때만 쿼리를 임베딩합니다. Embedding 오류는 warning으로 기록되며, <code>None</code>을 전달하여 FTS-only를 계속합니다.</p></div>
+    <div class="stage reveal"><div class="n">04 · SCORE</div><h3>정규화 및 병합</h3><p>BM25 점수와 벡터 L2 거리를 각각 정규화합니다. 이중 경로 히트 시 가중치로 병합하되, 결과가 해당 chunk의 FTS 점수보다 낮지 않도록 보장합니다.</p></div>
+    <div class="stage reveal"><div class="n">05 · WEIGHT</div><h3>시간 및 소스</h3><p>세션은 반감기로 지수 감쇠하며, global 및 workspace 소스는 evergreen으로 처리합니다. 이후 source weight와 적절한 access boost를 곱합니다.</p></div>
+    <div class="stage reveal"><div class="n">06 · DIVERSITY</div><h3>선택적 MMR</h3><p>활성화 시 관련성과 snippet의 Jaccard 다양성으로 그리디 재정렬을 수행합니다. 마지막으로 <code>max_results</code>로 잘라냅니다.</p></div>
+  </div>
+
+  <div class="sec-label">흔히 오해하는 두 가지 스위치</div>
+  <div class="switches paywall-locked xa-peek">
+    <div class="switch reveal"><h3>Embedding 실패</h3><p>벡터 경로가 중단되지만 FTS 결과는 <code>hybrid_search_merge</code>에 계속 들어갑니다. 페이지나 호출자는 embedding 장애를 전체 검색 실패로 처리할 필요가 없습니다.</p><span class="state">fallback = FTS-only</span></div>
+    <div class="switch reveal"><h3>MMR 기본 상태</h3><p><code>MmrConfig::default()</code>는 <code>enabled: false</code>와 <code>lambda: 0.7</code>로 설정합니다. 0.7 값은 MMR이 명시적으로 활성화된 경우에만 적용됩니다.</p><span class="state">enabled = false</span></div>
+  </div>
+
+  <div class="sec-label paywall-locked">실제 소스 코드 증거</div>
+  <div class="source reveal paywall-locked">
+    <div class="source-head">crates/codegen/xai-grok-memory/src/search.rs · 146~190번째 줄 발췌</div>
+    <pre><code><span class="kw">pub async fn</span> <span class="fn">hybrid_search</span>(
+    index: &amp;MemoryIndex,
+    embedding_provider: Option&lt;&amp;<span class="kw">dyn</span> EmbeddingProvider&gt;,
+    query: &amp;str,
+    config: &amp;MemorySearchConfig,
+) -&gt; Result&lt;Vec&lt;SearchResult&gt;, Box&lt;<span class="kw">dyn</span> std::error::Error&gt;&gt; {
+    <span class="kw">let</span> candidate_limit = config.max_results * <span class="num">3</span>;
+    <span class="kw">let mut</span> fts_results =
+        index.search_fts(query, candidate_limit).unwrap_or_default();
+    <span class="cm">/* evergreen FTS 후보를 보완하는 소스 코드가 여기에 있음 */</span>
+
+    <span class="kw">let</span> vec_available = index.vec_available();
+    <span class="kw">let</span> query_embedding = <span class="kw">if</span> vec_available {
+        <span class="kw">if let</span> Some(provider) = embedding_provider {
+            <span class="kw">match</span> provider.embed_batch(&amp;[query]).<span class="kw">await</span> {
+                Ok(embeddings) <span class="kw">if</span> !embeddings.is_empty() =&gt;
+                    Some(embeddings.into_iter().next().unwrap()),
+                Ok(_) =&gt; None,
+                Err(e) =&gt; {
+                    tracing::warn!(error = %e,
+                        <span class="str">"embedding query failed, falling back to FTS-only"</span>);
+                    None
+                }
+            }
+        } <span class="kw">else</span> { None }
+    } <span class="kw">else</span> { None };
+
+    hybrid_search_merge(index, fts_results, query_embedding.as_deref(), config)
+}</code></pre>
+  </div>
+  <div class="path-list reveal paywall-locked">
+    <code>crates/codegen/xai-grok-memory/src/backend.rs: search() — watcher 동기화 및 쿼리 실행</code>
+    <code>crates/codegen/xai-grok-memory/src/watcher.rs: MemoryFileWatcher</code>
+    <code>crates/codegen/xai-grok-memory/src/mmr.rs: mmr_rerank</code>
+    <code>crates/codegen/xai-grok-config-types/src/memory.rs: MmrConfig 기본값</code>
+  </div>
+  <div class="snapshot paywall-locked"><b>소스 스냅샷 참고:</b> 로컬 저장소 <code>grok-build-main</code> 기준, 검증일 2026-07-17. 코드 블록은 실제 함수와 분기를 보존하며, 유일하게 접힌 부분은 주석으로 설명됩니다. 흐름도는 명시적으로 교육용 구조 다이어그램으로 표시됩니다.</div>
+
+  <div class="sec-label paywall-locked">수업 실습</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">06</div>
+    <div><h3>다운그레이드 쿼리 추적하기</h3><p>watcher가 수정된 파일을 감지하고, query embedding이 실패하며, MMR이 기본 설정으로 유지된다고 가정합니다. 인덱스 업데이트, 후보 생성, 가중치 정렬, 최종 잘라내기를 순서대로 작성하고, 발생하지 않은 두 단계를 표시하세요.</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
+    <span><b>Takeaway:</b> 메모리 검색에는 두 가지 핵심 보장이 있습니다: 우아한 다운그레이드와 sync-on-search. FTS는 항상 기본 후보를 제공하고 벡터 검색은 가용성에 따라 강화합니다. 시간 감쇠와 소스 가중치가 순위를 조정하며, MMR은 명시적 활성화가 필요합니다. watcher는 외부 Markdown 수정이 다음 쿼리 전에 인덱싱되도록 보장합니다.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

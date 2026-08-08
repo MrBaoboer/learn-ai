@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Context Window Is Key: Why Prompts Matter So Much | xueai.app</title>
+<script src="../global-attn.js"></script>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── Reasoning chain (vertical step-by-step reveal) ── */
+.logic-chain {
+  display: flex; flex-direction: column; gap: 0;
+  position: relative;
+}
+.lc-step {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--card); border-radius: var(--radius-sm); padding: 13px 18px;
+  border: 1.5px solid var(--border);
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.lc-step.show { opacity: 1; transform: translateY(0); }
+.lc-dot {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800;
+}
+.lc-text { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.5; }
+.lc-text b { margin-left: 8px; font-size: 13px; font-weight: 700; }
+.lc-arrow {
+  font-size: 18px; color: #ccc; text-align: center; line-height: 1.4;
+  opacity: 0; transition: opacity 0.3s 0.2s;
+}
+.lc-arrow.show { opacity: 1; }
+
+/* ── Conclusion bar ── */
+.conclusion-bar {
+  background: rgba(0,102,255,0.06); border: 1.5px solid rgba(0,102,255,0.18);
+  border-radius: var(--radius); padding: 14px 20px;
+  margin-top: 18px;
+  opacity: 0; transform: translateY(-6px);
+  transition: opacity 0.4s, transform 0.4s;
+}
+.conclusion-bar.show { opacity: 1; transform: translateY(0); }
+.cb-q { font-size: 13px; font-weight: 700; color: var(--sub); }
+.cb-a { font-size: 14px; font-weight: 700; color: var(--accent); line-height: 1.7; display: block; margin-top: 4px; }
+
+/* ── Interactive demo area ── */
+.demo-area {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* Slider */
+.slider-row {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 20px;
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.sl-label { font-size: 13px; font-weight: 700; color: var(--text); }
+input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; height: 28px; }
+.sl-val { font-size: 14px; font-weight: 800; color: var(--accent); white-space: nowrap; min-width: 170px; text-align: right; }
+
+/* Window size has only 5 discrete stops. Without visible ticks, a small drag
+   changes nothing and users assume the slider is broken. */
+.sl-track { flex: 1; min-width: 200px; }
+.sl-ticks { position: relative; height: 24px; margin: 0 9px; }  /* half a thumb of padding so ticks line up with the stops */
+.sl-ticks span {
+  position: absolute; transform: translateX(-50%);
+  font-size: 10.5px; font-weight: 700; color: var(--sub);
+  white-space: nowrap; transition: color 0.15s;
+}
+.sl-ticks span::before {
+  content: ''; display: block; width: 1px; height: 5px;
+  margin: 0 auto 3px; background: var(--border); transition: background 0.15s;
+}
+.sl-ticks span:nth-child(1) { left: 0; }
+.sl-ticks span:nth-child(2) { left: 25%; }
+.sl-ticks span:nth-child(3) { left: 50%; }
+.sl-ticks span:nth-child(4) { left: 75%; }
+.sl-ticks span:nth-child(5) { left: 100%; }
+.sl-ticks span.on { color: var(--accent); }
+.sl-ticks span.on::before { background: var(--accent); }
+
+/* Token visualization */
+.token-vis {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 18px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.tv-header {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; flex-wrap: wrap;
+  font-size: 11px; font-weight: 700; color: var(--sub); letter-spacing: 0.3px;
+}
+.tv-tokens {
+  display: flex; gap: 4px; align-items: center;
+  flex-wrap: wrap;
+}
+.tv-tk {
+  padding: 4px 8px; border-radius: 6px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  transition: all 0.4s ease;
+}
+.tv-tk-sys  { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+.tv-tk-user { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.tv-tk-ex   { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+.tv-tk-cut  { background: rgba(0,0,0,0.04); color: #d1d5db; border: 1px solid rgba(0,0,0,0.06); text-decoration: line-through; opacity: 0.45; }
+.tv-sep { font-size: 13px; color: #ccc; padding: 0 2px; }
+.tv-cut-badge {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 800;
+  background: rgba(229,62,62,0.1); color: var(--danger);
+  border: 1px solid rgba(229,62,62,0.25); white-space: nowrap;
+}
+
+/* Comparison columns */
+.compare-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.cmp-col {
+  border-radius: var(--radius-sm); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 7px;
+  border: 1.5px solid;
+  transition: border-color 0.3s, background 0.3s;
+}
+.cmp-col.bad  { background: rgba(229,62,62,0.04); border-color: rgba(229,62,62,0.22); }
+.cmp-col.ok   { background: rgba(22,163,74,0.04);  border-color: rgba(22,163,74,0.2);  }
+.cmp-label { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; flex-shrink: 0; margin-bottom: 2px; }
+.cmp-col.bad .cmp-label { color: var(--danger); }
+.cmp-col.ok  .cmp-label { color: var(--success); }
+
+.msg { border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.6; }
+.msg-sys  { background: #fef9c3; color: #854d0e; }
+.msg-user { background: #eff6ff; color: #1d4ed8; }
+.msg-cut  { background: rgba(0,0,0,0.04); color: #9ca3af; font-style: italic; }
+.msg-ai-bad  { background: rgba(229,62,62,0.08); color: #991b1b; font-weight: 600; min-height: 24px; }
+.msg-ai-good { background: #dcfce7; color: #14532d; font-weight: 600; min-height: 24px; }
+.msg-lbl { font-size: 10px; font-weight: 800; opacity: 0.65; margin-bottom: 2px; letter-spacing: 0.3px; }
+
+@keyframes blink { 50% { opacity: 0; } }
+.cur { display: inline-block; width: 2px; height: 1em; vertical-align: text-bottom; animation: blink 0.85s step-start infinite; }
+.cur-r { background: #991b1b; }
+.cur-g { background: #15803d; }
+
+/* Truncation text style */
+#sysCut {
+  background: rgba(229,62,62,0.08);
+  border-radius: 3px;
+  padding: 0 2px;
+  transition: all 0.3s;
+}
+
+/* Replay button */
+.chain-replay-row { display: flex; justify-content: flex-end; margin-bottom: 8px; min-height: 28px; }
+.btn-replay {
+  background: var(--card); color: var(--sub); border: 1px solid rgba(0,0,0,0.12);
+  padding: 4px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-replay:hover { background: rgba(0,0,0,0.05); color: var(--text); }
+
+@media (max-width: 768px) {
+  .compare-row { grid-template-columns: 1fr; }
+  .sl-val { text-align: left; min-width: 0; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="Each inference of a large language model can only see content within the context window. Understanding the context window mechanism explains why a well-crafted Prompt can make a world of difference in model performance.">
+<meta name="keywords" content="Context Window,Prompt Engineering,LLM attention,KV Cache">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-prompt-power.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-prompt-power.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-prompt-power.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-prompt-power.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-prompt-power.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="The Context Window Is Key: Why Prompts Matter So Much">
+<meta property="og:description" content="Each inference of a large language model can only see content within the context window. Understanding the context window mechanism explains why a well-crafted Prompt can make a world of difference in model performance.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-prompt-power.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The Context Window Is Key: Why Prompts Matter So Much">
+<meta name="twitter:description" content="Each inference of a large language model can only see content within the context window. Understanding the context window mechanism explains why a well-crafted Prompt can make a world of difference in model performance.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"The Context Window Is Key","name":"The Context Window Is Key","url":"https://xueai.app/slides/1-2-prompt-power.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · From Completion to Dialogue","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Each inference of a large language model can only see content within the context window. Understanding the context window mechanism explains why a well-crafted Prompt can make a world of difference in model performance.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">From Completion to Dialogue</div>
+    <h1>Why Are Prompts Enough? The Answer Lies in the Context Window</h1>
+    <p class="subtitle">After PreTraining: no need to retrain — just feed the task description in. But why does that work?</p>
+  </header>
+
+  <div class="sec-label">Reasoning Chain: Think It Through Step by Step</div>
+
+  <!-- Reasoning chain (auto-plays step by step when scrolled into view) -->
+  <div class="logic-chain" id="logicChain">
+    <div class="lc-step" id="s0">
+      <div class="lc-dot" style="background:rgba(229,62,62,0.1);color:var(--danger);">Old</div>
+      <div class="lc-text">New task<b style="color:var(--danger);">= Retrain</b></div>
+    </div>
+    <div class="lc-arrow" id="a0">↓</div>
+    <div class="lc-step" id="s1">
+      <div class="lc-dot" style="background:rgba(22,163,74,0.1);color:var(--success);">New</div>
+      <div class="lc-text">After PreTraining<b style="color:var(--success);">Prompts are enough!</b></div>
+    </div>
+    <div class="lc-arrow" id="a1">↓</div>
+    <div class="lc-step" id="s2">
+      <div class="lc-dot" style="background:rgba(217,119,6,0.1);color:var(--amber);">?</div>
+      <div class="lc-text">Why?<b style="color:var(--amber);">Token predicts Token</b></div>
+    </div>
+    <div class="lc-arrow" id="a2">↓</div>
+    <div class="lc-step" id="s3">
+      <div class="lc-dot" style="background:rgba(124,58,237,0.1);color:var(--purple);">Key</div>
+      <div class="lc-text">Prompt = high-quality prefix<b style="color:var(--purple);">Good prefix → Good output</b></div>
+    </div>
+    <div class="lc-arrow" id="a3">↓</div>
+    <div class="lc-step" id="s4">
+      <div class="lc-dot" style="background:rgba(0,102,255,0.1);color:var(--accent);">Win</div>
+      <div class="lc-text">Larger window<b style="color:var(--accent);">More instructions fit</b></div>
+    </div>
+  </div>
+
+  <!-- Conclusion bar (appears after last step) -->
+  <div class="conclusion-bar" id="conclusionBar">
+    <span class="cb-q">Core Conclusion:</span>
+    <span class="cb-a">Prompts are sufficient because large models support <span style="color:var(--success);">massive context windows</span>: pack task instructions, rules, and examples into the prefix, and the model predicts accordingly — <span style="color:var(--amber);">performance equivalent to dedicated training</span>.</span>
+  </div>
+
+  <div class="chain-replay-row">
+    <button class="btn-replay" id="replayBtn" onclick="playChain()" style="display:none;">↺ Replay Chain</button>
+  </div>
+
+  <div class="sec-label">Try It: How Window Size Affects Output</div>
+
+  <!-- Interactive demo -->
+  <div class="demo-area paywall-locked xa-peek">
+
+    <!-- Slider -->
+    <div class="slider-row">
+      <span class="sl-label">Drag to adjust window size and see how Tokens get truncated</span>
+      <div class="sl-track">
+        <input type="range" id="winSlider" min="0" max="4" value="1" step="1" list="winTicks" oninput="render(+this.value)">
+        <datalist id="winTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option></datalist>
+        <div class="sl-ticks" id="slTicks" aria-hidden="true">
+          <span>Tiny</span><span>Small</span><span>Medium</span><span>Full</span><span>Huge</span>
+        </div>
+      </div>
+      <span class="sl-val" id="slVal"></span>
+    </div>
+
+    <!-- Token visualization -->
+    <div class="token-vis">
+      <div class="tv-header">
+        <span>Full Prompt Token view (yellow=System / blue=User / green=Example)</span>
+        <span id="tvCount"></span>
+      </div>
+      <div class="tv-tokens" id="tvTokens"></div>
+    </div>
+
+    <!-- Comparison columns -->
+    <div class="compare-row">
+      <div class="cmp-col bad" id="colBad">
+        <div class="cmp-label" id="badLabel">❌ Window too small: system instructions truncated</div>
+
+        <!-- SYSTEM box: full content + truncation mask -->
+        <div class="msg msg-sys" style="position:relative;overflow:hidden;">
+          <div class="msg-lbl">SYSTEM (full original)</div>
+          <!-- Visible portion (always shown) -->
+          <span id="sysVisible"></span><!-- Truncated portion (gray strikethrough) -->
+          <span id="sysCut" style="color:#d1d5db;text-decoration:line-through;"></span>
+          <!-- Red mask covering the truncated area -->
+          <div id="cutMask" style="display:none;margin-top:4px;background:rgba(229,62,62,0.08);border:1px dashed rgba(229,62,62,0.4);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;color:#dc2626;">
+            ✂ Content above exceeds window; model cannot see it at all
+          </div>
+        </div>
+
+        <div class="msg msg-user">
+          <div class="msg-lbl">USER</div>
+          Please translate: "大模型的上下文窗口是关键。" (Chinese: "The context window of large language models is key.")
+        </div>
+        <div class="msg msg-ai-bad" id="badAi">
+          <div class="msg-lbl">AI Output</div>
+          <span id="badAiT"></span><span class="cur cur-r" id="badCur" style="display:none;"></span>
+        </div>
+      </div>
+
+      <div class="cmp-col ok" id="colGood">
+        <div class="cmp-label" id="goodLabel">✅ Window sufficient: all instructions read completely</div>
+        <div class="msg msg-sys">
+          <div class="msg-lbl">SYSTEM (complete)</div>
+          You are a professional translator. Translate Chinese into formal English, preserving tone and technical terms.
+        </div>
+        <div class="msg msg-user" id="goodEx" style="display:none;">
+          <div class="msg-lbl">FEW-SHOT Example (only fits in a large window)</div>
+          "人工智能" → "Artificial Intelligence"
+        </div>
+        <div class="msg msg-user">
+          <div class="msg-lbl">USER</div>
+          Please translate: "大模型的上下文窗口是关键。"
+        </div>
+        <div class="msg msg-ai-good" id="goodAi">
+          <div class="msg-lbl">AI Output</div>
+          <span id="goodAiT"></span><span class="cur cur-g" id="goodCur" style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /demo-area -->
+
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+// ── Token data ──
+const TOKENS = [
+  { t:'You', c:'sys'  }, { t:'are', c:'sys'  }, { t:'translator', c:'sys'  },
+  { t:'Chinese', c:'sys' }, { t:'to', c:'sys'  }, { t:'formal English', c:'sys' },
+  { t:'preserve', c:'sys'  }, { t:'tone', c:'sys'  }, { t:'note', c:'sys'  }, { t:'terminology', c:'sys' },
+  { t:'SEP', sep:true },
+  { t:'Ex:', c:'ex'  }, { t:'AI(人工智能)', c:'ex' }, { t:'→AI', c:'ex'  },
+  { t:'SEP', sep:true },
+  { t:'Please', c:'user' }, { t:'translate:', c:'user' }, { t:'context', c:'user' },
+  { t:'window', c:'user' }, { t:'is key', c:'user' },
+];
+const TOTAL = TOKENS.filter(t => !t.sep).length; // 17
+
+const CLS = { sys:'tv-tk-sys', user:'tv-tk-user', ex:'tv-tk-ex' };
+
+const LEVELS = [
+  { lbl:'Tiny (only 4 Tokens)',    keep:4  },
+  { lbl:'Small (only 9 Tokens)',    keep:9  },
+  { lbl:'Medium (14 Tokens)',       keep:14 },
+  { lbl:'Sufficient (all 17 Tokens)',  keep:TOTAL },
+  { lbl:'Very large (128K Tokens)',     keep:TOTAL },
+];
+
+// SYSTEM prompt segments, each corresponding to a group of sys tokens
+// sys tokens total 10: You are translator Chinese to formal English preserve tone note terminology
+const SYS_SEGMENTS = [
+  { text: 'You are a professional translator, ' },
+  { text: 'translate Chinese into formal English, ' },
+  { text: 'preserve tone, ' },
+  { text: 'note technical terminology.' },
+];
+// Cumulative sys token counts at the end of each segment
+const SYS_SEG_TOKENS = [3, 5, 7, 10]; // total sys tokens used through end of segment i
+
+const BAD_AI_OUT = [
+  'The context of... ⚠ Instructions lost, output unreliable',
+  'The window of large models is… (unstable, instructions incomplete)',
+  'The context window of large language models is key.',
+  'The context window is a critical capability of large language models.',
+  'The context window is a critical capability of large language models.',
+];
+const GOOD_AI_OUT = 'The context window is a critical capability of large language models.';
+
+let typingTimer = null;
+
+function render(lv) {
+  const lvl = LEVELS[lv];
+  document.getElementById('slVal').textContent = lvl.lbl;
+  document.querySelectorAll('#slTicks span').forEach((t, i) => t.classList.toggle('on', i === lv));
+  const keep = lvl.keep;
+  const nonSepTokens = TOKENS.filter(t => !t.sep);
+  const cutCount = nonSepTokens.length - keep;
+
+  // ── Token visualization ──
+  const tv = document.getElementById('tvTokens');
+  tv.innerHTML = '';
+  let nonSepIdx = 0;
+  TOKENS.forEach(tk => {
+    if (tk.sep) {
+      const s = document.createElement('span');
+      s.className = 'tv-sep'; s.textContent = '│';
+      tv.appendChild(s);
+      return;
+    }
+    const isCut = nonSepIdx < cutCount;
+    const el = document.createElement('span');
+    el.className = 'tv-tk ' + (isCut ? 'tv-tk-cut' : CLS[tk.c]);
+    el.textContent = tk.t;
+    tv.appendChild(el);
+    nonSepIdx++;
+  });
+
+  // Truncation indicator
+  const countEl = document.getElementById('tvCount');
+  if (cutCount > 0) {
+    countEl.innerHTML = `<span class="tv-cut-badge">⚠ ${cutCount} Tokens truncated, ${keep} remaining</span>`;
+  } else {
+    countEl.innerHTML = `<span style="color:var(--success);font-weight:800;">✓ All ${TOTAL} Tokens are within the window</span>`;
+  }
+
+  // ── Left column: SYSTEM truncation visualization ──
+  // total sys tokens = 10; truncated sys tokens = max(0, portion of cutCount that are sys)
+  // nonSep token order: 10 sys + 3 ex + 4 user = 17
+  // the first cutCount nonSep tokens are all sys tokens (they come first)
+  const sysCutCount = Math.min(cutCount, 10); // max 10 sys tokens can be truncated
+  const sysKeepCount = 10 - sysCutCount;      // sys tokens visible to the model
+
+  // Calculate visible / truncated segments based on sysKeepCount
+  let visibleText = '';
+  let cutText = '';
+  SYS_SEGMENTS.forEach((seg, si) => {
+    const prevTokens = si === 0 ? 0 : SYS_SEG_TOKENS[si - 1];
+    const segEndTokens = SYS_SEG_TOKENS[si];
+    if (sysKeepCount >= segEndTokens) {
+      // entire segment visible
+      visibleText += seg.text;
+    } else if (sysKeepCount <= prevTokens) {
+      // entire segment truncated
+      cutText += seg.text;
+    } else {
+      // partially visible (roughly half by character count)
+      const half = Math.floor(seg.text.length / 2);
+      visibleText += seg.text.slice(0, half) + '…';
+      cutText += '…' + seg.text.slice(half);
+    }
+  });
+
+  document.getElementById('sysVisible').textContent = visibleText;
+  const sysCutEl = document.getElementById('sysCut');
+  const cutMask  = document.getElementById('cutMask');
+  if (cutText) {
+    sysCutEl.textContent = cutText;
+    cutMask.style.display = 'block';
+  } else {
+    sysCutEl.textContent = '';
+    cutMask.style.display = 'none';
+  }
+
+  // ── Left column label ──
+  const hasCut = lv <= 1;
+  document.getElementById('colBad').className = 'cmp-col ' + (lv >= 3 ? 'ok' : 'bad');
+  document.getElementById('badLabel').textContent =
+    lv >= 3 ? '✅ Window sufficient: system instructions fully read' :
+    hasCut   ? `❌ Window only ${keep} Tokens: system instructions severely truncated` :
+               `⚠ Window too small: instructions partially truncated`;
+
+  // ── Right column ──
+  document.getElementById('goodEx').style.display = lv >= 3 ? 'block' : 'none';
+  document.getElementById('goodLabel').textContent = lv >= 3
+    ? '✅ Large window: instructions + Few-Shot examples all fit'
+    : '✅ Window sufficient: all instructions read completely';
+
+  // ── Typing animation ──
+  if (typingTimer) clearInterval(typingTimer);
+  const badAiEl  = document.getElementById('badAiT');
+  const goodAiEl = document.getElementById('goodAiT');
+  const badCur   = document.getElementById('badCur');
+  const goodCur  = document.getElementById('goodCur');
+  badAiEl.textContent = ''; goodAiEl.textContent = '';
+  badCur.style.display = 'inline-block';
+  goodCur.style.display = 'inline-block';
+
+  const badOut  = BAD_AI_OUT[lv];
+  badAiEl.style.color = lv <= 1 ? '#991b1b' : lv === 2 ? '#b45309' : '#14532d';
+  document.getElementById('badAi').className = 'msg ' + (lv <= 2 ? 'msg-ai-bad' : 'msg-ai-good');
+
+  let bi = 0, gi = 0;
+  typingTimer = setInterval(() => {
+    let done = true;
+    if (bi < badOut.length)      { badAiEl.textContent  += badOut[bi++];       done = false; }
+    if (gi < GOOD_AI_OUT.length) { goodAiEl.textContent += GOOD_AI_OUT[gi++];  done = false; }
+    if (done) {
+      clearInterval(typingTimer);
+      badCur.style.display = 'none'; goodCur.style.display = 'none';
+    }
+  }, 28);
+}
+
+// ── Reasoning chain: auto-plays step by step on scroll-into-view, replayable ──
+const CHAIN_STEPS = ['s0','s1','s2','s3','s4'];
+const CHAIN_ARROWS = ['a0','a1','a2','a3'];
+let chainTimer = null;
+
+function playChain() {
+  if (chainTimer) { clearInterval(chainTimer); chainTimer = null; }
+  document.getElementById('replayBtn').style.display = 'none';
+  document.getElementById('conclusionBar').classList.remove('show');
+  CHAIN_STEPS.forEach(id => document.getElementById(id).classList.remove('show'));
+  CHAIN_ARROWS.forEach(id => document.getElementById(id).classList.remove('show'));
+
+  let i = 0;
+  document.getElementById(CHAIN_STEPS[0]).classList.add('show');
+  chainTimer = setInterval(() => {
+    i++;
+    if (i >= CHAIN_STEPS.length) {
+      clearInterval(chainTimer);
+      chainTimer = null;
+      document.getElementById('conclusionBar').classList.add('show');
+      document.getElementById('replayBtn').style.display = 'inline-block';
+      return;
+    }
+    document.getElementById(CHAIN_ARROWS[i - 1]).classList.add('show');
+    document.getElementById(CHAIN_STEPS[i]).classList.add('show');
+  }, 550);
+}
+
+lessonOnView(document.getElementById('logicChain'), playChain);
+
+// Initial render
+render(1);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

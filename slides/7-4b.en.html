@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>5 Patterns of Agent Deadlocks | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--green:var(--success);--orange:var(--amber);--red:var(--danger);--muted:var(--sub);--surface:var(--card);--surface2:rgba(0,0,0,.04)}
+
+/* 模式选择卡片 */
+.mode-list{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.mode-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .15s;position:relative;min-height:44px}
+.mode-card:hover{border-color:rgba(217,119,6,.4)}
+.mode-card.active{background:rgba(217,119,6,.05);border-color:var(--orange)}
+.mode-card.active .mc-name{color:var(--orange)}
+.mc-icon{font-size:20px;margin-bottom:4px}
+.mc-name{font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;transition:color .15s}
+.mc-brief{font-size:12px;color:var(--muted);line-height:1.4}
+.mc-num{position:absolute;top:10px;right:12px;width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--muted)}
+.mode-card.active .mc-num{background:rgba(217,119,6,.12);color:var(--orange)}
+
+/* 主区 */
+.main{margin-top:16px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.main-top{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.mt-scenario{font-size:14px;color:var(--text);font-weight:700;flex:1;min-width:200px}
+
+.main-body{display:grid;grid-template-columns:1fr 1fr}
+.sim-col{display:flex;flex-direction:column;min-width:0}
+.sim-col:first-child{border-right:1px solid var(--border)}
+.sim-hd{padding:9px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px}
+.sim-hd-fail{color:var(--red);background:rgba(220,38,38,.03)}
+.sim-hd-fix{color:var(--green);background:rgba(22,163,74,.03)}
+.sim-body{padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-height:160px}
+
+.msg{border-radius:10px;padding:8px 12px;font-size:13px;line-height:1.6;opacity:0;transform:translateY(6px);transition:all .35s ease}
+.msg.show{opacity:1;transform:translateY(0)}
+.msg-role{font-size:10px;font-weight:800;letter-spacing:.4px;margin-bottom:3px;text-transform:uppercase}
+.msg-text{white-space:pre-line}
+
+.msg-user{background:rgba(8,145,178,.06);border:1px solid rgba(8,145,178,.12)}
+.msg-user .msg-role{color:var(--cyan)}
+.msg-model{background:rgba(124,58,237,.05);border:1px solid rgba(124,58,237,.1)}
+.msg-model .msg-role{color:var(--purple)}
+.msg-tool{background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.12)}
+.msg-tool .msg-role{color:var(--green)}
+.msg-error{background:rgba(220,38,38,.06);border:1.5px solid rgba(220,38,38,.2)}
+.msg-error .msg-role{color:var(--red)}
+.msg-warning{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2)}
+.msg-warning .msg-role{color:var(--amber)}
+.msg-loop{background:rgba(124,58,237,.03);border:1.5px dashed rgba(124,58,237,.2)}
+.msg-loop .msg-role{color:var(--purple)}
+.msg-ok{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.2)}
+.msg-ok .msg-role{color:var(--green)}
+.msg-framework{background:rgba(217,119,6,.05);border:1px dashed rgba(217,119,6,.2)}
+.msg-framework .msg-role{color:var(--orange)}
+
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
+.shake{animation:shake .4s ease}
+@keyframes pulse-border{0%,100%{border-color:rgba(220,38,38,.2)}50%{border-color:rgba(220,38,38,.5)}}
+.pulse{animation:pulse-border 1.2s ease infinite}
+
+.decision-bar{padding:12px 14px;border-top:1px solid var(--border)}
+.dec{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);line-height:1.6}
+.dec b{color:var(--orange)}
+
+.btn{padding:8px 16px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:38px}
+.btn-p{background:var(--orange);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.3;cursor:not-allowed}
+.btn-r{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+
+.empty-state{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--muted);font-size:14px;padding:60px 20px}
+.empty-state-icon{font-size:36px;opacity:.4}
+
+.counter{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:12px;font-weight:700}
+.counter-fail{background:rgba(220,38,38,.08);color:var(--red)}
+.counter-fix{background:rgba(22,163,74,.08);color:var(--green)}
+
+@media (max-width:768px){
+  .mode-list{grid-template-columns:1fr 1fr}
+  .main-body{grid-template-columns:1fr}
+  .sim-col:first-child{border-right:none;border-bottom:1px solid var(--border)}
+}
+</style>
+<meta name="description" content="Agents are not infallible — they have 5 typical failure patterns. Good product design confronts these issues and prepares a response plan for each failure mode.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-4b.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-4b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-4b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-4b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-4b.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="5 Patterns of Agent Deadlocks">
+<meta property="og:url" content="https://xueai.app/slides/7-4b.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"5 Patterns of Agent Deadlocks","name":"5 Patterns of Agent Deadlocks","url":"https://xueai.app/slides/7-4b.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Agent Engineering","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Agents are not infallible — they have 5 typical failure patterns. Good product design confronts these issues and prepares a response plan for each failure mode.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent Engineering</div>
+    <h1>5 Patterns of Agent Deadlocks</h1>
+    <p class="subtitle">Click a card below to select a failure mode → Play the failure simulation → Compare behavior with protection applied.</p>
+  </header>
+
+  <div class="sec-label">Five Failure Modes</div>
+  <div class="mode-list" id="cardList"></div>
+
+  <div class="main paywall-locked xa-peek" id="mainArea">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-state-icon">↑</div>
+      <div>Select a failure mode to view the animated simulation</div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b>　Agents are not infallible — they have 5 typical failure patterns. Good product design confronts these issues head-on and prepares a response for each: <b>parameter validation, tool verification, loop detection, proactive clarification, and timeout fallbacks.</b>
+  </div>
+</article>
+
+<script>
+var MODES = [
+  {
+    icon:'📋❌', name:'Parameter Format Error', brief:'Model guesses parameter format, fails repeatedly',
+    scenario:'Model calls get_weather, but the parameter format doesn\'t match the API requirement',
+    decision:'<b>📌 Design Decision:</b> Tool descriptions must include clear parameter format examples, otherwise the model can only guess. Whether you write "city must be lowercase pinyin, e.g. beijing" is what determines how many retries the model needs.',
+    fail:[
+      {type:'msg-user',role:'User',text:'What\'s the weather in Beijing tomorrow?'},
+      {type:'msg-model',role:'Model Reasoning',text:'Calling get_weather tool\ncity → "北京市"'},
+      {type:'msg-error',role:'API Response',text:'❌ Error 400: city field invalid, must be English city name',shake:true},
+      {type:'msg-model',role:'Model Retry #1',text:'Let me try a different format…\ncity → "Beijing"'},
+      {type:'msg-error',role:'API Response',text:'❌ Error 400: city must be all lowercase',shake:true},
+      {type:'msg-model',role:'Model Retry #2',text:'One more try…\ncity → "beijing"'},
+      {type:'msg-tool',role:'API Response',text:'✅ Finally succeeded. But 3 retries and 1800 Tokens were consumed.'},
+      {type:'msg-warning',role:'Result',text:'⚠️ Got lucky this time. Bad luck means hitting maxRetries and giving up.'}
+    ],
+    fix:[
+      {type:'msg-framework',role:'Framework: Tool Description',text:'get_weather\nDescription: Query city weather\ncity: Lowercase city name in English, e.g. beijing, shanghai\ndate: YYYY-MM-DD format'},
+      {type:'msg-user',role:'User',text:'What\'s the weather in Beijing tomorrow?'},
+      {type:'msg-model',role:'Model Reasoning',text:'Description says city must be lowercase English\ncity → "beijing"\ndate → "2026-04-23"'},
+      {type:'msg-ok',role:'API Response',text:'✅ Success on first try! Beijing tomorrow: light rain turning cloudy, 12-20°C'},
+      {type:'msg-ok',role:'Result',text:'Zero retries, saved 1200 Tokens. Key: one example line in the description.'}
+    ]
+  },
+  {
+    icon:'👻🔧', name:'Hallucinated Tool', brief:'Model calls a tool name that doesn\'t exist',
+    scenario:'Model hallucinates a tool that doesn\'t exist in the system and tries to call it',
+    decision:'<b>📌 Design Decision:</b> When the model calls a non-existent tool, the framework should return a list of available tools to help the model self-correct. Don\'t just say "tool not found" — that\'s like asking the model to guess in the dark.',
+    fail:[
+      {type:'msg-user',role:'User',text:'The meeting is starting soon, remind all attendees'},
+      {type:'msg-model',role:'Model Reasoning',text:'Send notification to attendees… calling send_notification tool'},
+      {type:'msg-error',role:'Framework Response',text:'❌ Tool not found: send_notification',shake:true},
+      {type:'msg-model',role:'Model Retry #1',text:'What about push_notification?'},
+      {type:'msg-error',role:'Framework Response',text:'❌ Tool not found: push_notification',shake:true},
+      {type:'msg-model',role:'Model Retry #2',text:'Maybe it\'s notify_users?'},
+      {type:'msg-error',role:'Framework Response',text:'❌ Tool not found: notify_users',shake:true},
+      {type:'msg-warning',role:'Result',text:'⚠️ Model guessed 3 wrong tool names, burned 2400 Tokens.\nThe only tool that can notify people is send_email.'}
+    ],
+    fix:[
+      {type:'msg-user',role:'User',text:'The meeting is starting soon, remind all attendees'},
+      {type:'msg-model',role:'Model Reasoning',text:'Send notification… calling send_notification'},
+      {type:'msg-framework',role:'Framework Response (with guidance)',text:'⚠️ send_notification does not exist.\nAvailable tools: send_email, get_calendar, search_contacts\nHint: Use send_email to send notifications'},
+      {type:'msg-model',role:'Model Correction',text:'Ah, should use send_email!\nFirst use get_calendar to get attendees, then send_email to each'},
+      {type:'msg-ok',role:'Result',text:'✅ Succeeded after one correction round. Available list = a flashlight for the model.'}
+    ]
+  },
+  {
+    icon:'🔄♾️', name:'Infinite Loop', brief:'Read-edit-verify-edit cycle that never ends',
+    scenario:'Model falls into a "read file → edit → verify → re-edit" infinite loop',
+    decision:'<b>📌 Design Decision:</b> Default max 50 iterations. Too few limits complex tasks; too many burns money. What should your product set? Also add loop detection: force-interrupt if the same operation repeats 3 times in a row.',
+    fail:[
+      {type:'msg-user',role:'User',text:'Help me optimize the performance of this code'},
+      {type:'msg-model',role:'Model → Round 1',text:'read_file("app.js")\n→ Found optimization at line 42'},
+      {type:'msg-tool',role:'Tool',text:'edit_file("app.js", ...)  Modified line 42'},
+      {type:'msg-model',role:'Model → Round 2',text:'read_file("app.js") to verify\n→ Hmm, line 58 can also be optimized'},
+      {type:'msg-tool',role:'Tool',text:'edit_file("app.js", ...)  Modified line 58'},
+      {type:'msg-loop',role:'Model → Round 3',text:'read_file("app.js") to verify again\n→ Now wants to revert line 42…'},
+      {type:'msg-loop',role:'Model → Rounds 4, 5, 6…',text:'🔄 read → edit → read → edit → read → edit …\nSame file read 20 times, modified 15 times'},
+      {type:'msg-error',role:'Round 50',text:'❌ Reached maxIterations(50), force-terminated\n48,000 Tokens consumed, code is worse than before',pulse:true}
+    ],
+    fix:[
+      {type:'msg-user',role:'User',text:'Help me optimize the performance of this code'},
+      {type:'msg-framework',role:'Framework: Loop Detector',text:'Rule: Same operation on same file ≥ 3 consecutive times → Interrupt\nmaxIterations = 25 (for extreme cases)'},
+      {type:'msg-model',role:'Model → Round 1',text:'read_file → edit_file → modification done'},
+      {type:'msg-model',role:'Model → Round 2',text:'read_file to verify → found new optimization → edit_file'},
+      {type:'msg-model',role:'Model → Round 3',text:'read_file to verify → wants to revert Round 1 change'},
+      {type:'msg-framework',role:'Framework Interrupt',text:'⚠️ Loop detected: read_file("app.js") called 3 consecutive times\nAuto-interrupted, model asked to summarize current state'},
+      {type:'msg-ok',role:'Result',text:'✅ Stopped at Round 3, saved 40,000+ Tokens\nModel forced to summarize and deliver partial results'}
+    ]
+  },
+  {
+    icon:'🤷❓', name:'Missing Info, No Questions Asked', brief:'Fills in gaps by guessing instead of asking',
+    scenario:'User instruction is ambiguous; model guesses instead of asking, causing errors',
+    decision:'<b>📌 Design Decision:</b> Should an Agent ask more or guess more? Excessive questions are annoying; excessive guessing is dangerous. Rule of thumb: for <b>irreversible operations</b> (send email, delete file, payment), always confirm; reversible operations can act first.',
+    fail:[
+      {type:'msg-user',role:'User',text:'Send an email for me'},
+      {type:'msg-model',role:'Model Reasoning',text:'User wants to send an email. No recipient specified…\nNo subject… no content…\nBut I\'m a helpful assistant, so I\'ll guess!'},
+      {type:'msg-model',role:'Model Execution',text:'Calling send_email\nRecipient → team@company.com (guessed)\nSubject → "Notification" (guessed)\nContent → "Hello, this is a notification email." (guessed)'},
+      {type:'msg-tool',role:'API Response',text:'✅ Email sent successfully!'},
+      {type:'msg-error',role:'User Reaction',text:'😱 What?! I just wanted to send a contract to Zhang San!\nYou sent a random email to the whole team?!',shake:true},
+      {type:'msg-warning',role:'Result',text:'⚠️ Technically succeeded, but user trust is destroyed.\nIrreversible operation + blind guessing = disaster.'}
+    ],
+    fix:[
+      {type:'msg-user',role:'User',text:'Send an email for me'},
+      {type:'msg-framework',role:'System Prompt Rule',text:'Rule: Before irreversible operations, if key parameters are missing,\nmust call ask_user tool to confirm with user'},
+      {type:'msg-model',role:'Model Reasoning',text:'Sending email is irreversible; missing: recipient, subject, content\n→ Calling ask_user tool'},
+      {type:'msg-model',role:'ask_user',text:'Please provide the following:\n1. Who to send to? (name or email)\n2. What is the email subject?\n3. Key points for the email content?'},
+      {type:'msg-user',role:'User Reply',text:'Send to Zhang San, subject is Contract Confirmation,\ncontent: please find the attached contract'},
+      {type:'msg-ok',role:'Result',text:'✅ Sent accurately with complete info.\nOne extra question prevented a disaster.'}
+    ]
+  },
+  {
+    icon:'⏱️💥', name:'API Timeout Cascade', brief:'Slow external API floods context with error messages',
+    scenario:'External API responds slowly; retries pile up error messages until context overflows',
+    decision:'<b>📌 Design Decision:</b> How long to set tool timeouts? 5 seconds is too short (kills normal requests); 60 seconds is too long (users can\'t wait). Recommended: <b>10s for reads, 30s for writes</b>, max 2 retries, return a friendly message on failure — don\'t throw raw error stacks.',
+    fail:[
+      {type:'msg-user',role:'User',text:'Check Tesla\'s latest stock price'},
+      {type:'msg-model',role:'Model',text:'Calling get_stock_price("TSLA")'},
+      {type:'msg-error',role:'After 30 seconds…',text:'❌ Request timeout: Stock API unresponsive (30s timeout)',shake:true},
+      {type:'msg-model',role:'Model Retry #1',text:'Timed out? Try again…\nCalling get_stock_price("TSLA")'},
+      {type:'msg-error',role:'Another 30 seconds…',text:'❌ Request timeout: Stock API unresponsive (30s timeout)',shake:true},
+      {type:'msg-model',role:'Model Retry #2',text:'One more try…'},
+      {type:'msg-error',role:'30 more seconds…',text:'❌ Request timeout: Stock API unresponsive (30s timeout)',shake:true},
+      {type:'msg-warning',role:'Result',text:'⚠️ User waited 90 seconds and got nothing\nContext filled with 3 timeout errors, massive Token waste\nAnd the model may still want to retry…',pulse:true}
+    ],
+    fix:[
+      {type:'msg-user',role:'User',text:'Check Tesla\'s latest stock price'},
+      {type:'msg-framework',role:'Framework: Timeout & Retry Strategy',text:'get_stock_price config:\ntimeout = 10s ｜ maxRetries = 2\nOn failure: fallback = return friendly message (no raw error stack)'},
+      {type:'msg-model',role:'Model',text:'Calling get_stock_price("TSLA")'},
+      {type:'msg-error',role:'Timeout after 10 seconds',text:'Timeout → auto-retry once → still times out'},
+      {type:'msg-framework',role:'Framework Fallback',text:'Message returned to model:\n"Stock API temporarily unavailable, suggest telling user to retry later\nor direct user to finance.yahoo.com to check manually"'},
+      {type:'msg-model',role:'Model Reply to User',text:'Sorry, the stock data service is temporarily slow.\nPlease try again later, or visit Yahoo Finance to check.'},
+      {type:'msg-ok',role:'Result',text:'✅ Clear reply within 20 seconds\nContext only gained 1 concise fallback message, no Token burn'}
+    ]
+  }
+];
+
+var activeMode = -1, playing = false, failStep = 0, fixStep = 0, timers = [];
+
+function buildCards() {
+  var html = '';
+  for (var i = 0; i < MODES.length; i++) {
+    var m = MODES[i];
+    html += '<div class="mode-card' + (i === activeMode ? ' active' : '') + '" onclick="selectMode(' + i + ')" id="card' + i + '">' +
+      '<div class="mc-num">' + (i + 1) + '</div>' +
+      '<div class="mc-icon">' + m.icon + '</div>' +
+      '<div class="mc-name">' + m.name + '</div>' +
+      '<div class="mc-brief">' + m.brief + '</div>' +
+      '</div>';
+  }
+  document.getElementById('cardList').innerHTML = html;
+}
+
+function selectMode(i) {
+  clearTimers();
+  playing = false;
+  failStep = 0;
+  fixStep = 0;
+  activeMode = i;
+  buildCards();
+  renderMain();
+  setTimeout(function() {
+    var main = document.getElementById('mainArea');
+    if (main) main.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }, 60);
+}
+
+function renderMain() {
+  if (activeMode < 0) return;
+  var m = MODES[activeMode];
+  var mainEl = document.getElementById('mainArea');
+  var es = document.getElementById('emptyState');
+  if (es) es.style.display = 'none';
+
+  mainEl.innerHTML =
+    '<div class="main-top">' +
+      '<div class="mt-scenario"><span style="color:var(--orange);margin-right:6px">' + m.icon + '</span> ' + m.scenario + '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<button class="btn btn-p" id="btnPlay" onclick="playAll()">▶ Play Simulation</button>' +
+        '<button class="btn btn-r" onclick="resetSim()">Reset</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="main-body">' +
+      '<div class="sim-col">' +
+        '<div class="sim-hd sim-hd-fail">❌ Without Protection <span class="counter counter-fail" id="failCount">0 / ' + m.fail.length + '</span></div>' +
+        '<div class="sim-body" id="failSim"></div>' +
+      '</div>' +
+      '<div class="sim-col">' +
+        '<div class="sim-hd sim-hd-fix">✅ With Protection <span class="counter counter-fix" id="fixCount">0 / ' + m.fix.length + '</span></div>' +
+        '<div class="sim-body" id="fixSim"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="decision-bar">' +
+      '<div class="dec">' + m.decision + '</div>' +
+    '</div>';
+}
+
+function addMsg(containerId, step, callback) {
+  var el = document.createElement('div');
+  el.className = 'msg ' + step.type;
+  el.innerHTML = '<div class="msg-role">' + step.role + '</div><div class="msg-text">' + step.text + '</div>';
+  document.getElementById(containerId).appendChild(el);
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      el.classList.add('show');
+      if (step.shake) setTimeout(function() { el.classList.add('shake'); }, 100);
+      if (step.pulse) setTimeout(function() { el.classList.add('pulse'); }, 300);
+      if (callback) callback();
+    });
+  });
+}
+
+function clearTimers() {
+  for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
+  timers = [];
+}
+
+function playAll() {
+  if (playing) return;
+  playing = true;
+  var m = MODES[activeMode];
+  var btn = document.getElementById('btnPlay');
+  if (btn) { btn.disabled = true; btn.textContent = 'Playing…'; }
+
+  var maxLen = Math.max(m.fail.length, m.fix.length);
+  var step = 0;
+
+  function tick() {
+    if (step >= maxLen) {
+      playing = false;
+      if (btn) btn.textContent = '✓ Playback Complete';
+      return;
+    }
+    if (step < m.fail.length) {
+      addMsg('failSim', m.fail[step]);
+      failStep = step + 1;
+      var fc = document.getElementById('failCount');
+      if (fc) fc.textContent = failStep + ' / ' + m.fail.length;
+    }
+    if (step < m.fix.length) {
+      addMsg('fixSim', m.fix[step]);
+      fixStep = step + 1;
+      var xc = document.getElementById('fixCount');
+      if (xc) xc.textContent = fixStep + ' / ' + m.fix.length;
+    }
+    step++;
+    timers.push(setTimeout(tick, 850));
+  }
+  tick();
+}
+
+function resetSim() {
+  clearTimers();
+  playing = false;
+  failStep = 0;
+  fixStep = 0;
+  renderMain();
+}
+
+buildCards();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

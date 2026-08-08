@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>함수 호출의 진실: 대화 하나 뒤에 숨은 5개의 메시지 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 双栏：用户视角 | Message List ── */
+.duo{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
+
+/* 左：用户视角（聊天模拟窗口，保留内部滚动） */
+.chat-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);position:sticky;top:16px}
+.l-label{padding:10px 16px;font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.chat-area{padding:12px;min-height:180px;max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;background:#eae7df}
+.chat-bubble{max-width:88%;padding:9px 13px;border-radius:14px;font-size:15px;line-height:1.6;opacity:0;transform:translateY(6px);transition:all .3s ease}
+.chat-bubble.show{opacity:1;transform:translateY(0)}
+.chat-user{align-self:flex-end;background:var(--cyan);color:white;border-bottom-right-radius:4px}
+.chat-bot{align-self:flex-start;background:var(--card);color:var(--text);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.chat-loading{align-self:flex-start;background:var(--card);color:var(--sub);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);font-size:14px;display:flex;align-items:center;gap:6px}
+.typing-dots span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--sub);animation:blink 1.4s infinite both}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
+.chat-tool-card{align-self:flex-start;background:var(--card);border:1.5px solid rgba(22,163,74,.2);border-radius:12px;padding:10px 12px;box-shadow:0 1px 4px rgba(0,0,0,.06);max-width:88%}
+.ctc-hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--success);margin-bottom:5px}
+.ctc-row{display:flex;justify-content:space-between;font-size:13px;padding:2px 0}
+.ctc-label{color:var(--sub)}
+.ctc-val{font-weight:600;color:var(--text)}
+
+/* 产品决策卡片 */
+.decision{padding:12px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(4px);transition:all .35s}
+.dec-card.show{opacity:1;transform:translateY(0)}
+.dec-card b{color:var(--accent)}
+
+/* 右：Message List */
+.ml-panel{min-width:0}
+.r-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.r-title{font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.5px}
+.r-stats{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.r-stat{font-size:13px;color:var(--sub);font-weight:600}
+.r-stat span{font-weight:800;color:var(--text)}
+.btn-reset{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--sub);cursor:pointer;font-family:inherit;min-height:32px}
+
+.ml-area{display:flex;flex-direction:column;gap:8px}
+
+/* 消息条目 — 仿 API 调试器 */
+.ml-entry{border:1.5px solid var(--border);border-radius:10px;overflow:hidden;opacity:0;transform:translateY(8px);transition:all .35s ease;background:var(--card)}
+.ml-entry.show{opacity:1;transform:translateY(0)}
+.ml-head{padding:6px 12px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;background:rgba(0,0,0,.025);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:4px}
+.ml-idx{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;font-weight:800;color:var(--sub)}
+.ml-role{display:flex;align-items:center;gap:6px}
+.ml-role-badge{padding:2px 7px;border-radius:4px;font-size:12px;font-weight:800;letter-spacing:.3px}
+.ml-tokens{color:var(--sub);font-weight:600;font-size:13px}
+.ml-body{padding:10px 12px 12px;font-size:14px;line-height:1.6;color:var(--text)}
+.ml-field{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;color:var(--sub);font-weight:600;margin-bottom:1px;word-break:break-word}
+.ml-field-val{color:var(--text);font-weight:400}
+.ml-body-muted{color:var(--sub);font-size:13px}
+.ml-tool-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:13px;font-weight:700;margin:2px 0}
+.ml-param{display:flex;gap:8px;font-size:13px;padding:2px 0;padding-left:16px;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.ml-param-k{color:var(--sub);min-width:40px}
+.ml-param-v{color:var(--text);font-weight:600}
+
+/* 框架动作行 */
+.ml-action{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:rgba(217,119,6,.04);border:1px dashed rgba(217,119,6,.3);font-size:13px;color:var(--amber);font-weight:600;opacity:0;transform:translateY(6px);transition:all .3s}
+.ml-action.show{opacity:1;transform:translateY(0)}
+.ml-action-icon{font-size:15px}
+
+/* 请求方向标记 */
+.ml-dir{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:13px;font-weight:700;color:var(--sub);opacity:0;transition:opacity .3s}
+.ml-dir.show{opacity:1}
+.ml-dir-arrow{font-size:15px}
+
+/* 折叠的工具列表 */
+.ml-tools-summary{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.ml-ts-chip{padding:3px 8px;border-radius:4px;font-size:13px;font-weight:700;background:rgba(0,0,0,.05);color:var(--sub)}
+
+/* JSON 格式参考（可折叠卡片） */
+.json-panel{border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:var(--shadow-card)}
+.json-toggle{padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--sub);user-select:none;transition:all .15s;min-height:44px}
+.json-toggle:hover{background:rgba(0,0,0,.02)}
+.json-panel.closed .json-ref{display:none}
+.json-ref{background:#1e1e2e;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px;line-height:1.7;color:#cdd6f4;white-space:pre;padding:14px 16px;overflow-x:auto}
+.json-ref .jr-k{color:#89b4fa}
+.json-ref .jr-v{color:#a6e3a1}
+.json-ref .jr-null{color:#f38ba8;font-style:italic}
+.json-ref .jr-cm{color:#6c7086}
+.json-ref .jr-brace{color:#cdd6f4}
+
+.hint-line{font-size:13px;color:var(--sub);margin-top:10px;min-height:20px}
+
+@media (max-width:768px){
+  .duo{grid-template-columns:1fr}
+  .chat-panel{position:static}
+  .chat-area{max-height:260px}
+}
+</style>
+<meta name="description" content="Function Calling 완전 해부: 왼쪽은 사용자가 보는 대화, 오른쪽은 API에서 실제 전송되는 Message List입니다. 각 단계에는 프로덕트 매니저가 내려야 할 설계 결정이 표시됩니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-2a.ko.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-2a.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-2a.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-2a.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-2a.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="함수 호출의 진실: 대화 하나 뒤에 숨은 5개의 메시지">
+<meta property="og:url" content="https://xueai.app/slides/7-2a.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"대화 하나 뒤에 숨은 5개의 메시지","name":"대화 하나 뒤에 숨은 5개의 메시지","url":"https://xueai.app/slides/7-2a.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Agent 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Function Calling 완전 해부: 왼쪽은 사용자가 보는 대화, 오른쪽은 API에서 실제 전송되는 Message List입니다. 각 단계에는 프로덕트 매니저가 내려야 할 설계 결정이 표시됩니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 엔지니어링</div>
+    <h1>대화 하나 뒤에 숨은 5개의 메시지</h1>
+    <p class="subtitle">왼쪽: 사용자가 보는 화면 | 오른쪽: API에서 실제로 일어나는 일. 아래로 스크롤하면 날씨 조회 한 번의 이면을 자동으로 시연합니다.</p>
+  </header>
+
+  <div class="duo reveal" id="duoDemo">
+    <!-- 左：用户视角 + 设计决策 -->
+    <aside class="chat-panel">
+      <div class="l-label">사용자 화면</div>
+      <div class="chat-area" id="chatArea"></div>
+      <div class="decision" id="decArea"></div>
+    </aside>
+
+    <!-- 右：Message List -->
+    <div class="ml-panel">
+      <div class="r-bar">
+        <div class="r-title">실제 실행 과정</div>
+        <div class="r-stats">
+          <div class="r-stat">메시지 <span id="msgCount">0</span></div>
+          <div class="r-stat">Token <span id="tokenCount">0</span></div>
+          <div class="r-stat">API 호출 <span id="apiCount">0</span></div>
+          <button class="btn-reset" onclick="reset()">↺ 다시 재생</button>
+        </div>
+      </div>
+      <div class="ml-area" id="mlArea"></div>
+      <div class="hint-line" id="hint">총 7단계 · 날씨 조회 한 번의 이면을 살펴보세요</div>
+    </div>
+  </div>
+
+  <div class="sec-label reveal">JSON 형식 참고</div>
+  <div class="json-panel open reveal paywall-locked xa-peek" id="jsonPanel">
+    <div class="json-toggle" onclick="toggleJson()">
+      <span id="jsonArrow">▼</span>
+      <span class="json-toggle-label">messages 배열의 전체 형식</span>
+    </div>
+    <div class="json-ref"><span class="jr-brace">{</span>
+  <span class="jr-k">"messages"</span>: [
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"system"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"지시문"</span>
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"user"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"사용자 메시지"</span>
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"assistant"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-null">null</span>,
+      <span class="jr-k">"tool_calls"</span>: [{
+        <span class="jr-k">"name"</span>: <span class="jr-v">"…"</span>,
+        <span class="jr-k">"arguments"</span>: {…}
+      }]
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"tool"</span>,
+      <span class="jr-k">"tool_call_id"</span>: <span class="jr-v">"…"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"결과"</span>
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"assistant"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"최종 응답"</span>
+    }
+  ]
+<span class="jr-brace">}</span>
+
+<span class="jr-cm">// 총 5개 메시지</span>
+<span class="jr-cm">// 모델 API 호출 2회</span>
+<span class="jr-cm">// 도구 호출 1회</span></div>
+  </div>
+
+  <div class="sec-label reveal paywall-locked">Takeaway</div>
+  <div class="l-callout reveal paywall-locked" id="insightBar">
+    <b>Takeaway</b>&nbsp;&nbsp;사용자는 답변 한 줄을 봅니다. 이면에는 5개의 메시지, 2회의 모델 API 호출, 1회의 외부 API 호출이 있습니다. 프로덕트 설계의 본질은 이 단계들 중 어떤 것을 사용자에게 보여주고 어떤 것을 조용히 처리할지 결정하는 것입니다.
+  </div>
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+var msgIdx = 0;
+
+var STEPS = [
+  {
+    msgs: 1, tokens: 220, apis: 0,
+    hint: '1/7 · 대화가 시작되기 전, 코드가 먼저 system 메시지를 주입합니다',
+    chat: [],
+    decision: '<b>📌 설계 결정:</b> system 메시지에 어떤 도구를 등록할 건가요? 도구 하나 추가 ≈ 매 턴 +60 Token. 도구 10개 제품, 하루 100턴 = 매일 도구 정의에 6만 Token 추가 소비.',
+    ml: [
+      { type:'dir', arrow:'→', text:'코드가 모델 API에 1번째 요청을 전송합니다' },
+      { type:'entry', role:'system', roleColor:'#6b6b70', roleBg:'rgba(0,0,0,.06)', tokens: 220,
+        fields:[
+          {k:'role', v:'"system"'},
+          {k:'content', v:'"당신은 지능형 어시스턴트입니다. 다음 도구를 사용하여 사용자를 도울 수 있습니다…"'},
+          {k:'tools', special:'chips', chips:['get_weather','send_email','web_search']}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 2, tokens: 250, apis: 0,
+    hint: '2/7 · 사용자의 질문이 Message List에 추가됩니다',
+    chat: [{ type:'user', text:'베이징 내일 날씨 어때요?' }],
+    decision: '<b>📌 설계 결정:</b> 사용자가 메시지를 보낸 후 무엇을 보여줄 건가요? 대부분의 제품은 먼저 "생각 중…" 로딩 상태를 보여줍니다. 그런데 사용자는 이후 도구 호출이 발생한다는 걸 모릅니다 — 알려야 할까요?',
+    ml: [
+      { type:'entry', role:'user', roleColor:'#0891b2', roleBg:'rgba(8,145,178,.1)', tokens: 30,
+        fields:[
+          {k:'role', v:'"user"'},
+          {k:'content', v:'"베이징 내일 날씨 어때요?"'}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 3, tokens: 310, apis: 1,
+    hint: '3/7 · 모델이 직접 답하지 않고 tool_call을 반환했습니다',
+    chat: [{ type:'loading', text:'생각 중' }],
+    decision: '<b>📌 핵심 인식:</b> 오른쪽을 보세요: content가 <b>null</b>입니다! 모델이 사용자에게 답하지 않고 tool_calls를 출력했습니다. 이는 코드에 "이 도구를 호출하고 싶다"고 알리는 구조화된 텍스트입니다. 모델은 아무것도 직접 실행하지 않습니다.',
+    ml: [
+      { type:'dir', arrow:'←', text:'모델 API 응답 수신 (1번째 호출 완료, 1.8초 소요)' },
+      { type:'entry', role:'assistant', roleColor:'#7c3aed', roleBg:'rgba(124,58,237,.1)', tokens: 60,
+        fields:[
+          {k:'role', v:'"assistant"'},
+          {k:'content', v:'null', muted:true},
+          {k:'tool_calls', special:'tool_call', name:'get_weather', id:'call_abc123', args:[['city','"베이징"'],['date','"2026-04-23"']]}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 3, tokens: 310, apis: 1,
+    hint: '4/7 · 코드가 제어를 넘겨받습니다: 파라미터 검증 → 실제 API 호출',
+    chat: [{ type:'remove-loading' }, { type:'loading', text:'날씨 조회 중' }],
+    decision: '<b>📌 설계 결정:</b> 지금은 모델이 아니라 엔지니어링 코드가 실행 중입니다. 결정할 사항: ① 파라미터 검증을 얼마나 엄격하게? ② 타임아웃은 얼마나? ③ 실패 시 재시도 횟수? ④ "날씨 조회 중"을 표시할까요, 계속 "생각 중"을 표시할까요?',
+    ml: [
+      { type:'action', icon:'⚙️', text:'코드: tool_calls 파싱 → 파라미터 검증 → city 유효 ✓, date 형식 정확 ✓ → 날씨 API 호출 중…' }
+    ]
+  },
+  {
+    msgs: 4, tokens: 360, apis: 1,
+    hint: '5/7 · 날씨 API가 결과를 반환하고, 코드가 messages 배열에 다시 주입합니다',
+    chat: [],
+    decision: '<b>📌 설계 결정:</b> 도구가 원시 데이터를 반환했습니다. 선택지: 원시 데이터를 messages에 직접 삽입(간단하지만 Token 많음), 또는 먼저 처리/간소화(Token 절약하지만 추가 코드 필요).',
+    ml: [
+      { type:'action', icon:'✅', text:'날씨 API 반환 성공 (0.8초) → 코드가 tool 메시지를 구성하여 messages에 추가' },
+      { type:'entry', role:'tool', roleColor:'#16a34a', roleBg:'rgba(22,163,74,.1)', tokens: 50,
+        fields:[
+          {k:'role', v:'"tool"'},
+          {k:'tool_call_id', v:'"call_abc123"', muted:true},
+          {k:'content', special:'json', rows:[['weather','"가랑비 후 흐림"'],['temp','"12°C ~ 20°C"'],['wind','"북풍 3단계"']]}
+        ],
+        footnote:'이 메시지는 모델이 생성한 것이 아니라 코드가 주입한 것입니다'
+      }
+    ]
+  },
+  {
+    msgs: 5, tokens: 480, apis: 2,
+    hint: '6/7 · 코드가 2번째 모델 API 호출: 전체 4개 메시지를 전송합니다',
+    chat: [{ type:'remove-loading' }],
+    decision: '<b>📌 설계 결정:</b> 이제 2번째 모델 API 호출로 전체 4개 메시지를 함께 전송합니다. 모델이 도구 결과를 보고 답변을 생성하게 됩니다. 주의: 이전의 system, user, assistant, tool 4개 메시지가 다시 전송되어 Token이 다시 청구됩니다.',
+    ml: [
+      { type:'dir', arrow:'→', text:'코드가 2번째 요청 전송 (전체 4개 메시지 + 도구 결과 포함)' },
+      { type:'dir', arrow:'←', text:'모델이 최종 답변 반환 (1.5초 소요)' },
+      { type:'entry', role:'assistant', roleColor:'#7c3aed', roleBg:'rgba(124,58,237,.1)', tokens: 120,
+        fields:[
+          {k:'role', v:'"assistant"'},
+          {k:'content', v:'"내일 베이징은 가랑비 후 흐리며 기온 12~20°C, 북풍 3단계입니다. 외출 시 우산을 챙기세요."'}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 5, tokens: 480, apis: 2,
+    hint: '7/7 · 사용자가 최종 답변을 봅니다. 전체 과정: 모델 호출 2회 + 날씨 API 호출 1회',
+    chat: [
+      { type:'bot', text:'내일 베이징: 가랑비 후 흐림, 12~20°C, 북풍 3단계. 우산 챙기세요! ☂️' }
+    ],
+    decision: '<b>📌 설계 결정:</b> 최종 표시 형식: 텍스트만? 아니면 구조화된 카드도 표시? 카드가 더 나은 경험을 제공하지만 프론트엔드 추가 개발이 필요합니다.<br><b>전체 흐름 요약:</b> 사용자가 약 4초 기다리는 동안, 시스템은 5개 메시지를 처리하고, 모델 2회 + 날씨 API 1회를 호출하며, 480 Token(약 ¥0.003)을 소비했습니다.',
+    ml: []
+  }
+];
+
+var cur = 0;
+
+function addChat(item) {
+  var area = document.getElementById('chatArea');
+  if (item.type === 'remove-loading') {
+    var ld = area.querySelector('.chat-loading');
+    if (ld) ld.remove();
+    return;
+  }
+  var el = document.createElement('div');
+  if (item.type === 'user') {
+    el.className = 'chat-bubble chat-user';
+    el.textContent = item.text;
+  } else if (item.type === 'bot') {
+    el.className = 'chat-bubble chat-bot';
+    el.textContent = item.text;
+  } else if (item.type === 'loading') {
+    el.className = 'chat-bubble chat-loading';
+    el.innerHTML = item.text + ' <span class="typing-dots"><span></span><span></span><span></span></span>';
+  } else if (item.type === 'tool-card') {
+    el.className = 'chat-tool-card';
+    var h = '<div class="ctc-hd">' + item.title + '</div>';
+    for (var i = 0; i < item.rows.length; i++) {
+      h += '<div class="ctc-row"><span class="ctc-label">' + item.rows[i][0] + '</span><span class="ctc-val">' + item.rows[i][1] + '</span></div>';
+    }
+    el.innerHTML = h;
+  }
+  area.appendChild(el);
+  requestAnimationFrame(function() { requestAnimationFrame(function() {
+    el.classList.add('show');
+    area.scrollTop = area.scrollHeight;
+  })});
+}
+
+function renderField(f) {
+  var h = '<div class="ml-field"><span style="color:var(--sub)">' + f.k + ':</span> ';
+  if (f.special === 'chips') {
+    h += '[</div><div class="ml-tools-summary" style="padding-left:16px">';
+    for (var c = 0; c < f.chips.length; c++) {
+      h += '<div class="ml-ts-chip">' + f.chips[c] + '</div>';
+    }
+    h += '</div><div class="ml-field" style="margin-top:2px">]</div>';
+  } else if (f.special === 'tool_call') {
+    h += '[{</div>';
+    h += '<div class="ml-param"><span class="ml-param-k">name</span><span class="ml-param-v">"' + f.name + '"</span></div>';
+    h += '<div class="ml-param"><span class="ml-param-k">id</span><span class="ml-param-v" style="color:var(--sub);font-weight:400">"' + f.id + '"</span></div>';
+    h += '<div class="ml-param"><span class="ml-param-k">arguments</span><span class="ml-param-v">{</span></div>';
+    for (var a = 0; a < f.args.length; a++) {
+      h += '<div class="ml-param" style="padding-left:32px"><span class="ml-param-k">' + f.args[a][0] + '</span><span class="ml-param-v">' + f.args[a][1] + '</span></div>';
+    }
+    h += '<div class="ml-param"><span class="ml-param-k"></span><span class="ml-param-v">}</span></div>';
+    h += '<div class="ml-field">}]</div>';
+  } else if (f.special === 'json') {
+    h += '{</div>';
+    for (var r = 0; r < f.rows.length; r++) {
+      h += '<div class="ml-param"><span class="ml-param-k">' + f.rows[r][0] + '</span><span class="ml-param-v">' + f.rows[r][1] + '</span></div>';
+    }
+    h += '<div class="ml-field">}</div>';
+  } else {
+    var valStyle = f.muted ? 'color:var(--sub);font-style:italic' : 'color:var(--text)';
+    h += '<span class="ml-field-val" style="' + valStyle + '">' + f.v + '</span></div>';
+  }
+  return h;
+}
+
+function addML(item) {
+  var area = document.getElementById('mlArea');
+  var el = document.createElement('div');
+  if (item.type === 'dir') {
+    el.className = 'ml-dir';
+    el.innerHTML = '<span class="ml-dir-arrow">' + item.arrow + '</span> ' + item.text;
+  } else if (item.type === 'action') {
+    el.className = 'ml-action';
+    el.innerHTML = '<span class="ml-action-icon">' + item.icon + '</span> ' + item.text;
+  } else if (item.type === 'entry') {
+    el.className = 'ml-entry';
+    var bodyHtml = '';
+    for (var i = 0; i < item.fields.length; i++) {
+      bodyHtml += renderField(item.fields[i]);
+    }
+    if (item.footnote) {
+      bodyHtml += '<div class="ml-body-muted" style="margin-top:4px;font-style:italic">' + item.footnote + '</div>';
+    }
+    el.innerHTML =
+      '<div class="ml-head">' +
+        '<div class="ml-role">' +
+          '<span class="ml-idx">messages[' + msgIdx + ']</span>' +
+          '<span class="ml-role-badge" style="background:' + item.roleBg + ';color:' + item.roleColor + '">' + item.role + '</span>' +
+        '</div>' +
+        '<span class="ml-tokens">' + item.tokens + ' Token</span>' +
+      '</div>' +
+      '<div class="ml-body">' + bodyHtml + '</div>';
+    msgIdx++;
+  }
+  area.appendChild(el);
+  setTimeout(function() {
+    el.classList.add('show');
+  }, 60);
+}
+
+var playTimer = null;
+
+function playStep() {
+  if (cur >= STEPS.length) return;
+  var s = STEPS[cur];
+
+  document.getElementById('msgCount').textContent = s.msgs;
+  document.getElementById('tokenCount').textContent = s.tokens;
+  document.getElementById('apiCount').textContent = s.apis;
+  document.getElementById('hint').textContent = s.hint;
+
+  for (var i = 0; i < s.chat.length; i++) addChat(s.chat[i]);
+  for (var j = 0; j < s.ml.length; j++) {
+    (function(item, delay) {
+      setTimeout(function() { addML(item); }, delay);
+    })(s.ml[j], j * 150);
+  }
+
+  var da = document.getElementById('decArea');
+  da.innerHTML = '<div class="dec-card">' + s.decision + '</div>';
+  requestAnimationFrame(function() { requestAnimationFrame(function() {
+    var dc = da.querySelector('.dec-card');
+    if (dc) dc.classList.add('show');
+  })});
+
+  cur++;
+  if (cur >= STEPS.length) {
+    playTimer = null;
+  } else {
+    playTimer = setTimeout(playStep, 900);
+  }
+}
+
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
+function toggleJson() {
+  var p = document.getElementById('jsonPanel');
+  var a = document.getElementById('jsonArrow');
+  if (p.classList.contains('open')) {
+    p.classList.remove('open');
+    p.classList.add('closed');
+    a.textContent = '▶';
+  } else {
+    p.classList.remove('closed');
+    p.classList.add('open');
+    a.textContent = '▼';
+  }
+}
+
+function reset() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
+  cur = 0;
+  msgIdx = 0;
+  document.getElementById('chatArea').innerHTML = '';
+  document.getElementById('mlArea').innerHTML = '';
+  document.getElementById('decArea').innerHTML = '';
+  document.getElementById('msgCount').textContent = '0';
+  document.getElementById('tokenCount').textContent = '0';
+  document.getElementById('apiCount').textContent = '0';
+  document.getElementById('hint').textContent = '총 7단계 · 자동 재생 중…';
+  startPlay();
+}
+
+lessonOnView(document.getElementById('duoDemo'), function() {
+  document.getElementById('hint').textContent = '총 7단계 · 자동 재생 중…';
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

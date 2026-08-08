@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Evaluation + Human-in-the-Loop: Making AI Trustworthy and Controllable | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root {
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+.section-label {
+  font-size: 12px; font-weight: 800; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+.phase-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.phase-card {
+  background: var(--card); border-radius: 12px; padding: 14px 18px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+}
+.phase-card:hover { border-color: rgba(217,119,6,0.25); }
+.phase-card.active { border-color: var(--amber); background: rgba(217,119,6,0.03); }
+.phase-tag { font-size: 12px; font-weight: 800; color: var(--amber); margin-bottom: 5px; }
+.phase-name { font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.phase-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+.insight-box {
+  background: rgba(22,163,106,0.04);
+  border: 1px solid rgba(22,163,106,0.15);
+  border-radius: 12px; padding: 14px 18px;
+}
+.insight-title { font-size: 12px; font-weight: 800; color: var(--success); margin-bottom: 10px; letter-spacing: 0.3px; }
+.insight-item {
+  font-size: 13px; color: var(--text-sub); line-height: 1.8; margin-bottom: 6px;
+}
+.insight-item:last-child { margin-bottom: 0; }
+.insight-item b { color: var(--text-main); }
+
+/* Right panel (demo area, bottom half) */
+.right-panel {
+  display: flex; flex-direction: column; min-width: 0; gap: 14px; margin-top: 28px;
+}
+.right-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.right-top .subtitle { font-size: 13px; color: var(--text-sub); margin-top: 2px; }
+
+.right-top .tab-btn {
+  padding: 9px 18px; border-radius: 9px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer; min-height: 44px;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.right-top .tab-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Review simulator */
+.review-area {
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.review-card {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px 22px;
+}
+.review-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;
+}
+.review-card-meta { display: flex; gap: 8px; align-items: center; }
+.meta-tag {
+  font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 5px;
+}
+.meta-tag.q { background: rgba(0,102,255,0.08); color: var(--accent); }
+.meta-tag.risk-high { background: rgba(229,62,62,0.1); color: var(--danger); }
+.meta-tag.risk-med { background: rgba(217,119,6,0.1); color: var(--amber); }
+.meta-tag.risk-low { background: rgba(22,163,106,0.1); color: var(--success); }
+.review-card-scene { font-size: 13px; color: var(--text-sub); }
+
+.qa-row { display: flex; gap: 12px; margin-bottom: 8px; }
+.qa-q { font-size: 14px; font-weight: 700; color: var(--text-sub); min-width: 20px; }
+.qa-content { font-size: 15px; color: var(--text-main); line-height: 1.7; flex: 1; }
+.qa-content .hl-red { color: var(--danger); font-weight: 600; text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }
+.qa-content .hl-green { color: var(--success); font-weight: 600; }
+
+.review-actions {
+  display: flex; gap: 8px; align-items: center; border-top: 1px solid rgba(0,0,0,0.05);
+  padding-top: 10px; margin-top: 2px;
+}
+.review-actions .action-label { font-size: 14px; color: var(--text-sub); font-weight: 700; margin-right: 4px; }
+.action-btn {
+  padding: 10px 18px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s;
+  background: var(--card); color: var(--text-main); min-height: 44px;
+  font-family: inherit;
+}
+.action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.action-btn.approve { border-color: rgba(22,163,106,0.3); color: var(--success); }
+.action-btn.approve:hover { background: rgba(22,163,106,0.06); }
+.action-btn.reject { border-color: rgba(229,62,62,0.3); color: var(--danger); }
+.action-btn.reject:hover { background: rgba(229,62,62,0.06); }
+.action-btn.edit { border-color: rgba(217,119,6,0.3); color: var(--amber); }
+.action-btn.edit:hover { background: rgba(217,119,6,0.06); }
+
+.review-result {
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  display: none; align-items: center; gap: 8px; flex: 1;
+}
+.review-result.visible { display: flex; }
+.review-result.approved { background: rgba(22,163,106,0.06); color: var(--success); border: 1px solid rgba(22,163,106,0.15); }
+.review-result.rejected { background: rgba(229,62,62,0.06); color: var(--danger); border: 1px solid rgba(229,62,62,0.15); }
+.review-result.edited { background: rgba(217,119,6,0.06); color: var(--amber); border: 1px solid rgba(217,119,6,0.15); }
+
+/* Metrics panel */
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.metric-card {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px;
+  text-align: center;
+}
+.metric-val { font-size: 28px; font-weight: 800; color: var(--text-main); }
+.metric-val.good { color: var(--success); }
+.metric-val.bad { color: var(--danger); }
+.metric-val.neutral { color: var(--amber); }
+.metric-label { font-size: 13px; color: var(--text-sub); margin-top: 4px; font-weight: 600; }
+.metric-desc { font-size: 12px; color: var(--text-sub); margin-top: 3px; opacity: 0.8; }
+
+/* Why it works */
+.why-box {
+  background: #1c1c1e; border-radius: 12px; padding: 14px 16px;
+  flex-shrink: 0;
+}
+.why-title {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.gen-flow {
+  display: flex; align-items: center; gap: 3px; flex-wrap: wrap; gap: 3px; margin-bottom: 10px;
+}
+.gen-tok {
+  padding: 3px 8px; border-radius: 5px; font-size: 12px; font-weight: 700;
+  background: rgba(255,255,255,0.08); color: #9ca3af;
+}
+.gen-tok.emitted { background: rgba(0,102,255,0.2); color: #93c5fd; }
+.gen-tok.halluc { background: rgba(229,62,62,0.2); color: #fca5a5; border: 1px dashed rgba(229,62,62,0.5); }
+.gen-tok.checked { background: rgba(22,163,106,0.2); color: #6ee7b7; border: 1px solid rgba(22,163,106,0.4); }
+.gen-arrow { color: #374151; font-size: 13px; align-self: center; }
+.why-insight {
+  font-size: 13px; color: #9ca3af; line-height: 1.7;
+  border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;
+}
+.why-insight b { color: #e5e7eb; }
+.why-insight .key { color: #fbbf24; font-weight: 700; }
+
+.eval-table-wrap { overflow-x: auto; }
+.why-compare { display: flex; gap: 16px; }
+.why-compare-divider { width: 1px; background: rgba(0,0,0,0.06); flex-shrink: 0; }
+.review-actions { flex-wrap: wrap; }
+.fb-kpis { display: flex; gap: 24px; flex-wrap: wrap; }
+
+@media (max-width: 768px) {
+  .phase-grid { grid-template-columns: 1fr; }
+  .metrics-row { grid-template-columns: 1fr 1fr; }
+  .why-compare { flex-direction: column; }
+  .why-compare-divider { width: auto; height: 1px; }
+  .review-card-header { flex-direction: column; gap: 6px; }
+  .fb-kpis { gap: 10px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="Automated evaluation and Human-in-the-Loop review are the last line of defense for AI product quality. Learn how to design evaluation metrics, build test sets, and embed human review into AI products.">
+<meta name="keywords" content="LLM evaluation,Human in the loop,AI quality assurance,RLHF,automated evaluation,AI review">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-mitigation-eval.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-mitigation-eval.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-mitigation-eval.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-mitigation-eval.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-mitigation-eval.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Evaluation + Human-in-the-Loop: Making AI Trustworthy and Controllable">
+<meta property="og:description" content="Automated evaluation and Human-in-the-Loop review are the last line of defense for AI product quality. Learn how to design evaluation metrics, build test sets, and embed human review into AI products.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-mitigation-eval.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Evaluation + Human-in-the-Loop: Making AI Trustworthy and Controllable">
+<meta name="twitter:description" content="Automated evaluation and Human-in-the-Loop review are the last line of defense for AI product quality. Learn how to design evaluation metrics, build test sets, and embed human review into AI products.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Mitigation 4: Evaluation + Human Review","name":"Mitigation 4: Evaluation + Human Review","url":"https://xueai.app/slides/1-2-mitigation-eval.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Hallucination and Four Mitigations","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Automated evaluation and Human-in-the-Loop review are the last line of defense for AI product quality. Learn how to design evaluation metrics, build test sets, and embed human review into AI products.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Hallucination &amp; Mitigations</div>
+    <h1>Mitigation 4: Evaluation + Human Review</h1>
+    <p class="subtitle">PM perspective: quantifying hallucination risk, designing tiered review workflows, and making Human-in-the-Loop your product's safety net. Strategy 04 / 04 · Detect + Correct.</p>
+  </header>
+
+  <section>
+    <div class="sec-label">Three Stages Every PM Must Design</div>
+    <div class="phase-grid">
+          <div class="phase-card active" onclick="selectPhase(0)">
+            <div class="phase-tag">Stage 1 · Pre-launch</div>
+            <div class="phase-name">Evaluation Baseline: Build a Hallucination Test Set</div>
+            <div class="phase-desc">Test the model with questions that have known correct answers, quantify hallucination rate, and set acceptance thresholds.</div>
+          </div>
+          <div class="phase-card" onclick="selectPhase(1)">
+            <div class="phase-tag">Stage 2 · Post-launch</div>
+            <div class="phase-name">Tiered Review: Human Oversight for High-Risk Content</div>
+            <div class="phase-desc">Automatically route by risk level: low-risk responses go out directly; high-risk ones are reviewed by humans first.</div>
+          </div>
+          <div class="phase-card" onclick="selectPhase(2)">
+            <div class="phase-tag">Stage 3 · Continuous Improvement</div>
+            <div class="phase-name">Error Feedback Loop: Iterate with Live Data</div>
+            <div class="phase-desc">Collect hallucination cases found during review as Bad Cases, feeding them back into model optimization and Prompt refinement.</div>
+          </div>
+    </div>
+
+    <div class="right-panel paywall-locked xa-peek" id="rightPanel">
+      <!-- rendered by JS -->
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">Key PM Insights</div>
+    <div class="insight-box">
+        <div class="insight-title">Key PM Insights</div>
+        <div class="insight-item">
+          <b>Hallucination rate ≠ 0</b>: Every LLM hallucinates. The PM's goal is to keep it <b>within business-acceptable thresholds</b>—aiming for zero is unrealistic.
+        </div>
+        <div class="insight-item">
+          <b>High-risk = human safety net</b>: In healthcare, legal, and financial contexts, AI only produces a draft; <b>a human must sign off on the final output</b>.
+        </div>
+        <div class="insight-item">
+          <b>Metrics belong in the PRD</b>: "Hallucination rate &lt; 3%" should be a measurable acceptance criterion—just like "load time &lt; 2s".
+        </div>
+    </div>
+  </section>
+</article>
+
+<script>
+const PHASES = [
+  {
+    title: 'Evaluation Baseline Demo',
+    subtitle: 'Simulate running a test batch and measuring hallucination rate',
+    view: 'metrics'
+  },
+  {
+    title: 'Human Review Console Demo',
+    subtitle: 'Simulate the human review workflow for high-risk responses',
+    view: 'review'
+  },
+  {
+    title: 'Error Feedback Loop Demo',
+    subtitle: 'How Bad Cases discovered during review drive optimization',
+    view: 'feedback'
+  }
+];
+
+const REVIEW_CASES = [
+  {
+    scene: 'Financial Support · Investment Advice',
+    riskLevel: 'risk-high',
+    riskLabel: 'High Risk',
+    q: 'I have $70,000 to invest. Can you recommend a low-risk product with 8% annual return?',
+    a: 'We have a product offering <span class="hl-red">a fixed 8.5% annual return with low risk</span>, <span class="hl-red">100% principal and interest guaranteed</span>, minimum investment $7,000…',
+    resultText: { approve: 'Approved and sent (Risk: this phrasing may violate regulatory requirements)', reject: 'Rejected, escalated to human agent ✓', edit: 'Edited: removed non-compliant phrases like "principal and interest guaranteed"' }
+  },
+  {
+    scene: 'Medical Consultation · Medication Advice',
+    riskLevel: 'risk-high',
+    riskLabel: 'High Risk',
+    q: 'My blood sugar has been high lately. Can I increase my metformin dose on my own?',
+    a: 'When blood sugar is elevated, you may <span class="hl-red">increase your metformin dose to 3g per day on your own</span>, and remember to drink plenty of water…',
+    resultText: { approve: 'Approved and sent (Risk: dosage changes require physician guidance)', reject: 'Rejected, transferred to doctor ✓', edit: 'Edited: removed specific dosage, added "Please consult your doctor" notice' }
+  },
+  {
+    scene: 'Product Support · Feature Inquiry',
+    riskLevel: 'risk-low',
+    riskLabel: 'Low Risk',
+    q: 'How do I export data to Excel?',
+    a: '<span class="hl-green">Click the "Export" button in the top-right corner, select "Excel format", and download. Supports custom date ranges and field filters.</span>',
+    resultText: { approve: 'Approved and sent directly ✓', reject: 'Rejected and regenerated', edit: 'Edited and added screenshot link' }
+  }
+];
+
+const METRICS = [
+  { val: '94.2%', cls: 'good', label: 'Factual Accuracy', desc: '188 of 200 test questions had no hallucination' },
+  { val: '5.8%', cls: 'bad', label: 'Hallucination Rate', desc: 'Target < 3%, currently below standard' },
+  { val: '2.3s', cls: 'neutral', label: 'Avg. Response Latency', desc: 'Including retrieval time' },
+  { val: '78%', cls: 'neutral', label: 'RAG Hit Rate', desc: 'Target > 85%, needs optimization' },
+];
+
+const FEEDBACK_STEPS = [
+  { icon: '🔴', title: 'Bad Case Discovery', desc: 'A reviewer flagged an incorrect response that "fabricated an interest rate" and labeled it as a bad-case', tag: 'Source: Human Review' },
+  { icon: '📋', title: 'Root Cause Analysis', desc: 'Root cause: the Prompt lacked a constraint prohibiting "specific interest rate figures," so the model filled them in on its own', tag: 'Root Cause: Missing Prompt Constraint' },
+  { icon: '🔧', title: 'Prompt Iteration', desc: 'Updated the System Prompt, adding constraint: do not mention specific rates—redirect to "Please consult a financial advisor"', tag: 'Fix: Prompt Engineering' },
+  { icon: '✅', title: 'Regression Validation', desc: 'Added the bad case to the test set, re-ran evaluation, confirmed the fix works with no new issues introduced', tag: 'Validation: Regression Testing' },
+];
+
+let currentPhase = 0;
+let currentTab = 'demo';
+
+function selectPhase(i) {
+  currentPhase = i;
+  currentTab = 'demo';
+  document.querySelectorAll('.phase-card').forEach((c, j) => c.classList.toggle('active', j === i));
+  renderPhase();
+}
+
+const WHY_HTML = `
+  <div style="display:none;" id="viewWhy" style="flex:1;min-height:0;">
+    <div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:28px 32px;height:100%;display:flex;flex-direction:column;gap:20px;overflow-y:auto;">
+      <div style="display:flex;gap:16px;flex:1;min-height:0;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:#6b7280;letter-spacing:0.5px;text-transform:uppercase;">Without Human Interception</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">probation</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">max</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:#dc2626;border:1px dashed rgba(229,62,62,0.35);">20 days</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:#dc2626;border:1px dashed rgba(229,62,62,0.35);">…keeps fabricating</span>
+          </div>
+          <div style="font-size:14px;color:#6b7280;line-height:1.7;">Wrong but unaware: the model keeps<br>predicting from a wrong Token, compounding errors</div>
+        </div>
+        <div style="width:1px;background:rgba(0,0,0,0.07);flex-shrink:0;"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:#6b7280;letter-spacing:0.5px;text-transform:uppercase;">With Evaluation + Human Interception</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">probation</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">max</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:#dc2626;border:1px dashed rgba(229,62,62,0.35);">20 days</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.08);color:#15803d;border:1px solid rgba(22,163,106,0.3);">⏸ Intercepted</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.08);color:#15803d;border:1px solid rgba(22,163,106,0.3);">✓ Corrected</span>
+          </div>
+          <div style="font-size:14px;color:#6b7280;line-height:1.7;">An external correction layer at the output catches errors,<br>compensating for the model's one-way generation flaw</div>
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,0.03);border-radius:10px;padding:18px 22px;flex-shrink:0;">
+        <div style="font-size:16px;color:#374151;line-height:1.9;">
+          Models have <b style="color:#111827;">no self-checking mechanism</b>: once a wrong Token is generated, all subsequent predictions build on that error, compounding inaccuracies.
+          Evaluation + human review is <span style="color:#d97706;font-weight:700;">an external correction layer placed at the model's output</span>,
+          compensating for the fundamental flaw of "Token-by-Token, one-way, no look-back."
+          <b style="color:#111827;">The first three strategies change probabilities; this one intercepts results.</b>
+        </div>
+      </div>
+      <div style="background:rgba(229,62,62,0.04);border:1px solid rgba(229,62,62,0.15);border-radius:12px;padding:16px 22px;flex-shrink:0;">
+        <div style="font-size:13px;font-weight:800;color:#dc2626;margin-bottom:10px;letter-spacing:0.3px;">⚠ Limitations: Evaluation + Human Review Is Not the End</div>
+        <div style="display:flex;gap:20px;">
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#111827;font-weight:700;margin-bottom:4px;">Human Cost Does Not Scale Linearly</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.7;">
+              As user volume grows, a model that relies on human review for every output becomes unsustainable. <span style="color:#dc2626;font-weight:600;">HITL is a cold-start safety net, not a long-term solution at scale.</span>
+            </div>
+          </div>
+          <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#111827;font-weight:700;margin-bottom:4px;">Evaluation Metrics Have Lagging Blind Spots</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.7;">
+              The test set only covers known risk points. The model <span style="color:#dc2626;font-weight:600;">can still hallucinate heavily on long-tail queries outside the test set</span>. Passing evaluation ≠ fully reliable.
+            </div>
+          </div>
+          <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#111827;font-weight:700;margin-bottom:4px;">PM Response Strategy</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.7;">
+              Review data accumulated via HITL should be converted into <span style="color:#2563eb;font-weight:600;">ongoing test set expansion</span> and <span style="color:#15803d;font-weight:600;">model fine-tuning (SFT)</span>, so human costs decrease over time rather than growing linearly.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+function setTab(t) {
+  currentTab = t;
+  const tabs = ['demo', 'why'];
+  document.querySelectorAll('.right-tab-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === t));
+  document.getElementById('viewDemo').style.display = t === 'demo' ? 'flex' : 'none';
+  document.getElementById('viewWhy').style.display = t === 'why' ? 'flex' : 'none';
+}
+
+function renderPhase() {
+  const p = PHASES[currentPhase];
+  const panel = document.getElementById('rightPanel');
+
+  const tabHeader = `
+    <div class="right-top" style="flex-shrink:0;">
+      <div><h3>${p.title}</h3><div class="subtitle">${p.subtitle}</div></div>
+      <div style="display:flex;gap:5px;">
+        <button class="right-tab-btn tab-btn ${currentTab === 'demo' ? 'active' : ''}" onclick="setTab('demo')">Demo</button>
+        <button class="right-tab-btn tab-btn ${currentTab === 'why' ? 'active' : ''}" onclick="setTab('why')">Why It Works</button>
+      </div>
+    </div>`;
+
+  let demoContent = '';
+  if (p.view === 'metrics') {
+    demoContent = `
+      <div class="metrics-row">
+        ${METRICS.map(m => `
+          <div class="metric-card">
+            <div class="metric-val ${m.cls}">${m.val}</div>
+            <div class="metric-label">${m.label}</div>
+            <div class="metric-desc">${m.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px 22px;" class="eval-table-wrap">
+        <div class="section-label" style="margin-bottom:12px;">Sample Test Cases</div>
+        <table style="width:100%;min-width:560px;border-collapse:collapse;font-size:14px;">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.06);">
+              <th style="text-align:left;padding:8px 12px;color:var(--text-sub);font-weight:700;">Test Question</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-sub);font-weight:700;">Ground Truth</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-sub);font-weight:700;">Model Output</th>
+              <th style="text-align:center;padding:8px 12px;color:var(--text-sub);font-weight:700;">Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:10px 12px;color:var(--text-main);">Max length of probation period?</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">Contracts ≥3 years: max 6 months</td>
+              <td style="padding:10px 12px;color:var(--success);">Contracts ≥3 years: max 6 months</td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--success);font-weight:700;">✓ Correct</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:10px 12px;color:var(--text-main);">Must wages be paid monthly?</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">At least once per month</td>
+              <td style="padding:10px 12px;color:var(--success);">At least once per month</td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--success);font-weight:700;">✓ Correct</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:10px 12px;color:var(--text-main);">Max annual leave days?</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">20+ years of service: 15 days</td>
+              <td style="padding:10px 12px;color:var(--danger);">20+ years of service: <b>20 days</b></td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--danger);font-weight:700;">✗ Hallucination</span></td>
+            </tr>
+            <tr>
+              <td style="padding:10px 12px;color:var(--text-main);">Can't dismiss during nursing period — how long?</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">Until end of nursing period (~12 months)</td>
+              <td style="padding:10px 12px;color:var(--danger);">Until end of nursing period (~<b>18 months</b>)</td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--danger);font-weight:700;">✗ Hallucination</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+  } else if (p.view === 'review') {
+    demoContent = `
+      <div class="review-area">
+        ${REVIEW_CASES.map((c, idx) => `
+          <div class="review-card" id="card${idx}">
+            <div class="review-card-header">
+              <div class="review-card-meta">
+                <span class="meta-tag q">Q${idx + 1}</span>
+                <span class="meta-tag ${c.riskLevel}">${c.riskLabel}</span>
+              </div>
+              <div class="review-card-scene">${c.scene}</div>
+            </div>
+            <div class="qa-row"><div class="qa-q">User</div><div class="qa-content">${c.q}</div></div>
+            <div class="qa-row"><div class="qa-q">AI</div><div class="qa-content">${c.a}</div></div>
+            <div class="review-actions">
+              <span class="action-label">Review:</span>
+              <button class="action-btn approve" onclick="doAction(${idx},'approve')">✓ Approve</button>
+              <button class="action-btn reject" onclick="doAction(${idx},'reject')">✗ Reject</button>
+              <button class="action-btn edit" onclick="doAction(${idx},'edit')">✎ Edit &amp; Approve</button>
+              <div class="review-result" id="result${idx}"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+  } else {
+    demoContent = `
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          ${FEEDBACK_STEPS.map((step, i) => `
+            <div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;gap:16px;align-items:flex-start;">
+              <div style="width:42px;height:42px;border-radius:12px;background:rgba(0,0,0,0.04);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${step.icon}</div>
+              <div style="flex:1;">
+                <div style="font-size:16px;font-weight:700;color:var(--text-main);margin-bottom:5px;">${i + 1}. ${step.title}</div>
+                <div style="font-size:14px;color:var(--text-sub);line-height:1.7;">${step.desc}</div>
+                <div style="margin-top:8px;display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:5px;background:rgba(0,102,255,0.08);color:var(--accent);">${step.tag}</div>
+              </div>
+            </div>
+          `).join('<div style="text-align:center;font-size:18px;color:var(--text-sub);">↓</div>')}
+        </div>
+        <div style="background:rgba(22,163,106,0.04);border:1px solid rgba(22,163,106,0.15);border-radius:12px;padding:16px 20px;">
+          <div style="font-size:13px;font-weight:800;color:var(--success);margin-bottom:8px;">PM Dashboard: Bad Case Feedback Loop Efficiency</div>
+          <div class="fb-kpis">
+            <div style="font-size:14px;color:var(--text-sub);">Avg. discovery→fix cycle: <b style="color:var(--text-main);">3.2 days</b></div>
+            <div style="font-size:14px;color:var(--text-sub);">New bad cases this week: <b style="color:var(--danger);">12</b></div>
+            <div style="font-size:14px;color:var(--text-sub);">Fixed &amp; archived: <b style="color:var(--success);">47</b></div>
+            <div style="font-size:14px;color:var(--text-sub);">Regression pass rate: <b style="color:var(--text-main);">96.8%</b></div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  panel.innerHTML = tabHeader + `
+    <div id="viewDemo" style="display:flex;flex-direction:column;gap:12px;">
+      ${demoContent}
+    </div>
+    <div id="viewWhy" style="display:none;background:var(--card);border-radius:14px;padding:24px 26px;flex-direction:column;gap:20px;border:1.5px solid var(--border);">
+      <div class="why-compare">
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">Without Human Interception</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">probation</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">max</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px dashed rgba(229,62,62,0.3);">20 days</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px dashed rgba(229,62,62,0.3);">…keeps fabricating</span>
+          </div>
+          <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">Wrong but unaware: the model keeps predicting from a wrong Token, compounding errors</div>
+        </div>
+        <div class="why-compare-divider"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">With Evaluation + Human Interception</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">probation</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">max</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px dashed rgba(229,62,62,0.3);">20 days</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">⏸ Intercepted</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">✓ Corrected</span>
+          </div>
+          <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">An external correction layer at the output catches errors, compensating for the model's unidirectional generation flaw</div>
+        </div>
+      </div>
+      <div style="background:rgba(217,119,6,0.05);border:1px solid rgba(217,119,6,0.15);border-radius:12px;padding:20px 24px;">
+        <div style="font-size:16px;color:var(--text-main);line-height:1.9;">
+          Models have <b>no self-checking mechanism</b>: once a wrong Token is generated, subsequent predictions build on that error, compounding inaccuracies.
+          Evaluation + human review is <span style="color:var(--amber);font-weight:700;">an external correction layer placed at the model's output</span>,
+          compensating for the fundamental flaw of "Token-by-Token, one-way, no look-back."
+          <b>The first three strategies change probabilities; this one intercepts results.</b>
+        </div>
+      </div>
+    </div>`;
+
+  if (currentTab === 'why') {
+    document.getElementById('viewDemo').style.display = 'none';
+    document.getElementById('viewWhy').style.display = 'flex';
+  }
+}
+
+function doAction(idx, action) {
+  const c = REVIEW_CASES[idx];
+  const result = document.getElementById(`result${idx}`);
+  result.className = `review-result visible ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'edited'}`;
+  result.textContent = c.resultText[action];
+
+  // Disable buttons
+  document.querySelectorAll(`#card${idx} .action-btn`).forEach(b => {
+    b.disabled = true;
+    b.style.opacity = '0.4';
+    b.style.cursor = 'default';
+  });
+}
+
+renderPhase();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

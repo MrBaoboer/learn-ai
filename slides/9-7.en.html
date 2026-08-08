@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Why Agents Get Stuck in Infinite Loops | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.pattern-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+@media(max-width:768px){.pattern-grid{grid-template-columns:1fr}}
+.pattern-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card);cursor:pointer;transition:all .25s ease}
+.pattern-card:hover{border-color:var(--danger);box-shadow:0 4px 20px rgba(220,38,38,.1)}
+.pattern-card .head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.pattern-card .icon{width:36px;height:36px;border-radius:10px;background:rgba(220,38,38,.08);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.pattern-card .name{font-size:16px;font-weight:800;color:var(--text)}
+.pattern-card .brief{font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:12px}
+.pattern-card .detail{overflow:hidden;max-height:0;transition:max-height .4s ease;font-size:14px;line-height:1.7;color:var(--text)}
+.pattern-card.open .detail{max-height:400px}
+.detail-inner{padding-top:12px;border-top:1px solid var(--border)}
+.detail-inner .scene{background:rgba(220,38,38,.04);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px}
+.detail-inner .scene-title{font-size:12px;font-weight:700;color:var(--danger);margin-bottom:4px}
+.detail-inner .user-says{font-size:13px;color:var(--sub);font-style:italic}
+.expand-hint{font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:4px;transition:all .2s}
+.pattern-card.open .expand-hint{color:var(--sub)}
+.pattern-card.open .expand-hint .arrow{transform:rotate(180deg)}
+.expand-hint .arrow{transition:transform .3s;display:inline-block}
+.sim-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:8px;box-shadow:var(--shadow-card)}
+.sim-box h3{font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px}
+.sim-log{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12px;line-height:1.8;background:rgba(0,0,0,.03);border-radius:var(--radius-sm);padding:14px 16px;max-height:200px;overflow-y:auto}
+.sim-log .line{opacity:0;transition:opacity .3s}
+.sim-log .line.show{opacity:1}
+.sim-log .line.warn{color:var(--amber)}
+.sim-log .line.err{color:var(--danger)}
+.sim-log .line.dim{color:var(--sub)}
+.sim-btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.sim-btn{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;color:var(--text)}
+.sim-btn:hover{border-color:var(--danger);background:rgba(220,38,38,.04)}
+.sim-btn.active{border-color:var(--danger);background:rgba(220,38,38,.08);color:var(--danger)}
+.takeaway{background:rgba(220,38,38,.04);border:1.5px solid rgba(220,38,38,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--danger)}
+</style>
+<meta name="description" content="Several typical failure patterns of Agent loops in real production environments, and what users actually experience when things go wrong.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-7.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/9-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/9-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/9-7.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/9-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Why Agents Get Stuck in Infinite Loops">
+<meta property="og:url" content="https://xueai.app/slides/9-7.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Why Agents Get Stuck in Infinite Loops","name":"Why Agents Get Stuck in Infinite Loops","url":"https://xueai.app/slides/9-7.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Agent Loop","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Several typical failure patterns of Agent loops in real production environments, and what users actually experience when things go wrong.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Agent in Practice</div>
+    <h1>Why Agents Get Stuck in Infinite Loops</h1>
+    <p class="subtitle">Infinite loops in the lab are easy to catch — just glance at the console. But failures in production are far more subtle: users won't say "your Agent is looping." They'll say "why is your AI so slow" or "is it broken?"</p>
+  </header>
+
+  <div class="sec-label">Four Production-Specific Failure Patterns</div>
+
+  <div class="pattern-grid paywall-locked xa-peek" id="patternGrid">
+    <div class="pattern-card reveal" onclick="toggleCard(this)">
+      <div class="head">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
+        <div class="name">Same-Parameter Loop</div>
+      </div>
+      <div class="brief">The Agent calls the same tool with identical parameters 3 times in a row</div>
+      <div class="expand-hint"><span class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span> Click to expand</div>
+      <div class="detail">
+        <div class="detail-inner">
+          <p style="margin-bottom:10px">The model forgot it already did this, or thinks it didn't succeed and needs to retry — but with identical parameters, the result is always the same.</p>
+          <div class="scene">
+            <div class="scene-title">What users experience</div>
+            <div class="user-says">"It's been spinning forever with no response" · "Why does it keep loading?"</div>
+          </div>
+          <p style="font-size:13px;color:var(--sub)">Typical scenarios: reading the same file repeatedly, searching the same keyword over and over, calling the same API in a loop</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pattern-card reveal" onclick="toggleCard(this)">
+      <div class="head">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg></div>
+        <div class="name">Diminishing Returns</div>
+      </div>
+      <div class="brief">Ran 50 loop iterations but produced almost no valuable output</div>
+      <div class="expand-hint"><span class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span> Click to expand</div>
+      <div class="detail">
+        <div class="detail-inner">
+          <p style="margin-bottom:10px">The Agent is busy, but each iteration only does marginal work: reformatting, re-confirming, irrelevant searches. It looks busy but makes no real progress toward the core goal.</p>
+          <div class="scene">
+            <div class="scene-title">What users experience</div>
+            <div class="user-says">"I waited two minutes and this is all I get?" · "Is the AI slacking off?"</div>
+          </div>
+          <p style="font-size:13px;color:var(--sub)">Typical scenarios: Agent loses direction on a complex task, keeps making safe but useless micro-moves</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pattern-card reveal" onclick="toggleCard(this)">
+      <div class="head">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg></div>
+        <div class="name">Text Repetition</div>
+      </div>
+      <div class="brief">The model starts repeating itself — the same passage keeps appearing</div>
+      <div class="expand-hint"><span class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span> Click to expand</div>
+      <div class="detail">
+        <div class="detail-inner">
+          <p style="margin-bottom:10px">When the context is too long or the model is confused, it degrades into repetition mode: regenerating previous output verbatim. The model isn't frozen — it's lost.</p>
+          <div class="scene">
+            <div class="scene-title">What users experience</div>
+            <div class="user-says">"It's going in circles" · "Why is it saying the same thing again?"</div>
+          </div>
+          <p style="font-size:13px;color:var(--sub)">Typical scenarios: late in a long conversation, context nearing the window limit, vague task description</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pattern-card reveal" onclick="toggleCard(this)">
+      <div class="head">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+        <div class="name">Tool Failure Cascade</div>
+      </div>
+      <div class="brief">One tool goes down; the Agent retries frantically, bringing down the whole chain</div>
+      <div class="expand-hint"><span class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span> Click to expand</div>
+      <div class="detail">
+        <div class="detail-inner">
+          <p style="margin-bottom:10px">Tool A times out → Agent retries → still times out → tries a different call → still fails → falls back to Tool B → B depends on A's result and also fails → cascade.</p>
+          <div class="scene">
+            <div class="scene-title">What users experience</div>
+            <div class="user-says">"It seems stuck" · "Waited a long time and suddenly got an error"</div>
+          </div>
+          <p style="font-size:13px;color:var(--sub)">Typical scenarios: external API rate limiting, database connection pool exhausted, third-party service temporarily down</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Simulation: Live Failure</div>
+
+  <div class="sim-box reveal paywall-locked">
+    <h3>Choose a pattern to see what the backend logs look like</h3>
+    <div class="sim-btns">
+      <button class="sim-btn" onclick="simulate('loop')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Same-Param Loop</button>
+      <button class="sim-btn" onclick="simulate('diminish')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>Diminishing Returns</button>
+      <button class="sim-btn" onclick="simulate('repeat')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg>Text Repetition</button>
+      <button class="sim-btn" onclick="simulate('cascade')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Tool Cascade</button>
+    </div>
+    <div class="sim-log" id="simLog">
+      <div class="line show dim">← Choose a pattern to start simulation</div>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+    <span><b>Production Agent failures look nothing like lab failures: users won't tell you "the Agent is looping." They'll say "your AI is so slow" or "is it broken?"</b> Recognizing these patterns is the prerequisite for building defenses.</span>
+  </div>
+
+</article>
+
+<script>
+function toggleCard(el){
+  el.classList.toggle('open');
+}
+
+var SIM_DATA = {
+  loop: [
+    {t:'dim', s:'[Turn 1] User: "Check the project status for me"'},
+    {t:'', s:'[Turn 1] → tool_call: read_file("status.md")'},
+    {t:'', s:'[Turn 1] ← Return: file content (234 tokens)'},
+    {t:'', s:'[Turn 2] → tool_call: read_file("status.md")'},
+    {t:'warn', s:'[Turn 2] <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:2px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Duplicate call with identical parameters'},
+    {t:'', s:'[Turn 3] → tool_call: read_file("status.md")'},
+    {t:'err', s:'[Turn 3] ✗ 3 consecutive identical calls! Infinite loop confirmed'},
+    {t:'err', s:'[System] Agent has been idle for 45 s, user is waiting...'}
+  ],
+  diminish: [
+    {t:'dim', s:'[Turn 1] User: "Write me a competitive analysis report"'},
+    {t:'', s:'[Turn 1-5] Searching competitor info... found 3 results'},
+    {t:'', s:'[Turn 6-12] Formatting search results...'},
+    {t:'', s:'[Turn 13-20] Searching for more supplementary info...'},
+    {t:'warn', s:'[Turn 21-35] Repeatedly tweaking wording and layout...'},
+    {t:'warn', s:'[Turn 36-48] Checking spelling... adjusting format... re-checking...'},
+    {t:'err', s:'[Stats] 48 loop iterations, meaningful content output: only 3 paragraphs'},
+    {t:'err', s:'[System] 2 minutes elapsed, yield rate < 5%'}
+  ],
+  repeat: [
+    {t:'dim', s:'[Turn 1] User: "Summarize today\'s meeting key points"'},
+    {t:'', s:'[Turn 1] Output: "Today\'s meeting mainly discussed three aspects..."'},
+    {t:'', s:'[Turn 2] Output: "Meeting key points: First..."'},
+    {t:'warn', s:'[Turn 3] Output: "Today\'s meeting mainly discussed three aspects..."'},
+    {t:'warn', s:'[Detect] Similarity to Turn 1 output: 94%'},
+    {t:'err', s:'[Turn 4] Output: "Today\'s meeting mainly discussed three aspects..."'},
+    {t:'err', s:'[Detect] Text repetition confirmed, model has entered degraded state'},
+    {t:'err', s:'[System] Context length: 127,453 tokens (approaching limit)'}
+  ],
+  cascade: [
+    {t:'dim', s:'[Turn 1] User: "Query inventory data and generate a report"'},
+    {t:'', s:'[Turn 1] → tool_call: query_database("inventory")'},
+    {t:'err', s:'[Turn 1] ← Error: Connection timeout (5000ms)'},
+    {t:'', s:'[Turn 2] → tool_call: query_database("inventory")  [retry]'},
+    {t:'err', s:'[Turn 2] ← Error: Connection timeout (5000ms)'},
+    {t:'warn', s:'[Turn 3] → tool_call: export_report("inventory")'},
+    {t:'err', s:'[Turn 3] ← Error: dependency data empty, cannot generate'},
+    {t:'err', s:'[Turn 4-8] 5 consecutive tool calls all failed'},
+    {t:'err', s:'[System] Tool failure cascade, pipeline no longer usable'}
+  ]
+};
+
+function simulate(type){
+  var btns = document.querySelectorAll('.sim-btn');
+  btns.forEach(function(b){b.classList.remove('active');});
+  event.target.classList.add('active');
+
+  var log = document.getElementById('simLog');
+  log.innerHTML = '';
+  var lines = SIM_DATA[type];
+  lines.forEach(function(l, i){
+    var div = document.createElement('div');
+    div.className = 'line ' + l.t;
+    div.textContent = l.s;
+    log.appendChild(div);
+    setTimeout(function(){ div.classList.add('show'); }, i * 400);
+  });
+}
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Output Layer Optimization + Advanced KV Cache: The Last Mile of Cost Reduction | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+@keyframes _si{to{opacity:1}}
+body{opacity:0;animation:_si .15s ease .08s forwards}
+
+:root{
+  --red:var(--danger);
+  --green:var(--success);
+  --orange:var(--amber);
+  --purple:#5b4fcf;
+  --surface:var(--card);
+  --surface2:#f0ede6;
+  --muted:var(--sub);
+}
+
+.lesson-header h1 em{font-style:normal;color:var(--success)}
+
+/* ── technique nav ── */
+.nav-col{display:flex;flex-direction:column;gap:6px}
+.nav-group{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;padding:4px 2px 2px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px solid transparent;background:var(--surface);cursor:pointer;transition:all .2s;font-family:inherit;width:100%;text-align:left}
+.nav-item:hover{border-color:rgba(0,0,0,0.1);background:#fafaf8}
+.nav-item.active{border-color:var(--accent);background:rgba(0,102,255,.04);box-shadow:0 2px 10px rgba(0,102,255,.1)}
+.nav-badge{padding:3px 9px;border-radius:6px;font-size:12px;font-weight:800;flex-shrink:0}
+.badge-out{background:rgba(8,145,178,.12);color:var(--cyan)}
+.badge-kv{background:rgba(91,79,207,.12);color:var(--purple)}
+.nav-text h5{font-size:15px;font-weight:700;color:var(--text);line-height:1.3}
+.nav-text p{font-size:13px;color:var(--sub);margin-top:1px}
+.nav-save{margin-left:auto;font-size:14px;font-weight:900;flex-shrink:0;white-space:nowrap}
+
+/* ── demo area ── */
+.demo-col{display:flex;flex-direction:column;gap:16px}
+.demo-heading h3{font-size:20px;font-weight:800;color:var(--text)}
+.demo-heading p{font-size:15px;color:var(--sub);margin-top:4px;line-height:1.6}
+.demo-body{display:flex;flex-direction:column;gap:12px}
+
+/* generic card */
+.card{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:18px 20px}
+.card-title{font-size:13px;font-weight:800;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin-bottom:10px}
+
+/* Token stream area */
+.token-stream{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:52px}
+.tok{padding:9px 14px;border-radius:10px;font-size:16px;font-weight:700;font-family:'SF Mono',Menlo,monospace;transition:all .35s ease}
+.tok-ctx{background:rgba(0,102,255,.08);color:var(--accent);border:1px solid rgba(0,102,255,.2)}
+.tok-bad{background:rgba(220,38,38,.08);color:var(--red);border:1px solid rgba(220,38,38,.2)}
+.tok-good{background:rgba(22,163,74,.08);color:var(--green);border:1px solid rgba(22,163,74,.2);opacity:0;transform:translateY(6px)}
+.tok-good.show{opacity:1;transform:translateY(0)}
+.tok-stop{background:rgba(220,38,38,.15);color:var(--red);border:2px dashed rgba(220,38,38,.4);font-size:13px;padding:9px 10px}
+.tok-blocked{opacity:.2;text-decoration:line-through;filter:grayscale(1)}
+.tok-arrow{font-size:18px;color:#ccc}
+
+/* probability bar */
+.prob-list{display:flex;flex-direction:column;gap:6px}
+.prob-row{display:flex;align-items:center;gap:10px}
+.prob-word{width:90px;font-size:14px;font-weight:700;font-family:monospace;color:var(--text);flex-shrink:0}
+.prob-track{flex:1;height:12px;background:rgba(0,0,0,.06);border-radius:6px;overflow:hidden}
+.prob-fill{height:100%;border-radius:6px;transition:width .5s ease}
+.prob-pct{font-size:13px;font-weight:800;min-width:36px;text-align:right;color:var(--sub)}
+
+/* comparison columns */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1}
+.cmp-col{border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.cmp-col.bad{background:rgba(220,38,38,.04);border:1.5px solid rgba(220,38,38,.18)}
+.cmp-col.good{background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.18)}
+.cmp-head{font-size:14px;font-weight:800}
+.cmp-col.bad .cmp-head{color:var(--red)}
+.cmp-col.good .cmp-head{color:var(--green)}
+.cmp-body{font-size:15px;color:var(--sub);line-height:1.65;flex:1}
+.cmp-body b{color:var(--text)}
+
+/* code block */
+pre.code{background:#1e1e2e;border-radius:10px;padding:14px 16px;font-family:'SF Mono',Menlo,monospace;font-size:13.5px;line-height:1.75;color:#cdd6f4;overflow:auto;white-space:pre;flex-shrink:0}
+pre.code .c{color:#6c7086;font-style:italic}
+pre.code .k{color:#cba6f7}
+pre.code .s{color:#a6e3a1}
+pre.code .f{color:#89b4fa}
+pre.code .hl{color:#f38ba8}
+
+/* result stats */
+.stats{display:flex;gap:10px;flex-shrink:0}
+.stat{flex:1;border-radius:10px;padding:12px 14px;text-align:center}
+.stat .sv{font-size:26px;font-weight:900}
+.stat .sl{font-size:12px;font-weight:700;margin-top:2px;color:var(--muted)}
+.stat.red-s{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.15)}.stat.red-s .sv{color:var(--red)}
+.stat.green-s{background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.15)}.stat.green-s .sv{color:var(--green)}
+.stat.blue-s{background:rgba(0,102,255,.07);border:1px solid rgba(0,102,255,.15)}.stat.blue-s .sv{color:var(--accent)}
+.stat.gray-s{background:var(--surface);border:1px solid var(--border)}.stat.gray-s .sv{color:var(--text)}
+
+/* alert/tip */
+.tip{border-radius:10px;padding:11px 14px;font-size:15px;line-height:1.6;flex-shrink:0}
+.tip.green{background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);color:var(--green)}
+.tip.red{background:rgba(220,38,38,.05);border:1px solid rgba(220,38,38,.2);color:var(--red)}
+.tip.purple{background:rgba(91,79,207,.06);border:1px solid rgba(91,79,207,.2);color:var(--purple)}
+.tip b{font-weight:800}
+
+/* button */
+.btn-row{display:flex;gap:8px;flex-shrink:0;align-items:center}
+.btn{padding:9px 20px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s}
+.btn-p{background:var(--accent);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed;filter:none}
+.btn-r{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+.btn-hint{font-size:13px;color:var(--muted)}
+
+/* KV cache bar */
+.kv-bar{height:36px;border-radius:8px;overflow:hidden;display:flex;gap:1px;background:var(--surface2);transition:all .4s}
+.kv-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white;white-space:nowrap;overflow:hidden;padding:0 6px;transition:all .5s ease;border-radius:4px}
+.kv-seg.sys-stable{background:var(--purple)}
+.kv-seg.kv-cached{background:rgba(22,163,74,.35);color:var(--green)}
+.kv-seg.kv-miss{background:var(--red)}
+.kv-seg.kv-new{background:var(--accent)}
+
+/* flash animation */
+@keyframes flash-red{0%{background:rgba(220,38,38,.5)}100%{background:rgba(220,38,38,.07)}}
+.flash-red{animation:flash-red .4s ease}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+.pop{animation:pop .3s ease}
+@keyframes row-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.row-in{animation:row-in .3s ease}
+
+@media (max-width:768px){
+  .cmp{grid-template-columns:1fr}
+  .stats{flex-wrap:wrap}
+  .stat{min-width:calc(50% - 10px)}
+  .stat .sv{font-size:21px}
+  .demo-heading h3{font-size:18px}
+  pre.code{font-size:12px}
+  .demo-body [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Output tokens typically cost 2–3× more than input tokens. This lesson covers how to control output costs via length limits, conciseness requirements, and format constraints, plus advanced KV Cache scenarios and boundary conditions.">
+<meta name="keywords" content="output token optimization,advanced KV Cache,LLM output cost,max_tokens,AI cost refinement">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-8.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/8-8.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-8.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-8.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-8.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Output Layer Optimization + Advanced KV Cache: The Last Mile of Cost Reduction">
+<meta property="og:description" content="Output tokens typically cost 2–3× more than input tokens. This lesson covers how to control output costs via length limits, conciseness requirements, and format constraints, plus advanced KV Cache scenarios and boundary conditions.">
+<meta property="og:url" content="https://xueai.app/slides/8-8.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Output Layer Optimization + Advanced KV Cache: The Last Mile of Cost Reduction">
+<meta name="twitter:description" content="Output tokens typically cost 2–3× more than input tokens. This lesson covers how to control output costs via length limits, conciseness requirements, and format constraints, plus advanced KV Cache scenarios and boundary conditions.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Output Layer + Advanced KV Cache","name":"Output Layer + Advanced KV Cache","url":"https://xueai.app/slides/8-8.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practical Course · Cost Optimization & Model Selection","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Output tokens typically cost 2–3× more than input tokens. This lesson covers how to control output costs via length limits, conciseness requirements, and format constraints, plus advanced KV Cache scenarios and boundary conditions.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Cost Optimization</div>
+    <h1>Output Layer + Advanced KV Cache: <em>Control Output = Control Cost</em></h1>
+    <p class="subtitle">Output tokens cost 3–5× more than input tokens. Click the techniques below to switch interactive demos and experience three output-layer techniques and two advanced KV Cache traps.</p>
+  </header>
+
+  <div class="sec-label">Choose a Technique</div>
+  <div class="nav-col">
+      <div class="nav-group">Output Layer Optimization</div>
+      <button class="nav-item active" onclick="pick(this,0)">
+        <span class="nav-badge badge-out">Output</span>
+        <div class="nav-text"><h5>Negative Constraints: Don't Write "Be Concise"</h5><p>Explicitly state what the model cannot do</p></div>
+        <div class="nav-save" style="color:var(--green)">Save 30%</div>
+      </button>
+      <button class="nav-item" onclick="pick(this,1)">
+        <span class="nav-badge badge-out">Output</span>
+        <div class="nav-text"><h5>Diff Output: Only Change Those Few Words</h5><p>Don't rewrite the whole passage</p></div>
+        <div class="nav-save" style="color:var(--green)">Save 90%+</div>
+      </button>
+      <button class="nav-item" onclick="pick(this,2)">
+        <span class="nav-badge badge-out">Output</span>
+        <div class="nav-text"><h5>Stop Sequences: Physical Truncation, More Reliable than Constraints</h5><p>Precise control via the stop parameter</p></div>
+        <div class="nav-save" style="color:var(--accent)">Precise Control</div>
+      </button>
+
+      <div class="nav-group" style="margin-top:6px">Advanced KV Cache Traps</div>
+      <button class="nav-item" onclick="pick(this,3)">
+        <span class="nav-badge badge-kv">KV</span>
+        <div class="nav-text"><h5>Dynamic Tool Switching: Breaks the Cache</h5><p>Prefix changes = full recompute</p></div>
+        <div class="nav-save" style="color:var(--red)">Trap!</div>
+      </button>
+      <button class="nav-item" onclick="pick(this,4)">
+        <span class="nav-badge badge-kv">KV</span>
+        <div class="nav-text"><h5>Sliding Window: Prefix Always Changing</h5><p>FIFO queue breaks the cache</p></div>
+        <div class="nav-save" style="color:var(--red)">Trap!</div>
+      </button>
+  </div>
+
+  <div class="sec-label">Interactive Demo</div>
+  <div class="demo-col paywall-locked xa-peek" id="demoCol"></div>
+</article>
+<script>
+/* ========== Technique 0: Negative Constraints ========== */
+function demo0() {
+  return `
+  <div class="demo-heading">
+    <h3>Negative Constraints: Don't Write "Be Concise"</h3>
+    <p>"Concise" is too abstract for the model. Explicitly stating <b style="color:var(--red)">what it cannot do</b> is far more effective than saying "be concise."</p>
+  </div>
+  <div class="demo-body">
+    <div class="cmp" style="flex:none;height:auto">
+      <div class="cmp-col bad">
+        <div class="cmp-head">❌ Vague Positive Constraint</div>
+        <div class="cmp-body" style="font-family:monospace;font-size:15px;background:rgba(220,38,38,.04);border-radius:8px;padding:10px">
+          Please answer the user's question concisely,<br>and try not to ramble.
+        </div>
+        <div style="font-size:13px;color:var(--red);font-weight:700">The model doesn't know how concise is concise enough 😐</div>
+      </div>
+      <div class="cmp-col good">
+        <div class="cmp-head">✅ Explicit Negative Constraint</div>
+        <div class="cmp-body" style="font-family:monospace;font-size:15px;background:rgba(22,163,74,.04);border-radius:8px;padding:10px">
+          Output the result directly.<br><b>No</b> pleasantries, <b>no</b> summaries,<br><b>no</b> politeness, <b>no</b> process explanations.
+        </div>
+        <div style="font-size:13px;color:var(--green);font-weight:700">Definitive negation → model executes precisely ✓</div>
+      </div>
+    </div>
+    <div class="card" style="flex:1">
+      <div class="card-title">Click "Generate" to compare outputs under both constraints</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100% - 30px)">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:6px">❌ Vague Constraint Output</div>
+          <div id="out0bad" style="font-size:15px;color:var(--sub);line-height:1.7;min-height:80px"></div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:6px">✅ Negative Constraint Output</div>
+          <div id="out0good" style="font-size:15px;color:var(--sub);line-height:1.7;min-height:80px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-p" id="btn0" onclick="runDemo0()">▶ Simulate Generation</button>
+      <button class="btn btn-r" onclick="resetDemo0()">Reset</button>
+      <span class="btn-hint">User asks: What's the weather like today?</span>
+    </div>
+    <div class="stats">
+      <div class="stat red-s"><div class="sv" id="s0bad">—</div><div class="sl">Vague Constraint Tokens</div></div>
+      <div class="stat green-s"><div class="sv" id="s0good">—</div><div class="sl">Negative Constraint Tokens</div></div>
+      <div class="stat blue-s"><div class="sv" id="s0save">—</div><div class="sl">Savings</div></div>
+    </div>
+  </div>`;
+}
+
+const BAD_WORDS = ['Hello! I\'m happy to help you.', 'Today', 'in Beijing', 'the weather', 'is sunny,', 'temperature around', '22°C,', 'light breeze,', 'air quality', 'good.', 'Hope this', 'answer', 'helps you!', 'If you have other', 'questions, feel free to', 'ask anytime.'];
+const GOOD_WORDS = ['Sunny', '22°C', 'Light Breeze'];
+let d0Timer = null;
+
+function runDemo0() {
+  document.getElementById('btn0').disabled = true;
+  let bi = 0, gi = 0;
+  const badEl = document.getElementById('out0bad');
+  const goodEl = document.getElementById('out0good');
+  badEl.innerHTML = ''; goodEl.innerHTML = '';
+
+  d0Timer = setInterval(() => {
+    if (bi < BAD_WORDS.length) {
+      badEl.innerHTML += `<span style="color:var(--text)">${BAD_WORDS[bi]}</span>`;
+      bi++;
+    }
+    if (gi < GOOD_WORDS.length) {
+      goodEl.innerHTML += `<span style="color:var(--green);font-weight:700;font-size:18px">${GOOD_WORDS[gi]} </span>`;
+      gi++;
+    }
+    if (bi >= BAD_WORDS.length && gi >= GOOD_WORDS.length) {
+      clearInterval(d0Timer);
+      document.getElementById('s0bad').textContent = '48T';
+      document.getElementById('s0good').textContent = '12T';
+      document.getElementById('s0save').textContent = '75%';
+      document.getElementById('s0save').classList.add('pop');
+    }
+  }, 180);
+}
+
+function resetDemo0() {
+  clearInterval(d0Timer);
+  ['out0bad','out0good'].forEach(id => document.getElementById(id).innerHTML = '');
+  ['s0bad','s0good','s0save'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('btn0').disabled = false;
+}
+
+/* ========== Technique 1: Diff Output ========== */
+function demo1() {
+  return `
+  <div class="demo-heading">
+    <h3>Diff Output: Only Output the Modified Parts</h3>
+    <p>When the user says "make it smoother," the model outputs the entire 2,000-word passage. <b style="color:var(--red)">Moving just two or three words costs dozens of times less.</b></p>
+  </div>
+  <div class="demo-body">
+    <div class="card">
+      <div class="card-title">Original Text (User Submitted)</div>
+      <div style="font-size:17px;color:var(--text);line-height:1.7;padding:4px 0">
+        He slammed the door shut with tremendous force, making a loud noise, then left.
+      </div>
+    </div>
+    <div class="cmp" style="flex:1">
+      <div class="cmp-col bad">
+        <div class="cmp-head">❌ Old approach: Rewrite the whole text</div>
+        <div class="cmp-body" id="diffBad" style="font-size:15px;min-height:60px"></div>
+        <div style="font-size:13px;color:var(--red);font-weight:700" id="diffBadTok"></div>
+      </div>
+      <div class="cmp-col good">
+        <div class="cmp-head">✅ Diff Output: Only the changed sentence</div>
+        <div class="cmp-body" id="diffGood" style="font-size:15px;min-height:60px"></div>
+        <div style="font-size:13px;color:var(--green);font-weight:700" id="diffGoodTok"></div>
+      </div>
+    </div>
+    <pre class="code" style="font-size:13px"><span class="c"># System Prompt constraint</span>
+<span class="s">"Output only the sentences that need modification, in the format:
+ Original: [original sentence]
+ Revised: [new sentence]
+ Do not output unchanged content."</span></pre>
+    <div class="btn-row">
+      <button class="btn btn-p" id="btn1" onclick="runDemo1()">▶ Simulate Polish</button>
+      <button class="btn btn-r" onclick="resetDemo1()">Reset</button>
+    </div>
+    <div class="stats">
+      <div class="stat red-s"><div class="sv" id="s1bad">—</div><div class="sl">Rewrite Full Text Tokens</div></div>
+      <div class="stat green-s"><div class="sv" id="s1good">—</div><div class="sl">Diff Output Tokens</div></div>
+      <div class="stat blue-s"><div class="sv" id="s1save">—</div><div class="sl">Savings</div></div>
+    </div>
+  </div>`;
+}
+
+let d1t = null;
+function runDemo1() {
+  document.getElementById('btn1').disabled = true;
+  const badSegs = ['He', 'slammed', 'the door', 'shut,', 'with a loud noise,', 'then left.'];
+  let i = 0;
+  document.getElementById('diffBad').innerHTML = '';
+  d1t = setInterval(() => {
+    if (i < badSegs.length) {
+      document.getElementById('diffBad').innerHTML += `<span style="color:var(--text)">${badSegs[i]}</span>`;
+      i++;
+    } else {
+      clearInterval(d1t);
+      document.getElementById('diffBadTok').textContent = '~48 Tokens (outputs the full sentence)';
+      setTimeout(() => {
+        const g = document.getElementById('diffGood');
+        g.innerHTML = `<div style="margin-bottom:6px"><span style="color:var(--muted)">Original: </span><span style="text-decoration:line-through;color:var(--red)">He slammed the door shut with great force</span></div>`;
+        setTimeout(() => {
+          g.innerHTML += `<div><span style="color:var(--muted)">Revised: </span><span style="color:var(--green);font-weight:700">He gently closed the door.</span></div>`;
+          document.getElementById('diffGoodTok').textContent = '~18 Tokens (modified parts only)';
+          document.getElementById('s1bad').textContent = '48T';
+          document.getElementById('s1good').textContent = '18T';
+          document.getElementById('s1save').textContent = '63%';
+          document.getElementById('s1save').classList.add('pop');
+        }, 500);
+      }, 400);
+    }
+  }, 220);
+}
+function resetDemo1() {
+  clearInterval(d1t);
+  ['diffBad','diffGood','diffBadTok','diffGoodTok'].forEach(id => document.getElementById(id).innerHTML = '');
+  ['s1bad','s1good','s1save'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('btn1').disabled = false;
+}
+
+/* ========== Technique 2: Stop Sequences ========== */
+function demo2() {
+  return `
+  <div class="demo-heading">
+    <h3>Stop Sequences: Physical Truncation, More Reliable than Constraints</h3>
+    <p>Writing "only output 3 items" in the Prompt is hit-or-miss. <b style="color:var(--accent)">The stop parameter is physical truncation—independent of the model.</b></p>
+  </div>
+  <div class="demo-body">
+    <div class="card" style="flex:1">
+      <div class="card-title">Model generating a list · truncation triggered when stop=["4."]</div>
+      <div id="stopStream" class="token-stream"></div>
+    </div>
+    <pre class="code"><span class="c"># stop parameter usage</span>
+response = client.chat.completions.create(
+  model=<span class="s">"qwen3.6-plus"</span>,
+  messages=messages,
+  stop=[<span class="s">"4."</span>]  <span class="c"># truncate immediately before item 4</span>
+)
+
+<span class="c"># other common scenarios</span>
+stop=[<span class="s">"\n"</span>]    <span class="c"># only the first line of the answer</span>
+stop=[<span class="s">"}"</span>]    <span class="c"># stop when JSON closes</span>
+stop=[<span class="s">"User:"</span>]  <span class="c"># prevent model from self-answering</span></pre>
+    <div class="btn-row">
+      <button class="btn btn-p" id="btn2" onclick="runDemo2()">▶ Start Generation</button>
+      <button class="btn btn-r" onclick="resetDemo2()">Reset</button>
+      <span class="btn-hint">Observe item 4 being physically truncated</span>
+    </div>
+    <div class="tip green"><b>Truncated content does not enter the conversation history</b> — saves tokens and time, with no risk of the model rambling afterward.</div>
+  </div>`;
+}
+
+const STOP_TOKS = [
+  {t:'1.',cls:'tok-ctx'},{t:'High-Protein Foods',cls:'tok-good'},{t:'2.',cls:'tok-ctx'},
+  {t:'Control Carbs',cls:'tok-good'},{t:'3.',cls:'tok-ctx'},{t:'Regular Exercise',cls:'tok-good'},
+  {t:'4.',cls:'tok-stop',isStop:true},{t:'Adequate Sleep',cls:'tok-blocked'},{t:'5.',cls:'tok-blocked'},{t:'Drink More Water',cls:'tok-blocked'}
+];
+let d2t = null, d2i = 0;
+function runDemo2() {
+  document.getElementById('btn2').disabled = true;
+  document.getElementById('stopStream').innerHTML = '';
+  d2i = 0;
+  d2t = setInterval(() => {
+    if (d2i >= STOP_TOKS.length) { clearInterval(d2t); return; }
+    const tk = STOP_TOKS[d2i];
+    const span = document.createElement('span');
+    // Use correct class first; tok-good needs show class added in next frame to trigger animation
+    span.className = 'tok ' + tk.cls;
+    span.textContent = tk.t;
+    document.getElementById('stopStream').appendChild(span);
+    // tok-good needs show class to trigger
+    if (tk.cls === 'tok-good') {
+      requestAnimationFrame(() => requestAnimationFrame(() => span.classList.add('show')));
+    }
+    if (tk.isStop) {
+      const note = document.createElement('span');
+      note.textContent = '⛔ Truncated!';
+      note.style.cssText = 'font-size:15px;font-weight:800;color:var(--red);padding:8px 0';
+      document.getElementById('stopStream').appendChild(note);
+      clearInterval(d2t);
+      setTimeout(() => {
+        STOP_TOKS.slice(d2i+1).forEach(tk2 => {
+          const s2 = document.createElement('span');
+          s2.className = 'tok ' + tk2.cls;
+          s2.textContent = tk2.t;
+          s2.style.opacity = '0.2';
+          s2.style.textDecoration = 'line-through';
+          document.getElementById('stopStream').appendChild(s2);
+        });
+      }, 400);
+    }
+    d2i++;
+  }, 500);
+}
+function resetDemo2() {
+  clearInterval(d2t); d2i = 0;
+  document.getElementById('stopStream').innerHTML = '';
+  document.getElementById('btn2').disabled = false;
+}
+
+/* ========== Technique 3: Dynamic Tool Switching ========== */
+function demo3() {
+  return `
+  <div class="demo-heading">
+    <h3>KV Cache Trap: Dynamic Tool Switching</h3>
+    <p>Loading tools on demand looks like it saves tokens, but with a different tool list each round, <b style="color:var(--red)">prefix changes = full cache miss = doubled cost</b>.</p>
+  </div>
+  <div class="demo-body">
+    <div class="cmp" style="flex:1;min-height:0;overflow:hidden">
+      <!-- Left: Dynamic tools -->
+      <div class="cmp-col bad" style="overflow:hidden;display:flex;flex-direction:column;gap:6px">
+        <div class="cmp-head">❌ Dynamic Tools (on-demand loading)</div>
+        <div id="kvDynLog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+      <!-- Right: Fixed tools -->
+      <div class="cmp-col good" style="overflow:hidden;display:flex;flex-direction:column;gap:6px">
+        <div class="cmp-head">✅ Full Tool Set, Fixed Mounting</div>
+        <div id="kvFixLog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat red-s"><div class="sv" id="s3cost">0T</div><div class="sl">Dynamic Approach Cumulative Compute</div></div>
+      <div class="stat green-s"><div class="sv" id="s3save">0T</div><div class="sl">Fixed Approach Cumulative Compute</div></div>
+      <div class="stat blue-s"><div class="sv" id="s3round">0</div><div class="sl">Rounds Demonstrated</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-p" id="btn3" onclick="runDemo3()">▶ Next Round</button>
+      <button class="btn btn-r" onclick="resetDemo3()">Reset</button>
+    </div>
+    <div class="tip red"><b>Root cause:</b> Tool descriptions are inserted after the System Prompt. Tool changes → prefix changes → cache zeroed. Better to mount 200T of extra tools than lose cache hit rate.</div>
+  </div>`;
+}
+
+// Tool configuration
+const TOOLS3 = [
+  { name:'WeatherTool', tok:80,  q:'What\'s the weather in Beijing today?' },
+  { name:'MapTool',     tok:75,  q:'How do I get from the office to the airport?' },
+  { name:'WeatherTool', tok:80,  q:'Will it rain in Shanghai tomorrow?' },
+  { name:'SearchTool',  tok:90,  q:'Latest iPhone release news' },
+];
+const SYS3_TOK = 100; // SYS Prompt token
+let d3round = 0, d3dynTotal = 0, d3fixTotal = 0;
+
+function runDemo3() {
+  if (d3round >= TOOLS3.length) return;
+  const t = TOOLS3[d3round];
+  d3round++;
+  const isFirst = d3round === 1;
+
+  // ── Left: Dynamic approach ──
+  const dynLog = document.getElementById('kvDynLog');
+  const dynCard = document.createElement('div');
+  dynCard.className = 'row-in';
+  dynCard.style.cssText = 'background:rgba(220,38,38,.05);border:1px solid rgba(220,38,38,.2);border-radius:8px;padding:8px 10px;flex-shrink:0;font-size:13px;line-height:1.7';
+
+  const dynCost = SYS3_TOK + t.tok + 20 + (d3round - 1) * 30; // SYS + current tool + query + history
+  d3dynTotal += dynCost;
+
+  dynCard.innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <span style="font-weight:800;color:var(--text)">Round ${d3round}: ${t.q}</span>
+      <span style="font-weight:800;color:var(--red)">✗ MISS Full Recompute</span>
+    </div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
+      <span style="background:var(--surface2);color:var(--muted);padding:2px 8px;border-radius:4px;font-size:12px">SYS(${SYS3_TOK}T)</span>
+      <span style="background:rgba(220,38,38,.15);color:var(--red);padding:2px 9px;border-radius:4px;font-size:12px;font-weight:800;border:1px solid rgba(220,38,38,.3)">${t.name}(${t.tok}T)</span>
+      <span style="font-size:11px;color:var(--red);font-weight:700">← Unique this round</span>
+      ${d3round > 1 ? `<span style="background:var(--surface2);color:var(--muted);padding:2px 8px;border-radius:4px;font-size:12px">History (${(d3round-1)*30}T)</span>` : ''}
+      <span style="background:var(--surface2);color:var(--muted);padding:2px 8px;border-radius:4px;font-size:12px">Query (20T)</span>
+    </div>
+    <div style="color:var(--red);font-size:12px">Full recompute this round <b>${dynCost}T</b> (tool differs → prefix changes → cache miss)</div>`;
+  dynLog.appendChild(dynCard);
+  dynLog.scrollTop = dynLog.scrollHeight;
+
+  document.getElementById('s3cost').textContent = d3dynTotal + 'T';
+
+  // ── Right: Fixed approach ──
+  const fixLog = document.getElementById('kvFixLog');
+  const fixCard = document.createElement('div');
+  fixCard.className = 'row-in';
+  fixCard.style.cssText = 'background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:8px 10px;flex-shrink:0;font-size:13px;line-height:1.7';
+
+  const allToolsTok = 200; // all three tools mounted
+  const fixCost = isFirst ? (SYS3_TOK + allToolsTok + 20) : (20 + (d3round-1)*30); // first round write-in, then only incremental
+  d3fixTotal += fixCost;
+
+  fixCard.innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <span style="font-weight:800;color:var(--text)">Round ${d3round}: ${t.q}</span>
+      <span style="font-weight:800;color:${isFirst?'var(--accent)':'var(--green)'}">${isFirst ? '⚡ Write Cache' : '✓ Hit!'}</span>
+    </div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
+      <span style="background:var(--surface2);color:var(--muted);padding:2px 8px;border-radius:4px;font-size:12px">SYS(${SYS3_TOK}T)${isFirst?'':' ✓'}</span>
+      <span style="background:var(--surface2);color:var(--muted);padding:2px 8px;border-radius:4px;font-size:12px">All Tools (${allToolsTok}T)${isFirst?'':' ✓'}</span>' ✓'}</span>
+      <span style="background:${isFirst?'rgba(0,102,255,.12)':'rgba(22,163,74,.12)'};color:${isFirst?'var(--accent)':'var(--green)'};padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700">Query (20T)${isFirst?'':' ← This round only'}</span>
+    </div>
+    <div style="color:${isFirst?'var(--accent)':'var(--green)'};font-size:12px">${isFirst?`First write-in <b>${fixCost}T</b>; subsequent rounds only compute new queries`:`This round only <b>${fixCost}T</b> (prefix hit, new query only)`}</div>`;
+  fixLog.appendChild(fixCard);
+  fixLog.scrollTop = fixLog.scrollHeight;
+
+  document.getElementById('s3save').textContent = d3fixTotal + 'T';
+  document.getElementById('s3round').textContent = d3round;
+  if (d3round >= TOOLS3.length) document.getElementById('btn3').disabled = true;
+}
+
+function resetDemo3() {
+  d3round = 0; d3dynTotal = 0; d3fixTotal = 0;
+  ['kvDynLog','kvFixLog'].forEach(id => document.getElementById(id).innerHTML = '');
+  document.getElementById('s3cost').textContent = '0T';
+  document.getElementById('s3save').textContent = '0T';
+  document.getElementById('s3round').textContent = '0';
+  document.getElementById('btn3').disabled = false;
+}
+
+/* ========== Technique 4: Sliding Window ========== */
+function demo4() {
+  return `
+  <div class="demo-heading" style="flex-shrink:0">
+    <h3>KV Cache Trap: Sliding Window Breaks the Prefix</h3>
+    <p>Click "Next Round" and observe how context changes under each strategy: <b style="color:var(--red)">sliding window changes the prefix every round, so cache is always invalid</b>.</p>
+  </div>
+  <div class="demo-body" style="gap:10px">
+    <!-- Two-column visual context window -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex-shrink:0">
+
+      <!-- Left: Sliding window -->
+      <div style="background:rgba(220,38,38,.04);border:1.5px solid rgba(220,38,38,.18);border-radius:12px;padding:14px 16px">
+        <div style="font-size:14px;font-weight:800;color:var(--red);margin-bottom:10px">❌ Sliding Window (FIFO, last 3 rounds retained)</div>
+        <!-- Context bar -->
+        <div id="slidBar" style="display:flex;gap:4px;align-items:stretch;height:44px;margin-bottom:8px"></div>
+        <!-- Status row -->
+        <div id="slidStatus" style="font-size:13px;color:var(--sub);line-height:1.6;min-height:36px"></div>
+        <!-- Hit rate -->
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <span style="font-size:12px;color:var(--muted);font-weight:700">Hit Rate</span>
+          <div style="flex:1;height:8px;background:rgba(0,0,0,.08);border-radius:4px;overflow:hidden">
+            <div id="slidHitBar" style="height:100%;border-radius:4px;background:var(--red);transition:width .5s ease;width:0%"></div>
+          </div>
+          <span id="slidHitPct" style="font-size:13px;font-weight:800;color:var(--red);min-width:36px">—</span>
+        </div>
+      </div>
+
+      <!-- Right: Layered strategy -->
+      <div style="background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.18);border-radius:12px;padding:14px 16px">
+        <div style="font-size:14px;font-weight:800;color:var(--green);margin-bottom:10px">✅ Layered Strategy (stable SYS + active last 3 rounds)</div>
+        <!-- Context bar -->
+        <div id="layerBar" style="display:flex;gap:4px;align-items:stretch;height:44px;margin-bottom:8px"></div>
+        <!-- Status row -->
+        <div id="layerStatus" style="font-size:13px;color:var(--sub);line-height:1.6;min-height:36px"></div>
+        <!-- Hit rate -->
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <span style="font-size:12px;color:var(--muted);font-weight:700">Hit Rate</span>
+          <div style="flex:1;height:8px;background:rgba(0,0,0,.08);border-radius:4px;overflow:hidden">
+            <div id="layerHitBar" style="height:100%;border-radius:4px;background:var(--green);transition:width .5s ease;width:0%"></div>
+          </div>
+          <span id="layerHitPct" style="font-size:13px;font-weight:800;color:var(--green);min-width:36px">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current round question + log -->
+    <div style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:12px 16px;flex-shrink:0">
+      <div id="d4CurrentQ" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">Click "Next Round" to start the demo</div>
+      <div id="d4Log" style="font-size:13px;color:var(--sub);line-height:1.8;min-height:32px"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats" style="flex-shrink:0">
+      <div class="stat red-s"><div class="sv" id="s4slidCost">0T</div><div class="sl">Sliding Window Cumulative Recompute</div></div>
+      <div class="stat green-s"><div class="sv" id="s4layerCost">0T</div><div class="sl">Layered Strategy Cumulative Recompute</div></div>
+      <div class="stat blue-s"><div class="sv" id="s4round2">0 / 5</div><div class="sl">Rounds</div></div>
+    </div>
+
+    <div class="btn-row" style="flex-shrink:0">
+      <button class="btn btn-p" id="btn4" onclick="runDemo4()">▶ Next Round</button>
+      <button class="btn btn-r" onclick="resetDemo4()">Reset</button>
+    </div>
+    <div class="tip purple" style="flex-shrink:0"><b>Key difference:</b> The sliding window history after SYS changes every round → prefix never matches → full recompute each round. The layered strategy keeps SYS at the front, unchanged → 80%+ hit rate, saving enormous compute.</div>
+  </div>`;
+}
+
+const QUESTIONS4 = [
+  'What is your refund policy?',
+  'How many business days does a refund take?',
+  'Who covers the shipping cost?',
+  'Which account will the refund go to?',
+  'I applied—why hasn\'t it been processed yet?'
+];
+const SYS4_TOK = 150;
+const TURN_TOK = 40;
+let d4r = 0, d4slidTotal = 0, d4layerTotal = 0, d4slidHits = 0, d4layerHits = 0;
+const WSIZE = 3;
+
+// generate visual context blocks
+function makeCtxBlocks(segments) {
+  // segments: [{label, color, hit, width}]
+  return segments.map(s => {
+    const hitMark = s.hit === true ? '✓' : s.hit === false ? '✗' : '';
+    const opacity = s.dim ? 0.22 : 1;
+    return `<div style="
+      flex:${s.flex||1};min-width:${s.minW||36}px;max-width:${s.maxW||120}px;
+      background:${s.bg};color:${s.color};
+      border-radius:8px;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      font-size:11px;font-weight:700;line-height:1.3;
+      opacity:${opacity};transition:all .4s ease;
+      border:${s.border||'none'};
+      padding:2px 4px;text-align:center
+    "><span>${s.label}</span>${hitMark?`<span style="font-size:14px">${hitMark}</span>`:''}</div>`;
+  }).join('');
+}
+
+function runDemo4() {
+  if (d4r >= QUESTIONS4.length) return;
+  const q = QUESTIONS4[d4r];
+  d4r++;
+
+  const isFirst = d4r === 1;
+  // Sliding window: retain last WSIZE rounds
+  const winStart = Math.max(1, d4r - WSIZE + 1);
+  const winRounds = Math.min(d4r, WSIZE);
+
+  // ── Left visual: Sliding window ──
+  // prefix = SYS + window history. Round 1 writes; after that prefix always changes → MISS
+  const slidMiss = !isFirst; // Round 1 writes; every subsequent round is a MISS
+  if (!slidMiss) d4slidHits++;
+  const slidCost = SYS4_TOK + winRounds * TURN_TOK;
+  d4slidTotal += slidCost;
+
+  // Build color blocks: SYS + discarded rounds (dim) + window rounds
+  const slidSegs = [];
+  // SYS block (always present, but history after prefix changes, still MISS)
+  slidSegs.push({label:`SYS\n${SYS4_TOK}T`, bg:'rgba(220,38,38,.15)', color:'var(--red)', flex:3, minW:60, hit: false, border:'1px solid rgba(220,38,38,.3)'});
+  // Discarded rounds (dimmed)
+  for (let i = 1; i < winStart; i++) {
+    slidSegs.push({label:`Rnd${i}\nDropped`, bg:'rgba(0,0,0,.06)', color:'var(--muted)', flex:1, minW:32, dim:true});
+  }
+  // Rounds within the window
+  for (let i = winStart; i <= d4r; i++) {
+    const isNew = i === d4r;
+    slidSegs.push({label:`Rnd${i}${isNew?'\nNew':''}`, bg: isNew?'rgba(220,38,38,.12)':'rgba(220,38,38,.06)', color:isNew?'var(--red)':'rgba(220,38,38,.7)', flex:1, minW:36, border: isNew?'1px solid rgba(220,38,38,.3)':'none'});
+  }
+  document.getElementById('slidBar').innerHTML = makeCtxBlocks(slidSegs);
+
+  const slidStatusHtml = isFirst
+    ? `<b style="color:var(--accent)">⚡ Write Cache</b>: SYS + Round 1 = ${slidCost}T`
+    : `<b style="color:var(--red)">✗ MISS Full Recompute ${slidCost}T</b>: Round ${winStart-1} dropped, prefix differs from last round → cache miss`;
+  document.getElementById('slidStatus').innerHTML = slidStatusHtml;
+
+  const slidHitRate = Math.round(d4slidHits / d4r * 100);
+  document.getElementById('slidHitBar').style.width = slidHitRate + '%';
+  document.getElementById('slidHitPct').textContent = slidHitRate + '%';
+  document.getElementById('s4slidCost').textContent = d4slidTotal + 'T';
+
+  // ── Right visual: Layered strategy ──
+  // SYS always first and unchanged → hit; active last 3 rounds appended
+  const layerMiss = false; // SYS always hits; new round compute is minimal
+  d4layerHits++;
+  let layerCost;
+  if (isFirst) layerCost = SYS4_TOK + TURN_TOK;
+  else layerCost = TURN_TOK; // SYS hit, only compute new round
+
+  d4layerTotal += layerCost;
+
+  // Build layered color blocks
+  const layerSegs = [];
+  layerSegs.push({label:`SYS\n${SYS4_TOK}T`, bg: isFirst?'rgba(0,102,255,.12)':'rgba(22,163,74,.15)', color: isFirst?'var(--accent)':'var(--green)', flex:3, minW:60, hit: isFirst?undefined:true, border: isFirst?'1px solid rgba(0,102,255,.3)':'1px solid rgba(22,163,74,.3)'});
+  // Active last 3 rounds
+  const activeStart = Math.max(1, d4r - WSIZE + 1);
+  for (let i = activeStart; i <= d4r; i++) {
+    const isNew = i === d4r;
+    layerSegs.push({label:`Rnd${i}${isNew?'\nNew':''}`, bg: isNew?'rgba(0,102,255,.12)':'rgba(22,163,74,.08)', color: isNew?'var(--accent)':'var(--green)', flex:1, minW:36, border: isNew?'1px solid rgba(0,102,255,.3)':'none'});
+  }
+  document.getElementById('layerBar').innerHTML = makeCtxBlocks(layerSegs);
+
+  const layerStatusHtml = isFirst
+    ? `<b style="color:var(--accent)">⚡ Write SYS Cache</b>: First round writes ${layerCost}T, SYS hits permanently afterward`
+    : `<b style="color:var(--green)">✓ SYS Hit</b>: SYS prefix unchanged → cache hit! This round only computes new <b>${layerCost}T</b>`;
+  document.getElementById('layerStatus').innerHTML = layerStatusHtml;
+
+  const layerHitRate = Math.round(d4layerHits / d4r * 100);
+  document.getElementById('layerHitBar').style.width = layerHitRate + '%';
+  document.getElementById('layerHitPct').textContent = layerHitRate + '%';
+  document.getElementById('s4layerCost').textContent = d4layerTotal + 'T';
+
+  // Display current question
+  document.getElementById('d4CurrentQ').innerHTML = `<span style="color:var(--muted);font-weight:600">Round ${d4r}: </span>${q}`;
+
+  // Log comparison
+  const savings = slidCost - layerCost;
+  document.getElementById('d4Log').innerHTML = [
+    `<span style="color:var(--red)">Sliding window recompute this round <b>${slidCost}T</b></span>`,
+    `<span style="color:var(--green)">Layered strategy only <b>${layerCost}T</b> this round</span>`,
+    savings > 0 ? `<span style="color:var(--accent);font-weight:700">→ Saved ${savings}T this round (cumulative savings: ${d4slidTotal - d4layerTotal}T)</span>` : ''
+  ].filter(Boolean).join('　　');
+
+  document.getElementById('s4round2').textContent = `${d4r} / 5`;
+  if (d4r >= QUESTIONS4.length) document.getElementById('btn4').disabled = true;
+}
+
+function resetDemo4() {
+  d4r = 0; d4slidTotal = 0; d4layerTotal = 0; d4slidHits = 0; d4layerHits = 0;
+  document.getElementById('slidBar').innerHTML = '';
+  document.getElementById('layerBar').innerHTML = '';
+  document.getElementById('slidStatus').innerHTML = '';
+  document.getElementById('layerStatus').innerHTML = '';
+  document.getElementById('slidHitBar').style.width = '0%';
+  document.getElementById('layerHitBar').style.width = '0%';
+  document.getElementById('slidHitPct').textContent = '—';
+  document.getElementById('layerHitPct').textContent = '—';
+  document.getElementById('s4slidCost').textContent = '0T';
+  document.getElementById('s4layerCost').textContent = '0T';
+  document.getElementById('s4round2').textContent = '0 / 5';
+  document.getElementById('d4CurrentQ').innerHTML = 'Click "Next Round" to start the demo';
+  document.getElementById('d4Log').innerHTML = '';
+  document.getElementById('btn4').disabled = false;
+}
+
+// makeKvBar retained (possibly referenced elsewhere; empty implementation)
+function makeKvBar(segs) { return document.createElement('div'); }
+
+/* ========== Main Controller ========== */
+// makeKvBar defined in demo3 block, reused by demo4 (order OK)
+const DEMOS = [demo0, demo1, demo2, demo3, demo4];
+
+function pick(btn, idx) {
+  document.querySelectorAll('.nav-item').forEach((b,i) => b.classList.toggle('active', i===idx));
+  document.getElementById('demoCol').innerHTML = DEMOS[idx]();
+}
+
+pick(document.querySelector('.nav-item'), 0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

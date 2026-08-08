@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>시맨틱 레이어 최적화: 컨텍스트 윈도우를 쓰레기통으로 사용하지 마세요 | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+@keyframes _si{to{opacity:1}}
+body{opacity:0;animation:_si .15s ease .08s forwards}
+
+:root{
+  --red:var(--danger);
+  --green:var(--success);
+  --orange:var(--amber);
+  --purple:#5b4fcf;
+  --surface:var(--card);
+  --surface2:#f0ede6;
+  --muted:var(--sub);
+}
+
+.lesson-header h1 em{font-style:normal;color:var(--purple)}
+
+.problem-box{background:rgba(91,79,207,.06);border:1px solid rgba(91,79,207,.2);border-radius:10px;padding:14px 16px}
+.problem-box .pb-title{font-size:15px;font-weight:800;color:var(--purple);margin-bottom:6px}
+.problem-row{display:flex;align-items:flex-start;gap:8px;font-size:15px;color:var(--sub);line-height:1.6;margin-bottom:4px}
+.problem-row b{color:var(--text)}
+
+.strat-list{display:flex;flex-direction:column;gap:8px}
+.strat-btn{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;background:var(--surface);border:1.5px solid var(--border);cursor:pointer;font-family:inherit;text-align:left;transition:all .18s;width:100%}
+.strat-btn:hover{border-color:rgba(91,79,207,.3)}
+.strat-btn.active{border-color:var(--purple);background:rgba(91,79,207,.04);box-shadow:0 2px 10px rgba(91,79,207,.1)}
+.sn{width:32px;height:32px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:var(--muted);flex-shrink:0;transition:all .18s}
+.strat-btn.active .sn{background:var(--purple);color:white}
+.si h5{font-size:16px;font-weight:800;color:var(--text);margin-bottom:2px}
+.si p{font-size:14px;color:var(--sub)}
+.saving{margin-left:auto;font-size:15px;font-weight:900;flex-shrink:0}
+
+.demo-title{font-size:18px;font-weight:800;color:var(--text);margin-bottom:12px}
+.demo-area{display:flex;flex-direction:column;gap:10px}
+
+/* === Strategy 1: Dynamic Few-Shot Retrieval === */
+.fewshot-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fs-col{display:flex;flex-direction:column;gap:6px}
+.fs-col-title{font-size:14px;font-weight:700;padding:6px 10px;border-radius:6px;text-align:center;flex-shrink:0}
+.fs-col-title.bad{background:rgba(220,38,38,.1);color:var(--red)}
+.fs-col-title.good{background:rgba(22,163,74,.1);color:var(--green)}
+.case-pool{flex:1;display:flex;flex-direction:column;gap:4px;overflow-y:auto;max-height:340px}
+.case-item{padding:8px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface);font-size:13px;color:var(--sub);line-height:1.4;cursor:default;transition:all .3s;flex-shrink:0}
+.case-item .ci-q{font-weight:700;color:var(--text);font-size:13px}
+.case-item.selected{border-color:var(--green);background:rgba(22,163,74,.06);color:var(--green)}
+.case-item.greyed{opacity:.3}
+.prompt-box{flex:1;background:#1e1e2e;border-radius:8px;padding:12px 14px;font-family:monospace;font-size:12.5px;color:#cdd6f4;overflow-y:auto;line-height:1.6;white-space:pre-wrap;min-height:200px;max-height:340px}
+.prompt-box .p-sys{color:#cba6f7}
+.prompt-box .p-case{color:#a6e3a1}
+.prompt-box .p-user{color:#89b4fa}
+.tok-bar{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.tok-track{flex:1;height:10px;border-radius:5px;background:var(--surface2);overflow:hidden}
+.tok-fill{height:100%;border-radius:5px;transition:width .6s ease}
+.tok-num{font-size:14px;font-weight:800;min-width:70px;text-align:right}
+.btn-sim{padding:10px 18px;border-radius:8px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s}
+.btn-primary{background:var(--purple);color:white}
+.btn-reset{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+
+/* === Strategy 2: Document Compression === */
+.compress-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.doc-box{flex:1;border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.75;color:var(--sub);overflow-y:auto;background:var(--surface);max-height:380px}
+.doc-box .keep{color:var(--text);font-weight:500}
+.doc-box .drop{color:rgba(220,38,38,.35);text-decoration:line-through;transition:all .4s}
+.doc-box .drop.hidden{display:none}
+.compress-ctrl{display:flex;flex-direction:column;gap:8px}
+.slider-row{display:flex;align-items:center;gap:10px}
+.slider-label{font-size:14px;font-weight:700;color:var(--muted);white-space:nowrap}
+input[type=range]{flex:1;-webkit-appearance:none;height:6px;border-radius:3px;outline:none;cursor:pointer;background:linear-gradient(to right,var(--purple) 0%,var(--purple) var(--pct,30%),var(--surface2) var(--pct,30%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--purple);box-shadow:0 2px 6px rgba(91,79,207,.35);cursor:pointer}
+
+/* === Strategy 3: Attention Heatmap === */
+.attn-wrap{display:flex;flex-direction:column;gap:8px}
+.attn-prompt{display:flex;flex-direction:column;gap:6px}
+.attn-seg{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:9px;border:2px solid transparent;cursor:grab;transition:all .3s;user-select:none}
+.attn-seg:active{cursor:grabbing;transform:scale(0.98)}
+.attn-label{font-size:14px;font-weight:800;min-width:90px;flex-shrink:0}
+.attn-content{font-size:14px;color:var(--sub);flex:1;line-height:1.4}
+.attn-heat{width:70px;height:26px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white;transition:all .4s}
+.attn-note{font-size:13px;padding:9px 12px;border-radius:8px;text-align:center;font-weight:600}
+
+/* General */
+.stat-row{display:flex;gap:8px;flex-wrap:wrap}
+.stat-box{flex:1;min-width:120px;border-radius:8px;padding:10px;text-align:center}
+.stat-box .sv{font-size:24px;font-weight:900;transition:all .4s}
+.stat-box .sl{font-size:12px;font-weight:700;margin-top:1px}
+.stat-box.good{background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.2)}
+.stat-box.good .sv{color:var(--green)}
+.stat-box.bad{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.2)}
+.stat-box.bad .sv{color:var(--red)}
+.stat-box.neutral{background:var(--surface);border:1px solid var(--border)}
+.stat-box.neutral .sv{color:var(--purple)}
+.sl{color:var(--muted)}
+
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+.pop{animation:pop .3s ease}
+
+@media (max-width:768px){
+  .fewshot-wrap,.compress-wrap{grid-template-columns:1fr}
+  .case-pool,.prompt-box,.doc-box{max-height:280px}
+  .attn-label{min-width:76px;font-size:13px}
+  .attn-content{font-size:13px}
+  .stat-box .sv{font-size:20px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="컨텍스트 윈도우는 소중한 컴퓨팅 자원으로 불필요한 정보로 채워서는 안 됩니다. 시맨틱 레이어 관점에서 불필요한 히스토리 메시지 식별 및 삭제, 동적 요약 압축, 관련성 높은 컨텍스트 관리 전략을 설명합니다.">
+<meta name="keywords" content="컨텍스트 최적화,시맨틱 레이어 최적화,대화 히스토리 압축,Token 관리,컨텍스트 윈도우 관리">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-7.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/8-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-7.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-7.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="시맨틱 레이어 최적화: 컨텍스트 윈도우를 쓰레기통으로 사용하지 마세요">
+<meta property="og:description" content="컨텍스트 윈도우는 소중한 컴퓨팅 자원으로 불필요한 정보로 채워서는 안 됩니다. 시맨틱 레이어 관점에서 불필요한 히스토리 메시지 식별 및 삭제, 동적 요약 압축, 관련성 높은 컨텍스트 관리 전략을 설명합니다.">
+<meta property="og:url" content="https://xueai.app/slides/8-7.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="시맨틱 레이어 최적화: 컨텍스트 윈도우를 쓰레기통으로 사용하지 마세요">
+<meta name="twitter:description" content="컨텍스트 윈도우는 소중한 컴퓨팅 자원으로 불필요한 정보로 채워서는 안 됩니다. 시맨틱 레이어 관점에서 불필요한 히스토리 메시지 식별 및 삭제, 동적 요약 압축, 관련성 높은 컨텍스트 관리 전략을 설명합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"시맨틱 레이어 최적화: 컨텍스트를 쓰레기통으로 사용하지 마세요","name":"시맨틱 레이어 최적화: 컨텍스트를 쓰레기통으로 사용하지 마세요","url":"https://xueai.app/slides/8-7.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강의 · 비용 최적화와 모델 선택","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"컨텍스트 윈도우는 소중한 컴퓨팅 자원으로 불필요한 정보로 채워서는 안 됩니다. 시맨틱 레이어 관점에서 불필요한 히스토리 메시지 식별 및 삭제, 동적 요약 압축, 관련성 높은 컨텍스트 관리 전략을 설명합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">비용 최적화</div>
+    <h1>시맨틱 레이어 최적화: <em>컨텍스트 윈도우를 쓰레기통으로 사용하지 마세요</em></h1>
+    <p class="subtitle">정보 밀도가 높을수록 → 주의력이 집중되고 → 성능이 향상됩니다. 3가지 시맨틱 레이어 전략으로 모든 Token에 가치를 부여하세요.</p>
+  </header>
+
+  <div class="sec-label">왜 무한히 내용을 채울 수 없는가</div>
+  <div class="problem-box">
+    <div class="pb-title">왜 무한히 내용을 채울 수 없는가?</div>
+    <div class="problem-row">① <b>비싸고 느림</b>: 어텐션 복잡도 O(N²), Prompt 2배 → 계산량 4배</div>
+    <div class="problem-row">② <b>성능 저하</b>: 모델의 중간 컨텐츠 주의력이 가장 약해 핵심 정보가 묻힘</div>
+  </div>
+
+  <div class="sec-label">3가지 최적화 전략</div>
+  <div class="strat-list">
+        <button class="strat-btn active" onclick="pickStrat(this,0)">
+          <div class="sn">1</div>
+          <div class="si">
+            <h5>동적 Few-Shot: 케이스를 하드코딩하지 마세요</h5>
+            <p>벡터 검색으로 매번 가장 관련성 높은 3개만 가져옵니다</p>
+          </div>
+          <div class="saving" style="color:var(--green)">87.5% 절약</div>
+        </button>
+        <button class="strat-btn" onclick="pickStrat(this,1)">
+          <div class="sn">2</div>
+          <div class="si">
+            <h5>긴 문서: 먼저 압축 후 AI에 제공</h5>
+            <p>LLMLingua-2로 중복 내용 필터링, 시맨틱 핵심 보존</p>
+          </div>
+          <div class="saving" style="color:var(--purple)">5-20x 압축</div>
+        </button>
+        <button class="strat-btn" onclick="pickStrat(this,2)">
+          <div class="sn">3</div>
+          <div class="si">
+            <h5>핵심 정보는 처음과 끝에, 중간에 두지 마세요</h5>
+            <p>모델 어텐션의 처음-끝 선호 특성을 활용합니다</p>
+          </div>
+          <div class="saving" style="color:var(--cyan)">성능↑↑</div>
+        </button>
+  </div>
+
+  <div class="sec-label">인터랙티브 데모</div>
+  <div class="paywall-locked xa-peek">
+    <div class="demo-title" id="demoTitle">동적 Few-Shot: Text-to-SQL 데모</div>
+    <div class="demo-area" id="demoArea"></div>
+  </div>
+</article>
+<script>
+// ── Strategy 1: Dynamic Few-Shot ──
+const ALL_CASES = [
+  { q: 'Q: 2024년 매출 상위 5개 제품 조회', sim: 0.95, sql: 'SELECT p.name, SUM(o.amount) AS sales\nFROM orders o JOIN products p ON...\nORDER BY sales DESC LIMIT 5' },
+  { q: 'Q: 지역별 이번 달 주문 총량 집계', sim: 0.78, sql: 'SELECT region, COUNT(*) AS cnt\nFROM orders WHERE MONTH(...)' },
+  { q: 'Q: 환불률 5% 초과 상품 찾기', sim: 0.62, sql: 'SELECT product_id, refund_rate\nFROM (...) WHERE refund_rate > 0.05' },
+  { q: 'Q: 활성 사용자 평균 소비 금액 조회', sim: 0.51, sql: 'SELECT AVG(total) FROM orders\nWHERE user_id IN (SELECT ...)' },
+  { q: 'Q: 카테고리별 재고 수량 집계', sim: 0.38, sql: 'SELECT category, SUM(stock) FROM products GROUP BY category' },
+  { q: 'Q: 최근 7일 신규 가입 사용자 수 조회', sim: 0.29, sql: 'SELECT COUNT(*) FROM users WHERE created_at > NOW()-7' },
+];
+
+function renderFewShot() {
+  return `
+  <div class="fewshot-wrap">
+    <div class="fs-col">
+      <div class="fs-col-title bad">케이스 풀 (20개 고정 케이스)</div>
+      <div class="case-pool" id="casePool">
+        ${ALL_CASES.map((c,i)=>`
+          <div class="case-item" id="ci${i}">
+            <div class="ci-q">${c.q}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">관련도 ${Math.round(c.sim*100)}%</div>
+          </div>`).join('')}
+      </div>
+      <div class="tok-bar">
+        <span style="font-size:13px;font-weight:700;color:var(--muted)">기존 방식</span>
+        <div class="tok-track"><div class="tok-fill" style="width:100%;background:var(--red)"></div></div>
+        <span class="tok-num" style="color:var(--red)">4,000 T</span>
+      </div>
+    </div>
+    <div class="fs-col">
+      <div class="fs-col-title good">Prompt 주입 (동적 검색 Top-3)</div>
+      <pre class="prompt-box" id="promptBox"><span class="p-sys">System: 당신은 SQL 전문가입니다.</span>
+
+<span style="color:var(--muted)">← "검색 시작"을 클릭하여
+   벡터 매칭 과정을 시뮬레이션하세요</span></pre>
+      <div class="tok-bar">
+        <span style="font-size:13px;font-weight:700;color:var(--muted)">새 방식</span>
+        <div class="tok-track"><div class="tok-fill" id="newTokBar" style="width:0%;background:var(--green)"></div></div>
+        <span class="tok-num" id="newTokNum" style="color:var(--green)">0 T</span>
+      </div>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-box bad"><div class="sv">4,000</div><div class="sl">기존 방식 Token</div></div>
+    <div class="stat-box neutral"><div class="sv" id="fsSave">—</div><div class="sl">절약 비율</div></div>
+    <div class="stat-box good"><div class="sv" id="fsSpeed">—</div><div class="sl">응답 속도</div></div>
+    <div class="stat-box neutral" style="background:rgba(22,163,74,.04);border-color:rgba(22,163,74,.2)">
+      <div class="sv" style="color:var(--green)" id="fsAcc">—</div><div class="sl">정확도 변화</div></div>
+  </div>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <button class="btn-sim btn-primary" id="btnSim" onclick="runFewShot()">▶ 검색 시작</button>
+    <button class="btn-sim btn-reset" onclick="resetFewShot()">초기화</button>
+    <span style="font-size:13px;color:var(--muted);align-self:center">사용자 질문: 이번 달 지역별 매출 Top-5 제품 조회</span>
+  </div>`;
+}
+
+let fsStep = 0, fsTimer = null;
+function runFewShot() {
+  const btn = document.getElementById('btnSim');
+  if (fsStep >= 3) return;
+  btn.disabled = true;
+
+  const sorted = [...ALL_CASES].sort((a,b)=>b.sim-a.sim);
+  let delay = 0;
+  const selected = [];
+
+  sorted.forEach((c, rank) => {
+    const origIdx = ALL_CASES.indexOf(c);
+    setTimeout(() => {
+      const el = document.getElementById('ci'+origIdx);
+      if (rank < 3) {
+        el.classList.add('selected');
+        selected.push(c);
+        updatePromptBox(selected);
+        const tok = 120 + selected.length * 130;
+        const pct = Math.round(tok / 4000 * 100);
+        document.getElementById('newTokBar').style.width = pct + '%';
+        document.getElementById('newTokNum').textContent = tok + ' T';
+        if (selected.length === 3) {
+          document.getElementById('fsSave').textContent = '87.5%';
+          document.getElementById('fsSave').classList.add('pop');
+          document.getElementById('fsSpeed').textContent = '3x↑';
+          document.getElementById('fsAcc').textContent = '↑더 높음';
+          btn.disabled = false;
+          btn.textContent = '✓ 완료';
+        }
+      } else {
+        el.classList.add('greyed');
+      }
+    }, delay);
+    delay += rank < 3 ? 600 : 200;
+  });
+}
+
+function updatePromptBox(cases) {
+  const box = document.getElementById('promptBox');
+  let html = `<span class="p-sys">System: 당신은 SQL 전문가입니다.</span>\n\n`;
+  cases.forEach((c,i) => {
+    html += `<span class="p-case">/* 케이스 ${i+1} (관련도 ${Math.round(c.sim*100)}%) */\n${c.q}\nSQL: ${c.sql}</span>\n\n`;
+  });
+  html += `<span class="p-user">User: 이번 달 지역별 매출 Top-5 제품 조회</span>`;
+  box.innerHTML = html;
+  box.scrollTop = box.scrollHeight;
+}
+
+function resetFewShot() {
+  ALL_CASES.forEach((_,i) => {
+    const el = document.getElementById('ci'+i);
+    if (el) { el.classList.remove('selected','greyed'); }
+  });
+  document.getElementById('promptBox').innerHTML = `<span class="p-sys">System: 당신은 SQL 전문가입니다.</span>\n\n<span style="color:var(--muted)">← "검색 시작"을 클릭하여\n   벡터 매칭 과정을 시뮬레이션하세요</span>`;
+  document.getElementById('newTokBar').style.width = '0%';
+  document.getElementById('newTokNum').textContent = '0 T';
+  document.getElementById('fsSave').textContent = '—';
+  document.getElementById('fsSpeed').textContent = '—';
+  document.getElementById('fsAcc').textContent = '—';
+  const btn = document.getElementById('btnSim');
+  btn.disabled = false;
+  btn.textContent = '▶ 검색 시작';
+}
+
+// ── Strategy 2: Document Compression ──
+// 4 levels, each shows compression result on the right; 4 core data points always preserved
+
+// Left: original text (highlighted annotations for what will be compressed)
+const ORIG_PARAS = [
+  // [paragraph HTML, which level starts showing strikethrough]
+  { html: '면책고지: 본 보고서는 <span id="del-00">참고용으로만 제공되며</span>, 투자 조언을 구성하지 않고 <span id="del-01">어떠한 손실에 대해서도 책임지지 않습니다</span>.', delAt: 2 },
+  { html: '핵심 결론: 2024Q3 매출 전년 대비 <b>23.5%</b> 성장, 시장 예상치를 <b>8 퍼센트포인트</b> 초과 달성.', delAt: 99 }, // Always preserved
+  { html: '<span id="del-20">주지하다시피, </span>거시경제 환경은<span id="del-21"> 복잡하고 변화무쌍하며, </span>모든 산업은<span id="del-22"> 다양한 수준의 </span>도전과 기회에 직면해 있습니다.', delAt: 1 },
+  { html: '매출총이익률 <b>2.1pp</b> 상승하여 <b>61.3%</b> 달성, 주로 고마진 SaaS 사업 비중 증가 덕분.', delAt: 99 }, // Always preserved
+  { html: '<span id="del-40">지난 분기 보고서에서 언급했고, 여러 IR 행사에서 반복적으로 강조했던 바와 같이…</span>', delAt: 2 },
+  { html: '영업현금흐름 순액 <b>12.8억 위안</b>, 전년 대비 <b>41%</b> 성장, <span id="del-51">현금 보유량 풍부.</span>', delAt: 99 }, // Always preserved
+  { html: '<span id="del-60">투자자 여러분의 장기적인 관심과 지원에 감사드리며, 지속적으로 가치를 창출하기 위해 노력하겠습니다…</span>', delAt: 2 },
+  { html: '다음 분기 가이던스: 매출 <b>42-45억 위안</b>, Non-GAAP 순이익률 <b>18-20%</b>.', delAt: 99 }, // Always preserved
+];
+
+// Right: 4 levels of compression results (slider positions 0/1/2/3)
+const COMPRESS_LEVELS = [
+  // Level 0: No compression (original)
+  {
+    label: '1x (압축 없음)',
+    tok: 10000, savePct: 0,
+    titleColor: 'var(--sub)',
+    desc: '원본 문서, 다수의 중복 어휘와 무효 문장 포함',
+    html: `<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">면책고지: 본 보고서는 참고용으로만 제공되며, 투자 조언을 구성하지 않고, 어떠한 손실에 대해서도 책임지지 않습니다.</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>핵심 결론: 2024Q3 매출 전년 대비 23.5% 성장, 시장 예상치를 8 퍼센트포인트 초과 달성.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">주지하다시피, 거시경제 환경은 복잡하고 변화무쌍하며, 모든 산업은 다양한 수준의 도전과 기회에 직면해 있습니다.</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>매출총이익률 2.1pp 상승하여 61.3% 달성, 주로 고마진 SaaS 사업 비중 증가 덕분.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">지난 분기 보고서에서 언급했고, 여러 IR 행사에서 반복적으로 강조했던 바와 같이…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>영업현금흐름 순액 12.8억 위안, 전년 대비 41% 성장, 현금 보유량 풍부.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">투자자 여러분의 장기적인 관심과 지원에 감사드리며, 지속적으로 가치를 창출하기 위해 노력하겠습니다…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>다음 분기 가이던스: 매출 42-45억 위안, Non-GAAP 순이익률 18-20%.</b></p>`
+  },
+  // Level 1: Light compression — remove redundant adverbs and clichés
+  {
+    label: '3x (경도)',
+    tok: 3800, savePct: 62,
+    titleColor: 'var(--amber)',
+    desc: '1단계: 중복 부사와 상투적 표현 제거, 의미 불변',
+    html: `<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">면책고지: 본 보고서는 참고용으로만 제공되며, 투자 조언을 구성하지 않고, 어떠한 손실에 대해서도 책임지지 않습니다.</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>핵심 결론: 2024Q3 매출 전년 대비 23.5% 성장, 시장 예상치를 8 퍼센트포인트 초과 달성.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">거시경제 환경은 도전과 기회에 직면해 있습니다. <span style="color:var(--amber);font-size:12px">←「주지하다시피」「복잡하고 변화무쌍한」「다양한 수준의」삭제됨</span></p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>매출총이익률 2.1pp 상승하여 61.3% 달성, 주로 고마진 SaaS 사업 비중 증가 덕분.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">지난 분기 보고서에서 언급했고, 여러 IR 행사에서 반복적으로 강조했던 바와 같이…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>영업현금흐름 순액 12.8억 위안, 전년 대비 41% 성장, 현금 보유량 풍부.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">투자자 여러분의 장기적인 관심과 지원에 감사드리며, 지속적으로 가치를 창출하기 위해 노력하겠습니다…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>다음 분기 가이던스: 매출 42-45억 위안, Non-GAAP 순이익률 18-20%.</b></p>`
+  },
+  // Level 2: Medium compression — remove entire redundant paragraphs
+  {
+    label: '7x (중도)',
+    tok: 1500, savePct: 85,
+    titleColor: 'var(--orange)',
+    desc: '2단계: 전체 무효 단락 삭제 (면책고지, 감사 인사, 상투적 문단)',
+    html: `<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">면책고지: 본 보고서는 참고용으로만 제공되며… ← 전체 삭제</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>핵심 결론: 2024Q3 매출 전년 대비 23.5% 성장, 시장 예상치를 8 퍼센트포인트 초과 달성.</b></p>
+<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">거시경제 환경은 도전과 기회에 직면해 있습니다. ← 실질 정보 없음, 삭제</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>매출총이익률 2.1pp 상승하여 61.3% 달성, 주로 고마진 SaaS 사업 비중 증가 덕분.</b></p>
+<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">지난 분기 보고서에서 언급했고… ← 전체 삭제</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>영업현금흐름 순액 12.8억 위안, 전년 대비 41% 성장, 현금 보유량 풍부.</b></p>
+<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">투자자 여러분의 장기적인 관심과 지원에 감사드리며… ← 전체 삭제</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>다음 분기 가이던스: 매출 42-45억 위안, Non-GAAP 순이익률 18-20%.</b></p>`
+  },
+  // Level 3: Aggressive compression — restructure as minimal list, all 4 core data points preserved
+  {
+    label: '20x (급진적)',
+    tok: 520, savePct: 95,
+    titleColor: 'var(--green)',
+    desc: '3단계: 최소 목록으로 재구성, 핵심 데이터 100% 보존',
+    html: `<p style="margin-bottom:10px;font-size:13px;color:var(--muted)">↓ 구조화된 요약으로 압축, 최고 정보 밀도:</p>
+<div style="background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:10px 14px;line-height:2;font-size:15px;color:var(--text)">
+• 매출 전년 대비 +23.5%, 예상치 8pp 초과<br>
+• 매출총이익률 61.3% (+2.1pp), SaaS 비중 증가<br>
+• 영업현금흐름 12.8억, 전년 대비 +41%<br>
+• Q4 가이던스: 매출 42-45억, Non-GAAP 이익률 18-20%
+</div>
+<p style="margin-top:8px;font-size:13px;color:var(--green);font-weight:700">✓ 4개 핵심 데이터 완전 보존, 모든 중복 내용 필터링됨</p>`
+  },
+];
+
+function renderCompress() {
+  return `
+  <div style="font-size:14px;color:var(--sub);flex-shrink:0">슬라이더를 드래그하여 LLMLingua-2 압축 레벨을 체험하세요: <b style="color:var(--purple)">먼저 단어 삭제 → 그 다음 문장 삭제 → 마지막으로 목록으로 재구성. 핵심 데이터는 항상 보존됩니다.</b></div>
+  <div class="compress-wrap">
+    <div class="fs-col">
+      <div class="fs-col-title bad">원본 문서 (다수의 중복 포함)</div>
+      <div class="doc-box" id="docOriginal">
+        ${ORIG_PARAS.map((p,i) => `<p style="margin-bottom:7px;line-height:1.7;transition:all .4s" id="orig${i}">${p.html}</p>`).join('')}
+      </div>
+      <div class="tok-bar">
+        <div class="tok-track"><div class="tok-fill" style="width:100%;background:var(--red)"></div></div>
+        <span class="tok-num" style="color:var(--red)">10,000 T</span>
+      </div>
+    </div>
+    <div class="fs-col">
+      <div class="fs-col-title good" id="compTitle">압축 후 (LLMLingua-2): 압축 없음</div>
+      <div class="doc-box" id="docCompressed" style="transition:opacity .3s"></div>
+      <div class="tok-bar">
+        <div class="tok-track"><div class="tok-fill" id="compBar" style="width:100%;background:var(--sub)"></div></div>
+        <span class="tok-num" id="compTok" style="color:var(--sub)">10,000 T</span>
+      </div>
+    </div>
+  </div>
+  <div class="compress-ctrl">
+    <div class="slider-row">
+      <span class="slider-label">압축 강도</span>
+      <input type="range" id="compSlider" min="0" max="3" value="0" step="1" oninput="onCompress(this)" style="--pct:0%">
+      <span style="font-size:14px;font-weight:800;color:var(--purple);min-width:120px" id="compRatio">1x (압축 없음)</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:0 2px;margin-top:-4px">
+      <span>원문</span><span>경도 (단어 삭제)</span><span>중도 (문장 삭제)</span><span>급진적 (목록)</span>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-box bad"><div class="sv">10,000</div><div class="sl">원본 Token</div></div>
+    <div class="stat-box neutral"><div class="sv" id="compRemain">10,000</div><div class="sl">압축 후 Token</div></div>
+    <div class="stat-box neutral"><div class="sv" id="compSave" style="color:var(--sub)">0%</div><div class="sl">압축률</div></div>
+    <div class="stat-box neutral" style="background:rgba(91,79,207,.04);border-color:rgba(91,79,207,.2)">
+      <div class="sv" style="color:var(--purple)">BERT</div><div class="sl">양방향 어텐션 압축</div></div>
+  </div>`;
+}
+
+function onCompress(slider) {
+  const val = +slider.value; // 0/1/2/3
+  const pct = (val / 3 * 100).toFixed(0);
+  slider.style.setProperty('--pct', pct + '%');
+
+  const lv = COMPRESS_LEVELS[val];
+
+  // Right panel: switch content
+  const compBox = document.getElementById('docCompressed');
+  compBox.style.opacity = '0';
+  setTimeout(() => {
+    compBox.innerHTML = lv.html;
+    compBox.style.opacity = '1';
+  }, 150);
+
+  // Right panel: update title
+  document.getElementById('compTitle').textContent = `압축 후 (LLMLingua-2): ${lv.label}`;
+  document.getElementById('compTitle').style.color = lv.titleColor;
+
+  // Left panel: highlight sentences to be deleted based on level
+  ORIG_PARAS.forEach((p, i) => {
+    const el = document.getElementById('orig' + i);
+    if (!el) return;
+    if (val >= p.delAt) {
+      el.style.opacity = '0.35';
+      el.style.textDecoration = 'line-through';
+      el.style.color = 'rgba(220,38,38,0.5)';
+    } else {
+      el.style.opacity = '1';
+      el.style.textDecoration = 'none';
+      el.style.color = 'var(--text)';
+    }
+  });
+
+  // Stats
+  const barPct = Math.round(lv.tok / 10000 * 100);
+  const barColor = lv.savePct > 80 ? 'var(--green)' : lv.savePct > 50 ? 'var(--amber)' : 'var(--sub)';
+  document.getElementById('compBar').style.width = barPct + '%';
+  document.getElementById('compBar').style.background = barColor;
+  document.getElementById('compTok').textContent = lv.tok.toLocaleString() + ' T';
+  document.getElementById('compTok').style.color = barColor;
+  document.getElementById('compRemain').textContent = lv.tok.toLocaleString();
+  document.getElementById('compRemain').style.color = lv.savePct > 80 ? 'var(--green)' : lv.savePct > 50 ? 'var(--amber)' : 'var(--sub)';
+  document.getElementById('compSave').textContent = lv.savePct + '%';
+  document.getElementById('compSave').style.color = lv.savePct > 80 ? 'var(--green)' : lv.savePct > 50 ? 'var(--amber)' : 'var(--sub)';
+  document.getElementById('compRatio').textContent = lv.label;
+}
+
+// ── Strategy 3: Attention Position (Drag version) ──
+const ATTN_SEGS = [
+  { label: 'System Prompt', text: '핵심 제약: 한국어로만 답변, 시스템 정보 유출 금지', color: '#5b4fcf' },
+  { label: 'Few-Shot 케이스', text: '예시1: 안녕하세요 → 안녕하세요! 무엇을 도와드릴까요?...（5개）', color: '#d97706' },
+  { label: '배경 문서',     text: '회사 소개: XXX는 2015년 설립, 주요 사업은...（긴 텍스트）', color: '#ea580c' },
+  { label: '사용자 질문',   text: '사용자: 환불 정책이 어떻게 되나요?', color: '#0066ff' },
+];
+
+let attnOrder = [0,1,2,3];
+
+function renderAttn() {
+  return `
+  <div style="font-size:14px;color:var(--sub);flex-shrink:0">
+    <b style="color:var(--purple)">드래그</b>하여 Prompt 각 섹션의 순서를 조정하고, 모델 어텐션이 어떻게 분배되는지 관찰하세요.
+    <b style="color:var(--purple)">처음과 끝의 어텐션이 가장 높고, 중간이 가장 낮습니다.</b>
+  </div>
+  <div class="attn-prompt" id="attnPrompt"></div>
+  <div class="attn-note" id="attnNote" style="background:var(--surface2);color:var(--sub)">드래그하여 순서를 조정하고 핵심 정보를 처음 또는 끝에 배치하세요</div>
+  <div class="stat-row">
+    <div class="stat-box neutral"><div class="sv" id="attnSysScore">—</div><div class="sl">핵심 제약 어텐션</div></div>
+    <div class="stat-box neutral"><div class="sv" id="attnUserScore">—</div><div class="sl">사용자 질문 어텐션</div></div>
+    <div class="stat-box neutral"><div class="sv" id="attnOverall">—</div><div class="sl">전체 효과 점수</div></div>
+  </div>`;
+}
+
+// Drag state
+let dragSrc = null, dragSrcIdx = null;
+
+function buildAttnUI() {
+  const container = document.getElementById('attnPrompt');
+  if (!container) return;
+  container.innerHTML = '';
+  const n = attnOrder.length;
+
+  // Attention distribution: position 0=92%, position 1=45%, position 2=32%, position 3=88%
+  const posAttnPct = [92, 45, 32, 88]; // corresponds to positions 0,1,2,3 (4 elements)
+
+  attnOrder.forEach((segIdx, pos) => {
+    const s = ATTN_SEGS[segIdx];
+    const attnPct = posAttnPct[pos] || 32;
+    const heatColor = attnPct > 80 ? '#16a34a' : attnPct > 50 ? '#d97706' : '#dc2626';
+    const heatLabel = attnPct > 80 ? '높음' : attnPct > 50 ? '중간' : '낮음';
+
+    const div = document.createElement('div');
+    div.className = 'attn-seg';
+    div.style.cssText = `border-color:${s.color}40;background:${s.color}08;cursor:grab;transition:opacity .2s,transform .15s`;
+    div.draggable = true;
+    div.dataset.pos = pos;
+
+      div.innerHTML = `
+      <div style="font-size:18px;color:${s.color}55;flex-shrink:0;cursor:grab" title="드래그하여 정렬">⠿</div>
+      <div class="attn-label" style="color:${s.color}">${s.label}</div>
+      <div class="attn-content">${s.text}</div>
+      <div class="attn-heat" style="background:${heatColor}">${attnPct}% ${heatLabel}</div>
+    `;
+
+    div.addEventListener('dragstart', e => {
+      dragSrc = div;
+      dragSrcIdx = pos;
+      setTimeout(() => div.style.opacity = '0.4', 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    div.addEventListener('dragend', () => {
+      div.style.opacity = '1';
+      container.querySelectorAll('.attn-seg').forEach(el => el.classList.remove('drag-over'));
+    });
+    div.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      container.querySelectorAll('.attn-seg').forEach(el => el.classList.remove('drag-over'));
+      div.classList.add('drag-over');
+    });
+    div.addEventListener('dragleave', () => div.classList.remove('drag-over'));
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      const targetPos = +div.dataset.pos;
+      if (dragSrcIdx !== null && dragSrcIdx !== targetPos) {
+        // Swap two segments
+        [attnOrder[dragSrcIdx], attnOrder[targetPos]] = [attnOrder[targetPos], attnOrder[dragSrcIdx]];
+        buildAttnUI();
+      }
+    });
+
+    container.appendChild(div);
+  });
+
+  // Add drag-over style
+  if (!document.getElementById('drag-style')) {
+    const st = document.createElement('style');
+    st.id = 'drag-style';
+    st.textContent = '.attn-seg.drag-over{outline:2.5px dashed var(--purple);background:rgba(91,79,207,.07)!important;transform:scale(1.01)}';
+    document.head.appendChild(st);
+  }
+
+  updateAttnStats();
+}
+
+function updateAttnStats() {
+  const sysPos  = attnOrder.indexOf(0); // System Prompt
+  const userPos = attnOrder.indexOf(3); // User question
+  const n = attnOrder.length;
+  const posAttnPct = [92, 45, 32, 88];
+
+  const sysA  = posAttnPct[sysPos]  || 32;
+  const userA = posAttnPct[userPos] || 32;
+  const overall = Math.round((sysA + userA) / 2);
+
+  document.getElementById('attnSysScore').textContent = sysA + '%';
+  document.getElementById('attnSysScore').style.color = sysA > 70 ? 'var(--green)' : sysA > 50 ? 'var(--orange)' : 'var(--red)';
+  document.getElementById('attnUserScore').textContent = userA + '%';
+  document.getElementById('attnUserScore').style.color = userA > 70 ? 'var(--green)' : userA > 50 ? 'var(--orange)' : 'var(--red)';
+  document.getElementById('attnOverall').textContent = overall > 70 ? '우수' : overall > 50 ? '보통' : '미흡';
+  document.getElementById('attnOverall').style.color = overall > 70 ? 'var(--green)' : overall > 50 ? 'var(--orange)' : 'var(--red)';
+
+  const note = document.getElementById('attnNote');
+  if (overall > 70) {
+    note.style.background = 'rgba(22,163,74,.08)';
+    note.style.color = 'var(--green)';
+    note.textContent = '✓ 핵심 정보가 처음과 끝에 위치, 모델 어텐션 집중, 최적 성능!';
+  } else if (sysPos >= 1 && sysPos <= 2) {
+    note.style.background = 'rgba(220,38,38,.06)';
+    note.style.color = 'var(--red)';
+    note.textContent = '✗ 핵심 제약이 중간에 묻혔습니다, 모델이 무시할 수 있습니다! 처음으로 드래그해보세요.';
+  } else {
+    note.style.background = 'rgba(234,88,12,.06)';
+    note.style.color = 'var(--orange)';
+    note.textContent = '△ 더 최적화할 수 있습니다, 사용자 질문을 마지막으로 드래그해보세요.';
+  }
+}
+
+// ── Main control ──
+let curStrat = 0;
+function pickStrat(btn, idx) {
+  document.querySelectorAll('.strat-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  curStrat = idx;
+  const titles = ['동적 Few-Shot: Text-to-SQL 데모','긴 문서 압축: LLMLingua-2 실전 데모','핵심 정보 위치: 드래그하여 순서 조정'];
+  document.getElementById('demoTitle').textContent = titles[idx];
+  const area = document.getElementById('demoArea');
+  if (idx === 0) {
+    area.innerHTML = renderFewShot();
+  } else if (idx === 1) {
+    area.innerHTML = renderCompress();
+    setTimeout(() => {
+      // Initialize right panel content (level 0)
+      document.getElementById('docCompressed').innerHTML = COMPRESS_LEVELS[0].html;
+    }, 50);
+  } else {
+    attnOrder = [0,1,2,3];
+    area.innerHTML = renderAttn();
+    setTimeout(buildAttnUI, 50);
+  }
+}
+
+pickStrat(document.querySelector('.strat-btn'), 0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

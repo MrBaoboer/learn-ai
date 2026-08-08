@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ReAct in Practice: Reasoning &amp; Action Loop When an Agent Gets Stuck | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── Layout: status sidebar + execution log ── */
+.react-layout{display:grid;grid-template-columns:290px 1fr;gap:20px;align-items:start}
+
+/* Left: status panel */
+.side-panel{display:flex;flex-direction:column;gap:12px;position:sticky;top:16px}
+
+/* Loop counter */
+.loop-counter{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-card)}
+.lc-row{display:flex;justify-content:space-between;align-items:center}
+.lc-label{font-size:13px;color:var(--sub);font-weight:600}
+.lc-val{font-size:22px;font-weight:900;color:var(--text);transition:color .3s}
+.lc-val.warn{color:var(--amber)}
+.lc-val.danger{color:var(--danger)}
+.lc-bar{height:6px;background:rgba(0,0,0,.05);border-radius:3px;overflow:hidden}
+.lc-fill{height:100%;background:var(--success);border-radius:3px;transition:width .4s ease,background .4s}
+.lc-fill.warn{background:var(--amber)}
+.lc-fill.danger{background:var(--danger)}
+
+.status-badge{padding:6px 12px;border-radius:7px;font-size:13px;font-weight:700;text-align:center;transition:all .3s}
+
+/* Progress control */
+.ctrl-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-card)}
+.btn-reset{padding:9px 12px;border-radius:8px;background:rgba(0,0,0,.04);color:var(--sub);font-size:14px;border:1px solid var(--border);cursor:pointer;font-family:inherit;min-height:40px}
+.prog-bar{height:4px;background:rgba(0,0,0,.05);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .35s}
+
+.insight{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.18);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text);line-height:1.6}
+.insight b{color:var(--danger)}
+.insight.ok{background:rgba(22,163,74,.05);border-color:rgba(22,163,74,.2)}
+.insight.ok b{color:var(--success)}
+
+/* Right: execution log */
+.log-panel{min-width:0}
+.r-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.r-hd-label{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--sub);text-transform:uppercase}
+.r-hd-task{font-size:14px;font-weight:700;color:var(--text)}
+
+/* Message flow */
+.msg-area{display:flex;flex-direction:column;gap:8px}
+
+.msg{display:flex;gap:10px;opacity:0;transform:translateY(8px);transition:opacity .3s ease,transform .3s ease}
+.msg.show{opacity:1;transform:translateY(0)}
+.msg-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.msg-body{flex:1;min-width:0}
+.msg-role{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;margin-bottom:3px}
+.msg-bubble{border-radius:9px;padding:10px 14px;font-size:13.5px;line-height:1.65}
+
+/* Error shake */
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.shake{animation:shake .4s ease}
+
+.code{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.k{color:var(--purple)}.s{color:var(--success)}.c{color:#9ca3af;font-style:italic}.fn{color:var(--cyan)}.err{color:var(--danger);font-weight:700}
+
+.ft-msg{font-size:13px;color:var(--sub);font-weight:600;transition:color .3s;margin-top:10px;display:block;min-height:20px}
+
+@media (max-width:768px){
+  .react-layout{grid-template-columns:1fr}
+  .side-panel{position:static}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="The ReAct (Reasoning + Acting) framework lets Agents reason and act while executing. Real-world case analysis of the ReAct iterative loop: Thought, Action, Observation, plus common causes and solutions for Agents getting stuck.">
+<meta name="keywords" content="ReAct,Agent framework,reasoning acting,Thought Action Observation,Agent debugging,LangChain">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-3.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-3.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="ReAct in Practice: What to Do When the Agent Gets Stuck">
+<meta property="og:description" content="The ReAct (Reasoning + Acting) framework lets Agents reason and act while executing. Real-world case analysis of the ReAct iterative loop: Thought, Action, Observation, plus common causes and solutions for Agents getting stuck.">
+<meta property="og:url" content="https://xueai.app/slides/7-3.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ReAct in Practice: What to Do When the Agent Gets Stuck">
+<meta name="twitter:description" content="The ReAct (Reasoning + Acting) framework lets Agents reason and act while executing. Real-world case analysis of the ReAct iterative loop: Thought, Action, Observation, plus common causes and solutions for Agents getting stuck.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"ReAct in Practice: Full Hotel Booking Chain","name":"ReAct in Practice: Full Hotel Booking Chain","url":"https://xueai.app/slides/7-3.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practical Course · Agent Engineering","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"The ReAct (Reasoning + Acting) framework lets Agents reason and act while executing. Real-world case analysis of the ReAct iterative loop: Thought, Action, Observation, plus common causes and solutions for Agents getting stuck.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent Engineering</div>
+    <h1>ReAct in Practice: When the Agent Gets Stuck</h1>
+    <p class="subtitle">ReAct loop: Thought → Action → Observation, repeat. But if the model doesn't know the parameter format required by an API, it will keep guessing, spinning in circles at the same spot. Scroll down to automatically trace a real failure process.</p>
+  </header>
+
+  <div class="react-layout reveal paywall-locked xa-peek" id="reactDemo">
+    <!-- Left: status panel -->
+    <aside class="side-panel">
+      <div class="loop-counter">
+        <div class="lc-row">
+          <span class="lc-label">ReAct Loop Count</span>
+          <span class="lc-val" id="loopCount">0</span>
+        </div>
+        <div class="lc-bar"><div class="lc-fill" id="loopFill" style="width:0%"></div></div>
+        <div class="lc-row">
+          <span class="lc-label">Tool Calls</span>
+          <span class="lc-val" id="callCount" style="font-size:16px">0 times</span>
+        </div>
+        <div class="lc-row">
+          <span class="lc-label">Failures</span>
+          <span class="lc-val" id="failCount" style="font-size:16px;color:var(--danger)">0 times</span>
+        </div>
+        <div class="status-badge" id="statusBadge" style="background:rgba(0,0,0,.04);color:var(--sub)">Waiting to start</div>
+      </div>
+
+      <div class="ctrl-box">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--sub);font-weight:600" id="stepText">10 steps total</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text)" id="stepNum">0 / 10</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <button class="btn-reset" onclick="resetAll()">↺ Replay</button>
+      </div>
+
+      <div class="insight" id="insightBox">
+        <b>Root cause:</b> The model doesn't know the specific format required by the API, so it can only guess, retrying with a different format each time it fails. Without scaffolding, this loop for an Agent might never stop.
+      </div>
+    </aside>
+
+    <!-- Right: execution log -->
+    <div class="log-panel">
+      <div class="r-hd">
+        <span class="r-hd-label">ReAct Execution Log</span>
+        <span class="r-hd-task">Task: Book a hotel near the Bund in Shanghai, check in tomorrow, stay 2 nights</span>
+      </div>
+      <div class="msg-area" id="msgArea"></div>
+      <span class="ft-msg" id="ftMsg">Scroll here to auto-play the demo</span>
+    </div>
+  </div>
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+// Per-step data
+const STEPS = [
+  {
+    loop:1, calls:0, fails:0,
+    status:'Running', statusBg:'rgba(8,145,178,.08)', statusColor:'#0891b2',
+    ft:'Round 1: Agent starts thinking about the task…',
+    msgs:[{
+      icon:'🤔', iconBg:'#7c3aed', role:'THOUGHT', roleColor:'#7c3aed',
+      bg:'rgba(124,58,237,.05)', border:'rgba(124,58,237,.2)',
+      html:'The task is to book a hotel near the Bund in Shanghai, check in tomorrow, stay 2 nights. I need to call the book_hotel tool. Tomorrow is 2026-04-11, checkout is 4-13.'
+    }]
+  },
+  {
+    loop:1, calls:1, fails:0,
+    status:'Calling', statusBg:'rgba(8,145,178,.08)', statusColor:'#0891b2',
+    ft:'1st tool call, using natural language date format…',
+    msgs:[{
+      icon:'⚡', iconBg:'#0891b2', role:'ACTION', roleColor:'#0891b2',
+      bg:'rgba(8,145,178,.04)', border:'rgba(8,145,178,.2)',
+      html:`<div class="code"><span class="fn">book_hotel</span>({
+  location:   <span class="s">"Shanghai Bund"</span>,
+  checkin:    <span class="s">"tomorrow"</span>,        <span class="c">← used natural language</span>
+  checkout:   <span class="s">"day after tomorrow"</span>,
+  guests:     <span class="k">1</span>
+})</div>`
+    }]
+  },
+  {
+    loop:1, calls:1, fails:1,
+    status:'Error ×1', statusBg:'rgba(220,38,38,.08)', statusColor:'#dc2626',
+    ft:'API error: does not accept natural language dates',
+    msgs:[{
+      icon:'❌', iconBg:'#dc2626', role:'OBSERVATION · ERROR', roleColor:'#dc2626',
+      bg:'rgba(220,38,38,.04)', border:'rgba(220,38,38,.25)',
+      shake:true,
+      html:`<div class="code"><span class="err">Error 400: Invalid date format</span>
+The checkin field does not accept natural language.
+<span class="c">Please use YYYY-MM-DD format.</span></div>`
+    }]
+  },
+  {
+    loop:2, calls:2, fails:1,
+    status:'Retrying', statusBg:'rgba(215,119,6,.08)', statusColor:'#d97706',
+    ft:'Round 2: Model switched to numeric date, but format still wrong…',
+    msgs:[{
+      icon:'🤔', iconBg:'#7c3aed', role:'THOUGHT', roleColor:'#7c3aed',
+      bg:'rgba(124,58,237,.05)', border:'rgba(124,58,237,.2)',
+      html:'OK, I need a date format. Tomorrow is April 11, let me try 04/11.'
+    },{
+      icon:'⚡', iconBg:'#0891b2', role:'ACTION', roleColor:'#0891b2',
+      bg:'rgba(8,145,178,.04)', border:'rgba(8,145,178,.2)',
+      html:`<div class="code"><span class="fn">book_hotel</span>({
+  location:   <span class="s">"Shanghai Bund"</span>,
+  checkin:    <span class="s">"04/11"</span>,     <span class="c">← switched to slash format</span>
+  checkout:   <span class="s">"04/13"</span>,
+  guests:     <span class="k">1</span>
+})</div>`
+    }]
+  },
+  {
+    loop:2, calls:2, fails:2,
+    status:'Error ×2', statusBg:'rgba(220,38,38,.08)', statusColor:'#dc2626',
+    ft:'Still wrong: API only accepts YYYY-MM-DD, not MM/DD',
+    msgs:[{
+      icon:'❌', iconBg:'#dc2626', role:'OBSERVATION · ERROR', roleColor:'#dc2626',
+      bg:'rgba(220,38,38,.04)', border:'rgba(220,38,38,.25)',
+      shake:true,
+      html:`<div class="code"><span class="err">Error 400: Date parse failed</span>
+"04/11" cannot be recognized, must include year.
+<span class="c">Correct format: YYYY-MM-DD (e.g. 2026-04-11)</span></div>`
+    }]
+  },
+  {
+    loop:3, calls:3, fails:2,
+    status:'Retrying', statusBg:'rgba(215,119,6,.08)', statusColor:'#d97706',
+    ft:'Round 3: Finally guessed year is needed, but checkout calculated wrong…',
+    msgs:[{
+      icon:'🤔', iconBg:'#7c3aed', role:'THOUGHT', roleColor:'#7c3aed',
+      bg:'rgba(124,58,237,.05)', border:'rgba(124,58,237,.2)',
+      html:'Need to include the year, format is YYYY-MM-DD. Check in 2026-04-11, stay 2 nights, checkout is 2026-04-12.'
+    },{
+      icon:'⚡', iconBg:'#0891b2', role:'ACTION', roleColor:'#0891b2',
+      bg:'rgba(8,145,178,.04)', border:'rgba(8,145,178,.2)',
+      html:`<div class="code"><span class="fn">book_hotel</span>({
+  location:   <span class="s">"Shanghai Bund"</span>,
+  checkin:    <span class="s">"2026-04-11"</span>,
+  checkout:   <span class="s">"2026-04-12"</span>,  <span class="c">← 2 nights but only counted 1</span>
+  guests:     <span class="k">1</span>
+})</div>`
+    }]
+  },
+  {
+    loop:3, calls:3, fails:3,
+    status:'Error ×3', statusBg:'rgba(220,38,38,.1)', statusColor:'#dc2626',
+    ft:'Date format correct, but night count wrong',
+    msgs:[{
+      icon:'❌', iconBg:'#dc2626', role:'OBSERVATION · ERROR', roleColor:'#dc2626',
+      bg:'rgba(220,38,38,.04)', border:'rgba(220,38,38,.3)',
+      shake:true,
+      html:`<div class="code"><span class="err">Error 422: Invalid stay duration</span>
+checkout must be at least 1 night after checkin.
+checkin=2026-04-11, checkout=2026-04-12 → only 1 night.
+<span class="c">User requested 2 nights, checkout should be 2026-04-13.</span></div>`
+    }]
+  },
+  {
+    loop:4, calls:4, fails:3,
+    status:'Retrying', statusBg:'rgba(215,119,6,.08)', statusColor:'#d97706',
+    ft:'Round 4: All parameters finally correct, making 4th call…',
+    msgs:[{
+      icon:'🤔', iconBg:'#7c3aed', role:'THOUGHT', roleColor:'#7c3aed',
+      bg:'rgba(124,58,237,.05)', border:'rgba(124,58,237,.2)',
+      html:'2 nights, so checkout is 4-13, not 4-12. Format is already YYYY-MM-DD, this should be right.'
+    },{
+      icon:'⚡', iconBg:'#0891b2', role:'ACTION', roleColor:'#0891b2',
+      bg:'rgba(8,145,178,.04)', border:'rgba(8,145,178,.2)',
+      html:`<div class="code"><span class="fn">book_hotel</span>({
+  location:   <span class="s">"Shanghai Bund"</span>,
+  checkin:    <span class="s">"2026-04-11"</span>,
+  checkout:   <span class="s">"2026-04-13"</span>,  <span class="c">← corrected to 2 nights</span>
+  guests:     <span class="k">1</span>
+})</div>`
+    }]
+  },
+  {
+    loop:4, calls:4, fails:3,
+    status:'Success!', statusBg:'rgba(22,163,74,.08)', statusColor:'#16a34a',
+    ft:'Succeeded on the 4th try, spun around 3 times first',
+    msgs:[{
+      icon:'✅', iconBg:'#16a34a', role:'OBSERVATION · SUCCESS', roleColor:'#16a34a',
+      bg:'rgba(22,163,74,.04)', border:'rgba(22,163,74,.25)',
+      html:`<div class="code">booking_id:  <span class="s">"BK-20260411-0872"</span>
+hotel:       <span class="s">"Waldorf Astoria Shanghai on the Bund"</span>
+checkin:     <span class="s">"2026-04-11"</span>
+checkout:    <span class="s">"2026-04-13"</span>
+price:       <span class="k">¥1,280 / night</span>  × 2 nights = ¥2,560
+status:      <span class="fn">CONFIRMED</span></div>`
+    }]
+  },
+  {
+    loop:4, calls:4, fails:3,
+    status:'Completed', statusBg:'rgba(22,163,74,.08)', statusColor:'#16a34a',
+    ft:'4 total loops, 3 failures — all to complete one simple task',
+    msgs:[{
+      icon:'🤖', iconBg:'#16a34a', role:'FINAL ANSWER', roleColor:'#16a34a',
+      bg:'rgba(22,163,74,.05)', border:'rgba(22,163,74,.25)',
+      html:'I\'ve booked Waldorf Astoria Shanghai on the Bund for you. Check-in April 11, check-out April 13, 2 nights total, ¥2,560. Booking ID: BK-20260411-0872.'
+    }]
+  }
+];
+
+let cur = 0;
+let playTimer = null;
+
+function playStep() {
+  if (cur >= STEPS.length) return;
+  const s = STEPS[cur];
+
+  // Update left panel counters
+  const lc = document.getElementById('loopCount');
+  lc.textContent = s.loop;
+  lc.className = 'lc-val' + (s.fails >= 3 ? ' danger' : s.fails >= 1 ? ' warn' : '');
+  const fill = document.getElementById('loopFill');
+  fill.style.width = (s.loop / 4 * 100) + '%';
+  fill.className = 'lc-fill' + (s.fails >= 3 ? ' danger' : s.fails >= 1 ? ' warn' : '');
+  document.getElementById('callCount').textContent = s.calls + ' times';
+  document.getElementById('failCount').textContent = s.fails + ' times';
+
+  const badge = document.getElementById('statusBadge');
+  badge.textContent = s.status;
+  badge.style.background = s.statusBg;
+  badge.style.color = s.statusColor;
+
+  // Progress bar
+  document.getElementById('progFill').style.width = ((cur+1)/STEPS.length*100)+'%';
+  document.getElementById('stepNum').textContent = `${cur+1} / ${STEPS.length}`;
+  document.getElementById('ftMsg').textContent = s.ft;
+
+  // Render messages
+  const area = document.getElementById('msgArea');
+  s.msgs.forEach((m, mi) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'msg';
+      el.innerHTML = `
+        <div class="msg-icon" style="background:${m.iconBg}">${m.icon}</div>
+        <div class="msg-body">
+          <div class="msg-role" style="color:${m.roleColor}">${m.role}</div>
+          <div class="msg-bubble" style="background:${m.bg};border:1.5px solid ${m.border}">${m.html}</div>
+        </div>`;
+      area.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('show');
+        if (m.shake) setTimeout(() => el.querySelector('.msg-bubble').classList.add('shake'), 350);
+      }, 60);
+    }, mi * 180);
+  });
+
+  cur++;
+
+  // Last step
+  if (cur >= STEPS.length) {
+    document.getElementById('stepText').textContent = 'Demo ended';
+    const ib = document.getElementById('insightBox');
+    ib.className = 'insight ok';
+    ib.innerHTML = '<b>This is exactly the value of scaffolding:</b> Add parameter validation, format documentation, and a max retry limit — and the Agent won\'t loop indefinitely. The next page shows how to solve this problem with scaffolding.';
+    playTimer = null;
+  } else {
+    playTimer = setTimeout(playStep, 850);
+  }
+}
+
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
+function resetAll() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
+  cur = 0;
+  document.getElementById('msgArea').innerHTML = '';
+  document.getElementById('loopCount').textContent = '0';
+  document.getElementById('loopCount').className = 'lc-val';
+  document.getElementById('loopFill').style.width = '0%';
+  document.getElementById('loopFill').className = 'lc-fill';
+  document.getElementById('callCount').textContent = '0 times';
+  document.getElementById('failCount').textContent = '0 times';
+  document.getElementById('statusBadge').textContent = 'Waiting to start';
+  document.getElementById('statusBadge').style.background = 'rgba(0,0,0,.04)';
+  document.getElementById('statusBadge').style.color = 'var(--sub)';
+  document.getElementById('progFill').style.width = '0%';
+  document.getElementById('stepNum').textContent = '0 / 10';
+  document.getElementById('stepText').textContent = '10 steps total';
+  document.getElementById('ftMsg').textContent = 'Auto-playing…';
+  const ib = document.getElementById('insightBox');
+  ib.className = 'insight';
+  ib.innerHTML = '<b>Root cause:</b> The model doesn\'t know the specific format required by the API, so it can only guess, retrying with a different format each time it fails. Without scaffolding, this loop for an Agent might never stop.';
+  startPlay();
+}
+
+lessonOnView(document.getElementById('reactDemo'), function() {
+  document.getElementById('ftMsg').textContent = 'Auto-playing…';
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

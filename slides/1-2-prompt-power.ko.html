@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>컨텍스트 윈도우가 핵심: Prompt가 중요한 이유 | xueai.app</title>
+<script src="../global-attn.js"></script>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 추론 체인 (수직 단계별 공개) ── */
+.logic-chain {
+  display: flex; flex-direction: column; gap: 0;
+  position: relative;
+}
+.lc-step {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--card); border-radius: var(--radius-sm); padding: 13px 18px;
+  border: 1.5px solid var(--border);
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.lc-step.show { opacity: 1; transform: translateY(0); }
+.lc-dot {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800;
+}
+.lc-text { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.5; }
+.lc-text b { margin-left: 8px; font-size: 13px; font-weight: 700; }
+.lc-arrow {
+  font-size: 18px; color: #ccc; text-align: center; line-height: 1.4;
+  opacity: 0; transition: opacity 0.3s 0.2s;
+}
+.lc-arrow.show { opacity: 1; }
+
+/* ── 결론 바 ── */
+.conclusion-bar {
+  background: rgba(0,102,255,0.06); border: 1.5px solid rgba(0,102,255,0.18);
+  border-radius: var(--radius); padding: 14px 20px;
+  margin-top: 18px;
+  opacity: 0; transform: translateY(-6px);
+  transition: opacity 0.4s, transform 0.4s;
+}
+.conclusion-bar.show { opacity: 1; transform: translateY(0); }
+.cb-q { font-size: 13px; font-weight: 700; color: var(--sub); }
+.cb-a { font-size: 14px; font-weight: 700; color: var(--accent); line-height: 1.7; display: block; margin-top: 4px; }
+
+/* ── 인터랙티브 데모 영역 ── */
+.demo-area {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* 슬라이더 */
+.slider-row {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 20px;
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.sl-label { font-size: 13px; font-weight: 700; color: var(--text); }
+input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; height: 28px; }
+.sl-val { font-size: 14px; font-weight: 800; color: var(--accent); white-space: nowrap; min-width: 170px; text-align: right; }
+
+/* 윈도우 크기는 5단계뿐입니다. 눈금이 없으면 조금 드래그해도 변화가 없어
+   슬라이더가 고장 난 줄 알게 됩니다. */
+.sl-track { flex: 1; min-width: 200px; }
+.sl-ticks { position: relative; height: 24px; margin: 0 9px; }  /* 손잡이 절반만큼 여백을 둬 눈금을 정지 지점에 맞춤 */
+.sl-ticks span {
+  position: absolute; transform: translateX(-50%);
+  font-size: 10.5px; font-weight: 700; color: var(--sub);
+  white-space: nowrap; transition: color 0.15s;
+}
+.sl-ticks span::before {
+  content: ''; display: block; width: 1px; height: 5px;
+  margin: 0 auto 3px; background: var(--border); transition: background 0.15s;
+}
+.sl-ticks span:nth-child(1) { left: 0; }
+.sl-ticks span:nth-child(2) { left: 25%; }
+.sl-ticks span:nth-child(3) { left: 50%; }
+.sl-ticks span:nth-child(4) { left: 75%; }
+.sl-ticks span:nth-child(5) { left: 100%; }
+.sl-ticks span.on { color: var(--accent); }
+.sl-ticks span.on::before { background: var(--accent); }
+
+/* Token 시각화 */
+.token-vis {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 18px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.tv-header {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; flex-wrap: wrap;
+  font-size: 11px; font-weight: 700; color: var(--sub); letter-spacing: 0.3px;
+}
+.tv-tokens {
+  display: flex; gap: 4px; align-items: center;
+  flex-wrap: wrap;
+}
+.tv-tk {
+  padding: 4px 8px; border-radius: 6px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  transition: all 0.4s ease;
+}
+.tv-tk-sys  { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+.tv-tk-user { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.tv-tk-ex   { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+.tv-tk-cut  { background: rgba(0,0,0,0.04); color: #d1d5db; border: 1px solid rgba(0,0,0,0.06); text-decoration: line-through; opacity: 0.45; }
+.tv-sep { font-size: 13px; color: #ccc; padding: 0 2px; }
+.tv-cut-badge {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 800;
+  background: rgba(229,62,62,0.1); color: var(--danger);
+  border: 1px solid rgba(229,62,62,0.25); white-space: nowrap;
+}
+
+/* 비교 두 열 */
+.compare-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.cmp-col {
+  border-radius: var(--radius-sm); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 7px;
+  border: 1.5px solid;
+  transition: border-color 0.3s, background 0.3s;
+}
+.cmp-col.bad  { background: rgba(229,62,62,0.04); border-color: rgba(229,62,62,0.22); }
+.cmp-col.ok   { background: rgba(22,163,74,0.04);  border-color: rgba(22,163,74,0.2);  }
+.cmp-label { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; flex-shrink: 0; margin-bottom: 2px; }
+.cmp-col.bad .cmp-label { color: var(--danger); }
+.cmp-col.ok  .cmp-label { color: var(--success); }
+
+.msg { border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.6; }
+.msg-sys  { background: #fef9c3; color: #854d0e; }
+.msg-user { background: #eff6ff; color: #1d4ed8; }
+.msg-cut  { background: rgba(0,0,0,0.04); color: #9ca3af; font-style: italic; }
+.msg-ai-bad  { background: rgba(229,62,62,0.08); color: #991b1b; font-weight: 600; min-height: 24px; }
+.msg-ai-good { background: #dcfce7; color: #14532d; font-weight: 600; min-height: 24px; }
+.msg-lbl { font-size: 10px; font-weight: 800; opacity: 0.65; margin-bottom: 2px; letter-spacing: 0.3px; }
+
+@keyframes blink { 50% { opacity: 0; } }
+.cur { display: inline-block; width: 2px; height: 1em; vertical-align: text-bottom; animation: blink 0.85s step-start infinite; }
+.cur-r { background: #991b1b; }
+.cur-g { background: #15803d; }
+
+/* 잘린 텍스트 스타일 */
+#sysCut {
+  background: rgba(229,62,62,0.08);
+  border-radius: 3px;
+  padding: 0 2px;
+  transition: all 0.3s;
+}
+
+/* 다시 재생 버튼 */
+.chain-replay-row { display: flex; justify-content: flex-end; margin-bottom: 8px; min-height: 28px; }
+.btn-replay {
+  background: var(--card); color: var(--sub); border: 1px solid rgba(0,0,0,0.12);
+  padding: 4px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-replay:hover { background: rgba(0,0,0,0.05); color: var(--text); }
+
+@media (max-width: 768px) {
+  .compare-row { grid-template-columns: 1fr; }
+  .sl-val { text-align: left; min-width: 0; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="대형 언어 모델의 매 추론은 컨텍스트 윈도우 내의 내용만 볼 수 있습니다. 컨텍스트 윈도우의 작동 원리를 이해해야 잘 작성된 Prompt가 왜 모델 성능을 크게 바꾸는지 알 수 있습니다.">
+<meta name="keywords" content="컨텍스트윈도우,Context Window,Prompt엔지니어링,대형언어모델,KV Cache">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-prompt-power.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-prompt-power.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-prompt-power.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-prompt-power.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-prompt-power.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 트레이닝">
+<meta property="og:title" content="컨텍스트 윈도우가 핵심: Prompt가 중요한 이유">
+<meta property="og:description" content="대형 언어 모델의 매 추론은 컨텍스트 윈도우 내의 내용만 볼 수 있습니다. 컨텍스트 윈도우의 작동 원리를 이해해야 잘 작성된 Prompt가 왜 모델 성능을 크게 바꾸는지 알 수 있습니다.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-prompt-power.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="컨텍스트 윈도우가 핵심: Prompt가 중요한 이유">
+<meta name="twitter:description" content="대형 언어 모델의 매 추론은 컨텍스트 윈도우 내의 내용만 볼 수 있습니다. 컨텍스트 윈도우의 작동 원리를 이해해야 잘 작성된 Prompt가 왜 모델 성능을 크게 바꾸는지 알 수 있습니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"컨텍스트 윈도우가 핵심입니다","name":"컨텍스트 윈도우가 핵심입니다","url":"https://xueai.app/slides/1-2-prompt-power.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강의 · 완성에서 대화까지","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"대형 언어 모델의 매 추론은 컨텍스트 윈도우 내의 내용만 볼 수 있습니다. 컨텍스트 윈도우의 작동 원리를 이해해야 잘 작성된 Prompt가 왜 모델 성능을 크게 바꾸는지 알 수 있습니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">완성에서 대화까지</div>
+    <h1>왜 Prompt만으로 충분할까요? 답은 컨텍스트 윈도우에 있습니다</h1>
+    <p class="subtitle">PreTraining 이후: 재학습 없이 태스크 설명만 넣으면 됩니다. 하지만 왜 그럴까요?</p>
+  </header>
+
+  <div class="sec-label">추론 체인: 단계적으로 생각해보기</div>
+
+  <!-- 추론 체인 (화면에 들어오면 자동으로 단계별 재생) -->
+  <div class="logic-chain" id="logicChain">
+    <div class="lc-step" id="s0">
+      <div class="lc-dot" style="background:rgba(229,62,62,0.1);color:var(--danger);">구</div>
+      <div class="lc-text">태스크 변경<b style="color:var(--danger);">= 재학습</b></div>
+    </div>
+    <div class="lc-arrow" id="a0">↓</div>
+    <div class="lc-step" id="s1">
+      <div class="lc-dot" style="background:rgba(22,163,74,0.1);color:var(--success);">신</div>
+      <div class="lc-text">PreTraining 후<b style="color:var(--success);">Prompt만으로 충분합니다!</b></div>
+    </div>
+    <div class="lc-arrow" id="a1">↓</div>
+    <div class="lc-step" id="s2">
+      <div class="lc-dot" style="background:rgba(217,119,6,0.1);color:var(--amber);">?</div>
+      <div class="lc-text">왜일까요?<b style="color:var(--amber);">Token이 Token을 예측합니다</b></div>
+    </div>
+    <div class="lc-arrow" id="a2">↓</div>
+    <div class="lc-step" id="s3">
+      <div class="lc-dot" style="background:rgba(124,58,237,0.1);color:var(--purple);">핵</div>
+      <div class="lc-text">Prompt = 고품질 접두어<b style="color:var(--purple);">좋은 접두어 → 좋은 출력</b></div>
+    </div>
+    <div class="lc-arrow" id="a3">↓</div>
+    <div class="lc-step" id="s4">
+      <div class="lc-dot" style="background:rgba(0,102,255,0.1);color:var(--accent);">윈</div>
+      <div class="lc-text">윈도우가 클수록<b style="color:var(--accent);">더 많은 지시를 담을 수 있습니다</b></div>
+    </div>
+  </div>
+
+  <!-- 결론 바 (마지막 단계 이후 표시) -->
+  <div class="conclusion-bar" id="conclusionBar">
+    <span class="cb-q">핵심 결론:</span>
+    <span class="cb-a">Prompt만으로 충분한 이유는 대형 모델이 <span style="color:var(--success);">초대형 컨텍스트 윈도우</span>를 지원하기 때문입니다. 태스크 설명, 규칙, 예시를 모두 접두어에 넣으면 모델이 그에 따라 예측하며, <span style="color:var(--amber);">전용 학습과 동등한 효과</span>를 냅니다.</span>
+  </div>
+
+  <div class="chain-replay-row">
+    <button class="btn-replay" id="replayBtn" onclick="playChain()" style="display:none;">↺ 추론 체인 다시 재생</button>
+  </div>
+
+  <div class="sec-label">직접 해보기: 윈도우 크기가 출력에 미치는 영향</div>
+
+  <!-- 인터랙티브 데모 -->
+  <div class="demo-area paywall-locked xa-peek">
+
+    <!-- 슬라이더 -->
+    <div class="slider-row">
+      <span class="sl-label">슬라이더를 드래그하여 윈도우 크기를 조정하고 Token이 어떻게 잘리는지 확인하세요</span>
+      <div class="sl-track">
+        <input type="range" id="winSlider" min="0" max="4" value="1" step="1" list="winTicks" oninput="render(+this.value)">
+        <datalist id="winTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option></datalist>
+        <div class="sl-ticks" id="slTicks" aria-hidden="true">
+          <span>매우 작음</span><span>작음</span><span>중간</span><span>충분</span><span>초대형</span>
+        </div>
+      </div>
+      <span class="sl-val" id="slVal"></span>
+    </div>
+
+    <!-- Token 시각화 -->
+    <div class="token-vis">
+      <div class="tv-header">
+        <span>Prompt Token 전체 현황 (노랑=System / 파랑=User / 초록=예시)</span>
+        <span id="tvCount"></span>
+      </div>
+      <div class="tv-tokens" id="tvTokens"></div>
+    </div>
+
+    <!-- 비교 열 -->
+    <div class="compare-row">
+      <div class="cmp-col bad" id="colBad">
+        <div class="cmp-label" id="badLabel">❌ 윈도우 너무 작음: 시스템 지시 잘림</div>
+
+        <!-- SYSTEM 박스: 전체 내용 + 잘림 마스크 -->
+        <div class="msg msg-sys" style="position:relative;overflow:hidden;">
+          <div class="msg-lbl">SYSTEM (전체 원문)</div>
+          <!-- 표시 부분 (항상 표시) -->
+          <span id="sysVisible"></span><!-- 잘린 부분 (회색 취소선) -->
+          <span id="sysCut" style="color:#d1d5db;text-decoration:line-through;"></span>
+          <!-- 잘린 영역을 덮는 빨간 마스크 -->
+          <div id="cutMask" style="display:none;margin-top:4px;background:rgba(229,62,62,0.08);border:1px dashed rgba(229,62,62,0.4);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;color:#dc2626;">
+            ✂ 위 내용은 윈도우를 초과했으며, 모델이 전혀 볼 수 없습니다
+          </div>
+        </div>
+
+        <div class="msg msg-user">
+          <div class="msg-lbl">USER</div>
+          번역해 주세요: "大模型的上下文窗口是关键。" (중국어: "대형 언어 모델의 컨텍스트 윈도우가 핵심입니다.")
+        </div>
+        <div class="msg msg-ai-bad" id="badAi">
+          <div class="msg-lbl">AI 출력</div>
+          <span id="badAiT"></span><span class="cur cur-r" id="badCur" style="display:none;"></span>
+        </div>
+      </div>
+
+      <div class="cmp-col ok" id="colGood">
+        <div class="cmp-label" id="goodLabel">✅ 윈도우 충분: 모든 지시를 완전히 읽음</div>
+        <div class="msg msg-sys">
+          <div class="msg-lbl">SYSTEM (완전)</div>
+          당신은 전문 번역가입니다. 중국어를 격식체 영어로 번역하고, 어조를 유지하며 전문 용어에 주의하세요.
+        </div>
+        <div class="msg msg-user" id="goodEx" style="display:none;">
+          <div class="msg-lbl">FEW-SHOT 예시 (큰 윈도우에서만 들어감)</div>
+          "人工智能" → "Artificial Intelligence"
+        </div>
+        <div class="msg msg-user">
+          <div class="msg-lbl">USER</div>
+          번역해 주세요: "大模型的上下文窗口是关键。"
+        </div>
+        <div class="msg msg-ai-good" id="goodAi">
+          <div class="msg-lbl">AI 출력</div>
+          <span id="goodAiT"></span><span class="cur cur-g" id="goodCur" style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /demo-area -->
+
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+// ── Token 데이터 ──
+const TOKENS = [
+  { t:'당신은', c:'sys'  }, { t:'전문', c:'sys'  }, { t:'번역가', c:'sys'  },
+  { t:'중국어를', c:'sys' }, { t:'번역', c:'sys'  }, { t:'격식체영어', c:'sys' },
+  { t:'어조', c:'sys'  }, { t:'유지', c:'sys'  }, { t:'전문', c:'sys'  }, { t:'용어주의', c:'sys' },
+  { t:'SEP', sep:true },
+  { t:'예시:', c:'ex'  }, { t:'人工智能', c:'ex' }, { t:'→AI', c:'ex'  },
+  { t:'SEP', sep:true },
+  { t:'번역해', c:'user' }, { t:'주세요:', c:'user' }, { t:'컨텍스트', c:'user' },
+  { t:'윈도우', c:'user' }, { t:'핵심입니다', c:'user' },
+];
+const TOTAL = TOKENS.filter(t => !t.sep).length; // 17
+
+const CLS = { sys:'tv-tk-sys', user:'tv-tk-user', ex:'tv-tk-ex' };
+
+const LEVELS = [
+  { lbl:'매우 작음 (4 Token만)',    keep:4  },
+  { lbl:'작음 (9 Token만)',    keep:9  },
+  { lbl:'중간 (14 Token)',       keep:14 },
+  { lbl:'충분 (전체 17 Token)',  keep:TOTAL },
+  { lbl:'초대형 (128K Token)',     keep:TOTAL },
+];
+
+// SYSTEM prompt 각 단락, 각 단락은 sys token 그룹에 해당
+// sys token 총 10개: 당신은 전문 번역가 중국어를 번역 격식체영어 어조 유지 전문 용어주의
+const SYS_SEGMENTS = [
+  { text: '당신은 전문 번역가입니다, ' },
+  { text: '중국어를 격식체 영어로 번역하며, ' },
+  { text: '어조를 유지하고, ' },
+  { text: '전문 용어에 주의하세요.' },
+];
+// 각 segment에 해당하는 sys token 수량(누적)
+const SYS_SEG_TOKENS = [3, 5, 7, 10]; // i번째 단락 끝까지 사용된 sys token 총수
+
+const BAD_AI_OUT = [
+  '컨텍스트가... ⚠ 지시 손실, 출력 신뢰 불가',
+  '대형 언어 모델의 윈도우는… (불안정, 지시 불완전)',
+  'The context window of large language models is key.',
+  'The context window is a critical capability of large language models.',
+  'The context window is a critical capability of large language models.',
+];
+const GOOD_AI_OUT = 'The context window is a critical capability of large language models.';
+
+let typingTimer = null;
+
+function render(lv) {
+  const lvl = LEVELS[lv];
+  document.getElementById('slVal').textContent = lvl.lbl;
+  document.querySelectorAll('#slTicks span').forEach((t, i) => t.classList.toggle('on', i === lv));
+  const keep = lvl.keep;
+  const nonSepTokens = TOKENS.filter(t => !t.sep);
+  const cutCount = nonSepTokens.length - keep;
+
+  // ── Token 시각화 ──
+  const tv = document.getElementById('tvTokens');
+  tv.innerHTML = '';
+  let nonSepIdx = 0;
+  TOKENS.forEach(tk => {
+    if (tk.sep) {
+      const s = document.createElement('span');
+      s.className = 'tv-sep'; s.textContent = '│';
+      tv.appendChild(s);
+      return;
+    }
+    const isCut = nonSepIdx < cutCount;
+    const el = document.createElement('span');
+    el.className = 'tv-tk ' + (isCut ? 'tv-tk-cut' : CLS[tk.c]);
+    el.textContent = tk.t;
+    tv.appendChild(el);
+    nonSepIdx++;
+  });
+
+  // 잘림 표시
+  const countEl = document.getElementById('tvCount');
+  if (cutCount > 0) {
+    countEl.innerHTML = `<span class="tv-cut-badge">⚠ ${cutCount}개 Token 잘림, ${keep}개 남음</span>`;
+  } else {
+    countEl.innerHTML = `<span style="color:var(--success);font-weight:800;">✓ 전체 ${TOTAL}개 Token이 윈도우 내에 있습니다</span>`;
+  }
+
+  // ── 왼쪽 열 SYSTEM 잘림 시각화 ──
+  // sys token 총수 = 10, 잘린 sys token 수 = max(0, cutCount 중 sys에 속하는 부분)
+  // nonSep token 순서: 10 sys + 3 ex + 4 user = 17
+  // 처음 cutCount개 nonSep token이 잘리며, 모두 sys token임(앞에 위치)
+  const sysCutCount = Math.min(cutCount, 10); // 최대 10개 sys token 잘림
+  const sysKeepCount = 10 - sysCutCount;      // 모델이 볼 수 있는 sys token 수
+
+  // sysKeepCount에 따라 표시/잘림 segment 계산
+  let visibleText = '';
+  let cutText = '';
+  SYS_SEGMENTS.forEach((seg, si) => {
+    const prevTokens = si === 0 ? 0 : SYS_SEG_TOKENS[si - 1];
+    const segEndTokens = SYS_SEG_TOKENS[si];
+    if (sysKeepCount >= segEndTokens) {
+      // 전체 단락 표시
+      visibleText += seg.text;
+    } else if (sysKeepCount <= prevTokens) {
+      // 전체 단락 잘림
+      cutText += seg.text;
+    } else {
+      // 일부 표시(문자 수 기준으로 대략 반절)
+      const half = Math.floor(seg.text.length / 2);
+      visibleText += seg.text.slice(0, half) + '…';
+      cutText += '…' + seg.text.slice(half);
+    }
+  });
+
+  document.getElementById('sysVisible').textContent = visibleText;
+  const sysCutEl = document.getElementById('sysCut');
+  const cutMask  = document.getElementById('cutMask');
+  if (cutText) {
+    sysCutEl.textContent = cutText;
+    cutMask.style.display = 'block';
+  } else {
+    sysCutEl.textContent = '';
+    cutMask.style.display = 'none';
+  }
+
+  // ── 왼쪽 열 레이블 ──
+  const hasCut = lv <= 1;
+  document.getElementById('colBad').className = 'cmp-col ' + (lv >= 3 ? 'ok' : 'bad');
+  document.getElementById('badLabel').textContent =
+    lv >= 3 ? '✅ 윈도우 충분: 시스템 지시 완전히 읽힘' :
+    hasCut   ? `❌ 윈도우 ${keep} Token뿐: 시스템 지시 심각하게 잘림` :
+               `⚠ 윈도우 너무 작음: 지시 일부 잘림`;
+
+  // ── 오른쪽 열 ──
+  document.getElementById('goodEx').style.display = lv >= 3 ? 'block' : 'none';
+  document.getElementById('goodLabel').textContent = lv >= 3
+    ? '✅ 큰 윈도우: 지시 + Few-Shot 예시 모두 들어감'
+    : '✅ 윈도우 충분: 모든 지시를 완전히 읽음';
+
+  // ── 타이핑 애니메이션 ──
+  if (typingTimer) clearInterval(typingTimer);
+  const badAiEl  = document.getElementById('badAiT');
+  const goodAiEl = document.getElementById('goodAiT');
+  const badCur   = document.getElementById('badCur');
+  const goodCur  = document.getElementById('goodCur');
+  badAiEl.textContent = ''; goodAiEl.textContent = '';
+  badCur.style.display = 'inline-block';
+  goodCur.style.display = 'inline-block';
+
+  const badOut  = BAD_AI_OUT[lv];
+  badAiEl.style.color = lv <= 1 ? '#991b1b' : lv === 2 ? '#b45309' : '#14532d';
+  document.getElementById('badAi').className = 'msg ' + (lv <= 2 ? 'msg-ai-bad' : 'msg-ai-good');
+
+  let bi = 0, gi = 0;
+  typingTimer = setInterval(() => {
+    let done = true;
+    if (bi < badOut.length)      { badAiEl.textContent  += badOut[bi++];       done = false; }
+    if (gi < GOOD_AI_OUT.length) { goodAiEl.textContent += GOOD_AI_OUT[gi++];  done = false; }
+    if (done) {
+      clearInterval(typingTimer);
+      badCur.style.display = 'none'; goodCur.style.display = 'none';
+    }
+  }, 28);
+}
+
+// ── 추론 체인: 화면에 들어오면 자동 재생, 반복 가능 ──
+const CHAIN_STEPS = ['s0','s1','s2','s3','s4'];
+const CHAIN_ARROWS = ['a0','a1','a2','a3'];
+let chainTimer = null;
+
+function playChain() {
+  if (chainTimer) { clearInterval(chainTimer); chainTimer = null; }
+  document.getElementById('replayBtn').style.display = 'none';
+  document.getElementById('conclusionBar').classList.remove('show');
+  CHAIN_STEPS.forEach(id => document.getElementById(id).classList.remove('show'));
+  CHAIN_ARROWS.forEach(id => document.getElementById(id).classList.remove('show'));
+
+  let i = 0;
+  document.getElementById(CHAIN_STEPS[0]).classList.add('show');
+  chainTimer = setInterval(() => {
+    i++;
+    if (i >= CHAIN_STEPS.length) {
+      clearInterval(chainTimer);
+      chainTimer = null;
+      document.getElementById('conclusionBar').classList.add('show');
+      document.getElementById('replayBtn').style.display = 'inline-block';
+      return;
+    }
+    document.getElementById(CHAIN_ARROWS[i - 1]).classList.add('show');
+    document.getElementById(CHAIN_STEPS[i]).classList.add('show');
+  }, 550);
+}
+
+lessonOnView(document.getElementById('logicChain'), playChain);
+
+// 초기 렌더링
+render(1);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

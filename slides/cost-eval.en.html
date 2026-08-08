@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Model Selection: Capability vs. Cost Trade-offs and Decision Framework | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+@keyframes _si{to{opacity:1}}
+body{opacity:0;animation:_si .15s ease .08s forwards}
+
+:root{
+  --red:var(--danger);
+  --green:var(--success);
+  --orange:var(--amber);
+  --purple:#5b4fcf;
+  --surface:var(--card);
+  --surface2:#f0ede6;
+  --muted:var(--sub);
+}
+
+.lesson-header h1 em{font-style:normal;color:var(--amber)}
+
+/* ── Model selection question nav ── */
+.nav-col{display:flex;flex-direction:column;gap:6px}
+.nav-group{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;padding:4px 2px 2px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1.5px solid transparent;background:var(--surface);cursor:pointer;transition:all .2s;font-family:inherit;width:100%;text-align:left}
+.nav-item:hover{border-color:rgba(0,0,0,0.1);background:#fafaf8}
+.nav-item.active{border-color:var(--accent);background:rgba(0,102,255,.04);box-shadow:0 2px 10px rgba(0,102,255,.1)}
+.nav-badge{padding:3px 9px;border-radius:6px;font-size:12px;font-weight:800;flex-shrink:0}
+.badge-q{background:rgba(217,119,6,.12);color:var(--amber)}
+.badge-c{background:rgba(0,102,255,.12);color:var(--accent)}
+.badge-t{background:rgba(91,79,207,.12);color:var(--purple)}
+.nav-text h5{font-size:15px;font-weight:700;color:var(--text);line-height:1.3}
+.nav-text p{font-size:13px;color:var(--sub);margin-top:1px}
+
+/* ── Demo section ── */
+.demo-col{display:flex;flex-direction:column;gap:14px}
+.demo-heading h3{font-size:20px;font-weight:800;color:var(--text)}
+.demo-heading p{font-size:15px;color:var(--sub);margin-top:5px;line-height:1.7}
+.demo-body{display:flex;flex-direction:column;gap:12px}
+
+/* Generic card */
+.card{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:16px 18px}
+.card-title{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin-bottom:10px}
+
+/* Comparison two columns */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cmp-col{border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.cmp-col.bad{background:rgba(220,38,38,.04);border:1.5px solid rgba(220,38,38,.18)}
+.cmp-col.good{background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.18)}
+.cmp-col.neutral{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.15)}
+.cmp-head{font-size:14px;font-weight:800}
+.cmp-col.bad .cmp-head{color:var(--red)}
+.cmp-col.good .cmp-head{color:var(--green)}
+.cmp-col.neutral .cmp-head{color:var(--accent)}
+.cmp-body{font-size:14px;color:var(--sub);line-height:1.7}
+.cmp-body b{color:var(--text)}
+
+/* Stats */
+.stats{display:flex;gap:10px;flex-shrink:0}
+.stat{flex:1;border-radius:10px;padding:11px 14px;text-align:center}
+.stat .sv{font-size:24px;font-weight:900}
+.stat .sl{font-size:12px;font-weight:700;margin-top:2px;color:var(--muted)}
+.stat.red-s{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.15)}.stat.red-s .sv{color:var(--red)}
+.stat.green-s{background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.15)}.stat.green-s .sv{color:var(--green)}
+.stat.blue-s{background:rgba(0,102,255,.07);border:1px solid rgba(0,102,255,.15)}.stat.blue-s .sv{color:var(--accent)}
+.stat.amber-s{background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.2)}.stat.amber-s .sv{color:var(--amber)}
+.stat.gray-s{background:var(--surface);border:1px solid var(--border)}.stat.gray-s .sv{color:var(--text)}
+
+/* Tip */
+.tip{border-radius:10px;padding:11px 14px;font-size:14px;line-height:1.65;flex-shrink:0}
+.tip.green{background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);color:var(--green)}
+.tip.amber{background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.22);color:var(--amber)}
+.tip.blue{background:rgba(0,102,255,.06);border:1px solid rgba(0,102,255,.2);color:var(--accent)}
+.tip.red{background:rgba(220,38,38,.05);border:1px solid rgba(220,38,38,.2);color:var(--red)}
+.tip b{font-weight:800}
+
+/* Buttons */
+.btn-row{display:flex;gap:8px;flex-shrink:0;align-items:center}
+.btn{padding:9px 20px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s}
+.btn-p{background:var(--accent);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed;filter:none}
+.btn-r{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+.btn-hint{font-size:13px;color:var(--muted)}
+
+/* Scatter plot */
+.scatter-wrap{position:relative;border-radius:12px;border:1px solid var(--border);background:var(--surface);overflow:hidden}
+.scatter-canvas{display:block;width:100%;height:100%}
+.scatter-label-x{position:absolute;bottom:6px;right:12px;font-size:11px;font-weight:700;color:var(--muted)}
+.scatter-label-y{position:absolute;top:8px;left:8px;font-size:11px;font-weight:700;color:var(--muted);writing-mode:horizontal-tb}
+.axis-label-x{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:800;color:var(--muted)}
+.axis-label-y{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:800;color:var(--muted)}
+.scatter-tooltip{position:absolute;background:var(--text);color:white;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;pointer-events:none;white-space:nowrap;display:none;z-index:10;line-height:1.6}
+
+/* Cost bar chart */
+.bar-chart{display:flex;flex-direction:column;gap:7px}
+.bar-row{display:flex;align-items:center;gap:10px}
+.bar-name{font-size:13px;font-weight:700;color:var(--text);width:140px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:22px;background:rgba(0,0,0,.06);border-radius:5px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:5px;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:800;color:white;transition:width .5s ease;white-space:nowrap;min-width:0}
+.bar-val{font-size:12px;font-weight:700;color:var(--sub);width:56px;text-align:right;flex-shrink:0}
+
+/* Monthly cost calculator */
+.calc-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.calc-field{display:flex;flex-direction:column;gap:5px}
+.calc-field label{font-size:11px;font-weight:700;color:var(--sub)}
+.calc-input{border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:14px;font-weight:700;color:var(--text);background:var(--bg);font-family:inherit;outline:none;transition:border-color .2s;width:100%}
+.calc-input:focus{border-color:var(--accent)}
+.calc-result-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+.cres{background:var(--bg);border-radius:10px;padding:10px 12px;text-align:center}
+.cres .cr-name{font-size:11px;color:var(--sub);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cres .cr-val{font-size:17px;font-weight:900;color:var(--text)}
+.cres.best .cr-val{color:var(--green)}
+.cres .cr-score{font-size:11px;color:var(--muted);margin-top:2px}
+
+@keyframes row-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.row-in{animation:row-in .3s ease}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+.pop{animation:pop .3s ease}
+
+/* Scatter plot in article flow needs fixed height */
+.scatter-wrap{height:380px}
+
+@media (max-width:768px){
+  .cmp{grid-template-columns:1fr}
+  .scatter-wrap{height:280px}
+  .calc-row{grid-template-columns:1fr}
+  .calc-result-grid{grid-template-columns:repeat(2,1fr)}
+  .stats{flex-wrap:wrap}
+  .bar-name{width:90px;font-size:12px}
+  .demo-heading h3{font-size:18px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="How to estimate costs before launching an AI product? Covers Token usage estimation methods, cost calculation under concurrent models, model price comparisons, and a practical framework for setting cost budgets.">
+<meta name="keywords" content="AI cost evaluation,large model cost calculation,Token usage,API cost estimation,AI product budget">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-eval.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/cost-eval.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/cost-eval.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/cost-eval.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/cost-eval.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="AI Cost Evaluation: How to Quantify and Predict Large Model Usage Costs">
+<meta property="og:description" content="How to estimate costs before launching an AI product? Covers Token usage estimation methods, cost calculation under concurrent models, model price comparisons, and a practical framework for setting cost budgets.">
+<meta property="og:url" content="https://xueai.app/slides/cost-eval.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI Cost Evaluation: How to Quantify and Predict Large Model Usage Costs">
+<meta name="twitter:description" content="How to estimate costs before launching an AI product? Covers Token usage estimation methods, cost calculation under concurrent models, model price comparisons, and a practical framework for setting cost budgets.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Model Selection: Capability vs. Cost","name":"Model Selection: Capability vs. Cost","url":"https://xueai.app/slides/cost-eval.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI in Practice · Cost Optimization & Model Selection","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"How to estimate costs before launching an AI product? Covers Token usage estimation methods, model price comparisons, and a practical framework for setting cost budgets.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Cost Optimization</div>
+    <h1>Model Selection: Trade-offs of <em>Capability vs. Cost</em></h1>
+    <p class="subtitle">Once optimization is done, you still need to pick the right model. Click the questions below to switch perspectives, and view the scatter plot, monthly cost comparison, and scenario decision framework.</p>
+  </header>
+
+  <div class="sec-label">Three Model Selection Questions</div>
+  <div class="nav-col">
+
+      <button class="nav-item active" onclick="pick(this,0)">
+        <span class="nav-badge badge-q">Q1</span>
+        <div class="nav-text">
+          <h5>Does a more expensive model always perform better?</h5>
+          <p>Capability and price are not linearly correlated</p>
+        </div>
+      </button>
+
+      <button class="nav-item" onclick="pick(this,1)">
+        <span class="nav-badge badge-c">Q2</span>
+        <div class="nav-text">
+          <h5>For the same task, how much does the cost differ?</h5>
+          <p>Same Token count, different models</p>
+        </div>
+      </button>
+
+      <button class="nav-item" onclick="pick(this,2)">
+        <span class="nav-badge badge-t">Q3</span>
+        <div class="nav-text">
+          <h5>For my business, which model should I pick?</h5>
+          <p>Match by scenario: daily / professional / extreme</p>
+        </div>
+      </button>
+
+      <div class="nav-group" style="margin-top:6px">Conclusion</div>
+      <div style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:14px 14px;font-size:13px;color:var(--sub);line-height:1.8">
+        Selection = <b style="color:var(--text)">Task Difficulty</b> × <b style="color:var(--text)">Call Volume</b> × <b style="color:var(--text)">Error Tolerance</b><br>
+        <span style="font-size:12px">Data source: <a href="https://xsct.ai" target="_blank" style="color:var(--accent);font-weight:700;text-decoration:none">xsct.ai scenario-based benchmarks</a></span>
+      </div>
+      <a href="https://xsct.ai" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--accent);color:white;border-radius:12px;padding:13px 16px;text-decoration:none;font-weight:800;font-size:14px;transition:all .2s;margin-top:2px" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        View xsct.ai now →
+      </a>
+  </div>
+
+  <div class="sec-label">Interactive Demo</div>
+  <div class="demo-col paywall-locked xa-peek" id="demoCol"></div>
+</article>
+<script>
+
+/* ─────── Data ─────── */
+// Based on xsct.ai actual data (text capability xsct-l, output price $/1M)
+const MODELS = [
+  {name:'qwen3.5-flash',    short:'Qwen Flash',  output:0.29,  overall:84.3, daily:86.2, pro:83.9, extreme:82.8, color:'#0066ff'},
+  {name:'qwen3.5-plus',     short:'Qwen Plus',   output:0.70,  overall:86.3, daily:88.3, pro:86.1, extreme:84.5, color:'#0066ff'},
+  {name:'GLM-5v-turbo',     short:'GLM-5v',      output:2.63,  overall:87.8, daily:89.2, pro:87.5, extreme:86.6, color:'#0891b2'},
+  {name:'kimi-k2.5',        short:'Kimi K2',     output:3.03,  overall:87.8, daily:89.3, pro:87.6, extreme:86.6, color:'#ea580c'},
+  {name:'Claude Sonnet 4.6',short:'Sonnet 4.6',  output:15.00, overall:90.3, daily:90.8, pro:90.3, extreme:89.8, color:'#7c3aed'},
+  {name:'GPT-5.4',          short:'GPT-5.4',     output:15.00, overall:87.1, daily:87.5, pro:87.1, extreme:86.6, color:'#16a34a'},
+  {name:'Gemini 3.1 Pro',   short:'Gemini Pro',  output:12.00, overall:85.8, daily:87.3, pro:85.6, extreme:84.7, color:'#dc2626'},
+  {name:'GPT-5.2',          short:'GPT-5.2',     output:14.00, overall:86.3, daily:86.8, pro:86.3, extreme:85.7, color:'#16a34a'},
+  {name:'glm-5-turbo',      short:'GLM-5T',      output:2.61,  overall:85.5, daily:87.3, pro:85.3, extreme:83.8, color:'#0891b2'},
+  {name:'qwen3.6-plus',     short:'Qwen3.6+',    output:1.75,  overall:88.3, daily:89.8, pro:88.1, extreme:87.2, color:'#0066ff'},
+];
+
+/* ─────── Demo 0: Capability vs. Price Scatter Plot ─────── */
+function demo0() {
+  return `
+  <div class="demo-heading">
+    <h3>Does a more expensive model always perform better?</h3>
+    <p>X-axis is <b>output price ($/1M Token)</b>, Y-axis is <b>xsct.ai overall score</b>.<br>
+       Note: <b style="color:var(--orange)">price 50× higher, capability gap only 6 points</b>.</p>
+  </div>
+  <div class="demo-body">
+    <div class="scatter-wrap" style="flex:1;min-height:0">
+      <canvas id="scatterCanvas" style="width:100%;height:100%"></canvas>
+      <div class="scatter-tooltip" id="tooltip"></div>
+      <div class="axis-label-x">← Output price (cheaper to the left)</div>
+    </div>
+    <div class="tip amber">
+      <b>Conclusion:</b> For everyday conversation tasks, the <b>performance gap</b> between qwen3.5-flash (¢0.29/1M) and Claude Sonnet ($15/1M) is <b>less than 6 points</b>, but the cost difference is <b>50×</b>.
+      More expensive ≠ better. <b>The best model is the one that fits the scenario.</b>
+    </div>
+  </div>`;
+}
+
+/* ─────── Demo 1: Cost Bar Chart ─────── */
+function demo1() {
+  const toks = {input: 2000, output: 500};
+  const calls = 10000;
+  const days = 30;
+  // Calculate monthly cost ($)
+  const costs = MODELS.map(m => {
+    const inputP = m.output / 4; // Input price roughly estimated as 1/4 of output price
+    const monthly = ((inputP * toks.input + m.output * toks.output) / 1e6) * calls * days;
+    return {...m, monthly};
+  }).sort((a, b) => a.monthly - b.monthly);
+  const maxCost = costs[costs.length - 1].monthly;
+
+  const bars = costs.map(m => {
+    const pct = Math.round(m.monthly / maxCost * 100);
+    const color = m.monthly < 5 ? '#16a34a' : m.monthly < 50 ? '#ea580c' : '#dc2626';
+    return `<div class="bar-row row-in">
+      <div class="bar-name" title="${m.name}">${m.short}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${pct}%;background:${color}">
+          ${pct > 20 ? `Score ${m.overall}` : ''}
+        </div>
+      </div>
+      <div class="bar-val">$${m.monthly < 1 ? m.monthly.toFixed(2) : m.monthly.toFixed(0)}</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="demo-heading">
+    <h3>Same Task, Monthly Cost Comparison Across Models</h3>
+    <p>Assumption: single input <b>2000T</b> + output <b>500T</b>, <b>10,000</b> daily calls, running 30 days.</p>
+  </div>
+  <div class="demo-body">
+    <div class="card" style="flex:1;overflow-y:auto">
+      <div class="card-title">30-Day Monthly Cost Estimate (lowest to highest)</div>
+      <div class="bar-chart">${bars}</div>
+    </div>
+    <div class="tip blue">
+      <b>Core approach:</b> run A/B tests with cheaper models first; upgrade only when the performance gap is significant. <b>Higher capability is not always better—just enough is the optimal solution.</b>
+    </div>
+  </div>`;
+}
+
+/* ─────── Demo 2: Monthly Cost Calculator ─────── */
+function demo2() {
+  return `
+  <div class="demo-heading">
+    <h3>Match Models to Business Scenarios</h3>
+    <p>Different tasks have different model requirements: <b style="color:var(--green)">everyday Q&A</b> doesn't need a top-tier model, while <b style="color:var(--red)">extreme reasoning</b> demands the flagship.</p>
+  </div>
+  <div class="demo-body">
+    <div class="card">
+      <div class="card-title">Scenario vs. Recommended Model</div>
+      <div class="cmp" style="gap:8px">
+        <div class="cmp-col good">
+          <div class="cmp-head">Daily Scenario (customer service/Q&A)</div>
+          <div class="cmp-body">
+            <b>xsct-l daily dimension</b> top performers:<br>
+            qwen3.5-flash <b style="color:var(--green)">86.2 pts</b>, output only $0.29/1M<br>
+            qwen3.6-plus <b style="color:var(--green)">89.8 pts</b>, output only $1.75/1M<br>
+            <span style="font-size:12px;color:var(--muted)">→ Everyday tasks, cheap models are sufficient</span>
+          </div>
+        </div>
+        <div class="cmp-col bad">
+          <div class="cmp-head">Extreme Scenario (complex reasoning/coding)</div>
+          <div class="cmp-body">
+            <b>xsct-l extreme dimension</b> gap widens:<br>
+            Claude Sonnet 4.6 <b style="color:var(--red)">89.8 pts</b>, $15/1M<br>
+            qwen3.5-flash <b style="color:var(--red)">82.8 pts</b> (7-point gap)<br>
+            <span style="font-size:12px;color:var(--muted)">→ Extreme tasks: a 7-point gap represents real failure rate differences</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Estimate My Monthly Cost</div>
+      <div class="calc-row">
+        <div class="calc-field">
+          <label>Input Token per call</label>
+          <input class="calc-input" id="ci" type="number" value="2000" oninput="calcAll()">
+        </div>
+        <div class="calc-field">
+          <label>Output Token per call</label>
+          <input class="calc-input" id="co" type="number" value="500" oninput="calcAll()">
+        </div>
+        <div class="calc-field">
+          <label>Daily call count</label>
+          <input class="calc-input" id="cc" type="number" value="1000" oninput="calcAll()">
+        </div>
+      </div>
+      <div class="calc-result-grid" id="calcGrid"></div>
+    </div>
+
+    <div class="tip green">
+      <b>Decision Framework:</b> ① Define scenario difficulty → ② Check the corresponding dimension score → ③ Use the monthly cost estimator to confirm the budget → ④ Validate with small-traffic A/B testing, then roll out fully.
+    </div>
+    <a href="https://xsct.ai" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--accent);color:white;border-radius:11px;padding:11px 18px;text-decoration:none;font-weight:800;font-size:14px;transition:all .2s;flex-shrink:0" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      View the full model leaderboard at xsct.ai →
+    </a>
+  </div>`;
+}
+
+/* Calculator */
+function calcAll() {
+  const inTok  = parseFloat(document.getElementById('ci')?.value) || 0;
+  const outTok = parseFloat(document.getElementById('co')?.value) || 0;
+  const calls  = parseFloat(document.getElementById('cc')?.value) || 1;
+  const grid   = document.getElementById('calcGrid');
+  if (!grid) return;
+
+  // Select 4 representative models
+  const picks = [
+    MODELS.find(m => m.short === 'Qwen Flash'),
+    MODELS.find(m => m.short === 'Qwen3.6+'),
+    MODELS.find(m => m.short === 'GLM-5v'),
+    MODELS.find(m => m.short === 'Sonnet 4.6'),
+  ];
+
+  const costs = picks.map(m => {
+    const inputP = m.output / 4;
+    return ((inputP * inTok + m.output * outTok) / 1e6) * calls * 30;
+  });
+  const minCost = Math.min(...costs);
+
+  grid.innerHTML = picks.map((m, i) => {
+    const isBest = costs[i] === minCost;
+    const val = costs[i] < 1 ? '$' + costs[i].toFixed(2) : '$' + costs[i].toFixed(0);
+    return `<div class="cres ${isBest ? 'best' : ''}">
+      <div class="cr-name" title="${m.name}">${m.short}</div>
+      <div class="cr-val">${val}<span style="font-size:11px;font-weight:600;color:var(--muted)">/mo</span></div>
+      <div class="cr-score">Score ${m.overall}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ─────── Scatter Plot Rendering ─────── */
+function drawScatter() {
+  const canvas = document.getElementById('scatterCanvas');
+  if (!canvas) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = rect.width  * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width  = rect.width  + 'px';
+  canvas.style.height = rect.height + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  const PAD = {top: 20, right: 20, bottom: 36, left: 40};
+
+  const maxPrice = 16, minPrice = 0;
+  const maxScore = 92, minScore = 82;
+
+  function px(price) {
+    return PAD.left + Math.log1p(price) / Math.log1p(maxPrice) * (W - PAD.left - PAD.right);
+  }
+  function py(score) {
+    return H - PAD.bottom - (score - minScore) / (maxScore - minScore) * (H - PAD.top - PAD.bottom);
+  }
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+  ctx.lineWidth = 1;
+  [83,85,87,89,91].forEach(s => {
+    ctx.beginPath(); ctx.moveTo(PAD.left, py(s)); ctx.lineTo(W - PAD.right, py(s)); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.font = '10px -apple-system,sans-serif';
+    ctx.fillText(s, PAD.left - 26, py(s) + 3);
+  });
+
+  // Axes
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, H - PAD.bottom); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PAD.left, H - PAD.bottom); ctx.lineTo(W - PAD.right, H - PAD.bottom); ctx.stroke();
+
+  // Price ticks
+  [0, 1, 3, 5, 10, 15].forEach(p => {
+    const x = px(p);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.font = '10px -apple-system,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p === 0 ? '$0' : '$' + p, x, H - PAD.bottom + 14);
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, H - PAD.bottom); ctx.stroke();
+  });
+
+  // Draw points
+  const tooltip = document.getElementById('tooltip');
+  const points = [];
+  MODELS.forEach(m => {
+    const x = px(m.output), y = py(m.overall);
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = m.color + 'cc';
+    ctx.fill();
+    ctx.strokeStyle = m.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    points.push({x, y, m});
+
+    // Labels
+    ctx.fillStyle = m.color;
+    ctx.font = 'bold 11px -apple-system,sans-serif';
+    ctx.textAlign = 'center';
+    const labelY = y > H / 2 ? y - 14 : y + 20;
+    ctx.fillText(m.short, x, labelY);
+  });
+
+  // Hover interaction
+  canvas.onmousemove = (e) => {
+    const br = canvas.getBoundingClientRect();
+    const mx = e.clientX - br.left, my = e.clientY - br.top;
+    const hit = points.find(p => Math.hypot(p.x - mx, p.y - my) < 14);
+    if (hit) {
+      tooltip.style.display = 'block';
+      tooltip.style.left = (hit.x + 12) + 'px';
+      tooltip.style.top  = (hit.y - 12) + 'px';
+      tooltip.innerHTML  = `${hit.m.name}<br>Score ${hit.m.overall} · Output $${hit.m.output}/1M`;
+      canvas.style.cursor = 'pointer';
+    } else {
+      tooltip.style.display = 'none';
+      canvas.style.cursor = 'default';
+    }
+  };
+  canvas.onmouseleave = () => { tooltip.style.display = 'none'; };
+}
+
+/* ─────── Main Controller ─────── */
+const DEMOS = [demo0, demo1, demo2];
+
+function pick(btn, idx) {
+  document.querySelectorAll('.nav-item').forEach((b, i) => b.classList.toggle('active', i === idx));
+  document.getElementById('demoCol').innerHTML = DEMOS[idx]();
+  if (idx === 0) requestAnimationFrame(() => requestAnimationFrame(drawScatter));
+  if (idx === 2) requestAnimationFrame(calcAll);
+}
+
+pick(document.querySelector('.nav-item'), 0);
+window.addEventListener('resize', () => { if (document.getElementById('scatterCanvas')) drawScatter(); });
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

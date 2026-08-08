@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Context Compression: Four Layers of Defense | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--l1:#16a34a;--l2:#d97706;--l3:#ea580c;--l4:#dc2626}
+
+/* ── Layout: Tank + Four Layers ── */
+.tank-layout{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+
+/* Left: Tank */
+.tank-col{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);position:sticky;top:16px}
+.tank-info{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;line-height:1.7}
+.tank-info b{font-weight:800}
+.tank-info .model-max{color:var(--danger)}
+.tank-info .safe-val{color:var(--success)}
+.tank-area{display:flex;align-items:center;justify-content:center;padding:16px}
+.tank-vis{display:flex;align-items:stretch;gap:10px;height:320px}
+
+.tank-outer{width:120px;position:relative;border-radius:12px;border:2px solid #ccc;background:#eae7df;overflow:visible;flex-shrink:0}
+.tank-fill{position:absolute;bottom:0;left:0;right:0;border-radius:0 0 10px 10px;transition:height .5s cubic-bezier(.4,0,.2,1);background:linear-gradient(180deg,rgba(8,145,178,.25),rgba(8,145,178,.5))}
+.tank-fill-shine{position:absolute;top:0;left:0;right:0;height:6px;background:rgba(255,255,255,.3);filter:blur(3px)}
+
+/* Threshold Line */
+.tl{position:absolute;left:-6px;right:-6px;height:0;border-top:2px dashed;z-index:3;pointer-events:none}
+.tl-label{position:absolute;left:calc(100% + 8px);top:-9px;font-size:11px;font-weight:800;white-space:nowrap;padding:1px 6px;border-radius:4px}
+.tl1{border-color:var(--l1)}.tl1 .tl-label{color:var(--l1);background:rgba(22,163,74,.08)}
+.tl2{border-color:var(--l2)}.tl2 .tl-label{color:var(--l2);background:rgba(217,119,6,.08)}
+.tl3{border-color:var(--l3)}.tl3 .tl-label{color:var(--l3);background:rgba(234,88,12,.08)}
+.tl4{border-color:var(--l4)}.tl4 .tl-label{color:var(--l4);background:rgba(220,38,38,.08)}
+.tl-safe{border-color:var(--danger);border-top-style:solid}
+.tl-safe .tl-label{color:white;background:var(--danger);font-size:12px}
+/* Danger Zone */
+.danger-zone{position:absolute;left:0;right:0;top:0;background:repeating-linear-gradient(-45deg,transparent,transparent 3px,rgba(220,38,38,.05) 3px,rgba(220,38,38,.05) 6px);z-index:1;border-radius:10px 10px 0 0;pointer-events:none}
+
+/* Compression Flash */
+.compress-flash{position:absolute;left:50%;transform:translateX(-50%);padding:4px 10px;border-radius:6px;font-size:13px;font-weight:800;white-space:nowrap;opacity:0;z-index:10;pointer-events:none;transition:opacity .3s}
+.compress-flash.show{opacity:1;animation:flashPop .8s ease}
+@keyframes flashPop{0%{transform:translateX(-50%) scale(.8)}30%{transform:translateX(-50%) scale(1.15)}100%{transform:translateX(-50%) scale(1)}}
+
+/* Stats */
+.tank-stats{padding:10px 16px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border)}
+.ts-row{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.ts-label{color:var(--sub)}
+.ts-val{font-weight:800;font-size:15px;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.ts-val.total{color:var(--cyan)}
+.ts-val.current{color:var(--text)}
+.ts-val.saved{color:var(--success)}
+.ts-bar{height:4px;border-radius:2px;background:rgba(0,0,0,.05);overflow:hidden}
+.ts-bar-fill{height:100%;border-radius:2px;transition:width .5s}
+
+/* Slider */
+.slider-area{padding:10px 16px 8px;border-top:1px solid var(--border)}
+.slider-label{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-bottom:2px}
+.tank-slider{width:100%;accent-color:var(--cyan);cursor:pointer;height:28px}
+.ctrl-row{display:flex;gap:6px;padding:4px 16px 14px}
+.btn{padding:9px 16px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:40px}
+.btn-p{background:var(--accent);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-r{background:rgba(0,0,0,.04);color:var(--sub);border:1px solid var(--border)}
+
+/* Right: Four-Layer Details */
+.layers-col{min-width:0;display:flex;flex-direction:column;gap:10px}
+.layers-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.layers-title{font-size:14px;font-weight:800;color:var(--text)}
+.status-badge{padding:4px 10px;border-radius:6px;font-size:13px;font-weight:800;margin-left:auto;transition:all .3s}
+.layers-scroll{display:flex;flex-direction:column;gap:8px}
+
+.layer-card{border:2px solid var(--border);border-radius:12px;overflow:hidden;transition:all .35s;opacity:.4;transform:scale(.98);background:var(--card)}
+.layer-card.active{opacity:1;transform:scale(1)}
+.layer-card.firing{animation:fireGlow .8s ease}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(234,88,12,.3)}50%{box-shadow:0 0 20px 6px rgba(234,88,12,.2)}100%{box-shadow:none}}
+
+.lc-hd{padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:800;transition:background .3s;flex-wrap:wrap}
+.lc-name{flex:1;min-width:160px}
+.lc-trigger{font-size:13px;font-weight:800;padding:2px 8px;border-radius:5px;white-space:nowrap}
+.lc-saved{font-size:12px;font-weight:800;margin-left:6px;padding:2px 8px;border-radius:5px;opacity:0;transition:opacity .3s}
+.layer-card.active .lc-saved{opacity:1}
+
+.lc-body{padding:0 14px;max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease}
+.layer-card.active .lc-body{max-height:300px;padding:6px 14px 12px}
+
+.lc-desc{font-size:13px;line-height:1.6;color:var(--sub);margin-bottom:6px}
+.lc-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:start}
+.lc-cmp-box{border-radius:8px;padding:6px 10px;font-size:12px;line-height:1.5}
+.lc-cmp-label{font-size:11px;font-weight:800;margin-bottom:2px;letter-spacing:.3px}
+.lc-cmp-arrow{align-self:center;font-size:16px;color:var(--sub);font-weight:700}
+
+/* Decision Card */
+.dec-area{margin-top:2px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text);line-height:1.6;transition:all .3s}
+.dec-card b{color:var(--accent)}
+
+@keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}50%{box-shadow:0 0 16px 4px rgba(220,38,38,.25)}}
+.tank-outer.danger{animation:pulse-red 1.2s ease infinite;border-color:var(--danger)}
+
+@media (max-width:768px){
+  .tank-layout{grid-template-columns:1fr}
+  .tank-col{position:static}
+  .tank-vis{height:280px}
+  .lc-compare{grid-template-columns:1fr}
+  .lc-cmp-arrow{transform:rotate(90deg);justify-self:center}
+  .layer-card.active .lc-body{max-height:420px}
+}
+</style>
+<meta name="description" content="Context compression four-layer defense: 60% Snip, 75% MicroCompact, 85% Collapse, 95% AutoCompact.">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.app/slides/7-3b.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-3b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-3b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-3b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-3b.html">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Context Compression: Four Layers of Defense","name":"Context Compression: Four Layers of Defense","url":"https://xueai.app/slides/7-3b.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practicum · Agent Engineering","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Context compression four-layer defense: 60% Snip, 75% MicroCompact, 85% Collapse, 95% AutoCompact.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent Engineering</div>
+    <h1>Context Compression: Four Layers of Defense</h1>
+    <p class="subtitle">Drag the slider to simulate conversation growth and observe how compression extends context lifespan.</p>
+  </header>
+
+  <div class="tank-layout paywall-locked xa-peek">
+    <!-- Left: Tank -->
+    <aside class="tank-col">
+      <div class="tank-info">
+        Model context window = <b class="model-max">256K</b> Tokens<br>
+        Safe headroom = <b class="safe-val">200K</b> (reserving 56K for model output)
+      </div>
+      <div class="tank-area">
+        <div class="tank-vis">
+          <div class="tank-outer" id="tankOuter">
+            <div class="danger-zone" id="dangerZone"></div>
+            <div class="tank-fill" id="tankFill"><div class="tank-fill-shine"></div></div>
+
+            <div class="tl tl1" id="line1"><span class="tl-label">60% Snip</span></div>
+            <div class="tl tl2" id="line2"><span class="tl-label">75% MicroCompact</span></div>
+            <div class="tl tl3" id="line3"><span class="tl-label">85% Collapse</span></div>
+            <div class="tl tl4" id="line4"><span class="tl-label">95% AutoCompact</span></div>
+            <div class="tl tl-safe" id="lineSafe"><span class="tl-label">Safe Limit</span></div>
+
+            <div class="compress-flash" id="compFlash"></div>
+          </div>
+        </div>
+      </div>
+      <div class="tank-stats">
+        <div class="ts-row">
+          <span class="ts-label">Total Generated</span>
+          <span class="ts-val total" id="vTotal">0K</span>
+        </div>
+        <div class="ts-row">
+          <span class="ts-label">Current Context</span>
+          <span class="ts-val current" id="vCurrent">0K / 200K</span>
+        </div>
+        <div class="ts-bar"><div class="ts-bar-fill" id="tsBar" style="width:0;background:var(--cyan)"></div></div>
+        <div class="ts-row">
+          <span class="ts-label">Saved by Compression</span>
+          <span class="ts-val saved" id="vSaved">0K</span>
+        </div>
+      </div>
+      <div class="slider-area">
+        <div class="slider-label"><span>Conversation Start</span><span>Ongoing →</span></div>
+        <input type="range" min="0" max="500" value="0" class="tank-slider" id="slider" oninput="onSlider(+this.value)">
+      </div>
+      <div class="ctrl-row">
+        <button class="btn btn-p" onclick="autoPlay()" id="autoBtn">▶ Auto Demo</button>
+        <button class="btn btn-r" onclick="resetAll()">Reset</button>
+      </div>
+    </aside>
+
+    <!-- Right: Four Compression Layers -->
+    <div class="layers-col">
+      <div class="layers-top">
+        <span class="layers-title">Four-Layer Compression Strategy</span>
+        <span class="status-badge" id="statusBadge" style="background:rgba(8,145,178,.08);color:var(--cyan)">Safe Zone</span>
+      </div>
+      <div class="layers-scroll" id="layersScroll">
+        <div class="layer-card" id="lc0">
+          <div class="lc-hd" style="background:rgba(22,163,74,.04)">
+            <span class="lc-name" style="color:var(--l1)">Layer 1 · Snip</span>
+            <span class="lc-trigger" style="background:rgba(22,163,74,.1);color:var(--l1)">120K (60%)</span>
+            <span class="lc-saved" style="background:rgba(22,163,74,.1);color:var(--l1)">-36K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">Delete overly long raw data returned by early tools, keeping only summaries. Users <b>notice nothing</b>.</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">Before</div>
+                Weather API returns a 1,200-Token JSON: 7-day hourly forecast…
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(22,163,74,.04)">
+                <div class="lc-cmp-label" style="color:var(--l1)">After</div>
+                Tool summary: Tomorrow in Beijing cloudy 12–20°C (80 Tokens)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card" id="lc1">
+          <div class="lc-hd" style="background:rgba(217,119,6,.04)">
+            <span class="lc-name" style="color:var(--l2)">Layer 2 · MicroCompact</span>
+            <span class="lc-trigger" style="background:rgba(217,119,6,.1);color:var(--l2)">150K (75%)</span>
+            <span class="lc-saved" style="background:rgba(217,119,6,.1);color:var(--l2)">-50K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">Replace early long conversations with brief summaries. <b>Minor information loss</b>, key information retained.</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">Before</div>
+                Turn 3: "That file isn't PDF format, I need a Word version, change the title to…"
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(217,119,6,.04)">
+                <div class="lc-cmp-label" style="color:var(--l2)">After</div>
+                Summary: user requested Word format, title change, color adjustment
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card" id="lc2">
+          <div class="lc-hd" style="background:rgba(234,88,12,.04)">
+            <span class="lc-name" style="color:var(--l3)">Layer 3 · Collapse</span>
+            <span class="lc-trigger" style="background:rgba(234,88,12,.1);color:var(--l3)">170K (85%)</span>
+            <span class="lc-saved" style="background:rgba(234,88,12,.1);color:var(--l3)">-80K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">Collapse multiple early conversation turns into a single summary message. <b>Detail loss</b>, but the main thread is preserved.</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">Before</div>
+                Turns 1–8 (12 messages, 4,200 Tokens): discussed requirements, confirmed plan, revised 3 times…
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(234,88,12,.04)">
+                <div class="lc-cmp-label" style="color:var(--l3)">After</div>
+                Session summary: React + TS project, currently editing the reports page (350 Tokens)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card" id="lc3">
+          <div class="lc-hd" style="background:rgba(220,38,38,.04)">
+            <span class="lc-name" style="color:var(--l4)">Layer 4 · AutoCompact</span>
+            <span class="lc-trigger" style="background:rgba(220,38,38,.1);color:var(--l4)">190K (95%)</span>
+            <span class="lc-saved" style="background:rgba(220,38,38,.1);color:var(--l4)">-110K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">Full compression: retain only system + global summary + last 3 turns. <b>Significant information loss</b>, but prevents crash.</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">Before</div>
+                20 complete turns (38 messages, 18,000 Tokens)
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--l4)">After</div>
+                system + summary + last 3 turns (2,500 Tokens)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dec-area" id="decArea">
+        <div class="dec-card" id="decCard">
+          <b>📌 Design Decision:</b> Drag the slider and observe: without compression, a 200K context only supports one long conversation. With four-layer compression, the same window can sustain 5× or more conversation volume.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b>&emsp;Model window 256K, safe headroom 200K. Four-layer compression works like a flood-control dam: each time the window nears capacity, it automatically drains the water level, allowing the same window to carry far more than 200K of conversation. Only when truly nothing more can be deleted does it overflow.
+  </div>
+</article>
+
+<script>
+var SAFE = 200, MAX_CTX = 256;
+
+var KF = [
+  [0,   0],
+  [100, 120],
+  [101, 84],
+  [200, 150],
+  [201, 100],
+  [310, 170],
+  [311, 90],
+  [420, 190],
+  [421, 80],
+  [500, 260]
+];
+
+var COMP_POINTS = [
+  {at:100, layer:0, from:120, to:84,  label:'Snip! -36K',  color:'var(--l1)'},
+  {at:200, layer:1, from:150, to:100, label:'MicroCompact! -50K', color:'var(--l2)'},
+  {at:310, layer:2, from:170, to:90,  label:'Collapse! -80K',  color:'var(--l3)'},
+  {at:420, layer:3, from:190, to:80,  label:'AutoCompact! -110K', color:'var(--l4)'}
+];
+
+var DECISIONS = [
+  '<b>📌 Design Decision:</b> Context below 60%, everything safe. But every conversation turn consumes Tokens. A PM needs to predict: how long is an average user session? When will the first defense layer be triggered?',
+  '<b>📌 Design Decision:</b> Snip only removes redundant tool output data — users notice nothing. You need to decide: which tool outputs can be summarized? Which must be kept intact (e.g. code execution results)?',
+  '<b>📌 Design Decision:</b> MicroCompact begins condensing early conversations. Why not compress from the start? Because the model needs a complete context to understand user intent — compressing too early causes amnesia.',
+  '<b>📌 Design Decision:</b> Collapse turns multiple conversation turns into one summary. Who writes the summary? Let the model summarize itself? Or use a dedicated compression Prompt? Summary quality directly affects subsequent accuracy.',
+  '<b>📌 Design Decision:</b> AutoCompact is the last line of defense — significant information loss, but conversation continues uninterrupted. Alice\'s four-layer strategy vs. a simple "full = error" approach — which experience is better?',
+  '<b>📌 ⚠️ Overflow!</b> All four compression layers exhausted; context has exceeded safe headroom. If growth continues past the 256K model limit, the API will return a context_length_exceeded error. This is why emergency context rescue is needed as the final backstop.'
+];
+
+function lerp(val) {
+  if (val <= 0) return 0;
+  for (var i = 0; i < KF.length - 1; i++) {
+    if (val >= KF[i][0] && val <= KF[i + 1][0]) {
+      var r = KF[i + 1][0] - KF[i][0];
+      if (r === 0) return KF[i][1];
+      var t = (val - KF[i][0]) / r;
+      return KF[i][1] + t * (KF[i + 1][1] - KF[i][1]);
+    }
+  }
+  return KF[KF.length - 1][1];
+}
+
+function getActiveLayer(val) {
+  if (val >= 420) return 3;
+  if (val >= 310) return 2;
+  if (val >= 200) return 1;
+  if (val >= 100) return 0;
+  return -1;
+}
+
+function positionLines() {
+  var pcts = [120, 150, 170, 190, 200];
+  var ids = ['line1','line2','line3','line4','lineSafe'];
+  for (var i = 0; i < ids.length; i++) {
+    document.getElementById(ids[i]).style.bottom = ((pcts[i] / MAX_CTX) * 100) + '%';
+  }
+  document.getElementById('dangerZone').style.height = ((1 - SAFE / MAX_CTX) * 100) + '%';
+}
+
+function update(val) {
+  var ctxK = lerp(val);
+  var fillPct = Math.min((ctxK / MAX_CTX) * 100, 100);
+  var safePct = (ctxK / SAFE) * 100;
+
+  var fill = document.getElementById('tankFill');
+  fill.style.height = fillPct + '%';
+
+  if (ctxK > SAFE) {
+    fill.style.background = 'linear-gradient(180deg,rgba(220,38,38,.35),rgba(220,38,38,.65))';
+    document.getElementById('tankOuter').classList.add('danger');
+  } else if (safePct > 95) {
+    fill.style.background = 'linear-gradient(180deg,rgba(220,38,38,.25),rgba(220,38,38,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else if (safePct > 85) {
+    fill.style.background = 'linear-gradient(180deg,rgba(234,88,12,.25),rgba(234,88,12,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else if (safePct > 75) {
+    fill.style.background = 'linear-gradient(180deg,rgba(217,119,6,.25),rgba(217,119,6,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else if (safePct > 60) {
+    fill.style.background = 'linear-gradient(180deg,rgba(22,163,74,.2),rgba(22,163,74,.45))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else {
+    fill.style.background = 'linear-gradient(180deg,rgba(8,145,178,.25),rgba(8,145,178,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  }
+
+  var totalK = Math.round(val * 0.6);
+  var curK = Math.round(ctxK);
+  var savedK = Math.max(0, totalK - curK);
+  document.getElementById('vTotal').textContent = totalK + 'K';
+  document.getElementById('vCurrent').textContent = curK + 'K / ' + SAFE + 'K';
+  document.getElementById('vSaved').textContent = savedK + 'K';
+  document.getElementById('tsBar').style.width = Math.min(safePct, 130) + '%';
+  var bar = document.getElementById('tsBar');
+  bar.style.background = ctxK > SAFE ? 'var(--danger)' : safePct > 85 ? 'var(--l3)' : safePct > 60 ? 'var(--amber)' : 'var(--cyan)';
+
+  var active = getActiveLayer(val);
+  for (var i = 0; i < 4; i++) {
+    var card = document.getElementById('lc' + i);
+    var on = i <= active;
+    card.classList.toggle('active', on);
+    card.style.borderColor = on ? ['var(--l1)','var(--l2)','var(--l3)','var(--l4)'][i] : '';
+  }
+
+  var badge = document.getElementById('statusBadge');
+  if (ctxK > SAFE) {
+    badge.textContent = '⚠️ Exceeded Safe Limit!';
+    badge.style.color = 'var(--danger)';
+    badge.style.background = 'rgba(220,38,38,.1)';
+  } else if (active === 3) {
+    badge.textContent = 'AutoCompact Active';
+    badge.style.color = 'var(--l4)';
+    badge.style.background = 'rgba(220,38,38,.08)';
+  } else if (active === 2) {
+    badge.textContent = 'Collapse Active';
+    badge.style.color = 'var(--l3)';
+    badge.style.background = 'rgba(234,88,12,.08)';
+  } else if (active === 1) {
+    badge.textContent = 'MicroCompact Active';
+    badge.style.color = 'var(--l2)';
+    badge.style.background = 'rgba(217,119,6,.08)';
+  } else if (active === 0) {
+    badge.textContent = 'Snip Active';
+    badge.style.color = 'var(--l1)';
+    badge.style.background = 'rgba(22,163,74,.08)';
+  } else {
+    badge.textContent = 'Safe Zone';
+    badge.style.color = 'var(--cyan)';
+    badge.style.background = 'rgba(8,145,178,.08)';
+  }
+
+  var di = ctxK > SAFE ? 5 : active >= 0 ? active + 1 : 0;
+  document.getElementById('decCard').innerHTML = DECISIONS[di];
+
+  document.getElementById('slider').value = val;
+}
+
+function showFlash(cp) {
+  var fl = document.getElementById('compFlash');
+  var pct = (cp.from / MAX_CTX) * 100;
+  fl.style.bottom = pct + '%';
+  fl.style.background = cp.color;
+  fl.style.color = 'white';
+  fl.textContent = cp.label;
+  fl.classList.remove('show');
+  void fl.offsetWidth;
+  fl.classList.add('show');
+  setTimeout(function() { fl.classList.remove('show'); }, 1200);
+}
+
+function fireCard(idx) {
+  var card = document.getElementById('lc' + idx);
+  card.classList.remove('firing');
+  void card.offsetWidth;
+  card.classList.add('firing');
+}
+
+function onSlider(val) {
+  if (autoId) { cancelAnimationFrame(autoId); autoId = null; document.getElementById('autoBtn').textContent = '▶ Auto Demo'; }
+  update(val);
+}
+
+var autoId = null;
+function autoPlay() {
+  if (autoId) { cancelAnimationFrame(autoId); autoId = null; document.getElementById('autoBtn').textContent = '▶ Auto Demo'; return; }
+  document.getElementById('autoBtn').textContent = '⏸ Pause';
+  var v = 0;
+  var compIdx = 0;
+  var pauseUntil = 0;
+  var speed = 0.8;
+
+  function step(ts) {
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(step); return; }
+
+    if (compIdx < COMP_POINTS.length && v >= COMP_POINTS[compIdx].at && v < COMP_POINTS[compIdx].at + 2) {
+      showFlash(COMP_POINTS[compIdx]);
+      fireCard(COMP_POINTS[compIdx].layer);
+      pauseUntil = ts + 1200;
+      compIdx++;
+      v = v + 1;
+      update(v);
+      autoId = requestAnimationFrame(step);
+      return;
+    }
+
+    v += speed;
+    if (v > 500) {
+      v = 500;
+      update(v);
+      autoId = null;
+      document.getElementById('autoBtn').textContent = '▶ Replay';
+      return;
+    }
+    update(v);
+    autoId = requestAnimationFrame(step);
+  }
+  update(0);
+  autoId = requestAnimationFrame(step);
+}
+
+function resetAll() {
+  if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+  document.getElementById('autoBtn').textContent = '▶ Auto Demo';
+  update(0);
+}
+
+positionLines();
+update(0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

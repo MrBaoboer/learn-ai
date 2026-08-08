@@ -23,6 +23,69 @@
 
   var inFrame = window.top !== window.self;
 
+  /* ── 语言检测：与 auth.js 同一套口径，优先读 i18n.js 注入的 lang ── */
+  var _lang = (window.XUEAI_I18N && window.XUEAI_I18N.lang)
+    || (location.pathname.match(/\.(en)\.html?$/) ? 'en'
+       : location.pathname.match(/\.(ko)\.html?$/) ? 'ko' : 'zh');
+
+  /* 措辞与 auth.js 的登录弹窗保持一致，同一个站里两处引导不该各说各的 */
+  var _T = {
+    zh: {
+      artAlt:        '小山学 AI',
+      gateTitle:     '登录后继续免费阅读',
+      gateSub:       '本节还没有结束。登录即可解锁余下内容与全部课程，完全免费，不花一分钱。',
+      b0Title:       '解锁全部课程',
+      b0Desc:        '所有章节完整学完，不花一分钱',
+      b1Title:       'AI 实战技巧分享',
+      b1Desc:        '定期组织技术分享与交流会',
+      b2Title:       '岗位机会推荐',
+      b2Desc:        '帮你对接有 AI 岗位需求的公司',
+      gateBtn:       '快速登录，免费学习',
+      gateFoot:      '还没有账号？登录页可直接注册，一分钟搞定。<br>'
+                     + '要求登录也是为了防止内容被恶意贩卖。本站是免费公益站，'
+                     + '若你在任何付费课程里买到它，请申请退款。',
+      noteText:      '本节为部分预览，登录后可免费阅读全文',
+      noteLink:      '登录后继续免费阅读'
+    },
+    en: {
+      artAlt:        'Learn AI with Xiaoshan',
+      gateTitle:     'Log in to keep reading — free',
+      gateSub:       'This lesson is not over yet. Log in to unlock the rest and every other course, '
+                     + 'completely free of charge.',
+      b0Title:       'Unlock all courses',
+      b0Desc:        'Every lesson, completely free of charge',
+      b1Title:       'Hands-on AI tips',
+      b1Desc:        'Regular tech talks and practice exchanges',
+      b2Title:       'Job referrals',
+      b2Desc:        'We connect you with companies hiring for AI roles',
+      gateBtn:       'Log in free — start learning',
+      gateFoot:      'No account yet? You can sign up right on the login page in about a minute.<br>'
+                     + 'Login is required to prevent content from being resold. This site is a free '
+                     + 'public resource. If you paid for it anywhere, please request a refund.',
+      noteText:      'This is a partial preview. Log in to read the full lesson for free.',
+      noteLink:      'Log in to keep reading'
+    },
+    ko: {
+      artAlt:        '샤오산과 함께 배우는 AI',
+      gateTitle:     '로그인하고 무료로 계속 읽기',
+      gateSub:       '이 강의는 아직 끝나지 않았습니다. 로그인하면 나머지 내용과 전체 강의를 '
+                     + '완전 무료로 이용할 수 있습니다.',
+      b0Title:       '전체 강의 잠금 해제',
+      b0Desc:        '모든 챕터를 무료로 완주하세요',
+      b1Title:       'AI 실전 노하우 공유',
+      b1Desc:        '정기적인 기술 공유회와 교류회를 진행합니다',
+      b2Title:       '채용 기회 추천',
+      b2Desc:        'AI 인재를 찾는 기업과 연결해 드립니다',
+      gateBtn:       '무료 로그인 · 학습 시작',
+      gateFoot:      '아직 계정이 없으신가요? 로그인 페이지에서 바로 가입할 수 있고, 1분이면 끝납니다.<br>'
+                     + '로그인은 콘텐츠의 무단 판매를 방지하기 위한 조치입니다. 이 사이트는 무료 '
+                     + '공익 사이트이며, 유료로 구입하셨다면 환불을 요청하시기 바랍니다.',
+      noteText:      '이 강의는 부분 미리보기입니다. 로그인하면 전문을 무료로 읽을 수 있습니다',
+      noteLink:      '로그인하고 무료로 계속 읽기'
+    }
+  };
+  var T = _T[_lang] || _T.zh;
+
   /* ── 样式 ──
      配图走 background-image 而不是 <img>：面板在已登录时是 display:none，
      背景图不会发起请求，换成 <img> 则登录用户也要白下一张图。 */
@@ -98,30 +161,27 @@
   var gate = document.createElement('div');
   gate.className = 'xa-gate';
   gate.innerHTML = ''
-    + '<div class="xa-gate-art" role="img" aria-label="小山学 AI"></div>'
+    + '<div class="xa-gate-art" role="img" aria-label="' + T.artAlt + '"></div>'
     + '<div class="xa-gate-main">'
-    + '<h2>登录后继续免费阅读</h2>'
-    + '<p class="xa-gate-sub">本节还没有结束。登录即可解锁余下内容与全部课程，'
-    + '完全免费，不花一分钱。</p>'
+    + '<h2>' + T.gateTitle + '</h2>'
+    + '<p class="xa-gate-sub">' + T.gateSub + '</p>'
     + '<div class="xa-gate-list">'
     + benefit('<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 '
              + '7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
-             '解锁全部课程', '所有章节完整学完，不花一分钱')
+             T.b0Title, T.b0Desc)
     + benefit('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
-             'AI 实战技巧分享', '定期组织技术分享与交流会')
+             T.b1Title, T.b1Desc)
     + benefit('<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>'
              + '<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
-             '岗位机会推荐', '帮你对接有 AI 岗位需求的公司')
+             T.b2Title, T.b2Desc)
     + '</div>'
     + '<a class="xa-gate-btn" id="xaGateBtn" href="/auth/login">'
     + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
     + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
     + '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>'
     + '<polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>'
-    + '快速登录，免费学习</a>'
-    + '<p class="xa-gate-foot">还没有账号？登录页可直接注册，一分钟搞定。<br>'
-    + '要求登录也是为了防止内容被恶意贩卖。本站是免费公益站，'
-    + '若你在任何付费课程里买到它，请申请退款。</p>'
+    + T.gateBtn + '</a>'
+    + '<p class="xa-gate-foot">' + T.gateFoot + '</p>'
     + '</div>';
 
   // 引导要落在渐隐块之后，读者的视线才是「内容淡出 → 这里被挡住了」。
@@ -142,8 +202,8 @@
     + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
     + '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>'
     + '<path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
-    + '<span>本节为部分预览，登录后可免费阅读全文</span>'
-    + '<a class="xa-note-link" href="/auth/login">登录后继续免费阅读</a>';
+    + '<span>' + T.noteText + '</span>'
+    + '<a class="xa-note-link" href="/auth/login">' + T.noteLink + '</a>';
 
   // 落在标题那一块之后：插到 host 最前面会顶在大标题上方，像条系统横幅，
   // 跟正文没关系。h1 通常裹在 header 里，所以要往上找到 host 的直接子元素。
@@ -156,9 +216,11 @@
   }
 
   // iframe 里跳登录要顶掉整个窗口，否则登录页被塞进阅读器的内容区。
-  // 落地也该回阅读器的对应课程，而不是把人丢在裸课程页上。
+  // 落地也该回阅读器的对应课程，而不是把人丢在裸课程页上；
+  // 阅读器分语言，英韩课程要回各自那份，否则登录一趟就被切回中文站。
   var file = location.pathname.split('/').pop();
-  var next = (inFrame && file) ? '/slides/learn.html#' + file : location.pathname;
+  var reader = _lang === 'zh' ? 'learn.html' : 'learn.' + _lang + '.html';
+  var next = (inFrame && file) ? '/slides/' + reader + '#' + file : location.pathname;
   var href = '/auth/login?next=' + encodeURIComponent(next);
   [gate.querySelector('#xaGateBtn'), note.querySelector('.xa-note-link')]
     .forEach(function (a) {

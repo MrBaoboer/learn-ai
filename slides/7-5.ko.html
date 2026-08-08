@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skill: Agent 실행을 효율화하는 기술 캡슐화 | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--green:var(--success);--orange:var(--amber);--red:var(--danger);--muted:var(--sub);--surface:var(--card);--surface2:rgba(0,0,0,.04)}
+
+.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.left-col,.right-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+
+/* 공식 */
+.formula{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2);border-radius:12px;padding:14px 16px;text-align:center}
+.formula .eq{font-size:19px;font-weight:800;color:var(--orange);font-family:'Cascadia Code','Fira Code',monospace;margin-bottom:4px}
+.formula p{font-size:14px;color:var(--sub)}
+
+/* 제어 영역 */
+.ctrl{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.ctrl-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.ctrl-label{font-size:14px;color:var(--muted);font-weight:600}
+.btn-reset{padding:8px 14px;border-radius:8px;background:var(--surface2);color:var(--sub);font-size:14px;font-weight:600;border:1px solid var(--border);cursor:pointer;font-family:inherit;min-height:38px}
+.prog{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;border-radius:2px;transition:width .4s ease}
+
+/* 장면 선택 */
+.scene-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.scene-btn{padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;font-weight:700;color:var(--sub);font-family:inherit;transition:all .15s;min-height:40px}
+.scene-btn.active{border-color:var(--orange);background:rgba(217,119,6,.06);color:var(--orange)}
+
+/* 애니메이션 스테이지 */
+.stage{background:var(--card);border:1.5px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+.stage-head{padding:9px 14px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.stage-title{font-size:14px;font-weight:700;color:var(--text)}
+.mode-toggle{display:flex;gap:4px}
+.mode-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s;min-height:32px}
+.mode-btn.on-bad{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.25);color:var(--red)}
+.mode-btn.on-good{background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.25);color:var(--green)}
+.stage-body{padding:12px;display:flex;flex-direction:column;gap:6px;min-height:120px}
+
+/* 메시지 행 */
+.act{border-radius:8px;padding:8px 12px;display:flex;align-items:flex-start;gap:8px;opacity:0;transform:translateY(6px);transition:all .35s ease}
+.act.show{opacity:1;transform:translateY(0)}
+.act-icon{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:800}
+.act-body{flex:1;display:flex;flex-direction:column;gap:2px}
+.act-who{font-size:11px;font-weight:800;letter-spacing:.3px}
+.act-text{font-size:14px;line-height:1.6;color:var(--text)}
+.act.agent{background:rgba(217,119,6,.04)}.act.agent .act-icon{background:rgba(217,119,6,.12);color:var(--orange)}.act.agent .act-who{color:var(--orange)}
+.act.human{background:rgba(8,145,178,.04)}.act.human .act-icon{background:rgba(8,145,178,.12);color:var(--cyan)}.act.human .act-who{color:var(--cyan)}
+.act.waste{background:rgba(220,38,38,.04);border:1px dashed rgba(220,38,38,.15)}.act.waste .act-icon{background:rgba(220,38,38,.1);color:var(--red)}.act.waste .act-who{color:var(--red)}
+.act.done{background:rgba(22,163,74,.04)}.act.done .act-icon{background:rgba(22,163,74,.12);color:var(--green)}.act.done .act-who{color:var(--green)}
+
+/* 통계 막대 */
+.stat-bar{display:flex;gap:6px}
+.stat{flex:1;border-radius:8px;padding:8px 10px;text-align:center}
+.stat-n{font-size:22px;font-weight:800}
+.stat-l{font-size:11px;font-weight:700;margin-top:1px}
+.stat.bad{background:rgba(220,38,38,.06);color:var(--red)}.stat.bad .stat-l{color:var(--red)}
+.stat.good{background:rgba(22,163,74,.06);color:var(--green)}.stat.good .stat-l{color:var(--green)}
+.stat.neutral{background:var(--surface2);color:var(--text)}.stat.neutral .stat-l{color:var(--muted)}
+
+/* 오른쪽 열 SKILL.md */
+.skill-file{background:var(--card);border:1.5px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+.sf-head{padding:9px 14px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);font-size:14px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sf-body{padding:14px}
+.sk-section{margin-bottom:12px}.sk-section:last-child{margin-bottom:0}
+.sk-h{font-size:14px;font-weight:800;color:var(--orange);margin-bottom:3px}
+.sk-text{font-size:14px;color:var(--text);line-height:1.65}
+.sk-code{background:#1e1b2e;color:#cdd6f4;padding:10px 12px;border-radius:7px;font-family:'Cascadia Code','Fira Code',monospace;font-size:12px;line-height:1.6;margin-top:4px;white-space:pre-wrap;word-break:break-word}
+.sk-code .c{color:#6c7086}.sk-code .k{color:#cba6f7}.sk-code .s{color:#a6e3a1}.sk-code .fn{color:#89b4fa}
+.sk-list{padding-left:16px;font-size:13px;color:var(--sub);line-height:1.65;margin-top:3px}
+.sk-list li{margin-bottom:2px}
+
+.insight-box{background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.18);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(6px);transition:all .5s}
+.insight-box.show{opacity:1;transform:translateY(0)}
+.insight-box b{color:var(--orange)}
+
+.ref-box{background:rgba(124,58,237,.04);border:1px solid rgba(124,58,237,.15);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text);line-height:1.6}
+.ref-box b{color:var(--purple)}
+
+@keyframes bounce-in{0%{transform:scale(0.8);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+
+@media (max-width:768px){
+  .demo-grid{grid-template-columns:1fr}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Skill은 Agent가 자주 사용하는 도구 체인의 고수준 캡슐화로 Agent의 의사결정 부담을 줄입니다. Skill 설계 원칙, Tool과의 차이점, 재사용 가능한 Agent 기술 라이브러리 구축 방법을 소개합니다.">
+<meta name="keywords" content="Agent Skill,기술 캡슐화,AI Agent 엔지니어링,도구 체인,Agent 설계 패턴">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-5.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-5.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-5.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="Skill: Agent 실행을 효율화하는 기술 캡슐화">
+<meta property="og:description" content="Skill은 Agent가 자주 사용하는 도구 체인의 고수준 캡슐화로 Agent의 의사결정 부담을 줄입니다. Skill 설계 원칙, Tool과의 차이점, 재사용 가능한 Agent 기술 라이브러리 구축 방법을 소개합니다.">
+<meta property="og:url" content="https://xueai.app/slides/7-5.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Skill: Agent 실행을 효율화하는 기술 캡슐화">
+<meta name="twitter:description" content="Skill은 Agent가 자주 사용하는 도구 체인의 고수준 캡슐화로 Agent의 의사결정 부담을 줄입니다. Skill 설계 원칙, Tool과의 차이점, 재사용 가능한 Agent 기술 라이브러리 구축 방법을 소개합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Skill: Agent 실행 효율화","name":"Skill: Agent 실행 효율화","url":"https://xueai.app/slides/7-5.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Agent 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Skill은 Agent가 자주 사용하는 도구 체인의 고수준 캡슐화로 Agent의 의사결정 부담을 줄입니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 엔지니어링</div>
+    <h1>Skill: Agent가 더 빠르게 목표에 도달하도록</h1>
+    <p class="subtitle">시나리오를 선택하고 자동 재생 데모를 보면서 "나쁜 루프"와 "좋은 루프" 두 가지 실행 방식을 비교해보세요.</p>
+  </header>
+
+  <div class="demo-grid reveal paywall-locked xa-peek" id="skillDemo">
+    <!-- 왼쪽 열: 애니메이션 스테이지 -->
+    <div class="left-col">
+      <div class="formula">
+        <div class="eq">Skill = 프로세스 설명 + 도구 호출 가이드</div>
+        <p>ReAct 루프를 최대한 짧고 효율적으로 유지</p>
+      </div>
+
+      <div class="scene-tabs" id="sceneTabs"></div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label" id="ctrlLabel">시작 준비</span>
+          <button class="btn-reset" onclick="replayScene()">↺ 다시 보기</button>
+        </div>
+        <div class="prog"><div class="prog-fill" id="progFill" style="width:0%;background:var(--red)"></div></div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-head">
+          <span class="stage-title" id="stageTitle">Skill 없는 ReAct</span>
+          <div class="mode-toggle">
+            <button class="mode-btn on-bad" id="modeBad" onclick="setMode('bad')">나쁜 루프</button>
+            <button class="mode-btn" id="modeGood" onclick="setMode('good')">좋은 루프</button>
+          </div>
+        </div>
+        <div class="stage-body" id="stageBody"></div>
+      </div>
+
+      <div class="stat-bar" id="statBar"></div>
+
+      <div class="insight-box" id="insightBox">
+        <b>본질:</b> Skill은 단순히 <b>경험을 문서로 작성하는 것</b>으로 기술적으로 새로운 것이 아닙니다. AI에게 자연어로 말합니다: 이런 유형의 작업을 만나면 먼저 이것을 하고, 다음에 이것을 하고, 이 도구를 사용하라고. AI가 출발 전에 생각을 정리하고 한 번에 모든 것을 완료합니다.
+      </div>
+    </div>
+
+    <!-- 오른쪽 열: Skill 파일 구조 -->
+    <div class="right-col">
+      <div style="font-size:14px;font-weight:700;color:var(--muted)">해당 SKILL.md 파일 ↓ (좋은 루프의 비밀)</div>
+      <div class="skill-file">
+        <div class="sf-head">
+          <span style="font-size:16px">📄</span>
+          <span id="sfTitle">SKILL.md</span>
+        </div>
+        <div class="sf-body" id="sfBody"></div>
+      </div>
+      <div class="ref-box">
+        <b>Cursor / Claude Code / Copilot</b> 모두 Skill 표준을 지원합니다. 핵심은 단 하나의 <code>SKILL.md</code> 파일이며 AI가 매칭 작업을 인식하면 자동으로 로드합니다. <b>잘 쓴 Skill = 당신의 경험을 AI의 능력으로 전환.</b>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+const SCENES = [
+  {
+    name: '베란다 빨래 걷기',
+    skillTitle: 'SKILL.md — 베란다 빨래 걷기 기술',
+    bad: {
+      title: 'Skill 없는 ReAct',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'베란다에서 빨래를 걷어 방으로 돌아왔습니다.'},
+        {who:'waste',icon:'🔁',label:'반복 확인',text:'주인님, 바지도 걷어올까요?'},
+        {who:'human',icon:'👤',label:'당신',text:'당연하죠.'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'나가서 바지를 걷어 다시 돌아왔습니다.'},
+        {who:'waste',icon:'🔁',label:'반복 확인',text:'레몬 나무에 물을 줄까요?'},
+        {who:'human',icon:'👤',label:'당신',text:'네!'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'또 나가서 물을 줬습니다…'},
+        {who:'waste',icon:'🔁',label:'반복 확인',text:'아이 장난감도 걷어올까요?'},
+        {who:'human',icon:'👤',label:'당신',text:'당연하죠…'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'또 나가서 장난감을 걷었습니다…드디어 다 됐습니다.'},
+      ],
+      stats:{trips:'4번 왕복',loops:'10단계',verdict:'시간 낭비 + 에너지 낭비'}
+    },
+    good: {
+      title: 'Skill 있는 실행',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'Skill 로드: 「베란다 빨래 걷기」기술.'},
+        {who:'done',icon:'📋',label:'Plan',text:'나가기 전에 모든 작업 목록을 계획합니다.'},
+        {who:'done',icon:'✅',label:'실행',text:'빨래 걷기 완료 ✓'},
+        {who:'done',icon:'✅',label:'실행',text:'바지도 걷기 완료 ✓'},
+        {who:'done',icon:'✅',label:'실행',text:'레몬 나무 물주기 완료 ✓'},
+        {who:'done',icon:'✅',label:'실행',text:'아이 장난감도 걷기 완료 ✓'},
+        {who:'done',icon:'🎉',label:'완료',text:'한 번에 모두 완료하고 돌아와서 「다 됐습니다」라고 말합니다.'},
+      ],
+      stats:{trips:'1번 왕복',loops:'7단계',verdict:'한 번에 완료 → 비용과 에너지 절약'}
+    },
+    skillBody: `
+      <div class="sk-section">
+        <div class="sk-h">트리거 조건</div>
+        <div class="sk-text">사용자가 「빨래 걷기」「베란다」「건조」를 언급할 때 자동으로 이 기술이 트리거됩니다.</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">실행 흐름</div>
+        <div class="sk-code"><span class="c"># 베란다 빨래 걷기 Skill</span>
+
+<span class="k">Step 1:</span> 베란다의 모든 물품 확인 (빨래, 바지, 양말, 장난감…)
+<span class="k">Step 2:</span> 한 번에 모두 수거
+<span class="k">Step 3:</span> 식물에 물이 필요한지 확인 → 필요하면 물주기
+<span class="k">Step 4:</span> 바닥 잡동사니 확인 → 함께 정리
+<span class="k">Step 5:</span> 완료 보고</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">핵심 원칙</div>
+        <div class="sk-text"><b>한 번에 완료하고 반복 확인하지 않습니다.</b><br>나가기 전에 해야 할 모든 일을 명확히 생각하고, 순서를 계획한 후 한 번에 실행합니다.<br>나쁜 루프 = 각 단계마다 멈추고 확인 → 여러 번 대화 → Token 비용 높음<br>좋은 루프 = 출발 전 계획 → 한 번 실행 → Token 비용 낮음<br><b>좋은 루프와 나쁜 루프의 차이는 매우 큽니다.</b></div>
+      </div>
+    `
+  },
+  {
+    name: '노트 검색',
+    skillTitle: 'SKILL.md — 노트 검색 기술',
+    bad: {
+      title: 'Skill 없는 ReAct',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'생각: 사용자가 노트를 검색하려 합니다, 시도해 봅시다…'},
+        {who:'agent',icon:'🔧',label:'도구 호출',text:'search_notes("노트")'},
+        {who:'waste',icon:'❌',label:'결과',text:'200개 반환됨…너무 많습니다.'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'다른 키워드로 시도해볼까요?'},
+        {who:'agent',icon:'🔧',label:'도구 호출',text:'search_notes("AI 학습 노트")'},
+        {who:'waste',icon:'❌',label:'결과',text:'여전히 맞지 않음, 1개만 있습니다.'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'내용을 읽어볼까요?'},
+        {who:'agent',icon:'🔧',label:'도구 호출',text:'read_note(id=xxx)'},
+        {who:'agent',icon:'🔧',label:'도구 호출',text:'read_note(id=yyy)'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'드디어 찾았습니다…10단계나 걸렸습니다.'},
+      ],
+      stats:{trips:'도구 5번 호출',loops:'10단계',verdict:'반복 시행착오 → Token 낭비'}
+    },
+    good: {
+      title: 'Skill 있는 실행',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'작업 인식 → 「노트 검색」Skill 로드'},
+        {who:'done',icon:'📋',label:'Plan',text:'Skill 지침에 따라: 먼저 정확하게 제목 검색'},
+        {who:'done',icon:'🔧',label:'Step 1',text:'search_notes("키워드") → 초기 결과 획득'},
+        {who:'done',icon:'🔧',label:'Step 2',text:'semantic_search(query) → 의미 보완'},
+        {who:'done',icon:'🔧',label:'Step 3',text:'read_note(Top 3) → 요약 읽기'},
+        {who:'done',icon:'🎉',label:'완료',text:'구조화된 목록 출력: 제목 + 요약 + 날짜'},
+      ],
+      stats:{trips:'도구 3번 호출',loops:'6단계',verdict:'정확한 경로 → 루프 절반 감소'}
+    },
+    skillBody: `
+      <div class="sk-section">
+        <div class="sk-h">트리거 조건</div>
+        <div class="sk-text">사용자가 「노트 검색」「노트 찾기」「이전에 뭘 썼는지」를 말할 때 트리거됩니다.</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">실행 흐름</div>
+        <div class="sk-code"><span class="c"># 노트 검색 Skill 표준 절차</span>
+
+<span class="k">Step 1:</span> 키워드 추출, <span class="fn">search_notes</span>(keyword) 호출
+<span class="k">Step 2:</span> 결과 < 3이면 <span class="fn">semantic_search</span>(query)로 보완
+<span class="k">Step 3:</span> Top 5 결과 선택, <span class="fn">read_note</span>(id) 호출하여 요약 읽기
+<span class="k">Step 4:</span> 구조화된 목록 통합 출력, 제목+요약+날짜 포함</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">사용 가능한 도구</div>
+        <ul class="sk-list">
+          <li><b>search_notes(keyword)</b> — 키워드 검색</li>
+          <li><b>semantic_search(query)</b> — 의미 검색</li>
+          <li><b>read_note(id)</b> — 내용 읽기</li>
+        </ul>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">주의사항</div>
+        <div class="sk-text">먼저 검색 후 편집, ID를 추측하지 않습니다. 대형 문서는 search_note_content로 위치 지정.</div>
+      </div>
+    `
+  },
+  {
+    name: '배포 및 출시',
+    skillTitle: 'SKILL.md — 배포 및 출시 기술',
+    bad: {
+      title: 'Skill 없는 ReAct',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'생각: 먼저 build를 시도해 봅시다…'},
+        {who:'agent',icon:'🔧',label:'도구 호출',text:'run("npm run build")'},
+        {who:'waste',icon:'❌',label:'실패',text:'Build 실패: 환경 변수 DATABASE_URL 누락.'},
+        {who:'waste',icon:'🔁',label:'반복 확인',text:'주인님, DATABASE_URL은 무엇인가요?'},
+        {who:'human',icon:'👤',label:'당신',text:'mysql://user:pass@host/db'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'알겠습니다, 다시 build…성공했습니다.'},
+        {who:'agent',icon:'🔧',label:'도구 호출',text:'run("deploy production") — 바로 배포했습니다!'},
+        {who:'waste',icon:'💥',label:'서비스 장애',text:'테스트를 잊고 건너뜀, 서비스 500 오류 발생!'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'긴급 롤백…'},
+      ],
+      stats:{trips:'단계 누락',loops:'9단계',verdict:'테스트 누락 → 서비스 사고'}
+    },
+    good: {
+      title: 'Skill 있는 실행',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'「배포 및 출시」Skill 로드 → 단계 건너뜀 불가.'},
+        {who:'done',icon:'✅',label:'Step 1',text:'.env 파일 완전성 확인 → OK'},
+        {who:'done',icon:'✅',label:'Step 2',text:'pytest 전체 테스트 실행 → 모두 통과'},
+        {who:'done',icon:'✅',label:'Step 3',text:'npm run build → 빌드 성공'},
+        {who:'done',icon:'✅',label:'Step 4',text:'staging에 배포 → 스모크 테스트 통과'},
+        {who:'done',icon:'✅',label:'Step 5',text:'production에 배포 → 헬스 체크 통과'},
+        {who:'done',icon:'🎉',label:'완료',text:'안전하게 출시 완료, 팀에 알림.'},
+      ],
+      stats:{trips:'표준 절차',loops:'7단계',verdict:'단계별 검증 → 안전 출시'}
+    },
+    skillBody: `
+      <div class="sk-section">
+        <div class="sk-h">트리거 조건</div>
+        <div class="sk-text">사용자가 「배포」「출시」「프로덕션 발행」을 말할 때 트리거됩니다.</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">실행 흐름 (단계 건너뜀 불가)</div>
+        <div class="sk-code"><span class="c"># 배포 및 출시 Skill</span>
+
+<span class="k">Step 1:</span> .env 및 설정 파일 완전성 확인
+<span class="k">Step 2:</span> <span class="fn">pytest</span> 전체 테스트 실행, 모두 통과해야 계속 진행
+<span class="k">Step 3:</span> <span class="fn">build</span> 실행하여 프로덕션 버전 빌드
+<span class="k">Step 4:</span> <span class="s">staging</span>에 배포, 스모크 테스트
+<span class="k">Step 5:</span> 확인 후 <span class="s">production</span>에 배포
+<span class="k">Step 6:</span> 헬스 체크 검증 + 팀 알림</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">안전 제약</div>
+        <ul class="sk-list">
+          <li>테스트 미통과 → <b>진행 금지</b></li>
+          <li>staging 검증 실패 → <b>production 배포 금지</b></li>
+          <li>반드시 staging 먼저, 그 다음 production, 단계 건너뜀 불가</li>
+        </ul>
+      </div>
+    `
+  }
+];
+
+let curScene=0, curMode='bad', curStep=0, playTimer=null, viewed=false;
+
+function buildSceneTabs(){
+  document.getElementById('sceneTabs').innerHTML=SCENES.map((s,i)=>
+    `<button class="scene-btn${i===curScene?' active':''}" onclick="pickScene(${i})">${s.name}</button>`
+  ).join('');
+}
+
+function pickScene(i){
+  curScene=i;curMode='bad';
+  buildSceneTabs();
+  renderSkill();
+  resetStage();
+  if(viewed)startPlay();
+}
+
+function setMode(m){
+  curMode=m;
+  resetStage();
+  if(viewed)startPlay();
+}
+
+function replayScene(){
+  resetStage();
+  startPlay();
+}
+
+function resetStage(){
+  if(playTimer){clearTimeout(playTimer);playTimer=null;}
+  const sc=SCENES[curScene];
+  const data=curMode==='bad'?sc.bad:sc.good;
+  document.getElementById('stageTitle').textContent=data.title;
+  document.getElementById('modeBad').className='mode-btn'+(curMode==='bad'?' on-bad':'');
+  document.getElementById('modeGood').className='mode-btn'+(curMode==='good'?' on-good':'');
+
+  document.getElementById('stageBody').innerHTML=data.steps.map((s,i)=>
+    `<div class="act ${s.who}" id="act${i}">
+      <div class="act-icon">${s.icon}</div>
+      <div class="act-body">
+        <div class="act-who">${s.label}</div>
+        <div class="act-text">${s.text}</div>
+      </div>
+    </div>`
+  ).join('');
+
+  curStep=0;
+  const fill=document.getElementById('progFill');
+  fill.style.width='0%';
+  fill.style.background=curMode==='bad'?'var(--red)':'var(--green)';
+  document.getElementById('ctrlLabel').textContent='시작 준비 · 총 '+data.steps.length+'단계';
+  document.getElementById('statBar').innerHTML='';
+  document.getElementById('insightBox').classList.remove('show');
+}
+
+function playNext(){
+  const sc=SCENES[curScene];
+  const data=curMode==='bad'?sc.bad:sc.good;
+  if(curStep>=data.steps.length)return;
+
+  const el=document.getElementById('act'+curStep);
+  el.classList.add('show');
+  curStep++;
+
+  const pct=Math.round(curStep/data.steps.length*100);
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('ctrlLabel').textContent=`${curStep} / ${data.steps.length}단계`;
+
+  if(curStep>=data.steps.length){
+    playTimer=null;
+    showStats(data.stats);
+
+    if(curMode==='bad'){
+      setTimeout(()=>{
+        document.getElementById('ctrlLabel').textContent='나쁜 루프 완료 → 「좋은 루프」를 클릭해 비교하기';
+      },600);
+    } else {
+      setTimeout(()=>{
+        document.getElementById('insightBox').classList.add('show');
+      },400);
+    }
+  }else{
+    playTimer=setTimeout(playNext,700);
+  }
+}
+
+function startPlay(){
+  if(playTimer)clearTimeout(playTimer);
+  playTimer=setTimeout(playNext,300);
+}
+
+function showStats(s){
+  const isBad=curMode==='bad';
+  document.getElementById('statBar').innerHTML=`
+    <div class="stat ${isBad?'bad':'good'}"><div class="stat-n">${s.trips}</div><div class="stat-l">왕복 횟수</div></div>
+    <div class="stat neutral"><div class="stat-n">${s.loops}</div><div class="stat-l">총 단계</div></div>
+    <div class="stat ${isBad?'bad':'good'}"><div class="stat-n" style="font-size:14px">${s.verdict}</div><div class="stat-l">결론</div></div>
+  `;
+  document.getElementById('statBar').style.animation='bounce-in .4s ease';
+}
+
+function renderSkill(){
+  const sc=SCENES[curScene];
+  document.getElementById('sfTitle').textContent=sc.skillTitle;
+  document.getElementById('sfBody').innerHTML=sc.skillBody;
+}
+
+buildSceneTabs();
+renderSkill();
+resetStage();
+
+lessonOnView(document.getElementById('skillDemo'), function(){
+  viewed=true;
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Grok Build Source Course Lesson 19: Hook events, matchers, blocking semantics, and fail-open boundaries.">
+  <meta name="author" content="Luo Xiaoshan (洛小山)">
+  <title>Lesson 19: Hooks Blocking Semantics and Failure Boundaries | AI Systems Course</title>
+  <link rel="canonical" href="https://xueai.app/slides/12-19.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/12-19.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/12-19.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/12-19.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/12-19.html">
+  <link rel="stylesheet" href="lesson.css">
+  <style>
+    :root{--ink:#f7f0df;--muted:#b9ad91;--bg:#0c0b09;--panel:#15120d;--panel2:#1d1810;--line:rgba(245,181,58,.26);--amber:#f5b53a;--gold:#ffd978;--danger:#ff876f;--ok:#78d5a5}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(circle at 82% 5%,rgba(245,181,58,.12),transparent 28%),var(--bg);color:var(--ink);font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.7}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:32px 32px}
+    .lesson{position:relative;max-width:1180px;margin:auto;padding:84px 28px 96px}
+    .eyebrow,.tag{font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--amber)}
+    h1{max-width:900px;margin:16px 0 18px;font-size:clamp(42px,7vw,86px);line-height:1.02;letter-spacing:-.045em}
+    h1 span{color:var(--gold)}
+    .lead{max-width:790px;margin:0;color:#d9cfb8;font-size:clamp(17px,2vw,22px)}
+    .hero-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+    .tag{padding:8px 12px;border:1px solid var(--line);background:rgba(245,181,58,.06);border-radius:999px;letter-spacing:.05em;text-transform:none}
+    section{margin-top:70px}
+    .section-head{display:grid;grid-template-columns:110px 1fr;gap:20px;align-items:start;margin-bottom:24px}
+    .num{color:var(--amber);font:700 14px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    h2{margin:0;font-size:clamp(27px,4vw,44px);line-height:1.12}
+    h3{margin:0 0 10px;font-size:20px}
+    p{margin:8px 0;color:#d4cab4}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+    .card{grid-column:span 4;padding:22px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(30,25,16,.96),rgba(17,14,10,.96));box-shadow:0 18px 50px rgba(0,0,0,.25)}
+    .card.wide{grid-column:span 6}.card.full{grid-column:1/-1}
+    .card small{color:var(--amber);font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .objective{counter-reset:item}.objective .card{position:relative;padding-left:62px}.objective .card::before{counter-increment:item;content:"0" counter(item);position:absolute;left:20px;top:22px;color:var(--gold);font:700 14px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .visual{overflow:hidden;padding:18px;border:1px solid var(--line);border-radius:24px;background:#100e0b}
+    .visual svg{display:block;width:100%;height:auto}
+    .matrix{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+    .cell{padding:15px;background:#15120d;color:#d6ccb6}.cell.head{color:var(--gold);font-weight:750;background:#211a0e}.allow{color:var(--ok)}.deny{color:var(--danger)}
+    pre{margin:14px 0 0;padding:20px;overflow:auto;border:1px solid rgba(245,181,58,.18);border-radius:14px;background:#090806;color:#eadfca;font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2}
+    code{color:#ffe09a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .path{display:block;margin-top:15px;color:#9d9178;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
+    .callout{padding:24px;border-left:3px solid var(--amber);background:linear-gradient(90deg,rgba(245,181,58,.12),transparent);border-radius:0 16px 16px 0}
+    .exercise{display:grid;grid-template-columns:140px 1fr;gap:24px;padding:26px;border:1px solid var(--line);border-radius:18px;background:var(--panel2)}
+    .exercise b{color:var(--gold)}ol{margin:8px 0;padding-left:21px;color:#d7cdb7}li+li{margin-top:7px}
+    .snapshot{font-size:13px;color:#a99d83;border-top:1px solid var(--line);padding-top:18px}
+    .takeaway{position:relative;padding:34px;border:1px solid rgba(245,181,58,.5);border-radius:22px;background:linear-gradient(135deg,rgba(245,181,58,.15),rgba(245,181,58,.03))}
+    .takeaway strong{display:block;margin-bottom:8px;color:var(--gold);font-size:25px}
+    @media(max-width:760px){.lesson{padding:64px 18px 78px}.section-head{grid-template-columns:1fr;gap:8px}.card,.card.wide{grid-column:1/-1}.matrix{grid-template-columns:1fr}.matrix .cell.head:not(:first-child){display:none}.exercise{grid-template-columns:1fr}.visual{padding:8px}pre{font-size:11px}}
+  </style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Hooks: Explicit Deny to Block","name":"Hooks: Explicit Deny to Block","url":"https://xueai.app/slides/12-19.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Permissions, Sandboxing & Security","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Grok Build Source Course Lesson 19: Hook events, matchers, blocking semantics, and fail-open boundaries.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+  <main class="lesson">
+    <header>
+      <div class="eyebrow">Grok Build Source Course · 12 / 19</div>
+      <h1>Hooks: <span>Explicit Deny to Block</span></h1>
+      <p class="lead">Think of Hooks as programmable checkpoints on events. <code>PreToolUse</code> can return an explicit deny; process crashes, timeouts, and unparseable output all go fail-open, letting the tool call proceed.</p>
+      <div class="hero-meta">
+        <span class="tag">15 event names</span><span class="tag">PreToolUse can block</span><span class="tag">JSON config</span><span class="tag">process stdin / stdout</span>
+      </div>
+    </header>
+
+    <section>
+      <div class="section-head"><span class="num">01 / OBJECTIVES</span><h2>Learning Objectives</h2></div>
+      <div class="grid objective">
+        <article class="card"><h3>Distinguish Two Types of Outcomes</h3><p>Identify explicit <code>Deny</code> versus Hook execution failure — they produce opposite results for the tool call.</p></article>
+        <article class="card"><h3>Understand Event Matching</h3><p>Master the <code>matcher</code>'s exact name, regex pattern, and Bash compatibility alias.</p></article>
+        <article class="card"><h3>Write Testable Configuration</h3><p>Configure a command Hook following the user guide's JSON structure and design four fault-path tests.</p></article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="num">02 / CORE VISUAL</span><h2>The Decision Path of a Single PreToolUse</h2></div>
+      <div class="visual" role="img" aria-label="Decision diagram for PreToolUse Hook from event through matching, execution, to tool call">
+        <svg viewBox="0 0 1100 420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g19" x1="0" x2="1"><stop stop-color="#f5b53a" stop-opacity=".22"/><stop offset="1" stop-color="#f5b53a" stop-opacity=".04"/></linearGradient>
+            <marker id="a19" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#f5b53a"/></marker>
+          </defs>
+          <g fill="none" stroke="#f5b53a" stroke-width="2" marker-end="url(#a19)"><path d="M220 110H330"/><path d="M510 110H620"/><path d="M800 110H910"/><path d="M710 170V270"/><path d="M1000 170V270"/></g>
+          <g font-family="Arial, sans-serif" text-anchor="middle">
+            <g><rect x="40" y="50" width="180" height="120" rx="16" fill="url(#g19)" stroke="#735522"/><text x="130" y="98" fill="#ffd978" font-size="18" font-weight="700">PreToolUse</text><text x="130" y="130" fill="#b9ad91" font-size="14">event envelope → stdin</text></g>
+            <g><rect x="330" y="50" width="180" height="120" rx="16" fill="#17130d" stroke="#735522"/><text x="420" y="98" fill="#ffd978" font-size="18" font-weight="700">matcher</text><text x="420" y="130" fill="#b9ad91" font-size="14">executes only on tool name hit</text></g>
+            <g><rect x="620" y="50" width="180" height="120" rx="16" fill="#17130d" stroke="#735522"/><text x="710" y="98" fill="#ffd978" font-size="18" font-weight="700">Run Hook</text><text x="710" y="130" fill="#b9ad91" font-size="14">command / timeout</text></g>
+            <g><rect x="910" y="50" width="150" height="120" rx="16" fill="#17130d" stroke="#735522"/><text x="985" y="98" fill="#ffd978" font-size="18" font-weight="700">Interpret</text><text x="985" y="130" fill="#b9ad91" font-size="14">decision / exit</text></g>
+            <g><rect x="600" y="270" width="220" height="100" rx="16" fill="#112019" stroke="#3b8c65"/><text x="710" y="312" fill="#78d5a5" font-size="18" font-weight="700">Failure: ALLOW</text><text x="710" y="342" fill="#b9ad91" font-size="14">crash / timeout / invalid result</text></g>
+            <g><rect x="875" y="270" width="220" height="100" rx="16" fill="#25120f" stroke="#a44b3d"/><text x="985" y="312" fill="#ff876f" font-size="18" font-weight="700">Explicit DENY: BLOCK</text><text x="985" y="342" fill="#b9ad91" font-size="14">JSON deny / fallback exit 2</text></g>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="num">03 / EVENTS</span><h2>The Event Surface in Source Code</h2></div>
+      <div class="grid">
+        <article class="card wide"><small>Session &amp; Tool</small><h3>Eight Main-Flow Checkpoints</h3><p><code>SessionStart</code>, <code>SessionEnd</code>, <code>Stop</code>, <code>StopFailure</code>, <code>PreToolUse</code>, <code>PostToolUse</code>, <code>PostToolUseFailure</code>, <code>PermissionDenied</code>. Only <code>PreToolUse</code> has <code>is_blocking()</code> returning true.</p></article>
+        <article class="card wide"><small>User, Agent &amp; Compaction</small><h3>Seven Extended Checkpoints</h3><p><code>UserPromptSubmit</code>, <code>Notification</code>, <code>SubagentStart</code>, <code>SubagentStop</code>, compatibility alias <code>SubagentEnd</code>, <code>PreCompact</code>, <code>PostCompact</code>.</p></article>
+        <article class="card full"><small>Key Boundary</small><h3>"Event Triggered" ≠ "Controls the Main Flow"</h3><p>The event enum defines trigger points; <code>is_blocking()</code> separately declares blocking capability. When reading the event list, also trace how results are returned to the caller.</p><span class="path">crates/codegen/xai-grok-hooks/src/event.rs</span></article>
+      </div>
+    </section>
+
+    <section class="paywall-locked xa-peek">
+      <div class="section-head"><span class="num">04 / SEMANTICS</span><h2>Block vs. Fail-open Matrix</h2></div>
+      <div class="matrix">
+        <div class="cell head">Hook Result</div><div class="cell head">Dispatcher Interpretation</div><div class="cell head">Tool Call</div>
+        <div class="cell">JSON decision = <code>deny</code></div><div class="cell deny">Explicit deny</div><div class="cell deny">Blocked</div>
+        <div class="cell">No valid JSON, exit code <code>2</code></div><div class="cell deny">Fallback deny</div><div class="cell deny">Blocked</div>
+        <div class="cell">Valid JSON <code>allow</code>, exit code <code>2</code></div><div class="cell allow">JSON takes priority</div><div class="cell allow">Allowed, conflict warning logged</div>
+        <div class="cell">Exit code not 0 or 2</div><div class="cell allow">HookRunResult::Failed</div><div class="cell allow">Allowed, warning logged</div>
+        <div class="cell">Timeout or process crash</div><div class="cell allow">HookRunResult::Failed</div><div class="cell allow">Allowed, warning logged</div>
+        <div class="cell">Invalid stdout or unknown decision</div><div class="cell allow">Fallback exit code or Failed</div><div class="cell allow">Output alone does not block; fallback exit code 2 still denies</div>
+      </div>
+      <div class="callout" style="margin-top:18px"><p><strong>Security Implication:</strong> Hooks are appropriate for policy advisories, auditing, and recoverable pre-checks. When enforcement guarantees are required, the permission layer and sandbox should also be used. Source code comments explicitly require that Hook failures must not break tool availability.</p></div>
+    </section>
+
+    <section class="paywall-locked">
+      <div class="section-head"><span class="num">05 / SOURCE</span><h2>Real Source Evidence</h2></div>
+      <div class="grid">
+        <article class="card wide">
+          <small>dispatcher.rs</small><h3>Failure Defaults to Allow</h3>
+          <pre><code>match result {
+    HookRunnerResult::Decision(
+        HookDecision::Deny { reason, .. }
+    ) =&gt; {
+        return PreToolUseResult {
+            decision: HookDecision::Deny { ... },
+            results: run_results,
+        };
+    }
+    HookRunnerResult::Failed(err) =&gt; {
+        tracing::warn!(
+            error = %err,
+            "hook failed; ignoring (fail-open)"
+        );
+    }
+    _ =&gt; {}
+}</code></pre>
+          <span class="path">crates/codegen/xai-grok-hooks/src/dispatcher.rs</span>
+        </article>
+        <article class="card wide">
+          <small>matcher.rs + command.rs</small><h3>Matching and Exit Codes</h3>
+          <pre><code>pub const DENY_EXIT_CODE: i32 = 2;
+
+pub fn matches(&amp;self, tool_name: &amp;str) -&gt; bool {
+    self.regex.is_match(tool_name)
+        || self.matches_compat_alias(tool_name)
+}</code></pre>
+          <p>The compatibility mapping lets <code>Bash</code> in configuration hit the internal tool name <code>run_terminal_command</code>. Matchers are compiled from regex; the user guide examples use tool names.</p>
+          <span class="path">crates/codegen/xai-grok-hooks/src/matcher.rs · runner/command.rs</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="paywall-locked">
+      <div class="section-head"><span class="num">06 / CONFIG</span><h2>Configuration Written in the Real JSON Structure</h2></div>
+      <div class="grid">
+        <article class="card full">
+          <small>~/.grok/hooks/*.json · project/.grok/hooks/*.json</small>
+          <pre><code>{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bin/safe-shell-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+          <p>The configuration hierarchy is "event → matcher group → handler list". Commands receive the event envelope via stdin; a valid JSON decision takes priority — if no valid JSON is present, the exit code is interpreted, with exit code 2 expressing denial. Global Hooks live in <code>~/.grok/hooks/</code>; project Hooks live in <code>.grok/hooks/</code> and are controlled by folder trust. Reserved environment variables are filtered out, and unresolved variables cause an error before startup.</p>
+          <span class="path">crates/codegen/xai-grok-hooks/examples/hooks/safe-shell.json · xai-grok-pager/docs/user-guide/10-hooks.md</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="paywall-locked">
+      <div class="section-head"><span class="num">07 / LAB</span><h2>Lab Exercise: Verify Four Paths</h2></div>
+      <div class="exercise">
+        <div><span class="eyebrow">25 MIN</span><p><b>Deliverable</b><br>Config, script, test log</p></div>
+        <ol>
+          <li>Configure a <code>PreToolUse</code> command Hook matching <code>Bash</code>.</li>
+          <li>Make the script return JSON <code>deny</code> for <code>rm -rf</code> and record the blocked tool result.</li>
+          <li>Successively trigger exit code 1, timeout, and invalid stdout — verify all three go allowed and produce warnings.</li>
+          <li>Change the exit code to 2, then verify that invalid stdout can still reach the explicit deny path.</li>
+          <li>Write a one-sentence boundary statement: which policy must be moved to the permission layer or sandbox.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="paywall-locked">
+      <div class="takeaway"><strong>Takeaway</strong><p>To judge whether a Hook is safe, ask two questions: can it express an explicit deny, and what does the main flow do when the Hook itself fails? Grok Build's answer is clear — explicit deny blocks, Hook failure goes fail-open.</p></div>
+      <p class="snapshot"><b>Source Snapshot Note:</b> This page is based on the hooks crate, user guide, and example configurations from the local <code>grok-build-main</code> snapshot. Code excerpts are for teaching purposes, with log fields and error wrappers omitted; event names, JSON hierarchy, exit codes, and decision semantics match the source.</p>
+    </section>
+  </main>
+  <script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+  <script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

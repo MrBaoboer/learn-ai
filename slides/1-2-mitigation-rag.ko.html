@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RAG: 검색 증강 생성 — LLM에 외부 지식베이스 연결하기 | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root {
+  /* 기존 변수명 별칭: 디자인 시스템에 매핑 */
+  --bg-color: var(--bg);
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+.badge {
+  display: inline-block;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 5px 14px; border-radius: 8px; white-space: nowrap;
+  background: rgba(22,163,106,0.1); color: var(--success);
+  margin-top: 12px;
+}
+.main-area {
+  display: grid; grid-template-columns: 340px 1fr; gap: 20px;
+  align-items: start;
+}
+
+/* Left */
+.left-panel {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.section-label {
+  font-size: 12px; font-weight: 800; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+.scene-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 18px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+}
+.scene-card:hover { border-color: rgba(22,163,106,0.25); }
+.scene-card.active { border-color: var(--success); background: rgba(22,163,106,0.03); }
+.scene-tag { font-size: 12px; font-weight: 800; color: var(--success); margin-bottom: 5px; }
+.scene-name { font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.scene-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+.decision-box {
+  background: rgba(217,119,6,0.04);
+  border: 1px solid rgba(217,119,6,0.15);
+  border-radius: 12px; padding: 14px 18px;
+}
+.decision-title { font-size: 12px; font-weight: 800; color: var(--amber); margin-bottom: 10px; letter-spacing: 0.3px; }
+.decision-row {
+  display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;
+}
+.decision-row:last-child { margin-bottom: 0; }
+.decision-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.decision-text { font-size: 13px; color: var(--text-sub); line-height: 1.7; }
+.decision-text b { color: var(--text-main); }
+
+/* Right */
+.right-panel {
+  display: flex; flex-direction: column;
+  min-width: 0; gap: 14px;
+}
+.right-top {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 10px;
+}
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.tab-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab-btn {
+  padding: 9px 18px; border-radius: var(--radius-sm); border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.tab-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Flow view */
+.flow-view {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.flow-step-row {
+  display: flex; align-items: stretch; gap: 0;
+}
+.flow-node {
+  flex: 1; background: white; border-radius: 12px; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 6px; position: relative;
+}
+.flow-node.active-node { border: 2px solid var(--accent); }
+.flow-node-num {
+  font-size: 12px; font-weight: 800; color: var(--text-sub); letter-spacing: 0.3px;
+}
+.flow-node-title { font-size: 15px; font-weight: 700; color: var(--text-main); }
+.flow-node-desc { font-size: 13px; color: var(--text-sub); line-height: 1.6; }
+.flow-node-tag {
+  display: inline-block; margin-top: 4px;
+  font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 4px;
+  background: rgba(0,102,255,0.08); color: var(--accent);
+  align-self: flex-start;
+}
+.flow-node-tag.pm { background: rgba(217,119,6,0.1); color: var(--amber); }
+.flow-arrow-v {
+  width: 100%; text-align: center; color: var(--text-sub);
+  font-size: 18px; line-height: 1; padding: 2px 0; flex-shrink: 0;
+}
+.flow-arrow-h {
+  width: 28px; flex-shrink: 0; display: flex; align-items: center;
+  justify-content: center; color: var(--text-sub); font-size: 18px;
+}
+
+/* Compare view */
+.compare-area { display: flex; gap: 16px; }
+.compare-col { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col-label {
+  font-size: 13px; font-weight: 700; padding: 0 2px;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.col-label .dot { width: 10px; height: 10px; border-radius: 50%; }
+.col-label .dot.red { background: var(--danger); }
+.col-label .dot.green { background: var(--success); }
+.col-label span { color: var(--text-sub); }
+.convo-box {
+  flex: 1; background: var(--card); border-radius: var(--radius); padding: 16px 18px;
+  border: 1px solid var(--border);
+  min-height: 260px; max-height: 420px;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+}
+.bubble-user {
+  background: var(--accent); color: white;
+  padding: 11px 15px; border-radius: 12px 12px 4px 12px;
+  font-size: 15px; line-height: 1.6; align-self: flex-end; max-width: 90%;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.bubble-user.show { opacity: 1; transform: translateY(0); }
+.bubble-retrieval {
+  background: rgba(217,119,6,0.06); border: 1px dashed rgba(217,119,6,0.3);
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; color: #92400e; line-height: 1.6;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.bubble-retrieval.show { opacity: 1; transform: translateY(0); }
+.bubble-ai {
+  background: rgba(0,0,0,0.04); color: var(--text-main);
+  padding: 11px 15px; border-radius: 12px 12px 12px 4px;
+  font-size: 15px; line-height: 1.8; align-self: flex-start; max-width: 95%;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.bubble-ai.show { opacity: 1; transform: translateY(0); }
+.bubble-ai .hl-red { color: var(--danger); font-weight: 600; text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }
+.bubble-ai .hl-green { color: var(--success); font-weight: 600; }
+.bubble-ai .source-tag {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px;
+  background: rgba(0,102,255,0.1); color: var(--accent); margin-left: 4px;
+}
+.bubble-typing {
+  display: inline-block; width: 6px; height: 14px;
+  background: var(--text-sub); border-radius: 2px; margin-left: 2px;
+  animation: blink 0.7s step-end infinite; vertical-align: text-bottom;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.verdict {
+  padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  opacity: 0; transition: opacity 0.4s ease;
+}
+.verdict.show { opacity: 1; }
+.verdict.bad { background: rgba(229,62,62,0.06); color: var(--danger); border: 1px solid rgba(229,62,62,0.15); }
+.verdict.good { background: rgba(22,163,106,0.06); color: var(--success); border: 1px solid rgba(22,163,106,0.15); }
+
+.replay-btn {
+  padding: 9px 16px; border-radius: 9px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.replay-btn:hover { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Why it works */
+.why-box {
+  background: #1c1c1e; border-radius: 12px; padding: 14px 16px;
+  flex-shrink: 0;
+}
+.why-title {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.token-chain {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;
+}
+.token-chip {
+  padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700;
+}
+.token-chip.context { background: rgba(255,255,255,0.08); color: #9ca3af; }
+.token-chip.retrieved { background: rgba(22,163,106,0.2); color: #6ee7b7; border: 1px solid rgba(22,163,106,0.35); }
+.token-chip.question { background: rgba(0,102,255,0.2); color: #93c5fd; border: 1px solid rgba(0,102,255,0.35); }
+.token-chip.output { background: rgba(22,163,106,0.15); color: #6ee7b7; }
+.token-chip.output-bad { background: rgba(229,62,62,0.2); color: #fca5a5; border: 1px solid rgba(229,62,62,0.35); }
+.token-arrow { color: #4b5563; font-size: 14px; font-weight: 700; padding: 0 2px; align-self: center; }
+.why-insight {
+  font-size: 13px; color: #9ca3af; line-height: 1.7;
+  border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; margin-top: 4px;
+}
+.why-insight b { color: #e5e7eb; }
+.why-insight .key { color: #86efac; font-weight: 700; }
+
+/* "왜 효과적인가" 및 흐름도 뷰의 반응형 행 */
+.why-flex-row { display: flex; gap: 16px; }
+.why-limit-row { display: flex; gap: 20px; }
+.rag-flow-row { display: flex; flex-direction: row; gap: 14px; }
+.rag-flow-left { width: 46%; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.rag-flow-right { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+@media (max-width: 900px) {
+  .main-area { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .compare-area { flex-direction: column; }
+  .why-flex-row { flex-direction: column; }
+  .why-flex-row > div[style*="width:1px"] { display: none; }
+  .why-limit-row { flex-direction: column; }
+  .why-limit-row > div[style*="width:1px"] { display: none; }
+  .rag-flow-row { flex-direction: column; }
+  .rag-flow-left { width: 100%; }
+  .tab-btn { padding: 11px 14px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="RAG(Retrieval-Augmented Generation)는 LLM 환각 문제를 해결하는 가장 널리 쓰이는 엔지니어링 솔루션입니다. 벡터 검색, 컨텍스트 주입, 근거 기반 생성 등 RAG 동작 원리를 심층적으로 설명합니다.">
+<meta name="keywords" content="RAG,검색 증강 생성,벡터 데이터베이스,LLM 지식베이스,Embedding,환각 완화">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-mitigation-rag.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-mitigation-rag.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-mitigation-rag.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-mitigation-rag.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-mitigation-rag.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 트레이닝">
+<meta property="og:title" content="RAG: 검색 증강 생성 — LLM에 외부 지식베이스 연결하기">
+<meta property="og:description" content="RAG(Retrieval-Augmented Generation)는 LLM 환각 문제를 해결하는 가장 널리 쓰이는 엔지니어링 솔루션입니다. 벡터 검색, 컨텍스트 주입, 근거 기반 생성 등 RAG 동작 원리를 심층적으로 설명합니다.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-mitigation-rag.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="RAG: 검색 증강 생성 — LLM에 외부 지식베이스 연결하기">
+<meta name="twitter:description" content="RAG(Retrieval-Augmented Generation)는 LLM 환각 문제를 해결하는 가장 널리 쓰이는 엔지니어링 솔루션입니다. 벡터 검색, 컨텍스트 주입, 근거 기반 생성 등 RAG 동작 원리를 심층적으로 설명합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"대응 2: RAG 검색 증강 생성","name":"대응 2: RAG 검색 증강 생성","url":"https://xueai.app/slides/1-2-mitigation-rag.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강의 · 환각과 네 가지 대응법","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"RAG(Retrieval-Augmented Generation)는 LLM 환각 문제를 해결하는 가장 널리 쓰이는 엔지니어링 솔루션입니다. 벡터 검색, 컨텍스트 주입, 근거 기반 생성 등 RAG 동작 원리를 심층적으로 설명합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">환각과 대응법</div>
+    <h1>RAG: 모델에게 「오픈북 시험」을 허용하다</h1>
+    <p class="subtitle">PM 관점: RAG가 반드시 필요한 시나리오는? 검색 파이프라인 설계 방법은? 실제 도입 시 함정은 어디에 있나요?</p>
+    <div class="badge">전략 02 / 04 · 예방</div>
+  </header>
+
+  <div class="main-area paywall-locked xa-peek">
+    <div class="left-panel">
+      <div>
+        <div class="section-label">비즈니스 시나리오 선택</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="scene-card active" onclick="selectScene(0)">
+            <div class="scene-tag">시나리오 A · 법률 / 컴플라이언스</div>
+            <div class="scene-name">계약 검토 / 법규 조회 어시스턴트</div>
+            <div class="scene-desc">법규는 자주 개정되지만 모델의 학습 데이터에는 컷오프 시점이 있어, 폐지된 구 조문을 인용하기 쉽습니다.</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(1)">
+            <div class="scene-tag">시나리오 B · 의료 헬스케어</div>
+            <div class="scene-name">약품 정보 / 복약 안내 어시스턴트</div>
+            <div class="scene-desc">투약 방안은 개인마다 다르며, 모델의 일반 지식은 환자의 특수 상황이나 병원 지침을 반영할 수 없습니다.</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(2)">
+            <div class="scene-tag">시나리오 C · 제품 문서</div>
+            <div class="scene-name">SaaS 제품 기술 지원 챗봇</div>
+            <div class="scene-desc">제품은 빠르게 업데이트되고 버전 번호·기능 경로도 자주 바뀌지만, 모델은 학습 시점의 구버전만 기억합니다.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="decision-box">
+        <div class="decision-title">PM 의사결정 프레임워크: RAG가 반드시 필요한 경우</div>
+        <div class="decision-row">
+          <div class="decision-icon">✅</div>
+          <div class="decision-text"><b>지식의 시효성이 중요한 경우</b>: 정책·제품·가격이 자주 바뀌어 모델 학습 데이터가 따라잡을 수 없을 때</div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-icon">✅</div>
+          <div class="decision-text"><b>사내 전용 지식베이스</b>: 회사 내부 문서, 제품 매뉴얼 등 모델이 전혀 학습하지 못한 자료</div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-icon">✅</div>
+          <div class="decision-text"><b>오답 비용이 높은 경우</b>: 법률·의료·금융 시나리오에서 한 문장이 틀리면 사고로 이어질 수 있을 때</div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-icon">⚠️</div>
+          <div class="decision-text"><b>잡담·창작 시나리오에는 불필요</b>: RAG를 적용하면 오히려 답변이 딱딱해질 수 있습니다</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="right-top">
+        <h3 id="rightTitle">대화 비교</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="replay-btn" id="replayBtn" onclick="playAnimation()" style="display:none;">↺ 다시 보기</button>
+          <div class="tab-group">
+            <button class="tab-btn active" onclick="setTab('compare')">비교 뷰</button>
+            <button class="tab-btn" onclick="setTab('flow')">RAG 흐름도</button>
+            <button class="tab-btn" onclick="setTab('why')">왜 효과적인가</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compare view -->
+      <div class="compare-area" id="viewCompare">
+        <div class="compare-col">
+          <div class="col-label"><span class="dot red"></span><span>RAG 없음 (클로즈드북)</span></div>
+          <div class="convo-box" id="boxBad"></div>
+          <div class="verdict bad" id="verdictBad"></div>
+        </div>
+        <div class="compare-col">
+          <div class="col-label"><span class="dot green"></span><span>RAG 있음 (오픈북)</span></div>
+          <div class="convo-box" id="boxGood"></div>
+          <div class="verdict good" id="verdictGood"></div>
+        </div>
+      </div>
+
+      <!-- Flow view: 왼쪽 = 단계 목록, 오른쪽 = 상세 -->
+      <div class="flow-view" id="viewFlow" style="display:none;">
+        <div id="ragSceneLabel" style="font-size:12px;font-weight:700;color:var(--text-sub);background:rgba(0,102,255,0.05);border:1px solid rgba(0,102,255,0.14);border-radius:8px;padding:8px 14px;line-height:1.6;"></div>
+        <div class="rag-flow-row">
+
+          <!-- 왼쪽: 단계 목록 + 제어 버튼 -->
+          <div class="rag-flow-left">
+            <div id="ragStepper" style="background:var(--card);border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,0.07);"></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button id="ragNextBtn" onclick="ragNext()" style="background:var(--accent);color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">다음 →</button>
+              <button onclick="ragReset()" style="background:var(--card);color:var(--text-sub);border:1px solid rgba(0,0,0,0.1);padding:10px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">초기화</button>
+              <span id="ragProgress" style="font-size:13px;color:var(--text-sub);">0 / 7 단계</span>
+            </div>
+          </div>
+
+          <!-- 오른쪽: 단계 상세 -->
+          <div class="rag-flow-right">
+            <div style="font-size:13px;font-weight:700;color:var(--text-sub);" id="ragVisTitle">1단계: 「다음」을 클릭해 시작하세요</div>
+            <div id="ragVisArea" style="background:var(--card);border:1px solid rgba(0,0,0,0.07);border-radius:12px;padding:16px 20px;font-size:14px;line-height:1.85;">
+              <span style="color:var(--text-sub);">왼쪽 「다음」을 클릭하면 각 단계의 상세 내용을 확인할 수 있습니다 →</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Why it works view -->
+      <div id="viewWhy" style="display:none;background:var(--card);border-radius:14px;padding:28px 32px;flex-direction:column;gap:22px;border:1px solid rgba(0,0,0,0.06);">
+        <div class="why-flex-row">
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">RAG 없음: 클로즈드북 시험</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">질문</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px solid rgba(229,62,62,0.2);">× 학습 기억으로 추론</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">컨텍스트에 질문만 있어서 모델은 학습 데이터의 기억에 의존해 Token을 예측할 수밖에 없습니다</div>
+          </div>
+          <div style="width:1px;background:rgba(0,0,0,0.06);flex-shrink:0;"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">RAG 있음: 오픈북 시험</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">실제 문서 청크</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">+</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">질문</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">✓ 정확한 답변</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">검색된 문서가 컨텍스트의 일부가 되어 이후 각 Token의 확률 분포에 직접 영향을 줍니다</div>
+          </div>
+        </div>
+        <div style="background:rgba(22,163,106,0.05);border:1px solid rgba(22,163,106,0.15);border-radius:12px;padding:20px 24px;">
+          <div style="font-size:16px;color:var(--text-main);line-height:1.9;">
+            모델의 본질은 <b>Token이 Token을 예측하는 것</b>으로, 다음에 무엇이 오느냐는 전적으로 앞에 무엇이 있느냐에 달려 있습니다.
+            RAG는 <span style="color:var(--success);font-weight:700;">「검색된 실제 문서를 고품질 컨텍스트로 주입」</span>하는 방식입니다:
+            같은 모델이라도 컨텍스트가 바뀌면 이후 Token의 확률 분포도 바뀝니다.
+            <b>모델이 더 똑똑해진 게 아닙니다 — 단지 더 좋은 출발점을 얻은 것입니다.</b>
+          </div>
+        </div>
+        <div style="background:rgba(229,62,62,0.04);border:1px solid rgba(229,62,62,0.15);border-radius:12px;padding:16px 22px;">
+          <div style="font-size:13px;font-weight:800;color:var(--danger);margin-bottom:10px;letter-spacing:0.3px;">⚠ 한계점: RAG는 만능 해결책이 아닙니다</div>
+          <div class="why-limit-row">
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">검색 자체가 실패할 수 있습니다</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                검색된 청크가 부정확할 경우 모델은 잘못된 문서를 근거로 삼아, <span style="color:var(--danger);font-weight:600;">환각이 줄기는커녕 권위 있는 출처라는 외양까지 갖추게 됩니다</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">모델은 문서 밖 내용도 채워 넣습니다</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                검색된 컨텍스트 창은 제한적이라, 범위를 벗어난 부분은 여전히 학습 기억으로 채워집니다. <span style="color:var(--danger);font-weight:600;">RAG + 환각 혼합 출력은 순수 환각보다 사용자가 식별하기 더 어렵습니다</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">PM 대응 전략</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                RAG 품질의 상한 = 지식베이스 품질. <span style="color:var(--accent);font-weight:600;">검색 적중률 평가</span>를 구축하고, <span style="color:var(--amber);font-weight:600;">출처 강제 표시</span>로 사용자가 검증할 수 있게 해야 합니다
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script>
+const SCENES = [
+  {
+    bad: [
+      { type: 'user', text: '근로계약법에서 수습 기간은 최대 몇 개월까지 설정할 수 있나요?' },
+      { type: 'ai', bad: true, htmlParts: [
+        { text: '근로계약법 규정에 따르면 수습 기간은 최대 ' },
+        { text: '6개월', cls: 'hl-red' },
+        { text: '까지 가능하며, 3년 미만 계약은 1~3개월 수습을 약정할 수 있고, ' },
+        { text: '무기계약은 최대 12개월', cls: 'hl-red' },
+        { text: '까지 설정 가능합니다…' },
+      ]},
+    ],
+    good: [
+      { type: 'retrieval', text: '검색 완료: 근로계약법 제19조 (2024년판) · 유사도 0.94' },
+      { type: 'user', text: '근로계약법에서 수습 기간은 최대 몇 개월까지 설정할 수 있나요?' },
+      { type: 'ai', bad: false, htmlParts: [
+        { text: '검색 결과에 따르면:\n• 계약기간 3개월~1년 → 수습 기간' },
+        { text: '1개월 이내', cls: 'hl-green' },
+        { text: '\n• 계약기간 1년~3년 → 수습 기간' },
+        { text: '2개월 이내', cls: 'hl-green' },
+        { text: '\n• 3년 이상 또는 무기계약 → 수습 기간' },
+        { text: '6개월 이내', cls: 'hl-green' },
+        { text: ' ', tag: 'source-tag', tagText: '출처: 근로계약법 제19조' },
+      ]},
+    ],
+    verdictBad: '✗ 모델이 「무기계약 12개월」을 날조했습니다. 실제 법적 상한은 6개월이며, 잘못된 답변은 HR 담당자가 불법 운용을 하도록 오도할 수 있습니다.',
+    verdictGood: '✓ 법 조항을 정확히 인용하고, 시나리오별 상한을 제시하며 출처를 표기해 검증 가능합니다.',
+  },
+  {
+    bad: [
+      { type: 'user', text: '고혈압이 있는데 이부프로펜을 진통제로 복용해도 될까요?' },
+      { type: 'ai', bad: true, htmlParts: [
+        { text: '고혈압 환자도 ' },
+        { text: '이부프로펜을 단기 복용할 수 있습니다', cls: 'hl-red' },
+        { text: '. 1회 200~400mg, 하루 3회 이내 복용을 권장하며, 식후에 드시면 됩니다. 일반적으로 ' },
+        { text: '혈압 조절에 영향을 주지 않습니다', cls: 'hl-red' },
+        { text: '…' },
+      ]},
+    ],
+    good: [
+      { type: 'retrieval', text: '검색 완료: 이부프로펜 설명서·금기사항 + 고혈압 환자 복약 가이드 · 유사도 0.91' },
+      { type: 'user', text: '고혈압이 있는데 이부프로펜을 진통제로 복용해도 될까요?' },
+      { type: 'ai', bad: false, htmlParts: [
+        { text: '복약 가이드에 따르면: 이부프로펜은 NSAIDs 계열 약물로, ' },
+        { text: '고혈압 환자는 주의하여 복용해야 합니다', cls: 'hl-green' },
+        { text: '. 혈압을 높이거나 강압제 효과에 영향을 줄 수 있습니다.', tag: 'source-tag', tagText: '복약 가이드' },
+        { text: '\n\n권고사항: ' },
+        { text: '반드시 의사 또는 약사의 지도 하에 복용하십시오', cls: 'hl-green' },
+        { text: '. 저는 전문 의료 조언을 대체할 수 없습니다.' },
+      ]},
+    ],
+    verdictBad: '✗ 모델이 위험한 잘못된 조언을 제공했습니다. NSAIDs는 고혈압 환자에게 금기이며 상태를 악화시키거나 사고를 초래할 수 있습니다.',
+    verdictGood: '✓ 실제 가이드를 검색해 정확한 경고를 제시하고, 전문 의료 채널로 명확히 안내합니다.',
+  },
+  {
+    bad: [
+      { type: 'user', text: '제품에서 다단계 인증(MFA)은 어떻게 설정하나요?' },
+      { type: 'ai', bad: true, htmlParts: [
+        { text: 'MFA 설정은 「설정」→「' },
+        { text: '계정 보안', cls: 'hl-red' },
+        { text: '」→「' },
+        { text: '2단계 인증', cls: 'hl-red' },
+        { text: '」으로 이동해 「활성화」를 클릭한 후 QR 코드를 스캔하세요…' },
+      ]},
+    ],
+    good: [
+      { type: 'retrieval', text: '검색 완료: 제품 문서 v3.2 「보안 구성」 섹션 · 유사도 0.96' },
+      { type: 'user', text: '제품에서 다단계 인증(MFA)은 어떻게 설정하나요?' },
+      { type: 'ai', bad: false, htmlParts: [
+        { text: '최신 문서(v3.2) 기준:\n「워크스페이스」→「조직 관리」→「' },
+        { text: '보안 정책', cls: 'hl-green' },
+        { text: '」→「MFA 설정」으로 이동 후 인증 방식을 선택하고 저장하세요.', tag: 'source-tag', tagText: '문서 v3.2 §4.3' },
+        { text: '\n\n이전 버전을 사용 중이라면 경로가 다를 수 있으니 버전 번호를 알려주세요.' },
+      ]},
+    ],
+    verdictBad: '✗ 모델이 기억하는 것은 구버전 경로(v3.0에서 개편됨)입니다. 사용자가 안내를 따라도 입구를 찾을 수 없어 대량의 고객 불만이 발생합니다.',
+    verdictGood: '✓ 최신 문서 버전을 검색해 정확한 경로를 제시하고, 버전 차이를 선제적으로 안내합니다.',
+  }
+];
+
+let currentScene = 0;
+let currentTab = 'compare';
+let animTimers = [];
+
+function clearTimers() {
+  animTimers.forEach(t => clearTimeout(t));
+  animTimers = [];
+}
+
+function delay(fn, ms) {
+  const t = setTimeout(fn, ms);
+  animTimers.push(t);
+  return t;
+}
+
+function selectScene(i) {
+  currentScene = i;
+  document.querySelectorAll('.scene-card').forEach((c, j) => c.classList.toggle('active', j === i));
+  if (currentTab === 'compare') playAnimation();
+  else if (currentTab === 'flow') ragReset();  // 플로우의 문서와 질문은 시나리오를 따라가므로, 바꾸면 처음부터 다시
+}
+
+function setTab(t) {
+  currentTab = t;
+  const tabs = ['compare', 'flow', 'why'];
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === t));
+  document.getElementById('viewCompare').style.display = t === 'compare' ? 'flex' : 'none';
+  document.getElementById('viewFlow').style.display = t === 'flow' ? 'flex' : 'none';
+  const whyEl = document.getElementById('viewWhy');
+  whyEl.style.display = t === 'why' ? 'flex' : 'none';
+  document.getElementById('replayBtn').style.display = t === 'compare' ? 'inline-block' : 'none';
+  if (t === 'compare') playAnimation();
+  // 다른 탭에서 시나리오를 바꿨다면 플로우 내용이 낡았으므로 다시 실행
+  if (t === 'flow' && ragScene !== currentScene) ragReset();
+}
+
+// htmlParts를 일반 텍스트 토큰(마크업 포함)으로 평탄화
+function flattenParts(parts) {
+  const tokens = [];
+  parts.forEach(p => {
+    if (p.tag === 'source-tag') {
+      tokens.push({ html: `<span class="source-tag">${p.tagText}</span>` });
+    } else if (p.cls) {
+      // 색상 있는 단어 — 전체 세그먼트를 하나의 token으로 처리
+      tokens.push({ html: `<span class="${p.cls}">${p.text}</span>`, isSpecial: true });
+    } else {
+      // 일반 텍스트 — 문자 단위로 분할
+      const chars = [...p.text];
+      chars.forEach(c => tokens.push({ html: c === '\n' ? '<br>' : c }));
+    }
+  });
+  return tokens;
+}
+
+// Token을 하나씩 타이핑
+function typeTokens(el, tokens, charDelay, onDone) {
+  el.innerHTML = '';
+  const cursor = document.createElement('span');
+  cursor.className = 'bubble-typing';
+  el.appendChild(cursor);
+
+  let i = 0;
+  function step() {
+    if (i >= tokens.length) {
+      el.removeChild(cursor);
+      if (onDone) onDone();
+      return;
+    }
+    const tok = tokens[i++];
+    const span = document.createElement('span');
+    span.innerHTML = tok.html;
+    el.insertBefore(span, cursor);
+    el.parentElement.scrollTop = el.parentElement.scrollHeight;
+    delay(step, tok.isSpecial ? charDelay * 3 : charDelay);
+  }
+  step();
+}
+
+function playAnimation() {
+  clearTimers();
+  const s = SCENES[currentScene];
+
+  // 초기화
+  const boxBad = document.getElementById('boxBad');
+  const boxGood = document.getElementById('boxGood');
+  boxBad.innerHTML = '';
+  boxGood.innerHTML = '';
+  const vBad = document.getElementById('verdictBad');
+  const vGood = document.getElementById('verdictGood');
+  vBad.textContent = '';
+  vGood.textContent = '';
+  vBad.classList.remove('show');
+  vGood.classList.remove('show');
+
+  // === 왼쪽: RAG 없음 ===
+  // 사용자 메시지
+  const uBad = document.createElement('div');
+  uBad.className = 'bubble-user';
+  uBad.textContent = s.bad[0].text;
+  boxBad.appendChild(uBad);
+  delay(() => uBad.classList.add('show'), 100);
+
+  // AI 말풍선
+  const aiBad = document.createElement('div');
+  aiBad.className = 'bubble-ai show';
+  boxBad.appendChild(aiBad);
+  const badTokens = flattenParts(s.bad[1].htmlParts);
+
+  delay(() => typeTokens(aiBad, badTokens, 28, () => {
+    vBad.textContent = s.verdictBad;
+    delay(() => vBad.classList.add('show'), 100);
+  }), 700);
+
+  // === 오른쪽: RAG 있음 ===
+  const goodMsgs = s.good;
+  // 검색 메시지가 먼저 나타남
+  const retEl = document.createElement('div');
+  retEl.className = 'bubble-retrieval';
+  retEl.textContent = '🔍 ' + goodMsgs[0].text;
+  boxGood.appendChild(retEl);
+  delay(() => retEl.classList.add('show'), 400);
+
+  // 사용자 메시지
+  const uGood = document.createElement('div');
+  uGood.className = 'bubble-user';
+  uGood.textContent = goodMsgs[1].text;
+  boxGood.appendChild(uGood);
+  delay(() => uGood.classList.add('show'), 900);
+
+  // AI 말풍선 (왼쪽 타이핑 시작 후 약간 지연)
+  const aiGood = document.createElement('div');
+  aiGood.className = 'bubble-ai show';
+  boxGood.appendChild(aiGood);
+  const goodTokens = flattenParts(goodMsgs[2].htmlParts);
+
+  delay(() => typeTokens(aiGood, goodTokens, 22, () => {
+    vGood.textContent = s.verdictGood;
+    delay(() => vGood.classList.add('show'), 100);
+  }), 1200);
+}
+
+// ── RAG 7단계 인터랙티브 애니메이션 (지식베이스 구축 단계 포함) ──
+/* 플로우 7단계가 사용하는 지식베이스 소재, 시나리오마다 한 벌씩.
+   세 시나리오 모두 같은 파이프라인을 따르고 문서·질문·검색 결과만 다르므로,
+   RAG_STEPS에는 템플릿만 두고 내용은 여기서 가져옵니다.
+   인덱스는 SCENES / .scene-card와 일대일로 대응합니다. */
+const SCENE_KB = [
+  { // A · 법률 / 컴플라이언스
+    label: '시나리오 A · 계약 검토 / 법규 조회 어시스턴트',
+    docName: '『노동계약법』 전문 및 사법해석 (2024년판)',
+    docPages: 186,
+    chunkTotal: 4210,
+    rawText: '제2장 노동계약의 체결<br>§19 수습기간 상한…§19 3개월 이상 1년 미만…§19 1년 이상 3년 미만…§19 3년 이상 및 기간의 정함이 없는 경우…§19 동일 사용자와 동일 근로자는 수습기간을 한 번만 정할 수 있음…',
+    chunks: [
+      { tok: 180, text: '§19 3개월 이상 1년 미만인 경우 수습기간은 1개월을 초과할 수 없음…' },
+      { tok: 150, text: '§19 1년 이상 3년 미만인 경우 수습기간은 2개월을 초과할 수 없음…' },
+      { tok: 200, text: '§19 3년 이상 또는 기간의 정함이 없는 경우 6개월을 초과할 수 없음…' },
+    ],
+    question: '노동계약법에서 수습기간은 최대 몇 개월까지 정할 수 있나요?',
+    hits: [
+      { score: '0.94', src: '노동계약법 §19', quote: '"3년 이상 또는 기간의 정함이 없는 경우 수습기간은 6개월을 초과할 수 없다…"' },
+      { score: '0.82', src: '사법해석(3) 제4조', quote: '"위법하게 정한 수습기간이 이미 이행된 경우 사용자는 배상금을 지급해야 한다…"' },
+      { score: '0.75', src: 'HR 컴플라이언스 핸드북 p.32', quote: '"동일 사용자와 동일 근로자는 수습기간을 한 번만 정할 수 있다…"' },
+    ],
+    semanticNote: '"신입을 얼마나 검증할 수 있나"와 "수습기간 상한"의 벡터도 매우 가깝게 위치합니다.',
+    sysRole: '당신은 기업 법무 어시스턴트입니다',
+    answerLines: [
+      '계약기간 3개월~1년 → 수습기간 <b>1개월 이내</b>',
+      '계약기간 1년~3년 → 수습기간 <b>2개월 이내</b>',
+      '3년 이상 또는 기간의 정함이 없는 경우 → 수습기간 <b>6개월 이내</b>',
+      '동일 사용자·동일 근로자는 수습기간을 <b>한 번만</b> 정할 수 있음',
+    ],
+    finalAnswer: '수습기간 상한은 계약기간에 따라 세 단계입니다. 3개월~1년은 <b>1개월 이내</b>, 1~3년은 <b>2개월 이내</b>, 3년 이상 또는 기간의 정함이 없는 경우는 <b>6개월 이내</b>입니다. 동일 사용자와 동일 근로자는 수습기간을 한 번만 정할 수 있습니다.',
+  },
+  { // B · 의료 / 건강
+    label: '시나리오 B · 의약품 설명 / 복약 안내 어시스턴트',
+    docName: '이부프로펜 설명서 + 『고혈압 환자 복약 지침』',
+    docPages: 64,
+    chunkTotal: 1930,
+    rawText: '이부프로펜 설명서 · 금기 및 주의사항<br>[금기] 본 제품에 과민한 환자는 사용 금지…[주의사항] NSAIDs는 수분·나트륨 저류를 일으켜 혈압을 높일 수 있음…[상호작용] ACEI/ARB 계열 강압제의 효과를 약화시킬 수 있음…',
+    chunks: [
+      { tok: 180, text: '[주의사항] NSAIDs는 수분·나트륨 저류를 일으켜 혈압을 높일 수 있음…' },
+      { tok: 150, text: '[상호작용] ACEI/ARB 계열 강압제의 효과를 약화시킬 수 있음…' },
+      { tok: 200, text: '『고혈압 환자 복약 지침』 §5.2 NSAIDs는 신중히 사용하고 의사 지도 하에…' },
+    ],
+    question: '고혈압이 있는데 진통 목적으로 이부프로펜을 복용해도 되나요?',
+    hits: [
+      { score: '0.91', src: '이부프로펜 설명서 · 주의사항', quote: '"NSAIDs는 수분·나트륨 저류를 일으켜 혈압을 높일 수 있다…"' },
+      { score: '0.84', src: '고혈압 복약 지침 §5.2', quote: '"고혈압 환자는 NSAIDs를 신중히 사용하고 의사 지도 하에 복용해야 한다…"' },
+      { score: '0.72', src: '약물 상호작용표 p.9', quote: '"ACEI/ARB 계열 강압제의 효과를 약화시킬 수 있다…"' },
+    ],
+    semanticNote: '"진통제가 혈압에 영향을 주나요"와 "NSAIDs 금기"의 벡터도 매우 가깝게 위치합니다.',
+    sysRole: '당신은 복약 상담 어시스턴트입니다',
+    answerLines: [
+      '이부프로펜은 NSAIDs로, 수분 저류와 <b>혈압 상승</b>을 유발할 수 있음',
+      '<b>ACEI/ARB 계열 강압제</b>의 효과를 약화시킬 수 있음',
+      '고혈압 환자는 <b>신중히 사용</b>해야 하며 자가 복용은 권장되지 않음',
+      '<b>의사 또는 약사의 지도</b> 하에 복용하세요',
+    ],
+    finalAnswer: '이부프로펜은 NSAIDs로 <b>혈압을 높이고</b> 강압제 효과를 약화시킬 수 있어 고혈압 환자는 <b>신중히 사용</b>해야 합니다. 의사 또는 약사의 지도 하에 복용하시기 바라며, 저는 전문 의료 조언을 대신할 수 없습니다.',
+  },
+  { // C · SaaS 제품 문서
+    label: '시나리오 C · SaaS 제품 기술지원 봇',
+    docName: '제품 도움말 문서 v3.2 (보안 설정 장)',
+    docPages: 42,
+    chunkTotal: 2847,
+    rawText: '제4장 보안 설정<br>§4.1 로그인 정책…§4.2 싱글 사인온 SSO…§4.3 다중 인증 MFA…§4.4 버전 변경 안내…',
+    chunks: [
+      { tok: 180, text: '§4.3 MFA 경로: 워크스페이스 → 조직 관리 → 보안 정책 → MFA 설정…' },
+      { tok: 150, text: '§4.3 지원 인증 방식: SMS 인증번호, TOTP 일회용 비밀번호, 하드웨어 키…' },
+      { tok: 200, text: '§4.4 v3.0부터 「계정 보안」이 「보안 정책」에 통합되어 이전 경로는 사용 불가…' },
+    ],
+    question: '이 제품에서 다중 인증(MFA)은 어떻게 설정하나요?',
+    hits: [
+      { score: '0.96', src: '제품 문서 v3.2 §4.3', quote: '"워크스페이스 → 조직 관리 → 보안 정책 → MFA 설정…"' },
+      { score: '0.85', src: '버전 변경 로그 v3.0', quote: '"「계정 보안」이 「보안 정책」에 통합되고 이전 경로는 폐기됨…"' },
+      { score: '0.74', src: '관리자 매뉴얼 p.18', quote: '"조직 관리자만 MFA 정책을 수정할 수 있다…"' },
+    ],
+    semanticNote: '"2단계 인증은 어떻게 켜나요"와 "MFA 설정"의 벡터도 매우 가깝게 위치합니다.',
+    sysRole: '당신은 제품 기술지원 어시스턴트입니다',
+    answerLines: [
+      '「워크스페이스」→「조직 관리」→「<b>보안 정책</b>」→「MFA 설정」으로 이동',
+      '<b>SMS 인증번호, TOTP 일회용 비밀번호, 하드웨어 키</b> 지원',
+      '<b>조직 관리자</b>만 MFA 정책을 수정할 수 있음',
+      'v3.0부터 이전 「계정 보안」 경로는 <b>사용 불가</b>',
+    ],
+    finalAnswer: 'v3.2에서는 「워크스페이스」→「조직 관리」→「<b>보안 정책</b>」→「MFA 설정」으로 이동해 인증 방식을 선택한 뒤 저장하세요. v3.0부터 「계정 보안」이 「보안 정책」에 통합되어 이전 경로는 더 이상 사용할 수 없습니다.',
+  },
+];
+
+const RAG_STEPS = [
+  {
+    num:'1', icon:'📄', title:'원본 문서 청킹(Chunking)',
+    desc:'긴 문서를 단락/제목 경계 기준으로 약 512~800 Token 크기의 작은 청크로 분할합니다',
+    phase: 'build',
+    vis: kb =>`<b>지식베이스 구축 단계 (일회성, 오프라인 완료)</b><br><br>
+<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+  <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px;">원본 문서: ${kb.docName} (총 ${kb.docPages}페이지)</div>
+  <div style="display:flex;align-items:flex-start;gap:10px;">
+    <div style="flex:1;background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.7;">
+      <div style="font-size:10px;font-weight:800;color:var(--text-sub);margin-bottom:4px;">원문 (전체 단락)</div>
+      ${kb.rawText}
+    </div>
+    <div style="display:flex;align-items:center;font-size:20px;color:var(--text-sub);">✂</div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+      ${kb.chunks.map((c, i) => `<div style="background:rgba(0,102,255,0.06);border:1px solid rgba(0,102,255,0.15);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.6;"><b style="color:var(--accent);font-size:10px;">청크 #${i+1} · 약 ${c.tok} Token</b><br>${c.text}</div>`).join('')}
+    </div>
+  </div>
+</div>
+<div style="margin-top:10px;font-size:12px;color:var(--amber);background:rgba(217,119,6,0.05);border:1px solid rgba(217,119,6,0.15);border-radius:8px;padding:8px 12px;">
+  ⚠ <b>PM 주의사항</b>: 청크 크기는 검색 품질에 영향을 줍니다. 너무 크면 불필요한 Token 낭비, 너무 작으면 컨텍스트 손실. 최적 범위: 약 512~800 Token/청크.
+</div>`
+  },
+  {
+    num:'2', icon:'🔢', title:'Embedding 및 인덱싱',
+    desc:'각 문서 청크를 Embedding 모델로 벡터로 변환하여 벡터 데이터베이스에 저장합니다',
+    phase: 'build',
+    vis: kb =>`<b>지식베이스 구축 단계 (일회성, 오프라인 완료)</b><br><br>
+<div style="display:flex;gap:10px;align-items:flex-start;margin-top:8px;">
+  <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+    <div style="font-size:11px;font-weight:800;color:var(--text-sub);margin-bottom:2px;">문서 청크 (텍스트)</div>
+    ${kb.chunks.map(c => `<div style="background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.6;">${c.text}</div>`).join('')}
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0 8px;">
+    <div style="font-size:11px;font-weight:700;color:var(--accent);text-align:center;">Embedding<br>모델</div>
+    <div style="font-size:20px;">→</div>
+  </div>
+  <div style="flex:1;">
+    <div style="font-size:11px;font-weight:800;color:var(--text-sub);margin-bottom:6px;">벡터 데이터베이스 (행당 1536차원)</div>
+    <div style="background:#1c1c1e;border-radius:8px;padding:10px 12px;font-family:monospace;font-size:10px;color:#6ee7b7;line-height:1.8;">
+      id:1 [0.231, -0.847, 0.562, 0.093, ...]<br>
+      id:2 [0.102,  0.445, -0.231, 0.671, ...]<br>
+      id:3 [-0.583, 0.312,  0.789, -0.044, ...]<br>
+      <span style="color:#4b5563;">… 총 ${kb.chunkTotal}개 청크</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-sub);margin-top:8px;line-height:1.6;">의미적으로 유사한 텍스트 → 고차원 공간에서 더 가까이 위치<br>쿼리 시 <b style="color:var(--text-main)">코사인 유사도</b>로 최근접 이웃 검색</div>
+  </div>
+</div>`
+  },
+  {
+    num:'3', icon:'❓', title:'사용자 질문 → 임베딩',
+    desc:'사용자가 질문을 입력하면 시스템이 동일한 Embedding 모델로 벡터로 변환합니다',
+    phase: 'query',
+    vis: kb =>`<b>쿼리 단계 (매 대화마다 실시간 실행)</b><br><br>
+<div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
+  <div style="flex:1;background:rgba(0,102,255,0.06);border:1px solid rgba(0,102,255,0.15);border-radius:10px;padding:12px 14px;">
+    <div style="font-size:11px;font-weight:800;color:var(--accent);margin-bottom:6px;">사용자 질문 (자연어)</div>
+    <div style="font-size:15px;font-weight:600;color:var(--text-main);">"${kb.question}"</div>
+  </div>
+  <div style="font-size:22px;color:var(--text-sub);">→</div>
+  <div style="flex:1;background:#1c1c1e;border-radius:10px;padding:12px 14px;">
+    <div style="font-size:11px;font-weight:800;color:#6b7280;margin-bottom:6px;">질문 벡터 (Embedding)</div>
+    <div style="font-family:monospace;font-size:10px;color:#6ee7b7;line-height:1.8;">[0.218, -0.831, 0.541, 0.087,<br>-0.308, 0.771, 0.124, -0.452, ...]<br><span style="color:#4b5563;">1536차원 부동소수점</span></div>
+  </div>
+</div>
+<div style="margin-top:10px;font-size:12px;color:var(--text-sub);line-height:1.7;">
+  핵심: 질문 벡터와 문서 청크 벡터는 <b style="color:var(--text-main)">동일한 Embedding 모델</b>로 생성되어야 같은 의미 공간에서 유사도 비교가 가능합니다.
+</div>`
+  },
+  {
+    num:'4', icon:'🔍', title:'벡터 검색 (Top-K)',
+    desc:'질문 벡터와 모든 문서 청크 벡터의 코사인 유사도를 계산해 가장 관련성 높은 Top-K 청크를 반환합니다',
+    phase: 'query',
+    vis: kb =>`<b>벡터 데이터베이스에서 Top-3 가장 관련성 높은 청크 검색:</b><br>
+<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+  ${kb.hits.map((h, i) => `<div style="background:${i === 0 ? 'rgba(0,102,255,0.06)' : 'rgba(0,0,0,0.03)'};border:1px solid ${i === 0 ? 'rgba(0,102,255,0.2)' : 'rgba(0,0,0,0.07)'};border-radius:8px;padding:10px 12px;font-size:12px;display:flex;align-items:center;gap:12px;">
+    <div style="flex-shrink:0;">
+      <div style="font-size:18px;font-weight:900;color:${i === 0 ? 'var(--accent)' : 'var(--text-sub)'};">${h.score}</div>
+      <div style="font-size:9px;color:var(--text-sub);text-align:center;">유사도</div>
+    </div>
+    <div>
+      <div style="font-weight:700;color:var(--text-main);margin-bottom:2px;">${h.src}</div>
+      <div style="color:var(--text-sub);">${h.quote}</div>
+    </div>
+  </div>`).join('')}
+</div>
+<div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.6;">검색은 <b style="color:var(--text-main)">의미적 유사성</b>으로 매칭합니다. ${kb.semanticNote}</div>`
+  },
+  {
+    num:'5', icon:'📋', title:'Prompt 구성',
+    desc:'검색된 문서 청크를 Prompt에 「참고 자료」로 삽입해 컨텍스트에 주입합니다',
+    phase: 'query',
+    vis: kb =>`<b>LLM에 전송되는 Prompt:</b>
+<div style="background:#1c1c1e;border-radius:8px;padding:12px 16px;font-family:monospace;font-size:11px;color:#9ca3af;margin-top:8px;line-height:1.9;white-space:pre-wrap;"><span style="color:#f38ba8;">System:</span> ${kb.sysRole}. 아래 참고 자료에만 근거하여 답변하고, 다른 내용을 인용하지 마세요.
+
+<span style="color:#a6e3a1;">[참고 자료]
+${kb.hits.map((h, i) => `${i+1}. ${h.src}: ${h.quote.replace(/^"|"$/g, '')}`).join('\n')}</span>
+
+<span style="color:#89dceb;">User:</span> ${kb.question}
+<span style="color:#cba6f7;">Assistant:</span></div>
+<div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.6;">초록색 부분 = 검색해 주입된 문서 청크. 이들이 모델의 컨텍스트가 되어 이후 각 Token의 확률 분포에 직접 영향을 줍니다.</div>`
+  },
+  {
+    num:'6', icon:'🤖', title:'LLM 답변 생성',
+    desc:'주입된 문서를 읽은 후 모델이 근거 있는 정확한 답변을 생성합니다',
+    phase: 'query',
+    vis: kb =>`<b>AI가 생성한 답변:</b><br><br>
+검색된 자료에 따르면:<br>
+<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.8;">
+  ${kb.answerLines.map(l => `<div>· ${l}</div>`).join('')}
+</div>
+<div style="margin-top:10px;font-size:12px;color:var(--success);font-weight:600;background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.2);border-radius:8px;padding:8px 12px;">✅ 출처: ${kb.hits.map(h => h.src).join(' + ')}</div>
+<div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.6;">모델이 주입된 실제 문서를 기반으로 답변하므로 학습 파라미터에서 추측할 필요가 없어 환각이 크게 줄어듭니다.</div>`
+  },
+  {
+    num:'7', icon:'📤', title:'답변 반환 (출처 포함)',
+    desc:'답변과 인용 출처를 함께 사용자에게 반환합니다. 답변은 추적 가능하고 검증 가능합니다',
+    phase: 'query',
+    vis: kb =>`<b>사용자에게 최종 표시:</b><br><br>
+<div style="background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.2);border-radius:10px;padding:16px;font-size:14px;line-height:1.8;">
+  ${kb.finalAnswer}<br><br>
+  <div style="font-size:12px;color:var(--success);font-weight:600;">📎 출처: ${kb.hits.map(h => h.src).join(' / ')}</div>
+</div>
+<div style="margin-top:10px;display:flex;gap:10px;">
+  <div style="flex:1;background:rgba(0,102,255,0.05);border:1px solid rgba(0,102,255,0.15);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;">
+    <b style="color:var(--accent);">🔗 출처 추적 가능</b><br>사용자가 출처를 클릭해 원문을 확인할 수 있어 신뢰도가 크게 향상됩니다
+  </div>
+  <div style="flex:1;background:rgba(22,163,74,0.05);border:1px solid rgba(22,163,74,0.15);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;">
+    <b style="color:var(--success);">✅ 항상 최신 유지</b><br>지식베이스를 업데이트하면 답변이 업데이트됩니다. 모델 재학습 불필요
+  </div>
+  <div style="flex:1;background:rgba(217,119,6,0.05);border:1px solid rgba(217,119,6,0.15);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;">
+    <b style="color:var(--amber);">🔒 범위 제어 가능</b><br>제공된 문서 범위 내에서만 답변하여 문서 외 내용을 임의로 말하지 않습니다
+  </div>
+</div>`
+  },
+];
+
+let ragStep = 0;
+let ragScene = -1;   // 플로우가 현재 보여 주는 시나리오. currentScene과 다르면 내용이 낡았다는 뜻
+function ragBuildStepper() {
+  const el = document.getElementById('ragStepper');
+  el.innerHTML = '';
+
+  // 단계 구분 레이블
+  let prevPhase = null;
+  RAG_STEPS.forEach((s, i) => {
+    // 단계 구분 행 삽입
+    if (s.phase !== prevPhase) {
+      const sep = document.createElement('div');
+      const isBuild = s.phase === 'build';
+      sep.style.cssText = `padding:5px 16px 4px;font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:${isBuild ? '#8e8e93' : 'var(--accent)'};background:${isBuild ? 'rgba(0,0,0,0.03)' : 'rgba(0,102,255,0.04)'};border-bottom:1px solid rgba(0,0,0,0.05);`;
+      sep.textContent = isBuild ? '📦 구축 단계 (일회성, 오프라인)' : '⚡ 쿼리 단계 (매번 실시간 실행)';
+      el.appendChild(sep);
+      prevPhase = s.phase;
+    }
+
+    const div = document.createElement('div');
+    div.dataset.step = i;
+    div.style.cssText = 'display:flex;gap:0;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.05);align-items:flex-start;opacity:0.4;transition:all 0.3s;';
+    div.innerHTML = `<div style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;margin-right:12px;border:2px solid rgba(0,0,0,0.1);background:#f0f0f0;color:#8e8e93;transition:all 0.3s;">${s.num}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;">${s.icon} ${s.title}</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-top:3px;max-height:0;overflow:hidden;transition:max-height 0.3s;line-height:1.55;">${s.desc}</div>
+      </div>`;
+    if (i === RAG_STEPS.length - 1) div.style.borderBottom = 'none';
+    el.appendChild(div);
+  });
+}
+
+function ragGetStepDivs() {
+  return Array.from(document.getElementById('ragStepper').querySelectorAll('[data-step]'));
+}
+
+function ragNext() {
+  if (ragStep >= RAG_STEPS.length) return;
+  const steps = ragGetStepDivs();
+  if (ragStep > 0) {
+    const prev = steps[ragStep - 1];
+    prev.style.opacity = '1';
+    prev.style.background = 'rgba(22,163,74,0.04)';
+    const num = prev.querySelector('div');
+    num.style.background = '#16a34a';
+    num.style.color = 'white';
+    num.style.borderColor = '#16a34a';
+  }
+  const cur = steps[ragStep];
+  cur.style.opacity = '1';
+  const isBuild = RAG_STEPS[ragStep].phase === 'build';
+  cur.style.background = isBuild ? 'rgba(0,0,0,0.03)' : 'rgba(0,102,255,0.04)';
+  const num = cur.querySelector('div');
+  num.style.background = isBuild ? '#6b7280' : 'var(--accent)';
+  num.style.color = 'white';
+  num.style.borderColor = isBuild ? '#6b7280' : 'var(--accent)';
+  // 설명 펼치기
+  const descEl = cur.querySelector('div:last-child div:last-child');
+  if (descEl) descEl.style.maxHeight = '60px';
+
+  const phaseLabel = RAG_STEPS[ragStep].phase === 'build' ? '[구축]' : '[쿼리]';
+  document.getElementById('ragVisTitle').textContent = `${ragStep+1}단계: ${RAG_STEPS[ragStep].title}`;
+  document.getElementById('ragVisArea').innerHTML = RAG_STEPS[ragStep].vis(SCENE_KB[currentScene]);
+  ragStep++;
+  document.getElementById('ragProgress').textContent = `${ragStep} / ${RAG_STEPS.length} 단계`;
+  if (ragStep >= RAG_STEPS.length) {
+    document.getElementById('ragNextBtn').disabled = true;
+    document.getElementById('ragNextBtn').style.opacity = '0.5';
+  }
+}
+function ragReset() {
+  ragStep = 0;
+  ragScene = currentScene;
+  document.getElementById('ragNextBtn').disabled = false;
+  document.getElementById('ragNextBtn').style.opacity = '1';
+  document.getElementById('ragProgress').textContent = `0 / ${RAG_STEPS.length} 단계`;
+  document.getElementById('ragVisArea').innerHTML = '<span style="color:var(--text-sub);">왼쪽 「다음」을 클릭하면 각 단계의 상세 내용을 확인할 수 있습니다 →</span>';
+  document.getElementById('ragVisTitle').textContent = '단계 상세:';
+  document.getElementById('ragSceneLabel').textContent = `현재 예시: ${SCENE_KB[currentScene].label} (왼쪽에서 시나리오를 바꾸면 여기 문서와 질문도 함께 바뀝니다)`;
+  ragBuildStepper();
+}
+
+// 초기화
+setTab('compare');
+ragReset();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

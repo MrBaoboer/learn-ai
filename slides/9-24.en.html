@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Cost of Concurrency: Who Can Run in Parallel | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+@media(max-width:768px){.two-col{grid-template-columns:1fr}}
+.col-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.col-panel .cp-head{padding:14px 18px;font-size:15px;font-weight:800;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.col-panel.safe .cp-head{background:rgba(22,163,74,.05);color:var(--success)}
+.col-panel.danger .cp-head{background:rgba(220,38,38,.05);color:var(--danger)}
+.col-panel .cp-body{padding:14px 18px}
+.tool-tag{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;margin:3px;transition:all .2s}
+.col-panel.safe .tool-tag{background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);color:var(--success)}
+.col-panel.danger .tool-tag{background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);color:var(--danger)}
+.tool-tag .t-icon{font-size:15px}
+
+.timeline-section{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px;box-shadow:var(--shadow-card)}
+.timeline-section h4{font-size:15px;font-weight:800;color:var(--text);margin:0 0 16px;display:flex;align-items:center;gap:8px}
+.tl-row{display:flex;flex-direction:column;gap:14px}
+.tl-label{font-size:13px;font-weight:700;color:var(--sub);margin-bottom:4px}
+.tl-bar-group{display:flex;flex-direction:column;gap:4px}
+.tl-bar{display:flex;align-items:center;gap:8px}
+.tl-bar .agent-name{font-size:12px;font-weight:700;min-width:60px;color:var(--sub)}
+.tl-bar .bar-track{flex:1;height:24px;background:var(--bg);border-radius:6px;position:relative;overflow:hidden}
+.tl-bar .bar-block{position:absolute;height:100%;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;transition:all .6s}
+.tl-time{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:4px}
+.tl-total{text-align:right;font-size:14px;font-weight:800;margin-top:6px}
+.tl-total.fast{color:var(--success)}
+.tl-total.slow{color:var(--danger)}
+
+.tl-toggle{display:flex;gap:8px;margin-bottom:16px}
+.tl-btn{padding:8px 18px;border-radius:8px;font-size:14px;font-weight:700;border:1.5px solid var(--border);background:var(--card);cursor:pointer;transition:all .2s;font-family:inherit}
+.tl-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tl-btn:hover:not(.active){background:var(--bg)}
+
+.rule-box{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:16px 20px;margin-top:16px;font-size:14px;color:var(--text);line-height:1.8}
+.rule-box b{color:var(--accent)}
+.rule-item{display:flex;align-items:flex-start;gap:8px;margin-top:8px}
+.rule-item .ri-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:20px}
+.takeaway b{color:var(--accent)}
+</style>
+<meta name="description" content="Reads can be parallel, writes must queue. How to determine whether a tool operation can run concurrently.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-24.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/9-24.en.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/9-24.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/9-24.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/9-24.en.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="The Cost of Concurrency: Who Can Run in Parallel">
+<meta property="og:url" content="https://xueai.app/slides/9-24.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"The Cost of Concurrency: Who Can Run in Parallel","name":"The Cost of Concurrency: Who Can Run in Parallel","url":"https://xueai.app/slides/9-24.en.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practical Course · Multi-Agent","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"Reads can be parallel, writes must queue. How to determine whether a tool operation can run concurrently.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Multi-Agent</div>
+    <h1>The Cost of Concurrency: Who Can Run in Parallel</h1>
+    <p class="subtitle">Reads can be parallel: multiple searches running simultaneously won't conflict. Writes must queue: two Agents modifying the same file at the same time will cause data corruption. The key question for whether an operation can run concurrently: is it read-only?</p>
+  </header>
+
+  <div class="sec-label">Parallelizable vs. Must Serialize</div>
+
+  <div class="two-col">
+    <div class="col-panel safe reveal">
+      <div class="cp-head"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success,#16a34a)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:3px"><path d="M20 6L9 17l-5-5"/></svg> Parallelizable (read-only operations)</div>
+      <div class="cp-body">
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>Search the web</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>Read files</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>Query API</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>Data analysis</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>Database query</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></span>Read notes</div>
+        <p style="font-size:13px;color:var(--sub);margin-top:12px;line-height:1.6">These operations don't modify anything, so multiple simultaneous runs don't interfere. 10 Agents searching concurrently won't conflict.</p>
+      </div>
+    </div>
+    <div class="col-panel danger reveal">
+      <div class="cp-head"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger,#dc2626)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:3px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Must Serialize (write operations)</div>
+      <div class="cp-body">
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>Write to file</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>Send email</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></span>Execute command</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>Delete resource</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>Payment operation</div>
+        <div class="tool-tag"><span class="t-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>Edit notes</div>
+        <p style="font-size:13px;color:var(--sub);margin-top:12px;line-height:1.6">These operations <b style="color:var(--danger)">change external state</b>. Two Agents modifying the same file simultaneously = data overwrite, content loss.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">Timeline Comparison</div>
+
+  <div class="timeline-section reveal paywall-locked">
+    <h4><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Same task: 3 searches + 1 write</h4>
+    <div class="tl-toggle">
+      <button class="tl-btn active" id="btnParallel" onclick="showTimeline('parallel')">Parallel execution</button>
+      <button class="tl-btn" id="btnSerial" onclick="showTimeline('serial')">Serial execution</button>
+    </div>
+
+    <div id="tlParallel">
+      <div class="tl-label">3 searches in parallel, write comes last</div>
+      <div class="tl-bar-group">
+        <div class="tl-bar">
+          <span class="agent-name">Search A</span>
+          <div class="bar-track">
+            <div class="bar-block" style="left:0;width:30%;background:var(--accent)">2s</div>
+          </div>
+        </div>
+        <div class="tl-bar">
+          <span class="agent-name">Search B</span>
+          <div class="bar-track">
+            <div class="bar-block" style="left:0;width:40%;background:var(--purple)">3s</div>
+          </div>
+        </div>
+        <div class="tl-bar">
+          <span class="agent-name">Search C</span>
+          <div class="bar-track">
+            <div class="bar-block" style="left:0;width:30%;background:var(--cyan)">2s</div>
+          </div>
+        </div>
+        <div class="tl-bar">
+          <span class="agent-name">Write</span>
+          <div class="bar-track">
+            <div class="bar-block" style="left:40%;width:20%;background:var(--danger)">1s</div>
+          </div>
+        </div>
+      </div>
+      <div class="tl-time"><span>0s</span><span>2s</span><span>4s</span><span>6s</span></div>
+      <div class="tl-total fast">Total: ~4 seconds ✓</div>
+    </div>
+
+    <div id="tlSerial" style="display:none">
+      <div class="tl-label">All operations executed in sequence</div>
+      <div class="tl-bar-group">
+        <div class="tl-bar">
+          <span class="agent-name">Search A</span>
+          <div class="bar-track">
+            <div class="bar-block" style="left:0;width:22%;background:var(--accent)">2s</div>
+          </div>
+        </div>
+        <div class="tl-bar">
+          <span class="agent-name">Search B</span>
+          <div class="bar-track">
+            <div class="bar-block" style="left:22%;width:33%;background:var(--purple)">3s</div>
+          </div>
+        </div>
+        <div class="tl-bar">
+          <span class="agent-name">Search C</span>
+          <div class="bar-track">
+            <div class="bar-block" style="left:55%;width:22%;background:var(--cyan)">2s</div>
+          </div>
+        </div>
+        <div class="tl-bar">
+          <span class="agent-name">Write</span>
+          <div class="bar-track">
+            <div class="bar-block" style="left:77%;width:12%;background:var(--danger)">1s</div>
+          </div>
+        </div>
+      </div>
+      <div class="tl-time"><span>0s</span><span>2s</span><span>5s</span><span>8s</span></div>
+      <div class="tl-total slow">Total: ~8 seconds ✗</div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Decision Rule</div>
+
+  <div class="rule-box reveal paywall-locked">
+    <b>One rule to determine concurrency:</b>
+    <div class="rule-item"><span class="ri-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><span>After this operation completes, has the world changed? <b>No</b> → can be parallel</span></div>
+    <div class="rule-item"><span class="ri-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span><span>After this operation completes, has the world changed? <b>Yes</b> → must queue</span></div>
+    <div class="rule-item"><span class="ri-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span>Two write operations targeting <b>different resources</b> (different files, different DB tables) → can also be parallel</span></div>
+    <p style="margin-top:12px;font-size:13px;color:var(--sub)">Simply put: conflicts occur when multiple operations modify the same resource. As long as the targets differ, write operations can also be parallel.</p>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>Parallelism saves time, but only read-only operations are safe to parallelize; write operations must queue.</b> When designing a multi-Agent system, the first step is to classify tools into "read" and "write" categories.</span>
+  </div>
+
+</article>
+<script>
+function showTimeline(mode) {
+  document.getElementById('tlParallel').style.display = mode === 'parallel' ? 'block' : 'none';
+  document.getElementById('tlSerial').style.display = mode === 'serial' ? 'block' : 'none';
+  document.getElementById('btnParallel').classList.toggle('active', mode === 'parallel');
+  document.getElementById('btnSerial').classList.toggle('active', mode === 'serial');
+}
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

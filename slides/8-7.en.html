@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Semantic-Layer Optimization: Don't Treat the Context Window as a Trash Can | xueai.app</title>
+<link rel="stylesheet" href="lesson.css">
+<style>
+@keyframes _si{to{opacity:1}}
+body{opacity:0;animation:_si .15s ease .08s forwards}
+
+:root{
+  --red:var(--danger);
+  --green:var(--success);
+  --orange:var(--amber);
+  --purple:#5b4fcf;
+  --surface:var(--card);
+  --surface2:#f0ede6;
+  --muted:var(--sub);
+}
+
+.lesson-header h1 em{font-style:normal;color:var(--purple)}
+
+.problem-box{background:rgba(91,79,207,.06);border:1px solid rgba(91,79,207,.2);border-radius:10px;padding:14px 16px}
+.problem-box .pb-title{font-size:15px;font-weight:800;color:var(--purple);margin-bottom:6px}
+.problem-row{display:flex;align-items:flex-start;gap:8px;font-size:15px;color:var(--sub);line-height:1.6;margin-bottom:4px}
+.problem-row b{color:var(--text)}
+
+.strat-list{display:flex;flex-direction:column;gap:8px}
+.strat-btn{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;background:var(--surface);border:1.5px solid var(--border);cursor:pointer;font-family:inherit;text-align:left;transition:all .18s;width:100%}
+.strat-btn:hover{border-color:rgba(91,79,207,.3)}
+.strat-btn.active{border-color:var(--purple);background:rgba(91,79,207,.04);box-shadow:0 2px 10px rgba(91,79,207,.1)}
+.sn{width:32px;height:32px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:var(--muted);flex-shrink:0;transition:all .18s}
+.strat-btn.active .sn{background:var(--purple);color:white}
+.si h5{font-size:16px;font-weight:800;color:var(--text);margin-bottom:2px}
+.si p{font-size:14px;color:var(--sub)}
+.saving{margin-left:auto;font-size:15px;font-weight:900;flex-shrink:0}
+
+.demo-title{font-size:18px;font-weight:800;color:var(--text);margin-bottom:12px}
+.demo-area{display:flex;flex-direction:column;gap:10px}
+
+/* === Strategy 1: Few-Shot Dynamic Retrieval === */
+.fewshot-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fs-col{display:flex;flex-direction:column;gap:6px}
+.fs-col-title{font-size:14px;font-weight:700;padding:6px 10px;border-radius:6px;text-align:center;flex-shrink:0}
+.fs-col-title.bad{background:rgba(220,38,38,.1);color:var(--red)}
+.fs-col-title.good{background:rgba(22,163,74,.1);color:var(--green)}
+.case-pool{flex:1;display:flex;flex-direction:column;gap:4px;overflow-y:auto;max-height:340px}
+.case-item{padding:8px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface);font-size:13px;color:var(--sub);line-height:1.4;cursor:default;transition:all .3s;flex-shrink:0}
+.case-item .ci-q{font-weight:700;color:var(--text);font-size:13px}
+.case-item.selected{border-color:var(--green);background:rgba(22,163,74,.06);color:var(--green)}
+.case-item.greyed{opacity:.3}
+.prompt-box{flex:1;background:#1e1e2e;border-radius:8px;padding:12px 14px;font-family:monospace;font-size:12.5px;color:#cdd6f4;overflow-y:auto;line-height:1.6;white-space:pre-wrap;min-height:200px;max-height:340px}
+.prompt-box .p-sys{color:#cba6f7}
+.prompt-box .p-case{color:#a6e3a1}
+.prompt-box .p-user{color:#89b4fa}
+.tok-bar{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.tok-track{flex:1;height:10px;border-radius:5px;background:var(--surface2);overflow:hidden}
+.tok-fill{height:100%;border-radius:5px;transition:width .6s ease}
+.tok-num{font-size:14px;font-weight:800;min-width:70px;text-align:right}
+.btn-sim{padding:10px 18px;border-radius:8px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s}
+.btn-primary{background:var(--purple);color:white}
+.btn-reset{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+
+/* === Strategy 2: Document Compression === */
+.compress-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.doc-box{flex:1;border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.75;color:var(--sub);overflow-y:auto;background:var(--surface);max-height:380px}
+.doc-box .keep{color:var(--text);font-weight:500}
+.doc-box .drop{color:rgba(220,38,38,.35);text-decoration:line-through;transition:all .4s}
+.doc-box .drop.hidden{display:none}
+.compress-ctrl{display:flex;flex-direction:column;gap:8px}
+.slider-row{display:flex;align-items:center;gap:10px}
+.slider-label{font-size:14px;font-weight:700;color:var(--muted);white-space:nowrap}
+input[type=range]{flex:1;-webkit-appearance:none;height:6px;border-radius:3px;outline:none;cursor:pointer;background:linear-gradient(to right,var(--purple) 0%,var(--purple) var(--pct,30%),var(--surface2) var(--pct,30%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--purple);box-shadow:0 2px 6px rgba(91,79,207,.35);cursor:pointer}
+
+/* === Strategy 3: Attention Heatmap === */
+.attn-wrap{display:flex;flex-direction:column;gap:8px}
+.attn-prompt{display:flex;flex-direction:column;gap:6px}
+.attn-seg{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:9px;border:2px solid transparent;cursor:grab;transition:all .3s;user-select:none}
+.attn-seg:active{cursor:grabbing;transform:scale(0.98)}
+.attn-label{font-size:14px;font-weight:800;min-width:90px;flex-shrink:0}
+.attn-content{font-size:14px;color:var(--sub);flex:1;line-height:1.4}
+.attn-heat{width:70px;height:26px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white;transition:all .4s}
+.attn-note{font-size:13px;padding:9px 12px;border-radius:8px;text-align:center;font-weight:600}
+
+/* General */
+.stat-row{display:flex;gap:8px;flex-wrap:wrap}
+.stat-box{flex:1;min-width:120px;border-radius:8px;padding:10px;text-align:center}
+.stat-box .sv{font-size:24px;font-weight:900;transition:all .4s}
+.stat-box .sl{font-size:12px;font-weight:700;margin-top:1px}
+.stat-box.good{background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.2)}
+.stat-box.good .sv{color:var(--green)}
+.stat-box.bad{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.2)}
+.stat-box.bad .sv{color:var(--red)}
+.stat-box.neutral{background:var(--surface);border:1px solid var(--border)}
+.stat-box.neutral .sv{color:var(--purple)}
+.sl{color:var(--muted)}
+
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+.pop{animation:pop .3s ease}
+
+@media (max-width:768px){
+  .fewshot-wrap,.compress-wrap{grid-template-columns:1fr}
+  .case-pool,.prompt-box,.doc-box{max-height:280px}
+  .attn-label{min-width:76px;font-size:13px}
+  .attn-content{font-size:13px}
+  .stat-box .sv{font-size:20px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="The context window is a precious computational resource — don't fill it with irrelevant information. Explains semantic-layer strategies: how to identify and remove redundant history, dynamic summary compression, and keeping only high-relevance content.">
+<meta name="keywords" content="context optimization,semantic layer optimization,conversation history compression,Token management,context window management">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-7.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/8-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-7.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-7.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Semantic-Layer Optimization: Don't Treat the Context Window as a Trash Can">
+<meta property="og:description" content="The context window is a precious computational resource — don't fill it with irrelevant information. Explains semantic-layer strategies: how to identify and remove redundant history, dynamic summary compression, and keeping only high-relevance content.">
+<meta property="og:url" content="https://xueai.app/slides/8-7.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Semantic-Layer Optimization: Don't Treat the Context Window as a Trash Can">
+<meta name="twitter:description" content="The context window is a precious computational resource — don't fill it with irrelevant information. Explains semantic-layer strategies: how to identify and remove redundant history, dynamic summary compression, and keeping only high-relevance content.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Semantic-Layer Optimization: Don't Treat the Context Window as a Trash Can","name":"Semantic-Layer Optimization: Don't Treat the Context Window as a Trash Can","url":"https://xueai.app/slides/8-7.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practical Course · Cost Optimization & Model Selection","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"The context window is a precious computational resource — don't fill it with irrelevant information. Explains semantic-layer strategies: how to identify and remove redundant history, dynamic summary compression, and keeping only high-relevance content.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Cost Optimization</div>
+    <h1>Semantic-Layer Optimization: <em>Don't Treat the Context Window as a Trash Can</em></h1>
+    <p class="subtitle">Higher information density → more focused attention → better results. Three semantic-layer strategies to make every Token count.</p>
+  </header>
+
+  <div class="sec-label">Why You Can't Stuff in Content Indefinitely</div>
+  <div class="problem-box">
+    <div class="pb-title">Why can't you stuff in content indefinitely?</div>
+    <div class="problem-row">① <b>Expensive and slow</b>: attention complexity is O(N²) — doubling the Prompt quadruples computation</div>
+    <div class="problem-row">② <b>Worse results</b>: the model's attention is weakest on middle content, so key information gets buried</div>
+  </div>
+
+  <div class="sec-label">Three Optimization Strategies</div>
+  <div class="strat-list">
+        <button class="strat-btn active" onclick="pickStrat(this,0)">
+          <div class="sn">1</div>
+          <div class="si">
+            <h5>Dynamic Few-Shot: Don't Hard-Code Examples</h5>
+            <p>Use vector retrieval to fetch only the top 3 most relevant examples each time</p>
+          </div>
+          <div class="saving" style="color:var(--green)">Save 87.5%</div>
+        </button>
+        <button class="strat-btn" onclick="pickStrat(this,1)">
+          <div class="sn">2</div>
+          <div class="si">
+            <h5>Long Documents: Compress Before Feeding to AI</h5>
+            <p>LLMLingua-2 filters redundancy and preserves the semantic core</p>
+          </div>
+          <div class="saving" style="color:var(--purple)">Compress 5–20x</div>
+        </button>
+        <button class="strat-btn" onclick="pickStrat(this,2)">
+          <div class="sn">3</div>
+          <div class="si">
+            <h5>Put Key Info at the Start and End, Not the Middle</h5>
+            <p>Leverage the model's attention bias toward the beginning and end</p>
+          </div>
+          <div class="saving" style="color:var(--cyan)">Better Results↑↑</div>
+        </button>
+  </div>
+
+  <div class="sec-label">Interactive Demo</div>
+  <div class="paywall-locked xa-peek">
+    <div class="demo-title" id="demoTitle">Dynamic Few-Shot: Text-to-SQL Demo</div>
+    <div class="demo-area" id="demoArea"></div>
+  </div>
+</article>
+<script>
+// ── Strategy 1: Dynamic Few-Shot ──
+const ALL_CASES = [
+  { q: 'Q: Top 5 products by revenue in 2024', sim: 0.95, sql: 'SELECT p.name, SUM(o.amount) AS sales\nFROM orders o JOIN products p ON...\nORDER BY sales DESC LIMIT 5' },
+  { q: 'Q: Total orders by region this month', sim: 0.78, sql: 'SELECT region, COUNT(*) AS cnt\nFROM orders WHERE MONTH(...)' },
+  { q: 'Q: Products with refund rate > 5%', sim: 0.62, sql: 'SELECT product_id, refund_rate\nFROM (...) WHERE refund_rate > 0.05' },
+  { q: 'Q: Average spend per active user', sim: 0.51, sql: 'SELECT AVG(total) FROM orders\nWHERE user_id IN (SELECT ...)' },
+  { q: 'Q: Inventory count by category', sim: 0.38, sql: 'SELECT category, SUM(stock) FROM products GROUP BY category' },
+  { q: 'Q: New users registered in the last 7 days', sim: 0.29, sql: 'SELECT COUNT(*) FROM users WHERE created_at > NOW()-7' },
+];
+
+function renderFewShot() {
+  return `
+  <div class="fewshot-wrap">
+    <div class="fs-col">
+      <div class="fs-col-title bad">Example Pool (20 fixed examples)</div>
+      <div class="case-pool" id="casePool">
+        ${ALL_CASES.map((c,i)=>`
+          <div class="case-item" id="ci${i}">
+            <div class="ci-q">${c.q}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Relevance ${Math.round(c.sim*100)}%</div>
+          </div>`).join('')}
+      </div>
+      <div class="tok-bar">
+        <span style="font-size:13px;font-weight:700;color:var(--muted)">Old approach</span>
+        <div class="tok-track"><div class="tok-fill" style="width:100%;background:var(--red)"></div></div>
+        <span class="tok-num" style="color:var(--red)">4,000 T</span>
+      </div>
+    </div>
+    <div class="fs-col">
+      <div class="fs-col-title good">Injected Prompt (Dynamic Top-3 Retrieval)</div>
+      <pre class="prompt-box" id="promptBox"><span class="p-sys">System: You are a SQL expert.</span>
+
+<span style="color:var(--muted)">← Click "Start Retrieval"
+   to simulate vector matching</span></pre>
+      <div class="tok-bar">
+        <span style="font-size:13px;font-weight:700;color:var(--muted)">New approach</span>
+        <div class="tok-track"><div class="tok-fill" id="newTokBar" style="width:0%;background:var(--green)"></div></div>
+        <span class="tok-num" id="newTokNum" style="color:var(--green)">0 T</span>
+      </div>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-box bad"><div class="sv">4,000</div><div class="sl">Old Approach Tokens</div></div>
+    <div class="stat-box neutral"><div class="sv" id="fsSave">—</div><div class="sl">Savings</div></div>
+    <div class="stat-box good"><div class="sv" id="fsSpeed">—</div><div class="sl">Response Speed</div></div>
+    <div class="stat-box neutral" style="background:rgba(22,163,74,.04);border-color:rgba(22,163,74,.2)">
+      <div class="sv" style="color:var(--green)" id="fsAcc">—</div><div class="sl">Accuracy Change</div></div>
+  </div>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <button class="btn-sim btn-primary" id="btnSim" onclick="runFewShot()">▶ Start Retrieval</button>
+    <button class="btn-sim btn-reset" onclick="resetFewShot()">Reset</button>
+    <span style="font-size:13px;color:var(--muted);align-self:center">User query: Top-5 products by revenue in each region this month</span>
+  </div>`;
+}
+
+let fsStep = 0, fsTimer = null;
+function runFewShot() {
+  const btn = document.getElementById('btnSim');
+  if (fsStep >= 3) return;
+  btn.disabled = true;
+
+  const sorted = [...ALL_CASES].sort((a,b)=>b.sim-a.sim);
+  let delay = 0;
+  const selected = [];
+
+  sorted.forEach((c, rank) => {
+    const origIdx = ALL_CASES.indexOf(c);
+    setTimeout(() => {
+      const el = document.getElementById('ci'+origIdx);
+      if (rank < 3) {
+        el.classList.add('selected');
+        selected.push(c);
+        updatePromptBox(selected);
+        const tok = 120 + selected.length * 130;
+        const pct = Math.round(tok / 4000 * 100);
+        document.getElementById('newTokBar').style.width = pct + '%';
+        document.getElementById('newTokNum').textContent = tok + ' T';
+        if (selected.length === 3) {
+          document.getElementById('fsSave').textContent = '87.5%';
+          document.getElementById('fsSave').classList.add('pop');
+          document.getElementById('fsSpeed').textContent = '3x↑';
+          document.getElementById('fsAcc').textContent = '↑Higher';
+          btn.disabled = false;
+          btn.textContent = '✓ Done';
+        }
+      } else {
+        el.classList.add('greyed');
+      }
+    }, delay);
+    delay += rank < 3 ? 600 : 200;
+  });
+}
+
+function updatePromptBox(cases) {
+  const box = document.getElementById('promptBox');
+  let html = `<span class="p-sys">System: You are a SQL expert.</span>\n\n`;
+  cases.forEach((c,i) => {
+    html += `<span class="p-case">/* Example ${i+1} (relevance ${Math.round(c.sim*100)}%) */\n${c.q}\nSQL: ${c.sql}</span>\n\n`;
+  });
+  html += `<span class="p-user">User: Top-5 products by revenue in each region this month</span>`;
+  box.innerHTML = html;
+  box.scrollTop = box.scrollHeight;
+}
+
+function resetFewShot() {
+  ALL_CASES.forEach((_,i) => {
+    const el = document.getElementById('ci'+i);
+    if (el) { el.classList.remove('selected','greyed'); }
+  });
+  document.getElementById('promptBox').innerHTML = `<span class="p-sys">System: You are a SQL expert.</span>\n\n<span style="color:var(--muted)">← Click "Start Retrieval"\n   to simulate vector matching</span>`;
+  document.getElementById('newTokBar').style.width = '0%';
+  document.getElementById('newTokNum').textContent = '0 T';
+  document.getElementById('fsSave').textContent = '—';
+  document.getElementById('fsSpeed').textContent = '—';
+  document.getElementById('fsAcc').textContent = '—';
+  const btn = document.getElementById('btnSim');
+  btn.disabled = false;
+  btn.textContent = '▶ Start Retrieval';
+}
+
+// ── Strategy 2: Document Compression ──
+// 4 levels; each level shows the compression result on the right; 4 core data points always preserved
+
+// Left side: original text (with highlights marking which words/sentences will be compressed)
+const ORIG_PARAS = [
+  // [paragraph HTML, at which level the left side shows strikethrough]
+  { html: 'Disclaimer: This report<span id="del-00"> is for reference only</span>, does not constitute investment advice, <span id="del-01">and assumes no liability for any loss</span>.', delAt: 2 },
+  { html: 'Key Finding: 2024Q3 revenue grew <b>23.5%</b> YoY, beating market expectations by <b>8 percentage points</b>.', delAt: 99 }, // always kept
+  { html: '<span id="del-20">As is widely known, </span>the macroeconomic environment<span id="del-21"> is complex and volatile, </span>and all industries face<span id="del-22"> varying degrees of</span> challenges and opportunities.', delAt: 1 },
+  { html: 'Gross margin improved <b>2.1pp</b> to <b>61.3%</b>, primarily driven by a higher share of high-margin SaaS revenue.', delAt: 99 }, // always kept
+  { html: '<span id="del-40">As we noted in last quarter\'s report, and as we have repeatedly emphasized in numerous roadshows…</span>', delAt: 2 },
+  { html: 'Operating cash flow <b>¥1.28B</b>, up <b>41%</b> YoY<span id="del-51">, with ample cash reserves.</span>', delAt: 99 }, // always kept
+  { html: '<span id="del-60">We sincerely thank all investors for their continued attention and support; we will keep working hard to create value…</span>', delAt: 2 },
+  { html: 'Q4 Guidance: Revenue <b>¥4.2–4.5B</b>, Non-GAAP net margin <b>18–20%</b>.', delAt: 99 }, // always kept
+];
+
+// Right side: 4 compression level results (matching slider positions 1/2/3/4)
+const COMPRESS_LEVELS = [
+  // Level 0: No compression (original)
+  {
+    label: '1x (No compression)',
+    tok: 10000, savePct: 0,
+    titleColor: 'var(--sub)',
+    desc: 'Original document with many redundant words and filler sentences',
+    html: `<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">Disclaimer: This report is for reference only, does not constitute investment advice, and assumes no liability for any loss.</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Key Finding: 2024Q3 revenue grew 23.5% YoY, beating market expectations by 8 percentage points.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">As is widely known, the macroeconomic environment is complex and volatile, and all industries face varying degrees of challenges and opportunities.</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Gross margin improved 2.1pp to 61.3%, primarily driven by a higher share of high-margin SaaS revenue.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">As we noted in last quarter's report, and as we have repeatedly emphasized in numerous roadshows…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Operating cash flow ¥1.28B, up 41% YoY, with ample cash reserves.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">We sincerely thank all investors for their continued attention and support; we will keep working hard to create value…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Q4 Guidance: Revenue ¥4.2–4.5B, Non-GAAP net margin 18–20%.</b></p>`
+  },
+  // Level 1: Light compression — remove redundant words (fillers, clichés)
+  {
+    label: '3x (Light)',
+    tok: 3800, savePct: 62,
+    titleColor: 'var(--amber)',
+    desc: 'Step 1: Remove redundant adverbs and filler phrases; semantics unchanged',
+    html: `<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">Disclaimer: This report is for reference only, does not constitute investment advice, and assumes no liability for any loss.</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Key Finding: 2024Q3 revenue grew 23.5% YoY, beating market expectations by 8 percentage points.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">The macroeconomic environment presents challenges and opportunities. <span style="color:var(--amber);font-size:12px">← "As is widely known," "complex and volatile," "varying degrees of" removed</span></p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Gross margin improved 2.1pp to 61.3%, primarily driven by a higher share of high-margin SaaS revenue.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">As we noted in last quarter's report, and as we have repeatedly emphasized in numerous roadshows…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Operating cash flow ¥1.28B, up 41% YoY, with ample cash reserves.</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">We sincerely thank all investors for their continued attention and support; we will keep working hard to create value…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Q4 Guidance: Revenue ¥4.2–4.5B, Non-GAAP net margin 18–20%.</b></p>`
+  },
+  // Level 2: Moderate compression — remove entire filler paragraphs (disclaimer, roadshow boilerplate, thank-you)
+  {
+    label: '7x (Moderate)',
+    tok: 1500, savePct: 85,
+    titleColor: 'var(--orange)',
+    desc: 'Step 2: Remove entire useless paragraphs (disclaimer, thank-you, boilerplate)',
+    html: `<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">Disclaimer: This report is for reference only… ← Entire paragraph removed</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Key Finding: 2024Q3 revenue grew 23.5% YoY, beating market expectations by 8 percentage points.</b></p>
+<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">The macroeconomic environment presents challenges and opportunities. ← No substantive info, removed</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Gross margin improved 2.1pp to 61.3%, primarily driven by a higher share of high-margin SaaS revenue.</b></p>
+<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">As we noted in last quarter's report… ← Entire paragraph removed</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Operating cash flow ¥1.28B, up 41% YoY, with ample cash reserves.</b></p>
+<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">We sincerely thank all investors… ← Entire paragraph removed</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>Q4 Guidance: Revenue ¥4.2–4.5B, Non-GAAP net margin 18–20%.</b></p>`
+  },
+  // Level 3: Aggressive compression — restructure into minimal list; 4 core data points preserved 100%
+  {
+    label: '20x (Aggressive)',
+    tok: 520, savePct: 95,
+    titleColor: 'var(--green)',
+    desc: 'Step 3: Restructure into minimal list; core data 100% preserved',
+    html: `<p style="margin-bottom:10px;font-size:13px;color:var(--muted)">↓ Compressed to structured summary at maximum information density:</p>
+<div style="background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:10px 14px;line-height:2;font-size:15px;color:var(--text)">
+• Revenue +23.5% YoY, beat expectations by 8pp<br>
+• Gross margin 61.3% (+2.1pp), SaaS share increased<br>
+• Operating cash flow ¥1.28B, +41% YoY<br>
+• Q4 Guidance: Revenue ¥4.2–4.5B, Non-GAAP margin 18–20%
+</div>
+<p style="margin-top:8px;font-size:13px;color:var(--green);font-weight:700">✓ All 4 core data points preserved; all redundant content filtered</p>`
+  },
+];
+
+function renderCompress() {
+  return `
+  <div style="font-size:14px;color:var(--sub);flex-shrink:0">Drag the slider to experience LLMLingua-2 compression levels: <b style="color:var(--purple)">Remove words → Remove sentences → Restructure into a list. Core data always preserved.</b></div>
+  <div class="compress-wrap">
+    <div class="fs-col">
+      <div class="fs-col-title bad">Original Document (with lots of redundancy)</div>
+      <div class="doc-box" id="docOriginal">
+        ${ORIG_PARAS.map((p,i) => `<p style="margin-bottom:7px;line-height:1.7;transition:all .4s" id="orig${i}">${p.html}</p>`).join('')}
+      </div>
+      <div class="tok-bar">
+        <div class="tok-track"><div class="tok-fill" style="width:100%;background:var(--red)"></div></div>
+        <span class="tok-num" style="color:var(--red)">10,000 T</span>
+      </div>
+    </div>
+    <div class="fs-col">
+      <div class="fs-col-title good" id="compTitle">After Compression (LLMLingua-2): No compression</div>
+      <div class="doc-box" id="docCompressed" style="transition:opacity .3s"></div>
+      <div class="tok-bar">
+        <div class="tok-track"><div class="tok-fill" id="compBar" style="width:100%;background:var(--sub)"></div></div>
+        <span class="tok-num" id="compTok" style="color:var(--sub)">10,000 T</span>
+      </div>
+    </div>
+  </div>
+  <div class="compress-ctrl">
+    <div class="slider-row">
+      <span class="slider-label">Compression Level</span>
+      <input type="range" id="compSlider" min="0" max="3" value="0" step="1" oninput="onCompress(this)" style="--pct:0%">
+      <span style="font-size:14px;font-weight:800;color:var(--purple);min-width:120px" id="compRatio">1x (No compression)</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:0 2px;margin-top:-4px">
+      <span>Original</span><span>Light (remove words)</span><span>Moderate (remove sentences)</span><span>Aggressive (list)</span>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-box bad"><div class="sv">10,000</div><div class="sl">Original Tokens</div></div>
+    <div class="stat-box neutral"><div class="sv" id="compRemain">10,000</div><div class="sl">Tokens After Compression</div></div>
+    <div class="stat-box neutral"><div class="sv" id="compSave" style="color:var(--sub)">0%</div><div class="sl">Compression Rate</div></div>
+    <div class="stat-box neutral" style="background:rgba(91,79,207,.04);border-color:rgba(91,79,207,.2)">
+      <div class="sv" style="color:var(--purple)">BERT</div><div class="sl">Bidirectional Attention</div></div>
+  </div>`;
+}
+
+function onCompress(slider) {
+  const val = +slider.value; // 0/1/2/3
+  const pct = (val / 3 * 100).toFixed(0);
+  slider.style.setProperty('--pct', pct + '%');
+
+  const lv = COMPRESS_LEVELS[val];
+
+  // Right side: switch content
+  const compBox = document.getElementById('docCompressed');
+  compBox.style.opacity = '0';
+  setTimeout(() => {
+    compBox.innerHTML = lv.html;
+    compBox.style.opacity = '1';
+  }, 150);
+
+  // Right side title
+  document.getElementById('compTitle').textContent = `After Compression (LLMLingua-2): ${lv.label}`;
+  document.getElementById('compTitle').style.color = lv.titleColor;
+
+  // Left side original highlight: add strikethrough to paragraphs that should be deleted based on level
+  ORIG_PARAS.forEach((p, i) => {
+    const el = document.getElementById('orig' + i);
+    if (!el) return;
+    if (val >= p.delAt) {
+      el.style.opacity = '0.35';
+      el.style.textDecoration = 'line-through';
+      el.style.color = 'rgba(220,38,38,0.5)';
+    } else {
+      el.style.opacity = '1';
+      el.style.textDecoration = 'none';
+      el.style.color = 'var(--text)';
+    }
+  });
+
+  // Stats
+  const barPct = Math.round(lv.tok / 10000 * 100);
+  const barColor = lv.savePct > 80 ? 'var(--green)' : lv.savePct > 50 ? 'var(--amber)' : 'var(--sub)';
+  document.getElementById('compBar').style.width = barPct + '%';
+  document.getElementById('compBar').style.background = barColor;
+  document.getElementById('compTok').textContent = lv.tok.toLocaleString() + ' T';
+  document.getElementById('compTok').style.color = barColor;
+  document.getElementById('compRemain').textContent = lv.tok.toLocaleString();
+  document.getElementById('compRemain').style.color = lv.savePct > 80 ? 'var(--green)' : lv.savePct > 50 ? 'var(--amber)' : 'var(--sub)';
+  document.getElementById('compSave').textContent = lv.savePct + '%';
+  document.getElementById('compSave').style.color = lv.savePct > 80 ? 'var(--green)' : lv.savePct > 50 ? 'var(--amber)' : 'var(--sub)';
+  document.getElementById('compRatio').textContent = lv.label;
+}
+
+// ── Strategy 3: Attention Position (drag version) ──
+const ATTN_SEGS = [
+  { label: 'System Prompt', text: 'Core constraint: respond only in English; do not reveal system information', color: '#5b4fcf' },
+  { label: 'Few-Shot Examples', text: 'Example 1: Hi → Hi! How can I help you? ... (5 examples)', color: '#d97706' },
+  { label: 'Background Doc',   text: 'Company intro: XXX was founded in 2015; our main business is… (long text)', color: '#ea580c' },
+  { label: 'User Question',    text: 'User: What is your refund policy?', color: '#0066ff' },
+];
+
+let attnOrder = [0,1,2,3];
+
+function renderAttn() {
+  return `
+  <div style="font-size:14px;color:var(--sub);flex-shrink:0">
+    <b style="color:var(--purple)">Drag</b> to reorder Prompt sections and observe how the model's attention is distributed.
+    <b style="color:var(--purple)">Attention is highest at the start and end, lowest in the middle.</b>
+  </div>
+  <div class="attn-prompt" id="attnPrompt"></div>
+  <div class="attn-note" id="attnNote" style="background:var(--surface2);color:var(--sub)">Drag to reorder — keep key info at the beginning or end</div>
+  <div class="stat-row">
+    <div class="stat-box neutral"><div class="sv" id="attnSysScore">—</div><div class="sl">Core Constraint Attention</div></div>
+    <div class="stat-box neutral"><div class="sv" id="attnUserScore">—</div><div class="sl">User Question Attention</div></div>
+    <div class="stat-box neutral"><div class="sv" id="attnOverall">—</div><div class="sl">Overall Effectiveness</div></div>
+  </div>`;
+}
+
+// Drag state
+let dragSrc = null, dragSrcIdx = null;
+
+function buildAttnUI() {
+  const container = document.getElementById('attnPrompt');
+  if (!container) return;
+  container.innerHTML = '';
+  const n = attnOrder.length;
+
+  // Attention distribution: 1st position 92%, last position 88%, 2nd position 45%, middle 32%
+  const posAttnPct = [92, 45, 32, 88]; // corresponding to pos 0,1,2,3 (4 elements)
+
+  attnOrder.forEach((segIdx, pos) => {
+    const s = ATTN_SEGS[segIdx];
+    const attnPct = posAttnPct[pos] || 32;
+    const heatColor = attnPct > 80 ? '#16a34a' : attnPct > 50 ? '#d97706' : '#dc2626';
+    const heatLabel = attnPct > 80 ? 'High' : attnPct > 50 ? 'Mid' : 'Low';
+
+    const div = document.createElement('div');
+    div.className = 'attn-seg';
+    div.style.cssText = `border-color:${s.color}40;background:${s.color}08;cursor:grab;transition:opacity .2s,transform .15s`;
+    div.draggable = true;
+    div.dataset.pos = pos;
+
+      div.innerHTML = `
+      <div style="font-size:18px;color:${s.color}55;flex-shrink:0;cursor:grab" title="Drag to reorder">⠿</div>
+      <div class="attn-label" style="color:${s.color}">${s.label}</div>
+      <div class="attn-content">${s.text}</div>
+      <div class="attn-heat" style="background:${heatColor}">${attnPct}% ${heatLabel}</div>
+    `;
+
+    div.addEventListener('dragstart', e => {
+      dragSrc = div;
+      dragSrcIdx = pos;
+      setTimeout(() => div.style.opacity = '0.4', 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    div.addEventListener('dragend', () => {
+      div.style.opacity = '1';
+      container.querySelectorAll('.attn-seg').forEach(el => el.classList.remove('drag-over'));
+    });
+    div.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      container.querySelectorAll('.attn-seg').forEach(el => el.classList.remove('drag-over'));
+      div.classList.add('drag-over');
+    });
+    div.addEventListener('dragleave', () => div.classList.remove('drag-over'));
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      const targetPos = +div.dataset.pos;
+      if (dragSrcIdx !== null && dragSrcIdx !== targetPos) {
+        // Swap two segments
+        [attnOrder[dragSrcIdx], attnOrder[targetPos]] = [attnOrder[targetPos], attnOrder[dragSrcIdx]];
+        buildAttnUI();
+      }
+    });
+
+    container.appendChild(div);
+  });
+
+  // Add drag-over style
+  if (!document.getElementById('drag-style')) {
+    const st = document.createElement('style');
+    st.id = 'drag-style';
+    st.textContent = '.attn-seg.drag-over{outline:2.5px dashed var(--purple);background:rgba(91,79,207,.07)!important;transform:scale(1.01)}';
+    document.head.appendChild(st);
+  }
+
+  updateAttnStats();
+}
+
+function updateAttnStats() {
+  const sysPos  = attnOrder.indexOf(0); // System Prompt
+  const userPos = attnOrder.indexOf(3); // User question
+  const n = attnOrder.length;
+  const posAttnPct = [92, 45, 32, 88];
+
+  const sysA  = posAttnPct[sysPos]  || 32;
+  const userA = posAttnPct[userPos] || 32;
+  const overall = Math.round((sysA + userA) / 2);
+
+  document.getElementById('attnSysScore').textContent = sysA + '%';
+  document.getElementById('attnSysScore').style.color = sysA > 70 ? 'var(--green)' : sysA > 50 ? 'var(--orange)' : 'var(--red)';
+  document.getElementById('attnUserScore').textContent = userA + '%';
+  document.getElementById('attnUserScore').style.color = userA > 70 ? 'var(--green)' : userA > 50 ? 'var(--orange)' : 'var(--red)';
+  document.getElementById('attnOverall').textContent = overall > 70 ? 'Excellent' : overall > 50 ? 'Average' : 'Poor';
+  document.getElementById('attnOverall').style.color = overall > 70 ? 'var(--green)' : overall > 50 ? 'var(--orange)' : 'var(--red)';
+
+  const note = document.getElementById('attnNote');
+  if (overall > 70) {
+    note.style.background = 'rgba(22,163,74,.08)';
+    note.style.color = 'var(--green)';
+    note.textContent = '✓ Key info is at the start and end — model attention is focused, best results!';
+  } else if (sysPos >= 1 && sysPos <= 2) {
+    note.style.background = 'rgba(220,38,38,.06)';
+    note.style.color = 'var(--red)';
+    note.textContent = '✗ Core constraint is buried in the middle — model may ignore it! Try dragging it to the top.';
+  } else {
+    note.style.background = 'rgba(234,88,12,.06)';
+    note.style.color = 'var(--orange)';
+    note.textContent = '△ Room for improvement — try dragging the user question to the end.';
+  }
+}
+
+// ── Main Control ──
+let curStrat = 0;
+function pickStrat(btn, idx) {
+  document.querySelectorAll('.strat-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  curStrat = idx;
+  const titles = ['Dynamic Few-Shot: Text-to-SQL Demo','Document Compression: LLMLingua-2 in Action','Key Info Positioning: Drag to Reorder'];
+  document.getElementById('demoTitle').textContent = titles[idx];
+  const area = document.getElementById('demoArea');
+  if (idx === 0) {
+    area.innerHTML = renderFewShot();
+  } else if (idx === 1) {
+    area.innerHTML = renderCompress();
+    setTimeout(() => {
+      // Initialize right-side content (level 0)
+      document.getElementById('docCompressed').innerHTML = COMPRESS_LEVELS[0].html;
+    }, 50);
+  } else {
+    attnOrder = [0,1,2,3];
+    area.innerHTML = renderAttn();
+    setTimeout(buildAttnUI, 50);
+  }
+}
+
+pickStrat(document.querySelector('.strat-btn'), 0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

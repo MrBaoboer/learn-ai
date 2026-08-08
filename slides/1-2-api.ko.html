@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>chat/completions의 비밀: API가 왜 '대화'가 아닌 '완성'인가? | xueai.app</title>
+<script src="../global-attn.js"></script>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── API 对比行 ── */
+.api-compare { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.api-row {
+  display: flex; align-items: stretch; gap: 0;
+  border-radius: var(--radius-sm); overflow: hidden;
+  border: 1px solid var(--border);
+}
+.api-brand {
+  width: 110px; padding: 14px 16px;
+  font-size: 14px; font-weight: 800;
+  display: flex; align-items: center; flex-shrink: 0;
+}
+.brand-openai { background: rgba(0,0,0,0.05); color: #374151; }
+.brand-anthropic { background: rgba(124,58,237,0.08); color: var(--purple); }
+.api-endpoint {
+  flex: 1; padding: 14px 16px;
+  font-size: 17px; font-weight: 700;
+  font-family: 'SF Mono', Menlo, monospace;
+  display: flex; align-items: center;
+  background: var(--card);
+}
+.api-note {
+  padding: 14px 16px; width: 150px;
+  font-size: 13px; color: var(--sub);
+  display: flex; align-items: center;
+  background: var(--card); border-left: 1px solid var(--border);
+}
+
+/* ── 解读卡片 ── */
+.answer-card {
+  border-radius: var(--radius-sm); padding: 16px 18px;
+  margin-top: 14px;
+}
+.answer-card.amber { background: rgba(217,119,6,0.06); border: 1px solid rgba(217,119,6,0.25); }
+.answer-card.blue { background: rgba(0,102,255,0.05); border: 1px solid rgba(0,102,255,0.18); }
+.answer-card .label { font-size: 13px; font-weight: 700; color: var(--sub); margin-bottom: 6px; }
+.answer-card .val { font-size: 15px; color: var(--text); line-height: 1.8; }
+
+/* ── 补全视角演示 ── */
+.completion-demo {
+  background: var(--card); border-radius: var(--radius); padding: 22px 24px;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-card);
+  position: relative;
+}
+.cd-label { font-size: 13px; font-weight: 700; color: var(--sub); letter-spacing: 0.3px; margin-bottom: 10px; }
+.cd-text {
+  font-size: 17px; line-height: 1.95; color: var(--text);
+  font-family: 'SF Mono', Menlo, monospace;
+  word-break: break-all;
+}
+.cd-user { color: var(--accent); font-weight: 700; }
+.cd-ai { color: var(--success); font-weight: 700; }
+.cd-system { color: var(--amber); font-weight: 700; }
+.cd-blank {
+  display: inline-block; width: 2px; height: 1em;
+  background: var(--success); vertical-align: text-bottom;
+  animation: blink 0.9s step-start infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.cd-segment {
+  opacity: 0; transform: translateY(4px);
+  transition: all 0.35s ease;
+}
+.cd-segment.show { opacity: 1; transform: translateY(0); }
+
+/* ── 三点洞察 ── */
+.insight-row {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+  margin-top: 22px;
+}
+.insight-item {
+  background: rgba(0,0,0,0.03); border-radius: var(--radius-sm);
+  padding: 14px 15px;
+}
+.ii-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+.ii-desc { font-size: 13px; color: var(--sub); line-height: 1.65; }
+
+/* ── 世界影响收尾 ── */
+.world-impact {
+  display: flex; align-items: stretch; gap: 0;
+  background: linear-gradient(135deg, rgba(0,102,255,0.06) 0%, rgba(124,58,237,0.06) 100%);
+  border: 1.5px solid rgba(0,102,255,0.2);
+  border-radius: var(--radius); overflow: hidden;
+  margin-top: 22px;
+}
+.wi-left {
+  padding: 18px 22px; display: flex; flex-direction: column; justify-content: center; gap: 8px;
+  min-width: 230px; flex-shrink: 0;
+}
+.wi-tag {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--accent);
+}
+.wi-title {
+  font-size: 19px; font-weight: 900; color: var(--text); line-height: 1.4;
+}
+.wi-divider {
+  width: 1px; background: rgba(0,102,255,0.15); flex-shrink: 0; margin: 10px 0;
+}
+.wi-right {
+  flex: 1; padding: 18px 22px; display: flex; flex-direction: column; justify-content: center; gap: 10px;
+}
+.wi-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 14px; color: var(--text); line-height: 1.55;
+}
+.wi-item-icon {
+  width: 22px; height: 22px; border-radius: 6px;
+  background: rgba(22,163,74,0.1); color: var(--success);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+}
+
+/* ── 重播按钮 ── */
+.btn-replay {
+  position: absolute; top: 14px; right: 16px;
+  background: var(--card); color: var(--sub); border: 1px solid rgba(0,0,0,0.12);
+  padding: 5px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+}
+.btn-replay:hover { background: rgba(0,0,0,0.05); color: var(--text); }
+
+@media (max-width: 768px) {
+  .api-note { display: none; }
+  .api-endpoint { font-size: 15px; }
+  .insight-row { grid-template-columns: 1fr; }
+  .world-impact { flex-direction: column; }
+  .wi-divider { width: auto; height: 1px; margin: 0 22px; }
+  .wi-left { min-width: 0; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="OpenAI의 chat/completions 엔드포인트가 왜 '완성(completions)'이라고 불릴까요? 대화 API의 본질 이해: 모든 요청은 독립적인 텍스트 완성이며, 멀티턴 대화는 클라이언트가 컨텍스트를 이어 붙여 구현합니다.">
+<meta name="keywords" content="chat completions,OpenAI API,대형 언어 모델 API,대화 API,완성 API">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/1-2-api.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-api.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-api.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-api.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-api.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 트레이닝">
+<meta property="og:title" content="chat/completions의 비밀: API가 왜 '대화'가 아닌 '완성'인가?">
+<meta property="og:description" content="OpenAI의 chat/completions가 왜 '완성'이라 불릴까요? 모든 요청은 독립적인 텍스트 완성이며, 멀티턴 대화는 클라이언트가 컨텍스트를 이어 붙여 구현합니다.">
+<meta property="og:url" content="https://xueai.app/slides/1-2-api.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="chat/completions의 비밀: API가 왜 '대화'가 아닌 '완성'인가?">
+<meta name="twitter:description" content="OpenAI의 chat/completions가 왜 '완성'이라 불릴까요? 모든 요청은 독립적인 텍스트 완성이며, 멀티턴 대화는 클라이언트가 컨텍스트를 이어 붙여 구현합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"chat/completions의 비밀","name":"chat/completions의 비밀","url":"https://xueai.app/slides/1-2-api.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문부터 중급까지","isPartOf":{"@type":"Course","name":"AI 실전 강의 · 완성에서 대화로","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"OpenAI의 chat/completions가 왜 '완성'이라 불릴까요? 모든 요청은 독립적인 텍스트 완성이며, 멀티턴 대화는 클라이언트가 컨텍스트를 이어 붙여 구현합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+  <header class="lesson-header">
+    <div class="kicker">완성에서 대화로</div>
+    <h1>chat/completions의 비밀</h1>
+    <p class="subtitle">분명히 대형 언어 모델과 대화를 나누고 있는데, 왜 OpenAI의 API 경로에는 '완성(completions)'이라고 쓰여 있을까요? 이 명명 방식 뒤에는 대형 언어 모델의 본질에 대한 이해가 숨어 있습니다.</p>
+  </header>
+
+  <div class="sec-label">흥미로운 질문</div>
+
+  <p style="font-size:17px; font-weight:700; line-height:1.6;">
+    분명히 '대화(chat)'인데, 왜 「<span style="color:var(--accent);">완성(completions)</span>」이라고 부를까요?
+  </p>
+  <p style="font-size:15px; color:var(--sub); margin-top:8px;">두 회사, 두 가지 전혀 다른 명명 방식 — 그 뒤에는 대형 언어 모델의 본질에 대한 서로 다른 이해가 담겨 있습니다.</p>
+
+  <div class="api-compare" id="apiCompare">
+    <div class="api-row reveal" id="apiRow0">
+      <div class="api-brand brand-openai">OpenAI</div>
+      <div class="api-endpoint">/chat/<span style="color:var(--accent);">completions</span></div>
+      <div class="api-note">채팅 / <strong style="color:var(--accent);">완성</strong></div>
+    </div>
+    <div class="api-row reveal" id="apiRow1">
+      <div class="api-brand brand-anthropic">Anthropic</div>
+      <div class="api-endpoint">/v1/<span style="color:var(--purple);">messages</span></div>
+      <div class="api-note">정직한 메시지</div>
+    </div>
+  </div>
+
+  <div class="answer-card amber reveal" id="cardAmber">
+    <div class="label">OpenAI의 숨겨진 논리</div>
+    <div class="val">
+      대형 언어 모델의 본질은 <strong>완성(completions)</strong>입니다: 텍스트를 주면 이어서 씁니다.
+      채팅은 단지 대화를 「완성되어야 할 텍스트」로 형식화한 것뿐이며, <strong>본질은 여전히 Token 완성입니다.</strong>
+    </div>
+  </div>
+
+  <div class="answer-card blue reveal paywall-locked xa-peek" id="cardBlue">
+    <div class="label">PM이 알아야 할 핵심 포인트</div>
+    <div class="val">
+      대형 언어 모델에 전송하는 모든 메시지는 하나의 텍스트 블록으로 이어 붙여지며,
+      모델은 그 텍스트 끝부분에서부터 <strong>계속 생성</strong>합니다.
+      대화는 인간이 편의를 위해 씌운 껍질에 불과합니다.
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">완성 관점에서 바라본 대화</div>
+
+  <div class="completion-demo reveal paywall-locked" id="completionDemo">
+    <button class="btn-replay" id="replayBtn" onclick="replayDemo()" style="display:none;">↺ 다시 재생</button>
+    <div class="cd-label">모델이 실제로 「보는」 내용 (이어 붙인 텍스트)</div>
+    <div class="cd-text">
+      <span class="cd-segment" id="seg0">
+        <span class="cd-system">[system]</span> 당신은 도움이 되는 어시스턴트입니다.<br>
+      </span>
+      <span class="cd-segment" id="seg1">
+        <span class="cd-user">[user]</span> 자샤선녀(紫霞仙子)는 누구인가요?（중국어 예시）<br>
+      </span>
+      <span class="cd-segment" id="seg2">
+        <span class="cd-ai">[assistant]</span> <span id="aiOutput"></span><span class="cd-blank" id="cursor" style="display:none;"></span>
+      </span>
+    </div>
+  </div>
+
+  <div class="insight-row reveal paywall-locked" id="insightRow">
+    <div class="insight-item">
+      <div class="ii-title">모델이 하는 일</div>
+      <div class="ii-desc">[assistant] 마커 이후, 확률이 가장 높은 다음 Token을 예측하고, 종료 토큰이 생성될 때까지 계속합니다</div>
+    </div>
+    <div class="insight-item">
+      <div class="ii-title">chat은 환상입니다</div>
+      <div class="ii-desc">당신은 '대화'한다고 생각하지만, 모델은 단지 '이 텍스트 블록을 완성'하고 있을 뿐입니다. 이것이 completions의 진실입니다</div>
+    </div>
+    <div class="insight-item">
+      <div class="ii-title">PM이 알아야 하는 이유</div>
+      <div class="ii-desc">System Prompt, 컨텍스트, 히스토리 메시지가 모두 이어 붙여져 모델에 전송되며, Token 수가 비용과 품질의 핵심 변수입니다</div>
+    </div>
+  </div>
+
+  <div class="world-impact reveal paywall-locked" id="worldImpact">
+    <div class="wi-left">
+      <div class="wi-tag">OpenAI의 설계 결정</div>
+      <div class="wi-title">이 직관적인 명명이<br>전 세계에 영향을 미쳤습니다.</div>
+    </div>
+    <div class="wi-divider"></div>
+    <div class="wi-right">
+      <div class="wi-item">
+        <div class="wi-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div>GPT + <code>/chat/completions</code> 패러다임이 시장을 가장 먼저 폭발적으로 성장시켰습니다</div>
+      </div>
+      <div class="wi-item">
+        <div class="wi-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div>전 세계 개발자, 프레임워크, 툴체인이 모두 이 인터페이스 설계에 맞춰졌습니다</div>
+      </div>
+      <div class="wi-item">
+        <div class="wi-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div>「대화 = 완성」을 이해하는 것이 모든 AI 엔지니어링을 파악하는 출발점입니다</div>
+      </div>
+    </div>
+  </div>
+
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+const AI_ANSWER = '자샤선녀(紫霞仙子)는 영화 《대화서유(大话西游)》의 등장인물로, 배우 주인(朱茵)이 연기했으며 주인공 지존보(至尊宝)의 연인입니다. [이것은 Token 완성을 시연하는 중국어 문학 예시입니다]';
+let typingTimer = null;
+
+function playDemo() {
+  if (typingTimer) { clearInterval(typingTimer); typingTimer = null; }
+  document.getElementById('replayBtn').style.display = 'none';
+  ['seg0', 'seg1', 'seg2'].forEach(id => document.getElementById(id).classList.remove('show'));
+  const output = document.getElementById('aiOutput');
+  output.textContent = '';
+  document.getElementById('cursor').style.display = 'none';
+
+  document.getElementById('seg0').classList.add('show');
+  setTimeout(() => document.getElementById('seg1').classList.add('show'), 350);
+  setTimeout(() => {
+    document.getElementById('seg2').classList.add('show');
+    document.getElementById('cursor').style.display = 'inline-block';
+    let idx = 0;
+    typingTimer = setInterval(() => {
+      if (idx >= AI_ANSWER.length) {
+        clearInterval(typingTimer);
+        typingTimer = null;
+        document.getElementById('cursor').style.display = 'none';
+        document.getElementById('replayBtn').style.display = 'inline-block';
+        return;
+      }
+      output.textContent += AI_ANSWER[idx];
+      idx++;
+    }, 38);
+  }, 700);
+}
+
+function replayDemo() { playDemo(); }
+
+lessonOnView(document.getElementById('completionDemo'), playDemo);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

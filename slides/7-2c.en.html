@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Multi-Tool Orchestration: Concurrent or Sequential? | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 布局：场景侧栏 + 甘特图 ── */
+.orch{display:grid;grid-template-columns:290px 1fr;gap:20px;align-items:start}
+
+/* 左：场景 */
+.scene-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.l-label{padding:10px 16px;font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.user-req{padding:14px 16px;font-size:15px;line-height:1.7;color:var(--text);background:rgba(8,145,178,.04);border-bottom:1px solid var(--border)}
+.user-req b{color:var(--cyan)}
+
+.tool-list{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.tool-chip{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--card);border:1.5px solid var(--border);transition:border-color .3s,box-shadow .3s}
+.tool-chip.active{border-color:rgba(0,102,255,.35);box-shadow:0 0 0 3px rgba(0,102,255,.08)}
+.tool-chip.done{border-color:rgba(22,163,74,.3);box-shadow:0 0 0 3px rgba(22,163,74,.06)}
+.tc-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-size:14px;font-weight:700;color:var(--text)}
+.tc-time{font-size:12px;color:var(--sub);margin-top:2px}
+.tc-badge{padding:3px 8px;border-radius:5px;font-size:11px;font-weight:800;flex-shrink:0}
+
+.decision{margin:8px 12px 12px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(4px);transition:all .35s}
+.dec-card.show{opacity:1;transform:translateY(0)}
+.dec-card b{color:var(--accent)}
+
+/* 右：模式切换 + 甘特图 */
+.gantt-panel{min-width:0}
+.r-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.r-title{font-size:14px;font-weight:800;color:var(--text)}
+.mode-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.mode-tab{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:14px;font-weight:700;color:var(--sub);font-family:inherit;transition:all .15s;min-height:40px}
+.mode-tab.active{border-color:var(--accent);background:rgba(0,102,255,.06);color:var(--accent)}
+
+.gantt-area{display:flex;flex-direction:column;gap:14px}
+
+/* 甘特图 */
+.gantt-container{display:flex;flex-direction:column;gap:12px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow-card)}
+.gantt-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.gantt-title{font-size:15px;font-weight:700;color:var(--text)}
+.gantt-total{padding:5px 14px;border-radius:8px;font-size:15px;font-weight:800}
+
+.gantt-scroll{overflow-x:auto}
+.gantt-timeline{position:relative;display:flex;flex-direction:column;gap:6px;min-width:560px}
+.gantt-axis{display:flex;align-items:center;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:4px}
+.gantt-axis-label{font-size:12px;color:var(--sub);font-weight:600;position:absolute}
+
+.gantt-row{display:flex;align-items:center;gap:12px;height:44px}
+.gantt-row-label{width:120px;flex-shrink:0;font-size:13px;font-weight:700;color:var(--text);text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.gantt-row-label .emoji{font-size:16px}
+.gantt-row-track{flex:1;height:36px;position:relative;border-radius:8px;background:rgba(0,0,0,.02);border:1px solid var(--border)}
+.gantt-bar{position:absolute;top:4px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;opacity:0;transform:scaleX(0);transform-origin:left;transition:all .6s cubic-bezier(.4,0,.2,1)}
+.gantt-bar.show{opacity:1;transform:scaleX(1)}
+.gantt-bar-time{position:absolute;right:-40px;font-size:11px;font-weight:700;color:var(--sub);white-space:nowrap}
+
+.batch-label{position:absolute;top:-18px;font-size:11px;font-weight:800;color:var(--accent);white-space:nowrap}
+
+/* 说明卡 + 对比卡 */
+.desc-section{display:flex;flex-direction:column;gap:8px}
+.desc-card{padding:12px 16px;border-radius:10px;font-size:14px;line-height:1.6;color:var(--text);opacity:0;transform:translateY(6px);transition:all .4s}
+.desc-card.show{opacity:1;transform:translateY(0)}
+.desc-card b{color:var(--accent)}
+
+.compare-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.compare-card{padding:12px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);text-align:center;opacity:0;transform:translateY(6px);transition:all .4s}
+.compare-card.show{opacity:1;transform:translateY(0)}
+.compare-card.highlight{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.04)}
+.cc-label{font-size:13px;font-weight:700;color:var(--sub);margin-bottom:4px}
+.cc-value{font-size:22px;font-weight:800}
+.cc-sub{font-size:12px;color:var(--sub);margin-top:2px}
+
+/* 控制 */
+.ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.btn{padding:10px 20px;border-radius:8px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:44px}
+.btn-p{background:var(--accent);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.3;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.04);color:var(--sub);border:1px solid var(--border)}
+.ctrl-hint{font-size:13px;color:var(--sub)}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.pulse{animation:pulse 1s ease infinite}
+
+@media (max-width:768px){
+  .orch{grid-template-columns:1fr}
+  .compare-row{grid-template-columns:1fr}
+}
+</style>
+<meta name="description" content="Multi-tool orchestration: concurrent or sequential? Visualize and compare serial, concurrent, and smart-batch tool execution strategies with a Gantt chart, helping product managers understand key framework-level design decisions.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-2c.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-2c.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-2c.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-2c.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-2c.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Multi-Tool Orchestration: Concurrent or Sequential?">
+<meta property="og:url" content="https://xueai.app/slides/7-2c.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Multi-Tool Orchestration: Concurrent vs. Sequential","name":"Multi-Tool Orchestration: Concurrent vs. Sequential","url":"https://xueai.app/slides/7-2c.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI in Action · Agent Engineering","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Multi-tool orchestration: concurrent or sequential? Visualize and compare serial, concurrent, and smart-batch tool execution strategies with a Gantt chart.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent Engineering</div>
+    <h1>Multi-Tool Orchestration: Concurrent vs. Sequential</h1>
+    <p class="subtitle">When the model returns 3 tool calls in one turn, how do you choose the execution order? Pick a mode, click the demo, and observe the time difference.</p>
+  </header>
+
+  <div class="orch paywall-locked xa-peek">
+    <!-- Left: scenario -->
+    <aside class="scene-panel">
+      <div class="l-label">User scenario</div>
+      <div class="user-req">
+        <b>User says:</b><br>"Book me a flight from Beijing to Shanghai tomorrow, and also check the weather in Shanghai and recommend hotels."
+      </div>
+      <div class="l-label">Model returns 3 tool calls</div>
+      <div class="tool-list" id="toolList">
+        <div class="tool-chip" id="chip-flight">
+          <div class="tc-icon" style="background:rgba(124,58,237,.08)">✈️</div>
+          <div class="tc-info">
+            <div class="tc-name">search_flights</div>
+            <div class="tc-time">Est. time: 1.5s</div>
+          </div>
+          <span class="tc-badge" id="badge-flight" style="background:rgba(0,0,0,.04);color:var(--sub)">Waiting</span>
+        </div>
+        <div class="tool-chip" id="chip-weather">
+          <div class="tc-icon" style="background:rgba(8,145,178,.08)">🌤️</div>
+          <div class="tc-info">
+            <div class="tc-name">get_weather</div>
+            <div class="tc-time">Est. time: 0.8s</div>
+          </div>
+          <span class="tc-badge" id="badge-weather" style="background:rgba(0,0,0,.04);color:var(--sub)">Waiting</span>
+        </div>
+        <div class="tool-chip" id="chip-hotel">
+          <div class="tc-icon" style="background:rgba(22,163,74,.08)">🏨</div>
+          <div class="tc-info">
+            <div class="tc-name">search_hotels</div>
+            <div class="tc-time">Est. time: 1.2s</div>
+          </div>
+          <span class="tc-badge" id="badge-hotel" style="background:rgba(0,0,0,.04);color:var(--sub)">Waiting</span>
+        </div>
+      </div>
+      <div class="decision" id="decArea"></div>
+    </aside>
+
+    <!-- Right: Gantt chart -->
+    <div class="gantt-panel">
+      <div class="r-bar">
+        <div class="r-title">Execution timeline comparison</div>
+        <div class="mode-tabs" id="modeTabs">
+          <button class="mode-tab active" onclick="pickMode(0)">Sequential</button>
+          <button class="mode-tab" onclick="pickMode(1)">Concurrent</button>
+          <button class="mode-tab" onclick="pickMode(2)">Smart Batch</button>
+        </div>
+      </div>
+
+      <div class="gantt-area" id="ganttArea"></div>
+
+      <div class="ctrl">
+        <button class="btn btn-p" id="btnRun" onclick="runDemo()">▶ Start Demo</button>
+        <button class="btn btn-r" onclick="resetDemo()">Reset</button>
+        <span class="ctrl-hint" id="hint">Choose a mode → click demo → observe the time difference</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b>　When a model returns multiple tool calls in one turn, the framework must decide: run all sequentially (safest), all concurrently (fastest), or smart-batch by safety level (the Alice approach). This decision directly impacts how long users wait.
+  </div>
+</article>
+
+<script>
+var TOOLS = [
+  {id:'flight', name:'search_flights', emoji:'✈️', color:'var(--purple)', bg:'rgba(124,58,237,.75)', time:1.5, safe:false},
+  {id:'weather', name:'get_weather', emoji:'🌤️', color:'var(--cyan)', bg:'rgba(8,145,178,.8)', time:0.8, safe:true},
+  {id:'hotel', name:'search_hotels', emoji:'🏨', color:'var(--success)', bg:'rgba(22,163,74,.75)', time:1.2, safe:true}
+];
+
+var MODES = [
+  {
+    key:'serial',
+    title:'Sequential',
+    subtitle:'One at a time — safest',
+    totalTime:3.5,
+    batches:[[0],[1],[2]],
+    decision:'<b>📌 Design decision:</b> Sequential = absolutely safe, but users wait 3.5s. Each tool must finish before the next starts — no data races possible.<br><b>Trade-off:</b> If tools have no actual dependencies, you\'re wasting the opportunity to parallelize.',
+    descText:'Each tool runs in order: flights first → then weather → finally hotels. Total time = sum of all tool durations.'
+  },
+  {
+    key:'parallel',
+    title:'Concurrent',
+    subtitle:'All at once — fastest',
+    totalTime:1.5,
+    batches:[[0,1,2]],
+    decision:'<b>📌 Design decision:</b> Concurrent = fastest experience, but carries risk. If flight booking can change user state (e.g. charge a card), and hotel search depends on flight results (e.g. filtering by arrival time), running them simultaneously may cause <b>data races</b>.<br><b>Follow-up question:</b> In your product, do these 3 tools have dependencies on each other?',
+    descText:'All three tools start simultaneously. Total time = slowest tool (1.5s). Speed improvement: 57%.'
+  },
+  {
+    key:'smart',
+    title:'Smart Batch (Alice\'s approach)',
+    subtitle:'Auto-grouped by safety level',
+    totalTime:2.7,
+    batches:[[0],[1,2]],
+    decision:'<b>📌 Design decision:</b> The framework tags each tool as safe or unsafe to parallelize. Flight search may involve state changes → run alone. Weather and hotels are pure reads → safe to merge.<br><b>Key insight:</b> The product manager must tell engineers each tool\'s safety tier. This is a business judgment call.',
+    descText:'Batch 1: flight search (may change state — run alone) → Batch 2: weather + hotels (pure reads — run together).'
+  }
+];
+
+var curMode = 0;
+var running = false;
+var animTimers = [];
+
+function pickMode(i) {
+  if (running) return;
+  curMode = i;
+  var tabs = document.querySelectorAll('.mode-tab');
+  for (var t = 0; t < tabs.length; t++) tabs[t].classList.toggle('active', t === i);
+  resetDemo();
+}
+
+function buildGantt() {
+  var m = MODES[curMode];
+  var maxTime = 4.0;
+  var pxPerSec = 100;
+
+  var html = '';
+  html += '<div class="gantt-container">';
+  html += '<div class="gantt-header"><div class="gantt-title">' + m.title + '<span style="font-weight:400;color:var(--sub);font-size:13px;margin-left:8px">' + m.subtitle + '</span></div>';
+
+  var totalColor = m.totalTime <= 2 ? 'var(--success)' : m.totalTime <= 3 ? 'var(--amber)' : 'var(--danger)';
+  html += '<div class="gantt-total" style="background:' + totalColor + '15;color:' + totalColor + '">Total: <span id="totalDisplay">—</span>s</div></div>';
+
+  html += '<div class="gantt-scroll"><div class="gantt-timeline" style="padding-left:132px">';
+
+  var axisHtml = '<div class="gantt-axis" style="position:relative;height:20px">';
+  for (var s = 0; s <= maxTime; s += 0.5) {
+    axisHtml += '<span class="gantt-axis-label" style="left:' + (s * pxPerSec) + 'px">' + s.toFixed(1) + 's</span>';
+  }
+  axisHtml += '</div>';
+  html += axisHtml;
+
+  var batchStartTimes = [];
+  var currentStart = 0;
+  for (var bi = 0; bi < m.batches.length; bi++) {
+    batchStartTimes.push(currentStart);
+    var batchMax = 0;
+    for (var bj = 0; bj < m.batches[bi].length; bj++) {
+      var toolTime = TOOLS[m.batches[bi][bj]].time;
+      if (toolTime > batchMax) batchMax = toolTime;
+    }
+    currentStart += batchMax;
+  }
+
+  for (var ti = 0; ti < TOOLS.length; ti++) {
+    var tool = TOOLS[ti];
+    var batchIdx = -1;
+    var posInBatch = -1;
+    for (var b = 0; b < m.batches.length; b++) {
+      for (var p = 0; p < m.batches[b].length; p++) {
+        if (m.batches[b][p] === ti) { batchIdx = b; posInBatch = p; }
+      }
+    }
+    var startSec = batchStartTimes[batchIdx];
+    var leftPx = startSec * pxPerSec;
+    var widthPx = tool.time * pxPerSec;
+
+    html += '<div class="gantt-row">';
+    html += '<div class="gantt-row-label" style="position:absolute;left:0;width:120px"><span class="emoji">' + tool.emoji + '</span>' + tool.name.replace('search_','').replace('get_','') + '</div>';
+    html += '<div class="gantt-row-track">';
+
+    if (m.key === 'smart' && posInBatch === 0 && m.batches[batchIdx].length > 0) {
+      var bLabel = m.batches[batchIdx].length > 1 ? 'Batch ' + (batchIdx + 1) + ' (concurrent)' : 'Batch ' + (batchIdx + 1) + ' (single)';
+      html += '<span class="batch-label" style="left:' + leftPx + 'px" id="blabel-' + batchIdx + '">' + bLabel + '</span>';
+    }
+
+    html += '<div class="gantt-bar" id="bar-' + tool.id + '" style="left:' + leftPx + 'px;width:' + widthPx + 'px;background:' + tool.bg + '">' + tool.time + 's</div>';
+    html += '</div></div>';
+  }
+
+  html += '</div></div></div>';
+
+  html += '<div class="desc-section">';
+  html += '<div class="desc-card" id="descCard" style="background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.15);border-radius:10px">' + m.descText + '</div>';
+  html += '</div>';
+
+  html += '<div class="compare-row" id="compareRow">';
+  for (var ci = 0; ci < MODES.length; ci++) {
+    var isActive = ci === curMode;
+    var cColor = MODES[ci].totalTime <= 2 ? 'var(--success)' : MODES[ci].totalTime <= 3 ? 'var(--amber)' : 'var(--danger)';
+    html += '<div class="compare-card' + (isActive ? ' highlight' : '') + '" id="cc-' + ci + '">';
+    html += '<div class="cc-label">' + MODES[ci].title + '</div>';
+    html += '<div class="cc-value" style="color:' + cColor + '">' + MODES[ci].totalTime + 's</div>';
+    html += '<div class="cc-sub">' + (ci === 0 ? 'Safest' : ci === 1 ? 'Fastest' : 'Balanced') + '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  document.getElementById('ganttArea').innerHTML = html;
+}
+
+function resetChips() {
+  for (var i = 0; i < TOOLS.length; i++) {
+    var chip = document.getElementById('chip-' + TOOLS[i].id);
+    var badge = document.getElementById('badge-' + TOOLS[i].id);
+    chip.className = 'tool-chip';
+    badge.style.background = 'rgba(0,0,0,.04)';
+    badge.style.color = 'var(--sub)';
+    badge.textContent = 'Waiting';
+  }
+}
+
+function setChipState(id, state) {
+  var chip = document.getElementById('chip-' + id);
+  var badge = document.getElementById('badge-' + id);
+  if (state === 'running') {
+    chip.className = 'tool-chip active';
+    badge.style.background = 'rgba(0,102,255,.1)';
+    badge.style.color = 'var(--accent)';
+    badge.textContent = 'Running';
+    badge.classList.add('pulse');
+  } else if (state === 'done') {
+    chip.className = 'tool-chip done';
+    badge.style.background = 'rgba(22,163,74,.1)';
+    badge.style.color = 'var(--success)';
+    badge.textContent = 'Done ✓';
+    badge.classList.remove('pulse');
+  }
+}
+
+function runDemo() {
+  if (running) return;
+  running = true;
+  document.getElementById('btnRun').disabled = true;
+  resetChips();
+  buildGantt();
+
+  var m = MODES[curMode];
+  var pxPerSec = 100;
+  var batchStartTimes = [];
+  var currentStart = 0;
+
+  for (var bi = 0; bi < m.batches.length; bi++) {
+    batchStartTimes.push(currentStart);
+    var batchMax = 0;
+    for (var bj = 0; bj < m.batches[bi].length; bj++) {
+      if (TOOLS[m.batches[bi][bj]].time > batchMax) batchMax = TOOLS[m.batches[bi][bj]].time;
+    }
+    currentStart += batchMax;
+  }
+
+  var speedFactor = 600;
+  var elapsed = 0;
+
+  for (var b = 0; b < m.batches.length; b++) {
+    (function(batchIdx) {
+      var batchStart = batchStartTimes[batchIdx];
+      var batchTools = m.batches[batchIdx];
+      var batchMaxTime = 0;
+
+      var startTimer = setTimeout(function() {
+        for (var t = 0; t < batchTools.length; t++) {
+          var tool = TOOLS[batchTools[t]];
+          setChipState(tool.id, 'running');
+          var bar = document.getElementById('bar-' + tool.id);
+          if (bar) {
+            bar.classList.add('show');
+          }
+          if (tool.time > batchMaxTime) batchMaxTime = tool.time;
+        }
+
+        for (var t2 = 0; t2 < batchTools.length; t2++) {
+          (function(toolIdx) {
+            var tool = TOOLS[toolIdx];
+            var doneTimer = setTimeout(function() {
+              setChipState(tool.id, 'done');
+            }, tool.time * speedFactor);
+            animTimers.push(doneTimer);
+          })(batchTools[t2]);
+        }
+      }, batchStart * speedFactor);
+      animTimers.push(startTimer);
+
+    })(b);
+  }
+
+  var totalTimer = setTimeout(function() {
+    document.getElementById('totalDisplay').textContent = m.totalTime;
+    var desc = document.getElementById('descCard');
+    if (desc) desc.classList.add('show');
+    var cards = document.querySelectorAll('.compare-card');
+    for (var c = 0; c < cards.length; c++) {
+      (function(card, delay) {
+        var t = setTimeout(function() { card.classList.add('show'); }, delay);
+        animTimers.push(t);
+      })(cards[c], c * 120);
+    }
+
+    var da = document.getElementById('decArea');
+    da.innerHTML = '<div class="dec-card">' + m.decision + '</div>';
+    requestAnimationFrame(function() { requestAnimationFrame(function() {
+      var dc = da.querySelector('.dec-card');
+      if (dc) dc.classList.add('show');
+    })});
+
+    running = false;
+    document.getElementById('btnRun').disabled = true;
+    document.getElementById('btnRun').textContent = '✓ Demo complete';
+    document.getElementById('hint').textContent = 'Switch modes to compare strategies → click Reset to replay';
+  }, m.totalTime * speedFactor + 300);
+  animTimers.push(totalTimer);
+}
+
+function resetDemo() {
+  for (var i = 0; i < animTimers.length; i++) clearTimeout(animTimers[i]);
+  animTimers = [];
+  running = false;
+  resetChips();
+  buildGantt();
+  document.getElementById('btnRun').disabled = false;
+  document.getElementById('btnRun').textContent = '▶ Start demo';
+  document.getElementById('hint').textContent = 'Choose a mode → click Demo → observe the time difference';
+  document.getElementById('decArea').innerHTML = '';
+}
+
+buildGantt();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

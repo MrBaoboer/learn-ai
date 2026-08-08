@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ReAct 실전: Agent가 막혔을 때의 추론과 행동 루프 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 레이아웃: 상태 사이드바 + 실행 로그 ── */
+.react-layout{display:grid;grid-template-columns:290px 1fr;gap:20px;align-items:start}
+
+/* 왼쪽: 상태 패널 */
+.side-panel{display:flex;flex-direction:column;gap:12px;position:sticky;top:16px}
+
+/* 루프 카운터 */
+.loop-counter{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-card)}
+.lc-row{display:flex;justify-content:space-between;align-items:center}
+.lc-label{font-size:13px;color:var(--sub);font-weight:600}
+.lc-val{font-size:22px;font-weight:900;color:var(--text);transition:color .3s}
+.lc-val.warn{color:var(--amber)}
+.lc-val.danger{color:var(--danger)}
+.lc-bar{height:6px;background:rgba(0,0,0,.05);border-radius:3px;overflow:hidden}
+.lc-fill{height:100%;background:var(--success);border-radius:3px;transition:width .4s ease,background .4s}
+.lc-fill.warn{background:var(--amber)}
+.lc-fill.danger{background:var(--danger)}
+
+.status-badge{padding:6px 12px;border-radius:7px;font-size:13px;font-weight:700;text-align:center;transition:all .3s}
+
+/* 진행 제어 */
+.ctrl-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-card)}
+.btn-reset{padding:9px 12px;border-radius:8px;background:rgba(0,0,0,.04);color:var(--sub);font-size:14px;border:1px solid var(--border);cursor:pointer;font-family:inherit;min-height:40px}
+.prog-bar{height:4px;background:rgba(0,0,0,.05);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .35s}
+
+.insight{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.18);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text);line-height:1.6}
+.insight b{color:var(--danger)}
+.insight.ok{background:rgba(22,163,74,.05);border-color:rgba(22,163,74,.2)}
+.insight.ok b{color:var(--success)}
+
+/* 오른쪽: 실행 로그 */
+.log-panel{min-width:0}
+.r-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.r-hd-label{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--sub);text-transform:uppercase}
+.r-hd-task{font-size:14px;font-weight:700;color:var(--text)}
+
+/* 메시지 흐름 */
+.msg-area{display:flex;flex-direction:column;gap:8px}
+
+.msg{display:flex;gap:10px;opacity:0;transform:translateY(8px);transition:opacity .3s ease,transform .3s ease}
+.msg.show{opacity:1;transform:translateY(0)}
+.msg-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+.msg-body{flex:1;min-width:0}
+.msg-role{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;margin-bottom:3px}
+.msg-bubble{border-radius:9px;padding:10px 14px;font-size:13.5px;line-height:1.65}
+
+/* 오류 shake */
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.shake{animation:shake .4s ease}
+
+.code{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.k{color:var(--purple)}.s{color:var(--success)}.c{color:#9ca3af;font-style:italic}.fn{color:var(--cyan)}.err{color:var(--danger);font-weight:700}
+
+.ft-msg{font-size:13px;color:var(--sub);font-weight:600;transition:color .3s;margin-top:10px;display:block;min-height:20px}
+
+@media (max-width:768px){
+  .react-layout{grid-template-columns:1fr}
+  .side-panel{position:static}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="ReAct(Reasoning + Acting) 프레임워크는 Agent가 실행 중에 추론하고 행동할 수 있게 합니다. 실제 사례로 ReAct 반복 루프를 분석합니다: Thought, Action, Observation, 그리고 Agent가 막히는 일반적인 원인과 해결책.">
+<meta name="keywords" content="ReAct,Agent 프레임워크,추론 행동,Thought Action Observation,Agent 디버깅,LangChain">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-3.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-3.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 제품 매니저 교육">
+<meta property="og:title" content="ReAct 실전: Agent가 막혔을 때 어떻게 할까">
+<meta property="og:description" content="ReAct(Reasoning + Acting) 프레임워크는 Agent가 실행 중에 추론하고 행동할 수 있게 합니다. 실제 사례로 ReAct 반복 루프를 분석합니다: Thought, Action, Observation, 그리고 Agent가 막히는 일반적인 원인과 해결책.">
+<meta property="og:url" content="https://xueai.app/slides/7-3.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ReAct 실전: Agent가 막혔을 때 어떻게 할까">
+<meta name="twitter:description" content="ReAct(Reasoning + Acting) 프레임워크는 Agent가 실행 중에 추론하고 행동할 수 있게 합니다. 실제 사례로 ReAct 반복 루프를 분석합니다: Thought, Action, Observation, 그리고 Agent가 막히는 일반적인 원인과 해결책.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"ReAct 실전: 호텔 예약 전체 체인","name":"ReAct 실전: 호텔 예약 전체 체인","url":"https://xueai.app/slides/7-3.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 중급까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Agent 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"ReAct(Reasoning + Acting) 프레임워크는 Agent가 실행 중에 추론하고 행동할 수 있게 합니다. 실제 사례로 ReAct 반복 루프를 분석합니다: Thought, Action, Observation, 그리고 Agent가 막히는 일반적인 원인과 해결책.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 엔지니어링</div>
+    <h1>ReAct 실전: Agent가 막혔을 때</h1>
+    <p class="subtitle">ReAct 루프: 사고 → 행동 → 관찰, 반복. 하지만 모델이 API에서 요구하는 파라미터 형식을 모른다면, 계속 추측하며 같은 곳에서 맴돌게 됩니다. 아래로 스크롤하면 실제 실패 과정이 자동으로 추적됩니다.</p>
+  </header>
+
+  <div class="react-layout reveal paywall-locked xa-peek" id="reactDemo">
+    <!-- 왼쪽: 상태 패널 -->
+    <aside class="side-panel">
+      <div class="loop-counter">
+        <div class="lc-row">
+          <span class="lc-label">ReAct 루프 횟수</span>
+          <span class="lc-val" id="loopCount">0</span>
+        </div>
+        <div class="lc-bar"><div class="lc-fill" id="loopFill" style="width:0%"></div></div>
+        <div class="lc-row">
+          <span class="lc-label">도구 호출</span>
+          <span class="lc-val" id="callCount" style="font-size:16px">0 회</span>
+        </div>
+        <div class="lc-row">
+          <span class="lc-label">실패 횟수</span>
+          <span class="lc-val" id="failCount" style="font-size:16px;color:var(--danger)">0 회</span>
+        </div>
+        <div class="status-badge" id="statusBadge" style="background:rgba(0,0,0,.04);color:var(--sub)">시작 대기 중</div>
+      </div>
+
+      <div class="ctrl-box">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--sub);font-weight:600" id="stepText">총 10 단계</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text)" id="stepNum">0 / 10</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <button class="btn-reset" onclick="resetAll()">↺ 다시 재생</button>
+      </div>
+
+      <div class="insight" id="insightBox">
+        <b>문제의 근본 원인:</b> 모델이 API에서 요구하는 구체적인 형식을 모르기 때문에 추측에 의존하고, 실패할 때마다 다른 방식으로 재시도합니다. 스캐폴딩이 없는 Agent는 이 루프가 영원히 멈추지 않을 수 있습니다.
+      </div>
+    </aside>
+
+    <!-- 오른쪽: 실행 로그 -->
+    <div class="log-panel">
+      <div class="r-hd">
+        <span class="r-hd-label">ReAct 실행 로그</span>
+        <span class="r-hd-task">작업: 상하이 와이탄 근처 호텔 예약, 내일 체크인, 2박</span>
+      </div>
+      <div class="msg-area" id="msgArea"></div>
+      <span class="ft-msg" id="ftMsg">여기로 스크롤하면 자동 재생됩니다</span>
+    </div>
+  </div>
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+// 단계별 데이터
+const STEPS = [
+  {
+    loop:1, calls:0, fails:0,
+    status:'실행 중', statusBg:'rgba(8,145,178,.08)', statusColor:'#0891b2',
+    ft:'1라운드: Agent가 작업에 대해 생각하기 시작합니다…',
+    msgs:[{
+      icon:'🤔', iconBg:'#7c3aed', role:'THOUGHT', roleColor:'#7c3aed',
+      bg:'rgba(124,58,237,.05)', border:'rgba(124,58,237,.2)',
+      html:'작업은 상하이 와이탄 근처 호텔 예약, 내일 체크인, 2박입니다. book_hotel 도구를 호출해야 합니다. 내일은 2026-04-11, 체크아웃은 4-13입니다.'
+    }]
+  },
+  {
+    loop:1, calls:1, fails:0,
+    status:'호출 중', statusBg:'rgba(8,145,178,.08)', statusColor:'#0891b2',
+    ft:'1번째 도구 호출, 자연어 날짜 형식 사용…',
+    msgs:[{
+      icon:'⚡', iconBg:'#0891b2', role:'ACTION', roleColor:'#0891b2',
+      bg:'rgba(8,145,178,.04)', border:'rgba(8,145,178,.2)',
+      html:`<div class="code"><span class="fn">book_hotel</span>({
+  location:   <span class="s">"Shanghai Bund"</span>,
+  checkin:    <span class="s">"내일"</span>,        <span class="c">← 자연어 사용</span>
+  checkout:   <span class="s">"모레"</span>,
+  guests:     <span class="k">1</span>
+})</div>`
+    }]
+  },
+  {
+    loop:1, calls:1, fails:1,
+    status:'오류 ×1', statusBg:'rgba(220,38,38,.08)', statusColor:'#dc2626',
+    ft:'API 오류: 자연어 날짜 불허',
+    msgs:[{
+      icon:'❌', iconBg:'#dc2626', role:'OBSERVATION · ERROR', roleColor:'#dc2626',
+      bg:'rgba(220,38,38,.04)', border:'rgba(220,38,38,.25)',
+      shake:true,
+      html:`<div class="code"><span class="err">Error 400: Invalid date format</span>
+checkin 필드는 자연어를 허용하지 않습니다.
+<span class="c">YYYY-MM-DD 형식을 사용하세요.</span></div>`
+    }]
+  },
+  {
+    loop:2, calls:2, fails:1,
+    status:'재시도 중', statusBg:'rgba(215,119,6,.08)', statusColor:'#d97706',
+    ft:'2라운드: 숫자 날짜로 변경했지만 형식이 여전히 틀렸습니다…',
+    msgs:[{
+      icon:'🤔', iconBg:'#7c3aed', role:'THOUGHT', roleColor:'#7c3aed',
+      bg:'rgba(124,58,237,.05)', border:'rgba(124,58,237,.2)',
+      html:'알겠습니다, 날짜 형식이 필요합니다. 내일은 4월 11일이므로 04/11로 시도해 보겠습니다.'
+    },{
+      icon:'⚡', iconBg:'#0891b2', role:'ACTION', roleColor:'#0891b2',
+      bg:'rgba(8,145,178,.04)', border:'rgba(8,145,178,.2)',
+      html:`<div class="code"><span class="fn">book_hotel</span>({
+  location:   <span class="s">"Shanghai Bund"</span>,
+  checkin:    <span class="s">"04/11"</span>,     <span class="c">← 슬래시 형식으로 변경</span>
+  checkout:   <span class="s">"04/13"</span>,
+  guests:     <span class="k">1</span>
+})</div>`
+    }]
+  },
+  {
+    loop:2, calls:2, fails:2,
+    status:'오류 ×2', statusBg:'rgba(220,38,38,.08)', statusColor:'#dc2626',
+    ft:'여전히 틀림: API는 YYYY-MM-DD만 허용, MM/DD 불허',
+    msgs:[{
+      icon:'❌', iconBg:'#dc2626', role:'OBSERVATION · ERROR', roleColor:'#dc2626',
+      bg:'rgba(220,38,38,.04)', border:'rgba(220,38,38,.25)',
+      shake:true,
+      html:`<div class="code"><span class="err">Error 400: Date parse failed</span>
+"04/11"을 인식할 수 없습니다. 연도를 포함해야 합니다.
+<span class="c">올바른 형식: YYYY-MM-DD (예: 2026-04-11)</span></div>`
+    }]
+  },
+  {
+    loop:3, calls:3, fails:2,
+    status:'재시도 중', statusBg:'rgba(215,119,6,.08)', statusColor:'#d97706',
+    ft:'3라운드: 드디어 연도가 필요하다는 것을 알았지만 체크아웃 계산이 틀렸습니다…',
+    msgs:[{
+      icon:'🤔', iconBg:'#7c3aed', role:'THOUGHT', roleColor:'#7c3aed',
+      bg:'rgba(124,58,237,.05)', border:'rgba(124,58,237,.2)',
+      html:'연도를 포함해야 하고 형식은 YYYY-MM-DD입니다. 체크인 2026-04-11, 2박이면 체크아웃은 2026-04-12입니다.'
+    },{
+      icon:'⚡', iconBg:'#0891b2', role:'ACTION', roleColor:'#0891b2',
+      bg:'rgba(8,145,178,.04)', border:'rgba(8,145,178,.2)',
+      html:`<div class="code"><span class="fn">book_hotel</span>({
+  location:   <span class="s">"Shanghai Bund"</span>,
+  checkin:    <span class="s">"2026-04-11"</span>,
+  checkout:   <span class="s">"2026-04-12"</span>,  <span class="c">← 2박인데 1박만 계산</span>
+  guests:     <span class="k">1</span>
+})</div>`
+    }]
+  },
+  {
+    loop:3, calls:3, fails:3,
+    status:'오류 ×3', statusBg:'rgba(220,38,38,.1)', statusColor:'#dc2626',
+    ft:'날짜 형식은 맞았지만 박수가 틀렸습니다',
+    msgs:[{
+      icon:'❌', iconBg:'#dc2626', role:'OBSERVATION · ERROR', roleColor:'#dc2626',
+      bg:'rgba(220,38,38,.04)', border:'rgba(220,38,38,.3)',
+      shake:true,
+      html:`<div class="code"><span class="err">Error 422: Invalid stay duration</span>
+checkout은 checkin보다 최소 1박 이후여야 합니다.
+checkin=2026-04-11, checkout=2026-04-12 → 1박만.
+<span class="c">사용자가 2박을 요청했으므로 checkout은 2026-04-13이어야 합니다.</span></div>`
+    }]
+  },
+  {
+    loop:4, calls:4, fails:3,
+    status:'재시도 중', statusBg:'rgba(215,119,6,.08)', statusColor:'#d97706',
+    ft:'4라운드: 드디어 모든 파라미터가 맞아서 4번째 호출을 합니다…',
+    msgs:[{
+      icon:'🤔', iconBg:'#7c3aed', role:'THOUGHT', roleColor:'#7c3aed',
+      bg:'rgba(124,58,237,.05)', border:'rgba(124,58,237,.2)',
+      html:'2박이므로 체크아웃은 4-13이고 4-12가 아닙니다. 형식은 이미 YYYY-MM-DD이므로 이번엔 맞을 것 같습니다.'
+    },{
+      icon:'⚡', iconBg:'#0891b2', role:'ACTION', roleColor:'#0891b2',
+      bg:'rgba(8,145,178,.04)', border:'rgba(8,145,178,.2)',
+      html:`<div class="code"><span class="fn">book_hotel</span>({
+  location:   <span class="s">"Shanghai Bund"</span>,
+  checkin:    <span class="s">"2026-04-11"</span>,
+  checkout:   <span class="s">"2026-04-13"</span>,  <span class="c">← 2박으로 수정</span>
+  guests:     <span class="k">1</span>
+})</div>`
+    }]
+  },
+  {
+    loop:4, calls:4, fails:3,
+    status:'성공!', statusBg:'rgba(22,163,74,.08)', statusColor:'#16a34a',
+    ft:'4번째 시도에서 성공, 3번 돌고 나서',
+    msgs:[{
+      icon:'✅', iconBg:'#16a34a', role:'OBSERVATION · SUCCESS', roleColor:'#16a34a',
+      bg:'rgba(22,163,74,.04)', border:'rgba(22,163,74,.25)',
+      html:`<div class="code">booking_id:  <span class="s">"BK-20260411-0872"</span>
+hotel:       <span class="s">"상하이 와이탄 호텔"</span>
+checkin:     <span class="s">"2026-04-11"</span>
+checkout:    <span class="s">"2026-04-13"</span>
+price:       <span class="k">¥1,280 / 박</span>  × 2박 = ¥2,560
+status:      <span class="fn">CONFIRMED</span></div>`
+    }]
+  },
+  {
+    loop:4, calls:4, fails:3,
+    status:'완료', statusBg:'rgba(22,163,74,.08)', statusColor:'#16a34a',
+    ft:'총 4번 루프, 3번 실패 — 단순한 작업 하나를 완료하기 위해',
+    msgs:[{
+      icon:'🤖', iconBg:'#16a34a', role:'FINAL ANSWER', roleColor:'#16a34a',
+      bg:'rgba(22,163,74,.05)', border:'rgba(22,163,74,.25)',
+      html:'상하이 와이탄 호텔을 예약해 드렸습니다. 4월 11일 체크인, 4월 13일 체크아웃, 총 2박, 합계 ¥2,560. 예약 번호: BK-20260411-0872.'
+    }]
+  }
+];
+
+let cur = 0;
+let playTimer = null;
+
+function playStep() {
+  if (cur >= STEPS.length) return;
+  const s = STEPS[cur];
+
+  // 왼쪽 패널 카운터 업데이트
+  const lc = document.getElementById('loopCount');
+  lc.textContent = s.loop;
+  lc.className = 'lc-val' + (s.fails >= 3 ? ' danger' : s.fails >= 1 ? ' warn' : '');
+  const fill = document.getElementById('loopFill');
+  fill.style.width = (s.loop / 4 * 100) + '%';
+  fill.className = 'lc-fill' + (s.fails >= 3 ? ' danger' : s.fails >= 1 ? ' warn' : '');
+  document.getElementById('callCount').textContent = s.calls + ' 회';
+  document.getElementById('failCount').textContent = s.fails + ' 회';
+
+  const badge = document.getElementById('statusBadge');
+  badge.textContent = s.status;
+  badge.style.background = s.statusBg;
+  badge.style.color = s.statusColor;
+
+  // 진행 바
+  document.getElementById('progFill').style.width = ((cur+1)/STEPS.length*100)+'%';
+  document.getElementById('stepNum').textContent = `${cur+1} / ${STEPS.length}`;
+  document.getElementById('ftMsg').textContent = s.ft;
+
+  // 메시지 렌더링
+  const area = document.getElementById('msgArea');
+  s.msgs.forEach((m, mi) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'msg';
+      el.innerHTML = `
+        <div class="msg-icon" style="background:${m.iconBg}">${m.icon}</div>
+        <div class="msg-body">
+          <div class="msg-role" style="color:${m.roleColor}">${m.role}</div>
+          <div class="msg-bubble" style="background:${m.bg};border:1.5px solid ${m.border}">${m.html}</div>
+        </div>`;
+      area.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('show');
+        if (m.shake) setTimeout(() => el.querySelector('.msg-bubble').classList.add('shake'), 350);
+      }, 60);
+    }, mi * 180);
+  });
+
+  cur++;
+
+  // 마지막 단계
+  if (cur >= STEPS.length) {
+    document.getElementById('stepText').textContent = '데모 종료';
+    const ib = document.getElementById('insightBox');
+    ib.className = 'insight ok';
+    ib.innerHTML = '<b>이것이 바로 스캐폴딩의 가치입니다:</b> 파라미터 검증, 형식 설명, 최대 재시도 횟수 제한을 추가하면 Agent가 무한히 루프하지 않습니다. 다음 페이지에서는 스캐폴딩으로 이 문제를 해결하는 방법을 소개합니다.';
+    playTimer = null;
+  } else {
+    playTimer = setTimeout(playStep, 850);
+  }
+}
+
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
+function resetAll() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
+  cur = 0;
+  document.getElementById('msgArea').innerHTML = '';
+  document.getElementById('loopCount').textContent = '0';
+  document.getElementById('loopCount').className = 'lc-val';
+  document.getElementById('loopFill').style.width = '0%';
+  document.getElementById('loopFill').className = 'lc-fill';
+  document.getElementById('callCount').textContent = '0 회';
+  document.getElementById('failCount').textContent = '0 회';
+  document.getElementById('statusBadge').textContent = '시작 대기 중';
+  document.getElementById('statusBadge').style.background = 'rgba(0,0,0,.04)';
+  document.getElementById('statusBadge').style.color = 'var(--sub)';
+  document.getElementById('progFill').style.width = '0%';
+  document.getElementById('stepNum').textContent = '0 / 10';
+  document.getElementById('stepText').textContent = '총 10 단계';
+  document.getElementById('ftMsg').textContent = '자동 재생 중…';
+  const ib = document.getElementById('insightBox');
+  ib.className = 'insight';
+  ib.innerHTML = '<b>문제의 근본 원인:</b> 모델이 API에서 요구하는 구체적인 형식을 모르기 때문에 추측에 의존하고, 실패할 때마다 다른 방식으로 재시도합니다. 스캐폴딩이 없는 Agent는 이 루프가 영원히 멈추지 않을 수 있습니다.';
+  startPlay();
+}
+
+lessonOnView(document.getElementById('reactDemo'), function() {
+  document.getElementById('ftMsg').textContent = '자동 재생 중…';
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

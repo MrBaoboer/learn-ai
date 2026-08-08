@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agent로 Agent 도구 최적화하기 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8;margin-bottom:8px}
+
+/* 3단계 워크플로 */
+.workflow-steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;margin-top:8px;position:relative}
+@media(max-width:768px){.workflow-steps{grid-template-columns:1fr;gap:16px}}
+.wf-step{background:var(--card);border:1.5px solid var(--border);padding:24px 22px;box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:12px;position:relative}
+.wf-step:first-child{border-radius:var(--radius) 0 0 var(--radius)}
+.wf-step:last-child{border-radius:0 var(--radius) var(--radius) 0}
+@media(max-width:768px){
+  .wf-step:first-child{border-radius:var(--radius) var(--radius) 0 0}
+  .wf-step:last-child{border-radius:0 0 var(--radius) var(--radius)}
+}
+.wf-step .wf-num{font-size:36px;font-weight:900;line-height:1;color:var(--border)}
+.wf-step h3{font-size:18px;font-weight:800;color:var(--text);margin:0}
+.wf-step .wf-desc{font-size:13.5px;color:var(--sub);line-height:1.7}
+.wf-step .wf-detail{background:var(--bg);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;line-height:1.6;color:var(--text)}
+.wf-step .wf-detail code{font-size:12px}
+.wf-arrow{position:absolute;right:-14px;top:50%;transform:translateY(-50%);z-index:2;width:28px;height:28px;background:var(--card);border:1.5px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--sub)}
+@media(max-width:768px){.wf-arrow{display:none}}
+.wf-step.step1 h3{color:var(--accent)}
+.wf-step.step2 h3{color:var(--purple)}
+.wf-step.step3 h3{color:var(--success)}
+
+/* 원칙 카드(5가지 원칙) */
+.principle-grid-5{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+@media(max-width:768px){.principle-grid-5{grid-template-columns:1fr}}
+.p5-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:10px}
+.p5-card.wide{grid-column:1/-1}
+.p5-card .p5-header{display:flex;align-items:center;gap:10px}
+.p5-card .p5-num{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0}
+.p5-card:nth-child(1) .p5-num{background:var(--accent)}
+.p5-card:nth-child(2) .p5-num{background:var(--purple)}
+.p5-card:nth-child(3) .p5-num{background:var(--cyan)}
+.p5-card:nth-child(4) .p5-num{background:var(--amber)}
+.p5-card:nth-child(5) .p5-num{background:var(--success)}
+.p5-card h4{font-size:15px;font-weight:800;color:var(--text);margin:0;flex:1}
+.p5-card .p5-body{font-size:13.5px;color:var(--sub);line-height:1.7}
+.p5-card .p5-example{background:var(--bg);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;line-height:1.6;color:var(--text)}
+.p5-card .p5-example b{color:var(--accent)}
+
+/* 비교 패널 */
+.contrast-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:8px}
+.contrast-panel h4{font-size:16px;font-weight:800;color:var(--text);margin:0 0 16px;display:flex;align-items:center;gap:8px}
+.contrast-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:768px){.contrast-grid{grid-template-columns:1fr}}
+.contrast-side{border-radius:var(--radius-sm);padding:16px 18px}
+.contrast-side.bad{background:rgba(220,38,38,.04);border:1px solid rgba(220,38,38,.15)}
+.contrast-side.good{background:rgba(22,163,74,.04);border:1px solid rgba(22,163,74,.15)}
+.contrast-side .ct-label{font-size:12px;font-weight:800;letter-spacing:.5px;margin-bottom:10px}
+.contrast-side.bad .ct-label{color:var(--danger)}
+.contrast-side.good .ct-label{color:var(--success)}
+.contrast-side .ct-code{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px;line-height:1.6;color:var(--text);white-space:pre-wrap}
+.contrast-side .ct-note{font-size:13px;color:var(--sub);margin-top:10px;line-height:1.6}
+
+/* 네임스페이스 다이어그램 */
+.ns-demo{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:8px}
+.ns-demo h4{font-size:16px;font-weight:800;color:var(--text);margin:0 0 16px;display:flex;align-items:center;gap:8px}
+.ns-group{margin-bottom:16px}
+.ns-group:last-child{margin-bottom:0}
+.ns-prefix{font-size:13px;font-weight:800;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.ns-prefix .ns-bar{width:3px;height:16px;border-radius:2px;background:var(--accent);flex-shrink:0}
+.ns-items{display:flex;flex-wrap:wrap;gap:8px;padding-left:14px}
+.ns-chip{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px;padding:6px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-weight:600}
+
+/* Token 효율 */
+.token-demo{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+@media(max-width:768px){.token-demo{grid-template-columns:1fr}}
+.token-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-card)}
+.token-box h4{font-size:14px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:6px}
+.token-box.bad h4{color:var(--danger)}
+.token-box.good h4{color:var(--success)}
+.token-box .tk-content{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12px;line-height:1.6;color:var(--text);background:var(--bg);border-radius:var(--radius-sm);padding:12px 14px;white-space:pre-wrap;max-height:180px;overflow-y:auto}
+.token-box .tk-stat{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;font-weight:700}
+.token-box.bad .tk-stat{color:var(--danger)}
+.token-box.good .tk-stat{color:var(--success)}
+
+/* 루프 다이어그램 */
+.loop-visual{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:8px;display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap}
+.loop-node{padding:14px 22px;border-radius:var(--radius-sm);font-size:14px;font-weight:700;text-align:center;min-width:120px}
+.loop-node.proto{background:rgba(0,102,255,.08);color:var(--accent);border:1.5px solid rgba(0,102,255,.2)}
+.loop-node.eval{background:rgba(124,58,237,.08);color:var(--purple);border:1.5px solid rgba(124,58,237,.2)}
+.loop-node.opt{background:rgba(22,163,74,.08);color:var(--success);border:1.5px solid rgba(22,163,74,.2)}
+.loop-arrow{font-size:20px;color:var(--sub);padding:0 12px;flex-shrink:0;display:flex;align-items:center}
+.loop-back{width:100%;text-align:center;margin-top:12px;font-size:13px;color:var(--sub);font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+
+/* takeaway */
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:20px}
+.takeaway b{color:var(--accent)}
+</style>
+<meta name="description" content="Claude Code를 사용하여 도구 작성, 평가 실행, 자동 최적화하는 3단계 워크플로우와 5가지 핵심 도구 설계 원칙. 도구 품질이 Agent 품질의 상한선을 결정합니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/10-7.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/10-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/10-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/10-7.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/10-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="Agent로 Agent 도구 최적화하기">
+<meta property="og:url" content="https://xueai.app/slides/10-7.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Agent로 Agent 도구 최적화하기","name":"Agent로 Agent 도구 최적화하기","url":"https://xueai.app/slides/10-7.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 도구 설계의 예술","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"Claude Code를 사용하여 도구 작성, 평가 실행, 자동 최적화하는 3단계 워크플로우와 5가지 핵심 도구 설계 원칙. 도구 품질이 Agent 품질의 상한선을 결정합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">도구 설계의 예술</div>
+    <h1>Agent로 Agent 도구 최적화하기</h1>
+    <p class="subtitle">도구가 잘 만들어졌는지 가장 잘 아는 건 Agent 자신입니다. 업계에서는 "Agent로 도구 작성 &rarr; 평가 실행 &rarr; 자동 최적화" 워크플로우를 검증했습니다. 도구 설계를 수작업 튜닝에서 체계적인 반복으로 전환할 수 있습니다.</p>
+  </header>
+
+  <!-- ===== 핵심 아이디어 ===== -->
+  <div class="sec-label">핵심 아이디어</div>
+
+  <div class="l-callout reveal">
+    <b>전통적인 방식:</b> 인간이 도구 작성 &rarr; 인간이 테스트 &rarr; 인간이 개선. 사이클이 길고 피드백이 느리며 개발자 직관에 의존합니다.<br>
+    <b>새로운 방식:</b> Claude Code로 도구 작성 &rarr; 평가로 자동 측정 &rarr; Claude Code가 평가 결과를 읽고 자동 최적화. <b>Agent가 자신의 도구에 대한 프로덕트 매니저가 됩니다.</b>
+  </div>
+
+  <!-- ===== 3단계 워크플로우 ===== -->
+  <div class="sec-label">3단계 워크플로우: Prototype &rarr; Evaluate &rarr; Optimize</div>
+
+  <div class="loop-visual reveal">
+    <div class="loop-node proto">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Prototype
+    </div>
+    <div class="loop-arrow"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+    <div class="loop-node eval">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Evaluate
+    </div>
+    <div class="loop-arrow"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+    <div class="loop-node opt">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Optimize
+    </div>
+    <div class="loop-back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      평가 결과가 불만족스럽다면? 기준을 충족할 때까지 루프를 반복합니다
+    </div>
+  </div>
+
+  <div class="workflow-steps" style="margin-top:16px">
+    <div class="wf-step step1 reveal">
+      <div class="wf-num">01</div>
+      <h3>Prototype</h3>
+      <div class="wf-desc">Claude Code를 사용하여 도구 프로토타입을 빠르게 생성합니다. 원하는 도구 기능을 설명하고 MCP 도구의 코드 골격을 생성하도록 합니다.</div>
+      <div class="wf-detail">
+        <b>입력:</b> "Jira 도구를 만들어 주세요. issue 생성, issue 목록 조회, issue 상태 업데이트가 가능해야 합니다"<br><br>
+        <b>출력:</b> Claude Code가 도구 정의, 파라미터 검증, API 호출 로직을 포함한 완전한 MCP 도구 코드를 생성합니다
+      </div>
+      <div class="wf-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+    </div>
+    <div class="wf-step step2 reveal">
+      <div class="wf-num">02</div>
+      <h3>Evaluate</h3>
+      <div class="wf-desc">평가 시스템을 구축하여 도구 성능을 체계적으로 측정합니다. 데이터로 품질을 증명해야 합니다 — "작동하는 것 같다"는 충분하지 않습니다.</div>
+      <div class="wf-detail">
+        <b>평가 차원:</b><br>
+        - Agent가 올바른 도구를 선택했는가?<br>
+        - 파라미터가 올바르게 채워졌는가?<br>
+        - 반환 결과가 올바르게 해석되었는가?<br>
+        - 엔드-투-엔드 작업 완료율은 어떠한가?
+      </div>
+      <div class="wf-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+    </div>
+    <div class="wf-step step3 reveal">
+      <div class="wf-num">03</div>
+      <h3>Optimize</h3>
+      <div class="wf-desc">Claude Code가 평가 결과를 읽고 실패 원인을 자동으로 분석하여 도구 설명과 구현을 개선하도록 합니다.</div>
+      <div class="wf-detail">
+        <b>Claude Code 분석:</b> "Agent가 23% 케이스에서 search와 list를 혼동했습니다. 설명이 너무 유사했기 때문입니다"<br><br>
+        <b>자동 수정:</b> 도구 설명을 재작성하고 구별 설명과 사용 예제를 추가합니다
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 5가지 원칙 ===== -->
+  <div class="sec-label">5가지 도구 설계 원칙</div>
+
+  <div class="principle-grid-5">
+    <div class="p5-card reveal">
+      <div class="p5-header">
+        <div class="p5-num">1</div>
+        <h4>올바른 도구 선택: 적을수록 좋습니다</h4>
+      </div>
+      <div class="p5-body">도구를 너무 많이 구현하지 마세요. 인간 개발자가 <code>search</code>를 써야 할지 <code>find</code>를 써야 할지 <code>lookup</code>을 써야 할지 구별하지 못한다면, Agent도 구별하지 못합니다.</div>
+      <div class="p5-example"><b>원칙:</b> 두 도구의 사용 시나리오가 50% 이상 겹친다면 합치세요. 파라미터가 더 많은 도구 하나가 혼동하기 쉬운 두 도구보다 낫습니다.</div>
+    </div>
+    <div class="p5-card reveal">
+      <div class="p5-header">
+        <div class="p5-num">2</div>
+        <h4>네임스페이스: 그룹 관리</h4>
+      </div>
+      <div class="p5-body">관련 도구를 접두사로 그룹화하여 Agent가 도구 간의 관계를 한눈에 파악할 수 있게 합니다.</div>
+      <div class="p5-example"><b>좋은 명명:</b> <code>jira_create_issue</code> / <code>jira_list_issues</code> / <code>jira_update_status</code><br><b>나쁜 명명:</b> <code>create_issue</code> / <code>list_tasks</code> / <code>update</code></div>
+    </div>
+    <div class="p5-card reveal">
+      <div class="p5-header">
+        <div class="p5-num">3</div>
+        <h4>의미 있는 컨텍스트 반환</h4>
+      </div>
+      <div class="p5-body">도구가 "success"만 반환하면 안 됩니다. Agent의 다음 단계에 필요한 정보를 반환해야 합니다.</div>
+      <div class="p5-example"><b>나쁜 예:</b> <code>{"status": "success"}</code><br><b>좋은 예:</b> <code>{"status": "success", "issue_id": "PROJ-123", "url": "https://...", "assignee": "Alice"}</code></div>
+    </div>
+    <div class="p5-card reveal">
+      <div class="p5-header">
+        <div class="p5-num">4</div>
+        <h4>Token 효율성: 반환 결과 최소화</h4>
+      </div>
+      <div class="p5-body">대량의 결과는 줄여야 합니다. 1,000개의 레코드를 반환하면 엄청난 Token을 소비하지만 Agent는 처음 10개만 필요합니다.</div>
+      <div class="p5-example"><b>전략:</b> 요약(통계 정보만 반환), 잘라내기(기본적으로 상위 N개 반환), 페이지네이션(페이지 파라미터 지원), 필터링(조건 지원)</div>
+    </div>
+    <div class="p5-card wide reveal">
+      <div class="p5-header">
+        <div class="p5-num">5</div>
+        <h4>도구 설명을 Prompt처럼 엔지니어링</h4>
+      </div>
+      <div class="p5-body">도구 설명은 단순한 문서가 아니라 Prompt의 일부입니다. Agent에게 이 도구를 <b>언제 사용하는지</b>, 더 중요하게는 <b>언제 사용하지 않는지</b>를 알려줘야 합니다.</div>
+      <div class="p5-example"><b>좋은 설명 템플릿:</b> "[도구명]은 [구체적인 목적]에 사용됩니다. [시나리오 A] 또는 [시나리오 B]가 필요할 때 이 도구를 사용하세요. [시나리오 C]에서는 사용하지 마세요. 그 경우에는 [다른 도구]를 사용하세요. 예시: [구체적인 입력/출력]"</div>
+    </div>
+  </div>
+
+  <!-- ===== 네임스페이스 실습 ===== -->
+  <div class="sec-label">네임스페이스 실전: Agent에게 도구 맵 제공하기</div>
+
+  <div class="ns-demo reveal paywall-locked xa-peek">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      도구 네임스페이스 그룹
+    </h4>
+    <div class="ns-group">
+      <div class="ns-prefix"><div class="ns-bar"></div>jira_ -- 프로젝트 관리</div>
+      <div class="ns-items">
+        <span class="ns-chip">jira_create_issue</span>
+        <span class="ns-chip">jira_list_issues</span>
+        <span class="ns-chip">jira_update_status</span>
+        <span class="ns-chip">jira_add_comment</span>
+      </div>
+    </div>
+    <div class="ns-group">
+      <div class="ns-prefix"><div class="ns-bar" style="background:var(--purple)"></div>git_ -- 버전 관리</div>
+      <div class="ns-items">
+        <span class="ns-chip">git_diff</span>
+        <span class="ns-chip">git_commit</span>
+        <span class="ns-chip">git_log</span>
+        <span class="ns-chip">git_create_branch</span>
+      </div>
+    </div>
+    <div class="ns-group">
+      <div class="ns-prefix"><div class="ns-bar" style="background:var(--cyan)"></div>db_ -- 데이터베이스</div>
+      <div class="ns-items">
+        <span class="ns-chip">db_query</span>
+        <span class="ns-chip">db_insert</span>
+        <span class="ns-chip">db_update</span>
+        <span class="ns-chip">db_schema</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:16px">
+    <b>네임스페이스의 가치:</b> Agent가 <code>jira_</code> 접두사가 붙은 도구 그룹을 보면 이 도구들이 관련이 있고 같은 시스템을 조작한다는 것을 즉시 알 수 있습니다. 이는 잘못된 도구를 선택할 확률을 크게 낮춥니다.
+  </div>
+
+  <!-- ===== Token 효율성 비교 ===== -->
+  <div class="sec-label paywall-locked">Token 효율성: 반환 결과의 학문</div>
+
+  <div class="token-demo paywall-locked">
+    <div class="token-box bad reveal">
+      <h4>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        전체 반환
+      </h4>
+      <div class="tk-content">[
+  {"id": 1, "title": "Fix login bug",
+   "desc": "Users cannot login...",
+   "created": "2025-01-15T...",
+   "updated": "2025-01-16T...",
+   "assignee": {"name": "Alice", ...},
+   "labels": [...], "comments": [...]},
+  {"id": 2, ...},
+  ... // 총 847개 레코드
+]</div>
+      <div class="tk-stat">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+        ~52,000 Tokens -- Agent가 전혀 처리할 수 없습니다
+      </div>
+    </div>
+    <div class="token-box good reveal">
+      <h4>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        최소화된 반환
+      </h4>
+      <div class="tk-content">{
+  "total": 847,
+  "showing": 10,
+  "page": 1,
+  "results": [
+    {"id": 1, "title": "Fix login",
+     "status": "open",
+     "assignee": "Alice"},
+    {"id": 2, ...},
+    ... // 상위 10개, 핵심 필드만
+  ],
+  "hint": "Use page=2 for more"
+}</div>
+      <div class="tk-stat">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        ~800 Tokens -- 정보 밀도가 높아 Agent가 쉽게 소화합니다
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 도구 설명 비교 ===== -->
+  <div class="sec-label paywall-locked">실제 예시: 도구 설명의 차이</div>
+
+  <div class="contrast-panel reveal paywall-locked">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      search_issues 도구 설명 비교
+    </h4>
+    <div class="contrast-grid">
+      <div class="contrast-side bad">
+        <div class="ct-label">BEFORE -- 형식적인 설명</div>
+        <div class="ct-code">{
+  "name": "search_issues",
+  "description": "Search for issues
+    in the project tracker."
+}</div>
+        <div class="ct-note">Agent는 검색 구문, 반환 형식, list_issues와의 차이점을 알 수 없습니다</div>
+      </div>
+      <div class="contrast-side good">
+        <div class="ct-label">AFTER -- 엔지니어링된 설명</div>
+        <div class="ct-code">{
+  "name": "search_issues",
+  "description": "Full-text search
+    across issue titles and
+    descriptions. Use when the
+    user mentions specific
+    keywords. Returns max 20
+    results sorted by relevance.
+
+    For browsing by status/label,
+    use list_issues instead.
+
+    Example:
+    search_issues({
+      query: 'login timeout',
+      status: 'open'
+    })"
+}</div>
+        <div class="ct-note">명확한 의미, 사용 경계, 예시, 유사 도구와의 구분이 포함됩니다</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:16px">
+    <b>최적화 루프의 핵심 인사이트:</b> Claude Code가 평가를 완료한 후 "43%의 오류가 Agent가 search와 list를 혼동했기 때문"이라고 정확히 말할 수 있고, 그 문제를 해결하기 위해 도구 설명을 자동으로 수정합니다. 이는 인간이 직관으로 디버깅하는 것보다 훨씬 빠릅니다.
+  </div>
+
+  <!-- ===== Takeaway ===== -->
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>도구 품질이 Agent 품질의 상한선을 결정합니다.</b> Prototype &rarr; Evaluate &rarr; Optimize 루프를 사용하여 체계적으로 도구 품질을 향상시키세요. 5가지 원칙을 기억하세요: 올바른 도구 선택, 네임스페이스, 의미 있는 반환, Token 효율성, 엔지니어링된 설명. Agent가 자신의 도구에 대한 프로덕트 매니저가 되게 하세요.</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){
+  var ob = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); ob.unobserve(e.target); }});
+  }, {threshold:0.15});
+  ob.observe(el);
+});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

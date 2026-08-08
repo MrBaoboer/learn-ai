@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding Methodology Lesson 9: Back up the database first, provide a rollback plan before irreversible operations, and run a diff review before deploying. Includes a release diff review simulator and a three-gate checklist.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<title>Lesson 9: Three Safety Gates for Destructive Operations | AI Masterclass</title>
+<link rel="canonical" href="https://xueai.app/slides/vibe-9.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/vibe-9.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/vibe-9.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/vibe-9.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/vibe-9.html">
+<link rel="stylesheet" href="lesson.css">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e;--vibe-soft:rgba(13,148,136,.08);--vibe-line:rgba(13,148,136,.25)}
+.lesson-header .kicker{color:var(--vibe)}
+a{color:var(--vibe-deep)}
+code{color:var(--vibe-deep);background:rgba(13,148,136,.08)}
+.l-callout{background:rgba(13,148,136,.04);border-color:var(--vibe-line)}
+.l-callout b{color:var(--vibe)}
+.desc{font-size:15px;color:var(--sub);line-height:1.8;margin-bottom:12px}
+pre{margin:12px 0 0;padding:16px 18px;overflow:auto;border:1.5px solid var(--border);border-radius:12px;background:#0e1c1a;color:#d9f2ec;font-size:12.5px;line-height:1.7}
+pre code{background:none;padding:0;color:#d9f2ec}
+.demo-hd{font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.4px;text-transform:uppercase;margin-bottom:10px}
+
+/* ── common control buttons ── */
+.btn{padding:11px 22px;border-radius:10px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-p{background:var(--vibe);color:#fff}
+.btn-p:hover{filter:brightness(1.08)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.05);color:var(--sub);border:1.5px solid var(--border)}
+.ctrl-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.hint{font-size:13px;color:var(--sub)}
+
+/* ── three-gate overview ── */
+.gate-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.gate-grid h3{font-size:15.5px;font-weight:800;margin-bottom:5px}
+.gate-grid p{font-size:13.5px;color:var(--sub);line-height:1.75}
+.gate-tag{display:inline-block;margin-bottom:8px;padding:2px 10px;border:1px solid var(--vibe-line);border-radius:999px;background:var(--vibe-soft);color:var(--vibe-deep);font-family:"SF Mono",Menlo,monospace;font-size:11px;font-weight:800;letter-spacing:.04em}
+
+/* ── Demo 1: diff review simulator ── */
+.rel-card{padding:14px 18px;border:1.5px solid var(--vibe-line);border-radius:12px;background:var(--vibe-soft)}
+.rel-card .rt{font-family:"SF Mono",Menlo,monospace;font-size:13px;font-weight:800;color:var(--vibe-deep);margin-bottom:4px}
+.rel-card p{font-size:14px;line-height:1.7;margin:0}
+.df-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.df-row{display:flex;align-items:center;gap:12px;padding:12px 15px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);flex-wrap:wrap;transition:border-color .15s}
+.df-row.marked-ok{border-color:rgba(22,163,74,.4)}
+.df-row.marked-risk{border-color:rgba(220,38,38,.4)}
+.df-info{flex:1;min-width:220px}
+.df-file{font-family:"SF Mono",Menlo,monospace;font-size:13px;font-weight:700;color:var(--text)}
+.df-desc{font-size:12.5px;color:var(--sub);margin-top:2px;line-height:1.6}
+.df-acts{display:flex;gap:8px}
+.mark-btn{padding:9px 15px;border-radius:9px;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;min-height:44px;transition:all .15s}
+.mark-btn:hover{border-color:rgba(0,0,0,.2)}
+.mark-btn.ok-on{border-color:rgba(22,163,74,.55);background:rgba(22,163,74,.08);color:var(--success)}
+.mark-btn.risk-on{border-color:rgba(220,38,38,.5);background:rgba(220,38,38,.07);color:var(--danger)}
+.report{display:none;margin-top:14px;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card)}
+.report.show{display:block}
+.rp-hd{padding:10px 16px;background:rgba(0,0,0,.03);border-bottom:1px solid var(--border);font-family:"SF Mono",Menlo,monospace;font-size:12.5px;font-weight:800;letter-spacing:.5px;color:var(--sub)}
+.rp-body{padding:14px 16px;display:flex;flex-direction:column;gap:9px}
+.rp-line{font-size:13.5px;line-height:1.65;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.rp-line .rf{font-family:"SF Mono",Menlo,monospace;font-size:12.5px;font-weight:700}
+.rp-line .you-ok{color:var(--success);font-weight:700}
+.rp-line .you-no{color:var(--danger);font-weight:700}
+.rp-why{font-size:12.5px;color:var(--sub);width:100%;line-height:1.65}
+.rp-sum{margin-top:4px;padding:13px 15px;border-radius:10px;font-size:14px;font-weight:700;line-height:1.7;border:1.5px solid rgba(220,38,38,.4);background:rgba(220,38,38,.05);color:var(--danger)}
+
+/* ── Demo 2: three-gate checklist ── */
+.op-list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.op-btn{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:13px 15px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;text-align:left;min-height:44px;transition:all .2s}
+.op-btn:hover{border-color:rgba(0,0,0,.18)}
+.op-btn.active{border-color:var(--vibe);background:var(--vibe-soft)}
+.op-btn h4{font-size:15px;font-weight:800;color:var(--text)}
+.op-btn.active h4{color:var(--vibe-deep)}
+.op-btn p{font-size:12.5px;color:var(--sub);margin:0}
+.gate-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.gate-item{display:flex;gap:12px;padding:13px 15px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);cursor:pointer;transition:all .15s;align-items:flex-start;min-height:44px}
+.gate-item:hover{border-color:rgba(0,0,0,.18)}
+.gate-item.checked{border-color:rgba(22,163,74,.45);background:rgba(22,163,74,.05)}
+.gate-item.blocked{border-color:rgba(220,38,38,.38);background:rgba(220,38,38,.04)}
+.g-box{width:22px;height:22px;border-radius:6px;border:2px solid rgba(0,0,0,.2);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;transition:all .15s;background:var(--card)}
+.gate-item.checked .g-box{background:var(--success);border-color:var(--success)}
+.gate-item.blocked .g-box{border-color:rgba(220,38,38,.55);color:var(--danger);background:rgba(220,38,38,.06)}
+.g-t{font-size:14.5px;font-weight:800}
+.g-d{font-size:13px;color:var(--sub);margin-top:2px;line-height:1.65}
+.gate-result{display:none;margin-top:12px;padding:13px 16px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;line-height:1.75}
+.gate-result.show{display:block}
+.gate-result.pass{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.05)}
+.gate-result.warn{border-color:rgba(217,119,6,.4);background:rgba(217,119,6,.06)}
+.gate-result.stop{border-color:rgba(220,38,38,.4);background:rgba(220,38,38,.05)}
+.gate-result b{color:var(--text)}
+
+/* ── rule highlights ── */
+.rule-cols h3{font-size:15.5px;font-weight:800;margin-bottom:5px}
+.rule-cols ul{margin:0;padding-left:20px;font-size:13.5px;color:var(--sub);line-height:1.85}
+
+@media (max-width:768px){
+  .gate-grid,.op-list{grid-template-columns:1fr}
+  .df-acts{width:100%}
+  .df-acts .mark-btn{flex:1}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Three Safety Gates for Destructive Operations","name":"Three Safety Gates for Destructive Operations","url":"https://xueai.app/slides/vibe-9.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"course","educationalLevel":"beginner to advanced","isPartOf":{"@type":"Course","name":"AI Masterclass · Environment & Safety","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Vibe Coding Methodology Lesson 9: Back up the database first, provide a rollback plan before irreversible operations, and run a diff review before deploying. Includes a release diff review simulator and three-gate checklist.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">VIBE CODING METHODOLOGY · LESSON 9</div>
+    <h1>Three Safety Gates for Destructive Operations</h1>
+    <p class="subtitle">During a release you think you only changed feature A, but the actual diff contains a temporary change from last week's debugging of feature B, and half-finished code makes it into production. Irreversible operations like database migrations, config changes, and deployments must have gates set before execution. Both exercises below are interactive.</p>
+  </header>
+
+  <div class="l-callout reveal">
+    <p style="font-size:14.5px;line-height:1.8"><b>Core principle:</b> Safety for irreversible operations comes from gates. Backups block data loss, rollback plans block unrecoverable states, diff reviews block broken deployments — all three gates are set before execution.</p>
+  </div>
+
+  <section>
+    <div class="sec-label">Three-Gate Overview</div>
+    <div class="gate-grid">
+      <div class="l-card reveal">
+        <span class="gate-tag">GATE 1 · BACKUP</span>
+        <h3>Back Up Before Any Database Change</h3>
+        <p>Backups go in the project root's <code>backups/</code> directory, named with a timestamp. No migrate, drop, alter, or delete operation may be executed without a backup. The cost is one command line; the stake is the entire database.</p>
+      </div>
+      <div class="l-card reveal">
+        <span class="gate-tag">GATE 2 · ROLLBACK</span>
+        <h3>State the Rollback Plan Before Irreversible Operations</h3>
+        <p>The rollback plan must answer three things: how to restore to the pre-operation state, which backup files are needed, and estimated recovery time. If you can't answer all three, the operation hasn't been thought through yet.</p>
+      </div>
+      <div class="l-card reveal">
+        <span class="gate-tag">GATE 3 · REVIEW</span>
+        <h3>Run a Diff Review Before Deploying</h3>
+        <p>Separate "what I thought I changed" from "what I actually changed" and compare them. SubAgent independently analyzes the deviation between the diff and Release Notes; if risks are found, the deployment is paused.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-label">Interactive Exercise 1 · Release Diff Review Simulator</div>
+    <p class="desc">You are the reviewer for this release. The Release Notes describe only one thing, but the actual diff has 7 files. Judge each file's changes as "as expected" or "risk present," then generate a review report once all are marked.</p>
+    <div class="l-card reveal">
+      <div class="rel-card">
+        <div class="rt">RELEASE_NOTES.md · v1.4.0</div>
+        <p>✨ Added dark mode: switch to a dark interface in settings — no more eye strain after extended use.</p>
+      </div>
+      <div class="df-list" id="dfList"></div>
+      <div class="ctrl-row">
+        <button class="btn btn-p" id="dfReport" onclick="dfMakeReport()" disabled>Generate Review Report</button>
+        <button class="btn btn-r" onclick="dfReset()">Reset</button>
+        <span class="hint" id="dfProg">Marked 0 / 7 files</span>
+      </div>
+      <div class="report" id="dfReportBox">
+        <div class="rp-hd">SUBAGENT DIFF REVIEW · v1.3.2 → HEAD</div>
+        <div class="rp-body" id="dfReportBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="paywall-locked xa-peek">
+    <div class="sec-label">Interactive Exercise 2 · Which Gates Does This Operation Need to Pass?</div>
+    <p class="desc">Select an operation type, check off each gate it needs to pass, then try to execute. For any gate you miss, you'll see the corresponding consequence.</p>
+    <div class="l-card reveal">
+      <div class="op-list">
+        <button class="op-btn active" id="opBtn0" onclick="pickOp(0)">
+          <h4>Database migration</h4><p>Change table structure, run migration scripts</p>
+        </button>
+        <button class="op-btn" id="opBtn1" onclick="pickOp(1)">
+          <h4>Modify environment variables</h4><p>Change API Key, adjust service config</p>
+        </button>
+        <button class="op-btn" id="opBtn2" onclick="pickOp(2)">
+          <h4>Copy files directly to server</h4><p>scp the modified files up</p>
+        </button>
+      </div>
+      <div class="gate-list" id="gateList"></div>
+      <div class="ctrl-row">
+        <button class="btn btn-p" onclick="gateRun()">Execute Operation</button>
+        <span class="hint">Check the gates first, then execute</span>
+      </div>
+      <div class="gate-result" id="gateResult"></div>
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">Rule Highlights</div>
+    <div class="l-card reveal">
+      <h3 style="font-size:15.5px;font-weight:800;margin-bottom:4px">Backup Command (SQLite Example)</h3>
+<pre><code># Any change involving database structure or data must be backed up before execution
+cp database.db backups/database_$(date +%Y%m%d_%H%M%S).db</code></pre>
+      <p class="hint" style="margin-top:8px">Backup file naming format: {original-filename}_{YYYYMMDD_HHMMSS}.db, placed in the project root's backups/ directory.</p>
+    </div>
+    <div class="l-cols rule-cols" style="margin-top:14px">
+      <div class="l-card reveal">
+        <h3>Release Channel</h3>
+        <ul>
+          <li>Code releases, version releases, and server deployments must go through GitHub</li>
+          <li>Servers pull code via <code>git pull</code> or CI/CD pipeline</li>
+          <li>Emergency hotfixes may be excepted, but a follow-up commit must sync changes afterward</li>
+          <li>Tagging, pushing, and deploying are all prohibited until the user explicitly confirms</li>
+        </ul>
+      </div>
+      <div class="l-card reveal">
+        <h3>Credential Management</h3>
+        <ul>
+          <li>All credentials managed through environment variables or secrets</li>
+          <li>Hard-coding in code or config files is prohibited</li>
+          <li>Once a key enters git history it is permanently leaked and must be revoked and reissued</li>
+        </ul>
+      </div>
+    </div>
+    <div class="l-callout reveal" style="margin-top:14px">
+      <p style="font-size:14px;line-height:1.8"><b>Design intent:</b> Release Notes describe the expected changes, but actual commits may contain unrelated adjustments or even accidental deletions. Professional teams rely on CI/CD plus PR review to catch this; solo developers often skip review and push directly. The diff review rule essentially makes SubAgent serve as the reviewer.</p>
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">Classroom Exercise · 30 Minutes</div>
+    <div class="l-card reveal">
+      <p style="font-size:14px;color:var(--sub);line-height:1.9;margin:0">Deliverable: a risk review report. ① Deliberately mix a change unrelated to the release topic into a test repository (e.g., modify the logic of an existing function); ② Write Release Notes that only describe the on-topic feature, then ask AI to review following three steps: "fetch complete diff → compare file by file → categorize findings"; ③ Check whether AI can detect the mixed-in change and pause the deployment, then archive its risk report as a process template.</p>
+    </div>
+  </section>
+
+  <div class="l-card reveal paywall-locked" style="margin-top:28px">
+    <p style="font-size:12.5px;color:var(--sub);line-height:1.8;margin:0">Source material: open-source repository <a href="https://github.com/itshen/xs_vibe_rules">itshen/xs_vibe_rules</a>, <code>rule-opensource.mdc</code> Chapter 6, sections 6.4/6.5 "Database Backup & Rollback Plans," and Chapter 10 "Deployment & Environment."</p>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<script>
+/* ═══ Demo 1: release diff review simulator ═══ */
+const D_FILES = [
+  { f:'src/theme/darkTheme.css', d:'New file defining color variables and component styles for dark theme', risk:false,
+    why:'Core style file for dark mode, consistent with the Release Notes description.' },
+  { f:'src/components/ThemeToggle.tsx', d:'New file, theme toggle switch component for the settings page', risk:false,
+    why:'New component, belongs to this release topic.' },
+  { f:'src/App.tsx', d:'Modified, mounts ThemeToggle and reads user theme preference', risk:false,
+    why:'Integration change made to connect dark mode, scope is reasonable.' },
+  { f:'src/utils/messageParser.ts', d:'Modified, rewrote branch logic of an existing message parsing function', risk:true,
+    why:'Unrelated to dark mode; modifies the logic of an existing feature not mentioned at all in Release Notes. Very likely a temporary change from last week\'s debugging that slipped in.' },
+  { f:'package.json', d:'Modified, axios upgraded from 0.27.2 to 1.6.0', risk:true,
+    why:'Major version dependency change not mentioned in Release Notes. axios 1.x has breaking changes that may affect all network requests.' },
+  { f:'src/styles/tokens.css', d:'Modified, adds a set of color variables for dark theme to reference', risk:false,
+    why:'Only adds variables without changing existing values, serving this release topic.' },
+  { f:'docs/RELEASE_NOTES.md', d:'Modified, adds release notes for v1.4.0', risk:false,
+    why:'Routine documentation update as part of the release process.' }
+];
+let dfMarks = new Array(D_FILES.length).fill(null); // 0 = as expected, 1 = risk present
+
+function dfRender() {
+  const list = document.getElementById('dfList');
+  list.innerHTML = '';
+  D_FILES.forEach(function (file, i) {
+    const row = document.createElement('div');
+    row.className = 'df-row';
+    row.id = 'dfRow' + i;
+
+    const info = document.createElement('div');
+    info.className = 'df-info';
+    info.innerHTML = '<div class="df-file">' + file.f + '</div><div class="df-desc">' + file.d + '</div>';
+
+    const acts = document.createElement('div');
+    acts.className = 'df-acts';
+    const bOk = document.createElement('button');
+    bOk.className = 'mark-btn';
+    bOk.textContent = 'As Expected';
+    bOk.onclick = function () { dfMark(i, 0); };
+    const bRisk = document.createElement('button');
+    bRisk.className = 'mark-btn';
+    bRisk.textContent = 'Risk Present';
+    bRisk.onclick = function () { dfMark(i, 1); };
+    acts.appendChild(bOk);
+    acts.appendChild(bRisk);
+
+    row.appendChild(info);
+    row.appendChild(acts);
+    list.appendChild(row);
+  });
+}
+
+function dfMark(i, val) {
+  dfMarks[i] = val;
+  const row = document.getElementById('dfRow' + i);
+  row.className = 'df-row ' + (val === 0 ? 'marked-ok' : 'marked-risk');
+  const btns = row.querySelectorAll('.mark-btn');
+  btns[0].className = 'mark-btn' + (val === 0 ? ' ok-on' : '');
+  btns[1].className = 'mark-btn' + (val === 1 ? ' risk-on' : '');
+  const n = dfMarks.filter(function (m) { return m !== null; }).length;
+  document.getElementById('dfProg').textContent = 'Marked ' + n + ' / ' + D_FILES.length + ' files';
+  document.getElementById('dfReport').disabled = n < D_FILES.length;
+}
+
+function dfMakeReport() {
+  const body = document.getElementById('dfReportBody');
+  body.innerHTML = '';
+  let correct = 0, riskCount = 0;
+  D_FILES.forEach(function (file, i) {
+    const truth = file.risk ? 1 : 0;
+    const you = dfMarks[i];
+    const hit = you === truth;
+    if (hit) correct++;
+    if (file.risk) riskCount++;
+    const line = document.createElement('div');
+    line.className = 'rp-line';
+    line.innerHTML =
+      '<span>' + (file.risk ? '⚠️' : '✅') + '</span>' +
+      '<span class="rf">' + file.f + '</span>' +
+      '<span>Review conclusion: ' + (file.risk ? 'Risk Present' : 'As Expected') + '</span>' +
+      '<span class="' + (hit ? 'you-ok' : 'you-no') + '">Your judgment: ' + (hit ? 'Correct' : 'Wrong') + '</span>' +
+      '<span class="rp-why">' + file.why + '</span>';
+    body.appendChild(line);
+  });
+  const sum = document.createElement('div');
+  sum.className = 'rp-sum';
+  sum.textContent = 'Correctly judged ' + correct + ' / ' + D_FILES.length + ' · Detected ' + riskCount +
+    ' risky change(s) ⚠️ Risk present: deployment paused, awaiting user confirmation. Tagging, pushing, and deploying are all prohibited until confirmed.';
+  body.appendChild(sum);
+  document.getElementById('dfReportBox').classList.add('show');
+}
+
+function dfReset() {
+  dfMarks = new Array(D_FILES.length).fill(null);
+  document.getElementById('dfProg').textContent = 'Marked 0 / ' + D_FILES.length + ' files';
+  document.getElementById('dfReport').disabled = true;
+  document.getElementById('dfReportBox').classList.remove('show');
+  dfRender();
+}
+
+/* ═══ Demo 2: three-gate checklist ═══ */
+const OPS = [
+  {
+    gates: [
+      { t:'Backup gate', d:'Run cp database.db backups/database_$(date +%Y%m%d_%H%M%S).db — backup goes in backups/ with a timestamp in the name',
+        miss:'A migrate without a backup has no recovery path if it goes wrong. Rule: no migrate, drop, alter, or delete operation may be executed without a backup.' },
+      { t:'Rollback gate', d:'First state the three elements: how to restore to pre-operation state, which backup files are needed, and estimated recovery time',
+        miss:'Unable to state the three rollback elements means the operation has not been thought through. When things go wrong you can only scramble through docs for a fix — downtime is uncontrollable.' },
+      { t:'Channel gate', d:'Migration script has been committed to GitHub; server obtains it via git pull or CI/CD',
+        miss:'Script not in the repository means production database structure and repository code are out of sync — every future deployment could trigger the same problem.' }
+    ],
+    blocked: -1
+  },
+  {
+    gates: [
+      { t:'Backup gate', d:'Export a snapshot of current variables to backups/ (with timestamp), recording old values',
+        miss:'After making a wrong change, no one remembers the old values — service won\'t start and you can\'t roll back.' },
+      { t:'Rollback gate', d:'Three elements: how to restore, which snapshot is needed, estimated recovery time',
+        miss:'Broken environment variables often manifest as silent service anomalies — without a rollback plan, debugging is extremely slow.' },
+      { t:'Credential gate', d:'New key injected via environment variables or secrets — hard-coding into code or config files is prohibited',
+        miss:'Once a key enters git history it is permanently leaked and can only be revoked and reissued.' }
+    ],
+    blocked: -1
+  },
+  {
+    gates: [
+      { t:'Backup gate', d:'Back up old files to be overwritten in backups/ with a timestamp',
+        miss:'After overwriting the old file is gone — when things go wrong you can\'t even compare before and after.' },
+      { t:'Rollback gate', d:'Three elements: how to restore, which backups are needed, estimated recovery time',
+        miss:'Manually copied files have no version record — without planning rollback in advance, you can only rely on memory to restore.' },
+      { t:'Channel gate', d:'Releases must go through GitHub; server pulls via git pull or CI/CD',
+        blockedMsg:'This gate cannot be passed: copying files directly bypasses version control — changes are untraceable and unrollable. The correct approach is to commit and push to GitHub, then have the server run git pull. Emergency hotfixes may be excepted, but a follow-up commit must sync afterward.' }
+    ],
+    blocked: 2
+  }
+];
+let curOp = 0;
+let gateChecks = [];
+
+function pickOp(i) {
+  curOp = i;
+  for (let j = 0; j < 3; j++) document.getElementById('opBtn' + j).classList.toggle('active', j === i);
+  gateChecks = OPS[i].gates.map(function () { return false; });
+  gateRender();
+  const r = document.getElementById('gateResult');
+  r.className = 'gate-result';
+  r.innerHTML = '';
+}
+
+function gateRender() {
+  const op = OPS[curOp];
+  const list = document.getElementById('gateList');
+  list.innerHTML = '';
+  op.gates.forEach(function (g, i) {
+    const isBlocked = i === op.blocked;
+    const item = document.createElement('div');
+    item.className = 'gate-item' + (isBlocked ? ' blocked' : (gateChecks[i] ? ' checked' : ''));
+    const box = document.createElement('div');
+    box.className = 'g-box';
+    box.textContent = isBlocked ? '✕' : (gateChecks[i] ? '✓' : '');
+    const txt = document.createElement('div');
+    txt.innerHTML = '<div class="g-t">' + g.t + '</div><div class="g-d">' + g.d + '</div>';
+    item.appendChild(box);
+    item.appendChild(txt);
+    item.onclick = function () {
+      if (isBlocked) {
+        gateShow('stop', '<b>⛔ This item cannot be checked.</b> ' + g.blockedMsg);
+        return;
+      }
+      gateChecks[i] = !gateChecks[i];
+      gateRender();
+    };
+    list.appendChild(item);
+  });
+}
+
+function gateShow(cls, html) {
+  const r = document.getElementById('gateResult');
+  r.className = 'gate-result show ' + cls;
+  r.innerHTML = html;
+}
+
+function gateRun() {
+  const op = OPS[curOp];
+  if (op.blocked >= 0) {
+    gateShow('stop', '<b>⛔ Operation blocked.</b> ' + op.gates[op.blocked].blockedMsg +
+      (gateChecks.some(function (c, i) { return !c && i !== op.blocked; })
+        ? '<br>Additionally, the backup gate and rollback gate have not all been passed yet.' : ''));
+    return;
+  }
+  const missing = [];
+  op.gates.forEach(function (g, i) { if (!gateChecks[i]) missing.push(g); });
+  if (missing.length) {
+    gateShow('warn', '<b>⚠️ ' + missing.length + ' gate(s) not yet passed — operation paused.</b><br>' +
+      missing.map(function (g) { return '"' + g.t + '" missed: ' + g.miss; }).join('<br>'));
+    return;
+  }
+  gateShow('pass', '<b>✅ All three gates passed — you may proceed.</b> After execution, remember to record the backup path and rollback plan in CHANGELOG to make this operation traceable.');
+}
+
+/* initialize */
+dfRender();
+pickOp(0);
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

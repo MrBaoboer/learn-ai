@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>훈련 데이터 규모: LLM은 어떻게 학습되는가 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.big-num {
+  font-size: 64px; font-weight: 900; color: var(--accent);
+  line-height: 1; letter-spacing: -3px;
+  transition: transform 0.2s;
+}
+.big-num.pop { transform: scale(1.06); }
+.big-label { font-size: 15px; font-weight: 700; color: var(--sub); margin-top: 6px; }
+
+/* corpus bars */
+.corpus-list { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.corpus-row  { display: flex; align-items: center; gap: 10px; }
+.corpus-name { width: 70px; font-size: 13px; font-weight: 700; color: var(--sub); text-align: right; flex-shrink: 0; }
+.corpus-track { flex: 1; height: 24px; background: rgba(0,0,0,0.05); border-radius: 7px; overflow: hidden; }
+.corpus-fill {
+  height: 100%; border-radius: 7px; width: 0;
+  display: flex; align-items: center; padding-left: 10px;
+  transition: width 0.9s cubic-bezier(0.25,1,0.5,1);
+}
+.corpus-fill span { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.95); }
+.corpus-pct { width: 38px; font-size: 13px; font-weight: 800; text-align: right; flex-shrink: 0; }
+
+.insight {
+  background: rgba(217,119,6,0.06); border: 1.5px solid rgba(217,119,6,0.2);
+  border-radius: var(--radius); padding: 16px 20px;
+  font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.7;
+  margin-top: 18px;
+}
+.insight span { font-size: 13px; font-weight: 400; color: var(--sub); }
+
+/* slider */
+.slider-wrap {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px;
+  box-shadow: var(--shadow-card);
+}
+.slider-val { font-size: 18px; font-weight: 900; color: var(--accent); min-width: 72px; }
+.slider-mode-badge {
+  font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 8px;
+  white-space: nowrap; transition: all 0.3s;
+}
+input[type=range] {
+  flex: 1; accent-color: var(--accent); cursor: pointer; height: 28px;
+  min-width: 0;
+}
+
+.right-panels {
+  display: flex; flex-direction: column; gap: 14px; margin-top: 14px;
+}
+
+/* 规模感受卡 */
+.vis-box {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: var(--shadow-card);
+}
+.vis-analogy {
+  font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.5;
+}
+.vis-analogy b { color: var(--accent); }
+.vis-analogy .sub { font-size: 12px; font-weight: 400; color: var(--sub); margin-top: 2px; }
+
+/* icon grid */
+.icon-grid {
+  display: flex; flex-wrap: wrap;
+  align-content: flex-start; gap: 3px;
+  max-height: 60px; overflow: hidden;
+}
+.icon-unit {
+  font-size: 17px; line-height: 1;
+  opacity: 0; transform: scale(0.5);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.icon-unit.in { opacity: 1; transform: scale(1); }
+
+/* scale bar */
+.scale-bar-track {
+  height: 8px; background: rgba(0,0,0,0.06); border-radius: 8px; overflow: hidden;
+}
+.scale-bar-fill {
+  height: 100%; border-radius: 8px; background: var(--accent);
+  transition: width 0.5s cubic-bezier(0.25,1,0.5,1);
+}
+.scale-bar-labels {
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: var(--sub); margin-top: 3px; font-weight: 600;
+}
+
+/* ── 实测卡片 ── */
+.model-card {
+  border-radius: var(--radius); border: 2px solid var(--border);
+  padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;
+  transition: border-color 0.3s, background 0.3s;
+  background: var(--card);
+}
+.model-card.is-hallucination { border-color: rgba(229,62,62,0.45); background: rgba(229,62,62,0.03); }
+.model-card.is-unknown       { border-color: rgba(217,119,6,0.45);  background: rgba(217,119,6,0.03); }
+.model-card.is-correct       { border-color: rgba(22,163,74,0.5);   background: rgba(22,163,74,0.04); }
+
+.model-card-header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.model-size-big {
+  font-size: 28px; font-weight: 900; line-height: 1;
+  transition: color 0.3s;
+}
+.is-hallucination .model-size-big { color: var(--danger); }
+.is-unknown       .model-size-big { color: var(--amber); }
+.is-correct       .model-size-big { color: var(--success); }
+
+.model-card-meta { flex: 1; }
+.model-card-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.model-card-tag  { font-size: 11px; color: var(--sub); margin-top: 1px; }
+
+.verdict-badge {
+  font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 8px;
+  flex-shrink: 0;
+}
+.is-hallucination .verdict-badge { background: var(--danger); color: white; }
+.is-unknown       .verdict-badge { background: var(--amber);  color: white; }
+.is-correct       .verdict-badge { background: var(--success); color: white; }
+
+.model-card-q {
+  font-size: 12px; font-weight: 700; color: var(--sub);
+}
+.model-card-answer {
+  font-size: 14px; color: var(--text); line-height: 1.7;
+  border-radius: 10px; padding: 12px 16px;
+  transition: background 0.3s;
+}
+.is-hallucination .model-card-answer { background: rgba(229,62,62,0.05); }
+.is-unknown       .model-card-answer { background: rgba(217,119,6,0.05); }
+.is-correct       .model-card-answer { background: rgba(22,163,74,0.05); }
+
+.model-card-answer .wrong { color: var(--danger); font-weight: 700; }
+.model-card-answer .right { color: var(--success); font-weight: 700; }
+.model-card-answer b { color: var(--success); font-weight: 700; }
+
+.model-card-tip {
+  font-size: 13px; color: var(--sub); line-height: 1.6;
+}
+.model-card-tip b { color: var(--text); }
+
+@media (max-width: 768px) {
+  .big-num { font-size: 48px; letter-spacing: -2px; }
+  .slider-wrap { flex-wrap: wrap; }
+  .slider-val { min-width: 60px; }
+  .scale-bar-labels { font-size: 8px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="LLM 훈련 데이터의 규모와 품질을 심층 분석: 수조 Token 규모의 말뭉치, 데이터 정제 파이프라인, Common Crawl·도서·코드 데이터의 구성 비율, 그리고 데이터 규모가 모델의 능력 상한을 어떻게 결정하는지 이해합니다.">
+<meta name="keywords" content="LLM 훈련 데이터,Token,말뭉치 규모,Common Crawl,사전 훈련 데이터">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/training-data.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/training-data.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/training-data.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/training-data.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/training-data.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="훈련 데이터 규모: LLM은 어떻게 학습되는가">
+<meta property="og:description" content="LLM 훈련 데이터의 규모와 품질을 심층 분석: 수조 Token 말뭉치, 데이터 정제 파이프라인, Common Crawl·도서·코드 데이터 구성 비율, 그리고 데이터 규모가 모델의 능력 상한을 어떻게 결정하는지 이해합니다.">
+<meta property="og:url" content="https://xueai.app/slides/training-data.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="훈련 데이터 규모: LLM은 어떻게 학습되는가">
+<meta name="twitter:description" content="LLM 훈련 데이터의 규모와 품질을 심층 분석: 수조 Token 말뭉치, 데이터 정제 파이프라인, Common Crawl·도서·코드 데이터 구성 비율, 그리고 데이터 규모가 모델의 능력 상한을 어떻게 결정하는지 이해합니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"AI의 식량: 훈련 데이터","name":"AI의 식량: 훈련 데이터","url":"https://xueai.app/slides/training-data.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"초급~고급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 기초 원리","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"LLM 훈련 데이터의 규모와 품질을 심층 분석: 수조 Token 말뭉치, 데이터 정제 파이프라인, Common Crawl·도서·코드 데이터 구성 비율, 그리고 데이터 규모가 모델의 능력 상한을 어떻게 결정하는지 이해합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">기초 원리</div>
+    <h1>AI의 식량: 훈련 데이터</h1>
+    <p class="subtitle">AI에게 말하는 법을 가르치려면 먼저 수조 개의 단어를 먹여야 합니다. AI는 인류가 쓴 글의 대부분을 이미 읽었습니다.</p>
+  </header>
+
+  <div class="sec-label">데이터 규모 및 구성</div>
+
+  <div class="l-card">
+    <div class="big-num" id="bigNum">~1B</div>
+    <div class="big-label" id="bigSubLabel">Tokens · 초소형 모델 훈련 데이터 규모</div>
+
+    <div class="corpus-list" id="corpusList"></div>
+  </div>
+
+  <div class="insight paywall-locked xa-peek" id="insight">
+    얼마나 읽었는가가 얼마나 말할 수 있는가를 결정합니다.<br>
+    <span>훈련 데이터의 품질과 다양성이 모델의 세계관 상한을 결정합니다.</span>
+  </div>
+
+  <div class="sec-label paywall-locked">슬라이더를 드래그 · 모델 크기별 능력 차이를 직접 체감하세요</div>
+
+  <div class="slider-wrap paywall-locked">
+    <span class="slider-val" id="sliderVal">270M</span>
+    <input type="range" min="0" max="8" step="1" value="0" id="scaleSlider" oninput="updateScale(this.value)" style="flex:1">
+    <span class="slider-mode-badge" id="modeBadge">환각</span>
+  </div>
+
+  <div class="right-panels paywall-locked">
+
+    <!-- 上：规模感受小卡 -->
+    <div class="vis-box">
+      <div class="vis-analogy" id="visAnalogy"></div>
+      <div class="icon-grid" id="iconGrid"></div>
+      <div class="scale-bar-wrap">
+        <div class="scale-bar-track">
+          <div class="scale-bar-fill" id="scaleBarFill" style="width:2%"></div>
+        </div>
+      <div class="scale-bar-labels">
+        <span>270M</span><span>0.6B</span><span>1.8B</span><span>30B</span><span>70B</span><span>120B</span><span>235B</span><span>1T</span><span>5T+</span>
+      </div>
+      </div>
+    </div>
+
+    <!-- 下：实测大卡（随 slider 切换） -->
+    <div class="model-card" id="modelCard">
+      <div class="model-card-header">
+        <div class="model-size-big" id="cardSize">270M</div>
+        <div class="model-card-meta">
+          <div class="model-card-name" id="cardName">Gemma-4-e2b</div>
+          <div class="model-card-tag" id="cardTag">Google · 로컬 추론</div>
+        </div>
+        <div class="verdict-badge" id="cardVerdict">환각</div>
+      </div>
+      <div class="model-card-q">Q: 이지은(IU)은 누구입니까? 그녀의 생애와 대표 작품을 소개해 주세요.</div>
+      <div class="model-card-answer" id="cardAnswer"></div>
+      <div class="model-card-tip" id="cardTip"></div>
+    </div>
+
+  </div>
+
+</article>
+
+<script>
+// ── 말뭉치 바 ──
+const CORPUS = [
+  { name:'웹 텍스트', pct:70, color:'#0066ff' },
+  { name:'도서',      pct:12, color:'#7c3aed' },
+  { name:'코드',      pct:8,  color:'#16a34a' },
+  { name:'논문',      pct:5,  color:'#d97706' },
+  { name:'대화',      pct:5,  color:'#e53e3e' },
+];
+const list = document.getElementById('corpusList');
+CORPUS.forEach(c => {
+  list.innerHTML += `
+    <div class="corpus-row">
+      <div class="corpus-name">${c.name}</div>
+      <div class="corpus-track">
+        <div class="corpus-fill" style="background:${c.color}" data-w="${c.pct}">
+          <span>${c.pct}%</span>
+        </div>
+      </div>
+      <div class="corpus-pct" style="color:${c.color}">${c.pct}%</div>
+    </div>`;
+});
+setTimeout(() => {
+  list.querySelectorAll('.corpus-fill').forEach(el => el.style.width = el.dataset.w + '%');
+}, 200);
+
+// ── 모델 등급 데이터 (파라미터 수 + 실측 결과) ──
+const SCALES = [
+  {
+    // slider 왼쪽
+    num: '270M',
+    sublabel: 'Tokens · 초소형 모델, ~1B Tokens 훈련',
+    // 규모 시각화 (우상단)
+    analogy: '훈련 데이터 ≈ <b>75만 권</b>의 일반 소설',
+    sub: '소규모 시립 도서관 장서량에 해당',
+    icon: '📚', count: 8, pct: 2,
+    // 실측 카드
+    verdict: 'hallucination',
+    verdictLabel: '환각',
+    modelName: 'Gemma-4-e2b (270M)',
+    modelTag: 'Google · LMStudio 로컬 실측',
+    answer: '이지은은 유명한 <b class="wrong">중국 educólogo</b>이자 <b class="wrong">교육가</b>입니다. 현재 공개된 정보는 없지만 일부 기록에 따르면 <b class="wrong">중국 교육 교육가</b>임을 추론할 수 있습니다. 대표작: <b class="wrong">《교육가》 《교육과 교육가》</b> — 중국 교육 교육가의 삶과 업무를 묘사합니다.',
+    tip: '270M은 이지은이 누구인지 전혀 모릅니다. 즉석에서 "중국 교육가"라는 정체성을 날조했고, "educólogo"라는 단어도 틀리게 썼습니다. 파라미터가 너무 적고 훈련 데이터가 너무 희박할 때의 결과: 무작위 조합, 근거 없음.',
+  },
+  {
+    num: '0.6B',
+    sublabel: 'Tokens · 초소형 모델, ~1B Tokens 훈련',
+    analogy: '훈련 데이터 ≈ <b>75만 권</b>의 일반 소설',
+    sub: '지식 커버리지 극도로 희박 — 상식 수준 내용만 기억',
+    icon: '📚', count: 8, pct: 5,
+    verdict: 'hallucination',
+    verdictLabel: '환각',
+    modelName: 'Qwen3-0.6B',
+    modelTag: 'Alibaba · LMStudio 로컬 실측',
+    answer: '이지은(<b class="wrong">Lee Ji-hoon</b>)은 1993년생 한국의 유명 여배우로, 현재 <b class="wrong">한국 국가대백과전서 편집위원</b>을 맡고 있습니다. 그녀의 커리어는 한국 연예계에서 시작되었으며 다수의 영상 작품에서 독특한 매력을 발휘했습니다. 초기 이력: 이지은은 청소년 시절부터 연기에 대한 열정을 보였으며 이후 연예계에 입문하였습니다.',
+    tip: '0.6B은 대략적인 방향(한국 여성 연예인)은 맞췄지만, 예명을 Lee Ji-hoon으로 잘못 썼고 "국가대백과전서 편집위원"이라는 존재하지 않는 직책을 날조했습니다. 방향은 맞고 세부 사항은 전부 틀림.',
+  },
+  {
+    num: '1.8B',
+    sublabel: 'Tokens · 소형 모델, ~2B Tokens 훈련',
+    analogy: '훈련 데이터 ≈ <b>150만 권</b>의 도서',
+    sub: '기본 대중 지식은 가능하지만 약간 틈새인 사실은 공백 발생',
+    icon: '📖', count: 12, pct: 12,
+    verdict: 'unknown',
+    verdictLabel: '답변 거부',
+    modelName: 'HunYuan-1.8B',
+    modelTag: 'Tencent · LMStudio 로컬 실측',
+    answer: '"이지은"이라는 이름과 관련하여 현재 <b class="wrong">널리 알려지거나 공개된 권위 있는 자료</b>가 없어 생애 및 대표 작품을 파악하기 어렵습니다. 특정 분야 종사자이거나 비공인 인물일 수 있습니다. 특정 지역이나 분야의 개인을 지칭하신다면 관련 배경 정보(분야, 업적, 관련 사건 등)를 추가로 제공해 주시면 더 정확한 확인이 가능합니다.',
+    tip: '1.8B은 노골적인 환각보다는 낫습니다 — 최소한 정체성을 날조하지는 않았습니다 — 하지만 이지은이 누구인지 여전히 모르고, 사용자에게 "더 많은 정보를 주세요"라며 넘깁니다. "그 책은 읽어본 적 없습니다"와 동등합니다.',
+  },
+  {
+    num: '30B',
+    sublabel: 'Tokens · 대형 모델, ~15T Tokens 훈련',
+    analogy: '인터넷 전체를 <b>두세 번 읽은</b> 것과 맞먹음',
+    sub: '지식 커버리지 상당히 포괄적; 주류 사실 기본적으로 정확',
+    icon: '🚀', count: 26, pct: 56,
+    verdict: 'correct',
+    verdictLabel: '정확 & 상세',
+    modelName: 'Qwen3-Coder-30B',
+    modelTag: 'Alibaba · LMStudio 로컬 실측',
+    answer: '이지은(예명 <b>IU</b>), 1993년 5월 16일 서울 출생 — 한국의 저명한 싱어송라이터 겸 배우. 2008년 데뷔; 2010년 "좋은 날"로 폭발적 인지도를 얻으며 "국민 여동생"으로 불림. 대표 음악: 좋은 날, 밤편지, Palette, LILAC. 대표 출연: 나의 아저씨, 도깨비, 호텔 델루나.',
+    tip: '30B은 완전한 정보를 담은 소개를 제공할 수 있습니다: 예명, 생년월일, 데뷔 연도, 대표작 — 모두 정확합니다. 이 규모에서 주류 공인의 환각은 사실상 사라집니다.',
+  },
+  {
+    num: '70B',
+    sublabel: 'Tokens · 대형 모델, ~15T Tokens 훈련',
+    analogy: '인터넷 전체를 <b>두세 번 읽은</b> 것과 맞먹음',
+    sub: '파라미터가 많다고 환각이 없는 것은 아님; 약간 틈새인 사실은 여전히 오류',
+    icon: '🚀', count: 32, pct: 65,
+    verdict: 'hallucination',
+    verdictLabel: '심각한 환각',
+    modelName: 'Llama-3.3-70B-Instruct',
+    modelTag: 'Meta · OpenRouter 클라우드 실측',
+    answer: '이지은은 <b class="wrong">1987년 2월 9일</b>생 한국 여배우입니다. 2010년 드라마 <b class="wrong">《시크릿 가든》</b>에서 <b class="wrong">윤슬이라는 재벌 2세</b> 역할을 맡아 주목받았습니다. 대표작으로는 《시그널》 《건축학개론》 《악마가 너의 이름을 부를 때》 등이 있습니다.',
+    tip: '70B은 완전히 틀렸습니다! 이지은(가수/IU)을 동명의 다른 여배우로 혼동했습니다 — 생년이 6년이나 차이나고 대표작도 모두 다른 사람의 것입니다. 파라미터가 많다고 환각이 없는 것은 아닙니다. 이것이 바로 훈련 데이터 커버리지가 지식 경계를 결정하는 방식입니다.',
+  },
+  {
+    num: '120B',
+    sublabel: 'Tokens · 초대형 모델, ~15T+ Tokens 훈련',
+    analogy: '인터넷 전체를 <b>여러 차례 반복해서</b> 소화한 것과 맞먹음',
+    sub: '지식이 극도로 밀집; 세부 사항·다국어·심층 추론 처리 가능',
+    icon: '🤯', count: 38, pct: 78,
+    verdict: 'correct',
+    verdictLabel: '전문가 수준',
+    modelName: 'GPT-OSS-120B',
+    modelTag: 'OpenAI · LMStudio 로컬 실측',
+    answer: '이지은(Lee Ji-eun), 예명 <b>IU</b>, 1993년 5월 16일 서울 강남구 출생 — 부친은 음악 교사, 모친은 미술 교사. 2008년 싱글 "Lost Child"로 공식 데뷔, LOEN(현 Kakao M) 소속. 2010년 앨범 《IU…I\'m IU》 발매; 타이틀 "Marshmallow"로 음악 방송 첫 1위 달성. 같은 해 "좋은 날"의 3단 고음으로 "국민 여동생" 지위 확립. 대표 앨범: Last Fantasy, Modern Times, Palette, Lilac. 대표 곡: 밤편지, Eight, Coin. 드라마: 나의 아저씨, 호텔 델루나, 나의 해방일지.',
+    tip: '120B의 답변은 거의 위키백과 수준: 부모님 직업, 소속사 이름, 데뷔 싱글까지 정확합니다. 70B의 심각한 환각과 비교했을 때 이 도약감은 상당합니다.',
+  },
+  {
+    num: '235B',
+    sublabel: 'Tokens · MoE 초거대 모델, ~20T Tokens 훈련',
+    analogy: '훈련 데이터가 <b>인류의 모든 문자 총량을</b> 초과함',
+    sub: '2,350억 파라미터 풀, 22B 동적 활성화 — 추론과 지식 모두 균형',
+    icon: '🌌', count: 48, pct: 86,
+    verdict: 'correct',
+    verdictLabel: '백과사전 수준',
+    modelName: 'Qwen3-235B-A22B (MoE)',
+    modelTag: 'Alibaba · OpenRouter 클라우드 실측',
+    answer: '이지은(1993년 5월 16일–), 한국의 싱어송라이터·음악 프로듀서·배우로 예명 <b>IU</b>(아이유)로 알려져 있습니다. 13세에 오디션에 실패한 후 LOEN Entertainment(현 Kakao Music) 연습생이 되었습니다. 2008년 9월 공식 데뷔. 2010년 "좋은 날"의 3단 고음이 차트를 석권하며 국민 아이콘의 자리를 굳혔습니다. 대표 앨범: Last Fantasy, Modern Times, Palette, Lilac. 대표 곡: 좋은 날, 밤편지, BBIBBI, Love Scenario. 드라마: 나의 아저씨, 도깨비, 호텔 델루나.',
+    tip: '235B MoE는 완전히 정확합니다: 예명, 데뷔 배경, 대표작 모두 정확하여 파라미터 풀이 충분히 크면 약간 틈새인 지식 포인트도 정확하게 커버됨을 보여줍니다.',
+  },
+  {
+    num: '1T',
+    sublabel: 'Tokens · 1조 파라미터 MoE, ~20T Tokens 훈련',
+    analogy: '인류 언어 문자의 <b>수배 총량</b>',
+    sub: '1조 파라미터 MoE; 전문가 병렬 활성화; 극한의 지식 밀도',
+    icon: '🛸', count: 58, pct: 95,
+    verdict: 'correct',
+    verdictLabel: '백과사전을 초월',
+    modelName: 'Kimi K2 (~1T MoE)',
+    modelTag: 'Moonshot AI · OpenRouter 클라우드 실측',
+    answer: '이지은(이지은, Lee Ji-eun), 예명 <b>IU</b>(아이유, "I and You"의 약자), 1993년 5월 16일생, 한국의 싱어송라이터·배우·작사가·프로듀서. K-Pop 역사상 최초로 "멜론 일간·주간·연간 All-Kill"과 "음원 누적 100회 PAK(Perfect All-Kill)"을 동시 달성한 아티스트. 2007년 15세에 LOEN Entertainment 계약, 2008년 데뷔, 2010년 "좋은 날"이 3단 고음으로 폭발적 인기. 대표 앨범: Real, Last Fantasy, Modern Times, Palette, Lilac, The Winning. 대표 곡: 밤편지, Eight, Coin, Celebrity, Love wins all. 드라마: 나의 아저씨, 호텔 델루나, 나의 해방일지.',
+    tip: 'Kimi K2는 멜론 음원 기록, PAK 횟수, 한국어 곡명까지 정확히 알고 있습니다. 이것이 1조 파라미터 규모가 가져다 주는 지식 밀도 — 실시간 전문 데이터베이스와 거의 맞먹습니다.',
+  },
+  {
+    num: '5T+',
+    sublabel: 'Tokens · 최고급 비공개 소스 플래그십, ~20T+ Tokens 훈련',
+    analogy: '인류의 모든 텍스트의 <b>수십 배 등가 커버리지</b>',
+    sub: '파라미터 수 미공개; 업계 추산 5T 초과; 업계의 천장',
+    icon: '🌠', count: 72, pct: 100,
+    verdict: 'correct',
+    verdictLabel: '업계의 천장',
+    modelName: 'Claude Opus 4.6',
+    modelTag: 'Anthropic · OpenRouter 프록시 실측',
+    answer: '이지은(이지은), 예명 <b>IU</b>(아이유), 1993년 5월 16일 서울 출생. "IU"는 "I"와 "You"의 조합으로 음악으로 사람과 사람을 연결한다는 의미. 15세에 "미아"로 데뷔, LOEN Entertainment(후에 Kakao Entertainment로 개명) 소속. 2010년 "좋은 날"의 연속 3단 고음이 센세이션을 일으키며 "국민 여동생" 지위 확립. 대표 앨범: Modern Times, Palette(G-Dragon 피처링), Lilac. 대표 곡: 밤편지, BBIBBI, Celebrity, Love wins all(V와 MV 공동 출연). 드라마: Dream High, 나의 아저씨(연기 호평), 호텔 델루나, 달의 연인-보보경심 려.',
+    tip: 'Claude Opus 4.6의 답변은 위키백과처럼 명확한 구조: 예명 어원, 어린 시절 환경, 연습생 경력, 협업 아티스트 세부 사항까지 완벽하게 기록되어 있습니다. 이것이 최고급 비공개 소스 모델의 지식 폭과 표현력의 종합적 구현입니다.',
+  },
+];
+
+let currentScale = 0;
+
+// 类型 → 样式映射
+const VERDICT_CLASS = {
+  hallucination: 'is-hallucination',
+  unknown:       'is-unknown',
+  correct:       'is-correct',
+};
+const BADGE_COLORS = {
+  hallucination: { bg: 'var(--danger)', text: 'white' },
+  unknown:       { bg: 'var(--amber)',  text: 'white' },
+  correct:       { bg: 'var(--success)', text: 'white' },
+};
+
+function updateScale(v) {
+  const s = SCALES[+v];
+  currentScale = +v;
+
+  // 左侧大数字 pop 动画
+  const bigNum = document.getElementById('bigNum');
+  bigNum.textContent = s.num;
+  bigNum.classList.remove('pop');
+  void bigNum.offsetWidth;
+  bigNum.classList.add('pop');
+  setTimeout(() => bigNum.classList.remove('pop'), 300);
+
+  // 左侧副标签
+  document.getElementById('bigSubLabel').textContent = s.sublabel;
+
+  // slider val + mode badge
+  document.getElementById('sliderVal').textContent = s.num;
+  const badge = document.getElementById('modeBadge');
+  badge.textContent = s.verdictLabel;
+  const bc = BADGE_COLORS[s.verdict];
+  badge.style.background = bc.bg;
+  badge.style.color = bc.text;
+
+  // 规模感受（右上小卡）
+  document.getElementById('visAnalogy').innerHTML =
+    s.analogy + `<div class="sub">${s.sub}</div>`;
+  document.getElementById('scaleBarFill').style.width = s.pct + '%';
+
+  // 图标格
+  const grid = document.getElementById('iconGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < s.count; i++) {
+    const span = document.createElement('span');
+    span.className = 'icon-unit';
+    span.textContent = s.icon;
+    grid.appendChild(span);
+    setTimeout(() => span.classList.add('in'), i * 15);
+  }
+
+  // 实测大卡（右下）
+  const card = document.getElementById('modelCard');
+  card.className = 'model-card ' + VERDICT_CLASS[s.verdict];
+
+  document.getElementById('cardSize').textContent    = s.num;
+  document.getElementById('cardName').textContent    = s.modelName;
+  document.getElementById('cardTag').textContent     = s.modelTag;
+  document.getElementById('cardVerdict').textContent = s.verdictLabel;
+  document.getElementById('cardAnswer').innerHTML    = s.answer;
+  document.getElementById('cardTip').innerHTML       = s.tip;
+}
+
+// 初始化
+updateScale(0);
+document.getElementById('scaleSlider').value = 0;
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

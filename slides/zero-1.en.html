@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>What Exactly Is AI? It's Really Just Playing "Finish the Sentence" | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 接话茬卡片 ── */
+.phrase-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.phrase-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px;
+  cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow: var(--shadow-card);
+}
+.phrase-card:hover { border-color: rgba(0,102,255,0.35); transform: translateY(-1px); }
+.phrase-card.open { border-color: rgba(0,102,255,0.45); box-shadow: var(--shadow-pop); cursor: default; }
+.phrase-q {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 17px; font-weight: 800; color: var(--text);
+}
+.phrase-q .tap-hint {
+  margin-left: auto; font-size: 12px; font-weight: 700; color: var(--accent);
+  background: rgba(0,102,255,0.07); padding: 3px 12px; border-radius: 999px;
+  flex-shrink: 0; transition: opacity 0.3s;
+}
+.phrase-card.open .tap-hint { opacity: 0; }
+.phrase-answers { max-height: 0; overflow: hidden; transition: max-height 0.5s ease; }
+.phrase-card.open .phrase-answers { max-height: 300px; }
+.answer-list { display: flex; flex-direction: column; gap: 7px; padding-top: 16px; }
+.answer-row { display: flex; align-items: center; gap: 10px; }
+.answer-word {
+  width: 96px; font-size: 14px; font-weight: 700; color: var(--text);
+  text-align: right; flex-shrink: 0;
+}
+.answer-track { flex: 1; height: 22px; background: rgba(0,0,0,0.05); border-radius: 6px; overflow: hidden; }
+.answer-fill {
+  height: 100%; border-radius: 6px; width: 0;
+  transition: width 0.8s cubic-bezier(0.25,1,0.5,1);
+}
+.answer-pct { width: 44px; font-size: 13px; font-weight: 800; flex-shrink: 0; }
+.phrase-note { font-size: 13px; color: var(--sub); padding-top: 12px; line-height: 1.7; }
+.phrase-note b { color: var(--accent); }
+
+/* ── AI 续写演示 ── */
+.demo-box {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.demo-head {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.015);
+}
+.demo-head-label { font-size: 12px; font-weight: 800; color: var(--sub); margin-right: 4px; }
+.starter-chip {
+  border: 1.5px solid var(--border); background: var(--card);
+  border-radius: 999px; padding: 6px 16px;
+  font-size: 13px; font-weight: 700; color: var(--text);
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+}
+.starter-chip:hover { border-color: rgba(0,102,255,0.4); }
+.starter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.demo-body { padding: 22px 24px; min-height: 150px; }
+.demo-text { font-size: 17px; line-height: 2; color: var(--text); word-break: break-all; }
+.demo-text .starter-part { color: var(--sub); }
+.demo-text .ai-part { color: var(--text); font-weight: 600; }
+.demo-text .caret {
+  display: inline-block; width: 2px; height: 1.1em; background: var(--accent);
+  vertical-align: text-bottom; margin-left: 1px;
+  animation: blink 0.85s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* 决策点气泡 */
+.decision-pop {
+  margin: 14px 0 4px; padding: 14px 16px;
+  background: rgba(0,102,255,0.045); border: 1.5px dashed rgba(0,102,255,0.35);
+  border-radius: var(--radius-sm);
+  opacity: 0; transform: translateY(6px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.decision-pop.show { opacity: 1; transform: translateY(0); }
+.decision-title { font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 9px; letter-spacing: 0.3px; }
+.cand-list { display: flex; flex-direction: column; gap: 6px; }
+.cand-row { display: flex; align-items: center; gap: 9px; }
+.cand-word {
+  min-width: 68px; text-align: center; padding: 2px 10px;   /* fits multi-character tokens */
+  font-size: 14px; font-weight: 800; border-radius: 7px;
+  background: rgba(0,0,0,0.05); color: var(--sub);
+  transition: background 0.13s, color 0.13s, transform 0.13s;
+}
+.cand-row.picked .cand-word { background: var(--accent); color: #fff; transform: scale(1.06); }
+.cand-track { flex: 1; height: 14px; background: rgba(0,0,0,0.05); border-radius: 5px; overflow: hidden; }
+/* 0.14s is tuned to pace()'s shortest tier (300ms × 0.65 ≈ 195ms); any slower and the bar never arrives */
+.cand-fill { height: 100%; border-radius: 5px; background: rgba(0,0,0,0.16); width: 0; transition: width 0.14s cubic-bezier(0.25,1,0.5,1); }
+.cand-row.picked .cand-fill { background: var(--accent); }
+.cand-pct { width: 44px; font-size: 12px; font-weight: 800; color: var(--sub); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.cand-row.picked .cand-pct { color: var(--accent); }
+
+.demo-foot {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px 18px; border-top: 1px solid var(--border);
+}
+.btn-run {
+  background: var(--accent); color: #fff; border: none;
+  padding: 10px 26px; border-radius: 999px;
+  font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
+  transition: filter 0.15s, transform 0.15s;
+}
+.btn-run:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-run:disabled { background: #c4c8cf; cursor: not-allowed; }
+.demo-status { font-size: 12.5px; color: var(--sub); font-weight: 600; }
+
+/* ── 对话真相图 ── */
+.chat-truth { display: flex; flex-direction: column; gap: 10px; }
+.chat-row { display: flex; gap: 10px; align-items: flex-start; }
+.chat-row.user { flex-direction: row-reverse; }
+.chat-avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff;
+}
+.chat-row.user .chat-avatar { background: #64748b; }
+.chat-row.ai .chat-avatar { background: var(--accent); }
+.chat-bubble {
+  max-width: 78%; padding: 10px 16px; border-radius: 14px;
+  font-size: 14px; line-height: 1.7;
+}
+.chat-row.user .chat-bubble { background: rgba(100,116,139,0.1); border-top-right-radius: 4px; }
+.chat-row.ai .chat-bubble { background: rgba(0,102,255,0.07); border-top-left-radius: 4px; }
+.chat-annotation {
+  text-align: center; font-size: 12.5px; font-weight: 700; color: var(--amber);
+  padding: 6px 0;
+}
+
+/* ── 三连卡 ── */
+.why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.why-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+}
+.why-card .why-icon { font-size: 26px; margin-bottom: 8px; }
+.why-card h4 { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+.why-card p { font-size: 13px; color: var(--sub); line-height: 1.75; }
+.why-card p b { color: var(--text); }
+
+/* ── 数学翻车实验 ── */
+.math-box {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 20px 24px;
+}
+.math-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.math-chip {
+  border: 1.5px solid var(--border); background: var(--card);
+  border-radius: 999px; padding: 8px 20px;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.math-chip:hover { border-color: rgba(0,102,255,0.4); }
+.math-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.math-stage { min-height: 170px; }
+.math-q { font-size: 17px; font-weight: 800; color: var(--text); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+.math-q .mq-hint { font-size: 12px; font-weight: 700; color: var(--sub); margin-left: 10px; }
+.math-cands { margin-bottom: 14px; }
+.math-cands .cand-word { min-width: 96px; font-variant-numeric: tabular-nums; }
+.math-verdict {
+  font-size: 13px; line-height: 1.85; color: var(--sub);
+  border-top: 1px dashed var(--border); padding-top: 12px;
+  opacity: 0; transition: opacity 0.4s;
+}
+.math-verdict.show { opacity: 1; }
+.math-verdict b { color: var(--text); }
+.math-verdict .mv-ok { color: var(--success); font-weight: 800; }
+.math-verdict .mv-bad { color: var(--danger); font-weight: 800; }
+
+/* ── takeaway ── */
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .why-grid { grid-template-columns: 1fr; }
+  .answer-word { width: 72px; font-size: 13px; }
+  .demo-text { font-size: 15px; }
+  .chat-bubble { max-width: 85%; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="What exactly is AI? Why can ChatGPT, DeepSeek, and Doubao chat with you? A plain-language explanation for total beginners: AI isn't really thinking — it's a 'super sentence-finishing machine' that has read an enormous amount of text. A 3-minute interactive demo to build your first correct intuition about AI.">
+<meta name="keywords" content="what is AI,how ChatGPT works,AI for beginners,what is a large language model,AI basics,how AI works">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/zero-1.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/zero-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/zero-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/zero-1.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/zero-1.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="What Exactly Is AI? It's Really Just Playing &quot;Finish the Sentence&quot;">
+<meta property="og:description" content="AI isn't really thinking — it's a 'super sentence-finishing machine' that has read an enormous amount of text. A 3-minute interactive demo to build your first correct intuition about AI.">
+<meta property="og:url" content="https://xueai.app/slides/zero-1.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="What Exactly Is AI? It's Really Just Playing &quot;Finish the Sentence&quot;">
+<meta name="twitter:description" content="AI isn't really thinking — it's a 'super sentence-finishing machine' that has read an enormous amount of text. A 3-minute interactive demo to build your first correct intuition about AI.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"It's Really Just Playing \"Finish the Sentence\"","name":"It's Really Just Playing \"Finish the Sentence\"","url":"https://xueai.app/slides/zero-1.en.html","inLanguage":"en","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI in Action · What Exactly Is AI","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":true,"description":"What exactly is AI? Why can ChatGPT, DeepSeek, and Doubao chat with you? A plain-language explanation for total beginners: AI isn't really thinking — it's a 'super sentence-finishing machine' that has read an enormous amount of text. A 3-minute interactive demo to build your first correct intuition about AI."}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Chapter Zero · What Exactly Is AI</div>
+    <h1>What Exactly Is AI? It's Really Just Playing "Finish the Sentence"</h1>
+    <p class="subtitle">Don't let the words "artificial intelligence" intimidate you. ChatGPT, DeepSeek, Doubao… whatever the name, what they do boils down to one thing: <b>guessing the next word of your sentence</b>. No background needed for this lesson — play two little games and it'll click.</p>
+  </header>
+
+  <div class="sec-label">Step 1 · You were born knowing this game</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Forget AI for a second. The three sentences below are all unfinished. <b style="color:var(--text)">Tap each one open</b> and see whether the ending that pops into your head matches what most people say.</p>
+
+  <div class="phrase-grid" id="phraseGrid"></div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>Notice something?</b> Some sentences have only one way to finish ("Happy birthday to…"), while others have several plausible endings ("The weather today is really…"). In a split second, your brain answered a multiple-choice question — <b>and that's exactly the question AI answers at every step it writes</b>. The only difference: it has read millions of times more than you have, so its guesses are remarkably good.
+  </div>
+
+  <div class="sec-label">Step 2 · Watch the AI finish a sentence with your own eyes</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Pick an opening line and click "Let the AI continue". The box below is the multiple-choice question in its head at <b style="color:var(--text)">every step</b>, slowed down for you. Two things to watch. First, it does <b style="color:var(--text)">not</b> write one word at a time: "wonton" arrives as <b style="color:var(--text)">won</b> + <b style="color:var(--text)">ton</b>, "check-up" as <b style="color:var(--text)">check</b> + <b style="color:var(--text)">-</b> + <b style="color:var(--text)">up</b>. That unit is called a <b style="color:var(--text)">token</b> — sometimes a whole word, sometimes just a fragment of one; a later lesson covers how the pieces are cut. Second, the length of the bars: at some steps the preceding text all but forces its hand, at others you can watch it waver. <b style="color:var(--text)">Run the same opening a few times</b> — where the bars are close, it doesn't always take the longest one.</p>
+
+  <div class="demo-box">
+    <div class="demo-head">
+      <span class="demo-head-label">Pick an opening:</span>
+      <button class="starter-chip active" data-i="0">Worked overtime until 10 tonight, </button>
+      <button class="starter-chip" data-i="1">Dear Ms. Wang, </button>
+      <button class="starter-chip" data-i="2">To make braised pork belly: </button>
+    </div>
+    <div class="demo-body">
+      <div class="demo-text" id="demoText"><span class="starter-part">Worked overtime until 10 tonight, </span><span class="caret"></span></div>
+      <div class="decision-pop" id="decisionPop">
+        <div class="decision-title" id="decisionTitle">It's picking the next token…</div>
+        <div class="cand-list" id="candList"></div>
+      </div>
+    </div>
+    <div class="demo-foot">
+      <button class="btn-run" id="btnRun">Let the AI continue →</button>
+      <span class="demo-status" id="demoStatus">No lookups, no internet — it continues token by token purely from "the text it has read"</span>
+    </div>
+  </div>
+
+  <div class="sec-label">Step 3 · So what about "chatting"?</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">You might ask: I get the sentence-finishing part, but the AI and I are having a <b style="color:var(--text)">back-and-forth conversation</b>, aren't we? Actually, chat is just sentence-finishing in new packaging —</p>
+
+  <div class="l-card">
+    <div class="chat-truth">
+      <div class="chat-row user">
+        <div class="chat-avatar">You</div>
+        <div class="chat-bubble">Help me think of somewhere to go this weekend</div>
+      </div>
+      <div class="chat-annotation">↓ To the AI, your message is the "first half" — its job is to supply the "second half" ↓</div>
+      <div class="chat-row ai">
+        <div class="chat-avatar">AI</div>
+        <div class="chat-bubble">You could go hiking just outside town, or check out a newly opened exhibition. Do you prefer somewhere quiet or somewhere lively?</div>
+      </div>
+      <div class="chat-row user">
+        <div class="chat-avatar">You</div>
+        <div class="chat-bubble">Somewhere quiet</div>
+      </div>
+      <div class="chat-annotation">↓ It stitches all the previous messages into one longer "first half" and keeps finishing it ↓</div>
+      <div class="chat-row ai">
+        <div class="chat-bubble" style="margin-left:44px;">Then I'd suggest the botanical garden or an art museum — fewer crowds, and places to sit when you're tired of walking…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    It finishes sentences so well, so naturally, that it looks like it "gets you". If there's one line this lesson would love you to take away, it's this: <b>it has no thoughts of its own — what it has are statistics, gathered from hundreds of millions of books and billions of webpages, about "which words usually follow which words"</b>.
+  </div>
+
+  <div class="sec-label">This one intuition explains everything that comes later</div>
+
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="why-icon">✍️</div>
+      <h4>Why can it write essays?</h4>
+      <p>It just finishes sentences at length, fluently. Give it an opening (a topic and requirements), and it continues token by token until a whole piece comes out.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🤥</div>
+      <h4>Why does it spout nonsense?</h4>
+      <p>It only cares whether a continuation <b>sounds right</b>, not whether it <b>is right</b>. A smooth-sounding falsehood beats a clumsy truth in its selection. This matters a lot — <b>it gets its own lesson later</b>.</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🎲</div>
+      <h4>Why different answers to the same question?</h4>
+      <p>In the demo above it didn't always take the longest bar — where a few candidates are close in likelihood, it rolls a die weighted by those odds and wanders down a different fork of the sentence. At a step where one bar reaches 99%, any roll gives the same result, so the differences only ever show up where it was already wavering.</p>
+    </div>
+  </div>
+
+  <div class="sec-label">While we're at it, an old mystery · Why is it bad at math?</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">You may have heard that "AI gets even elementary-school math wrong". Now that you know about finishing sentences, you can solve this mystery yourself — <b style="color:var(--text)">it was never "calculating"; it's finishing sentences</b>. Send it both of these problems and see how different the candidates in its head look.</p>
+
+  <div class="math-box">
+    <div class="math-chips">
+      <button class="math-chip active" data-i="0">Ask it: 1 + 1 =</button>
+      <button class="math-chip" data-i="1">Ask it: 3847 × 2963 =</button>
+    </div>
+    <div class="math-stage">
+      <div class="math-q" id="mathQ"></div>
+      <div class="cand-list math-cands" id="mathCands"></div>
+      <div class="math-verdict" id="mathVerdict"></div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    See the difference? <b>It has seen "1+1=2" millions of times in its training data — effectively memorized; but it has almost never seen this exact "3847×2963" problem</b>, so it can only pick a number that "looks like an answer" — right number of digits, plausible start and end, but the middle digits are guessed. The good news: many AI products now have the AI call a real calculator or write code for math problems, turning "guessing" into "calculating" — a clever division of labor you'll meet again in later lessons.
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ What this lesson wants to share with you</h3>
+    <ul>
+      <li><b>AI = a super sentence-finishing machine</b>: all it does is endlessly guess "what's the next token"</li>
+      <li><b>Chat is just sentence-finishing repackaged</b>: your message is the first half; it supplies the second half</li>
+      <li><b>It has no thoughts of its own</b>: what it has are language patterns distilled from oceans of text</li>
+      <li><b>Its math relies on "memory", not "calculation"</b>: common problems are memorized cold; unseen ones get a plausible-looking guess</li>
+      <li><b>Sounding right ≠ being right</b>: the single most useful thing to keep in mind when using AI — next lesson digs in</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 第一步：接话茬卡片 ── */
+const PHRASES = [
+  {
+    q: '"Twinkle, twinkle, little ……"',
+    answers: [
+      { w: 'star', pct: 99, color: '#0066ff' },
+      { w: 'bat',  pct: 1,  color: '#94a3b8' },
+    ],
+    note: 'Almost everyone answers "star" — because you\'ve <b>seen this line countless times</b>. AI works the same way: the more it has seen something, the better it guesses.',
+  },
+  {
+    q: '"Happy birthday to ……"',
+    answers: [
+      { w: 'you', pct: 98, color: '#0066ff' },
+      { w: 'ya',  pct: 2,  color: '#94a3b8' },
+    ],
+    note: 'Nobody ever memorized this line, yet it <b>rolls off your tongue</b> anyway. So it is not just famous lines that have one obvious ending — everyday speech is full of <b>pairings with almost no suspense</b>.',
+  },
+  {
+    q: '"The weather today is really ……"',
+    answers: [
+      { w: 'nice',   pct: 42, color: '#0066ff' },
+      { w: 'hot',    pct: 26, color: '#7c3aed' },
+      { w: 'cold',   pct: 18, color: '#16a34a' },
+      { w: 'lovely', pct: 14, color: '#d97706' },
+    ],
+    note: 'This kind of sentence has <b>several perfectly reasonable endings</b>. AI picks one from these candidates — which is why the same question may get slightly different answers each time.',
+  },
+];
+
+const grid = document.getElementById('phraseGrid');
+PHRASES.forEach((p, i) => {
+  const card = document.createElement('div');
+  card.className = 'phrase-card';
+  card.innerHTML = `
+    <div class="phrase-q">${p.q}<span class="tap-hint">Tap to see how people finish it</span></div>
+    <div class="phrase-answers">
+      <div class="answer-list">
+        ${p.answers.map(a => `
+          <div class="answer-row">
+            <div class="answer-word">${a.w}</div>
+            <div class="answer-track"><div class="answer-fill" style="background:${a.color}" data-w="${a.pct}"></div></div>
+            <div class="answer-pct" style="color:${a.color}">${a.pct}%</div>
+          </div>`).join('')}
+      </div>
+      <div class="phrase-note">${p.note}</div>
+    </div>`;
+  card.addEventListener('click', () => {
+    if (card.classList.contains('open')) return;
+    card.classList.add('open');
+    setTimeout(() => {
+      card.querySelectorAll('.answer-fill').forEach(el => el.style.width = el.dataset.w + '%');
+    }, 250);
+  });
+  grid.appendChild(card);
+});
+
+/* ── Step 2: the continuation demo ──
+   One multiple-choice question per step: ['chosen token', odds, 'runner-up', odds, ...],
+   first entry is the one that gets written. The body text is assembled from steps
+   (see d.text below) rather than stored twice — otherwise editing the copy without
+   editing steps would put the panel a step out of sync with the text on screen.
+
+   Tokens here are split the way a real tokenizer would, not per word: "wonton"
+   arrives as won + ton, "check-up" as check + - + up, "caramelize" as cara + mel + ize.
+   That is the whole point — a token is not a word (and in the Chinese version, not a
+   character either). The later Tokens & Vocabulary lesson builds on exactly this.
+
+   Why show every step rather than a few sampled ones: this lesson is about how the
+   certainty rises and falls — "won" is followed by "ton" with no suspense at all,
+   while what follows "on the way" is wide open. Sampling a few spots hides that
+   rhythm. Together with pace() below, sure steps flash past and hesitant ones linger.
+
+   The percentages are hand-authored by feel, not real model output; they only need to
+   convey "sometimes there's no choice at all, sometimes it's a genuine toss-up". */
+const DEMOS = [
+  {
+    starter: 'Worked overtime until 10 tonight, ',
+    steps: [
+      ['gr',26,'I',18,'so',13],
+      ['abbed',91,'abbing',4,'ub',2],
+      [' a',62,' some',14,' myself',11],
+      [' bowl',44,' quick',16,' hot',12],
+      [' of',96,' with',1,' from',1],
+      [' hot',38,' won',21,' noodle',14],
+      [' won',33,' soup',18,' ramen',12],
+      ['ton',98,'der',1,'ky',0.4],
+      [' soup',71,' on',9,' from',6],
+      [' on',47,' from',17,' at',12],
+      [' the',89,' my',6,' his',2],
+      [' way',84,' walk',5,' train',3],
+      [' home',93,' back',3,' there',1],
+      [',',58,'.',21,' and',9],
+      [' and',43,' then',16,' one',11,'alt'],
+      [' one',31,' the',19,' after',14],
+      [' bite',67,' sip',13,' spoon',8],
+      [' in',82,' of',6,' and',4],
+      [' I',74,' and',9,' it',6],
+      [' felt',61,' was',17,' could',8,'alt'],
+      [' alive',46,' human',21,' better',13,'alt'],
+      [' again',95,'.',2,' inside',1],
+      ['.',88,',',5,'!',4],
+    ],
+  },
+  {
+    starter: 'Dear Ms. Wang, ',
+    steps: [
+      ['I',57,'Thank',14,'My',10],
+      ["'m",46,' am',38,' hope',5,'alt'],
+      [' Li',33,' the',21,' writing',12],
+      [' Ming',88,' Wei',4,' Hua',3],
+      ["'s",71,"'",9,' the',6],
+      [' parent',64,' mother',14,' father',11],
+      [' in',52,',',18,' and',9],
+      [' Grade',41,' Class',27,' year',11],
+      [' 3',34,' Three',16,' 2',14],
+      [' Class',76,',',8,' and',5],
+      [' 2',51,' Two',14,' B',9],
+      ['.',47,',',31,' at',7],
+      [' He',58,' Li',19,' I',11],
+      [' needs',39,' has',26,' will',12,'alt'],
+      [' a',67,' to',15,' his',6],
+      [' hospital',44,' follow',19,' medical',13],
+      [' check',51,' visit',18,' appointment',12],
+      ['-',62,'up',17,' up',9],
+      ['up',94,'ing',2,'in',1],
+      [' tomorrow',57,' this',14,' next',9],
+      [' and',61,',',16,' so',8],
+      [' cannot',37,' will',33,' can',14],
+      [' attend',72,' come',11,' make',6],
+      [' class',91,' school',4,' classes',2],
+      ['.',92,'!',3,',',2],
+    ],
+  },
+  {
+    starter: 'To make braised pork belly: ',
+    steps: [
+      ['cut',49,'first',21,'start',12],
+      [' the',78,' pork',9,' up',5],
+      [' pork',87,' belly',5,' meat',3],
+      [' into',71,' in',11,' up',7],
+      [' chunks',63,' cubes',19,' pieces',11,'alt'],
+      [' and',52,',',21,' then',12],
+      [' bl',44,' rinse',17,' bo',13],
+      ['anch',96,'ot',1,'end',1],
+      [' it',58,' them',22,' in',8,'alt'],
+      [',',74,'.',12,' for',5],
+      [' cara',38,' melt',24,' heat',15],
+      ['mel',97,'wal',1,'ct',0.5],
+      ['ize',82,'ized',9,'izing',4],
+      [' rock',56,' the',17,' sugar',12,'alt'],
+      [' sugar',98,' salt',1,' candy',0.4],
+      [',',51,' over',22,' in',11],
+      [' then',46,' add',24,' toss',9],
+      [' sim',43,' braise',26,' cook',14],
+      ['mer',99,'ple',0.4,'ilar',0.3],
+      [' with',48,' for',21,' the',13],
+      [' soy',67,' the',13,' dark',8],
+      [' sauce',97,' bean',1,' milk',1],
+      [' for',63,' and',16,',',8],
+      [' forty',34,' 40',22,' an',16,'alt'],
+      [' minutes',96,' more',2,' min',1],
+      ['.',89,',',5,' until',3],
+    ],
+  },
+];
+DEMOS.forEach(d => { d.text = d.steps.map(s => s[0]).join(''); });
+
+let curDemo = 0;
+let running = false;
+let runSeq = 0;   // a token-by-token pass runs for ~20s, so switching openings must interrupt it
+const demoText  = document.getElementById('demoText');
+const btnRun    = document.getElementById('btnRun');
+const statusEl  = document.getElementById('demoStatus');
+const pop       = document.getElementById('decisionPop');
+const candList  = document.getElementById('candList');
+
+function resetDemo() {
+  const d = DEMOS[curDemo];
+  demoText.innerHTML = `<span class="starter-part">${d.starter}</span><span class="ai-part" id="aiPart"></span><span class="caret"></span>`;
+  pop.classList.remove('show');
+  btnRun.disabled = false;
+  btnRun.textContent = 'Let the AI continue →';
+  statusEl.textContent = 'No lookups, no internet — it continues token by token purely from "the text it has read"';
+}
+
+/* The three candidate rows are built once and then updated in place: rebuilding
+   innerHTML restarts every cand-fill from 0, which at this cadence just flickers.
+   Reusing the nodes lets each bar glide from the previous step's height to this
+   one, like a row of twitching gauges. */
+candList.innerHTML = [0, 1, 2].map(() => `
+  <div class="cand-row">
+    <div class="cand-word"></div>
+    <div class="cand-track"><div class="cand-fill"></div></div>
+    <div class="cand-pct"></div>
+  </div>`).join('');
+const candRows = [...candList.children].map(row => ({
+  row,
+  word: row.querySelector('.cand-word'),
+  fill: row.querySelector('.cand-fill'),
+  pct:  row.querySelector('.cand-pct'),
+}));
+
+function renderStep(step) {
+  candRows.forEach((r, k) => {
+    const w = step[k * 2], p = step[k * 2 + 1];
+    r.row.classList.remove('picked');
+    /* English tokens carry their leading space (' soup'): keep it when appending to
+       the text, drop it in the panel or the chip's contents sit off-centre. */
+    r.word.textContent = w.trim() || w;
+    r.pct.textContent = p + '%';
+    r.fill.style.width = p + '%';
+  });
+}
+
+document.querySelectorAll('.starter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    runSeq++;
+    running = false;
+    document.querySelectorAll('.starter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    curDemo = +chip.dataset.i;
+    resetDemo();
+  });
+});
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* Dwell time tracks certainty: steps with no real choice flash past, genuinely
+   uncertain ones linger. At a constant speed "ton" would look just as hard as
+   "grabbed", and the difference between them is precisely the lesson. */
+function pace(pct) {
+  if (pct >= 90) return 300;
+  if (pct >= 60) return 620;
+  return 950;
+}
+
+/* Rolling the dice: a real model does not always take the highest-probability token.
+   It samples from the top candidates weighted by probability (temperature / top-p),
+   which is exactly why the same question gets a different answer each time.
+   Two constraints:
+   1. Only steps tagged 'alt' are sampled. Swapping elsewhere breaks the rest of the
+      sentence — 'gr' → 'I' would render as "Iabbed". Every 'alt' was read aloud both
+      ways to confirm the sentence still works.
+   2. Weighted by the two odds (46 : 38, not a coin flip). Weighting is the real
+      behaviour, and it is what explains why a 99% step never actually changes while
+      only the near-tied ones fork.
+   window.DEMO_GREEDY is a determinism switch for automated tests, i.e. temperature 0. */
+function pickIndex(step) {
+  if (step[6] !== 'alt' || window.DEMO_GREEDY) return 0;
+  return Math.random() * (step[1] + step[3]) < step[1] ? 0 : 1;
+}
+
+async function runDemo() {
+  if (running) return;
+  running = true;
+  const seq = ++runSeq;
+  btnRun.disabled = true;
+  btnRun.textContent = 'Continuing…';
+  statusEl.textContent = 'The blue dashed box holds the candidates it faces at every single token';
+
+  const d = DEMOS[curDemo];
+  const aiPart = document.getElementById('aiPart');
+  pop.classList.add('show');
+
+  let forks = 0;                         // how many steps didn't take the top candidate
+  for (const step of d.steps) {
+    const k = pickIndex(step);
+    const ms = pace(step[1]);
+    renderStep(step);
+    /* 65% goes to "laying out the candidates": a hesitant step (950ms) leaves time
+       to read all three, a foregone one (300ms) just flashes a full bar and moves on. */
+    await sleep(ms * 0.65);
+    if (seq !== runSeq) return;          // opening switched mid-run; abandon this pass
+    candRows[k].row.classList.add('picked');
+    if (k > 0) {
+      forks++;
+      statusEl.textContent = 'See that? It did not take the longest bar — the sentence just turned down another road';
+    }
+    // Linger on a fork, otherwise it flashes past and reads as a glitch
+    await sleep(ms * (k > 0 ? 0.9 : 0.35));
+    if (seq !== runSeq) return;
+    aiPart.textContent += step[k * 2];
+  }
+
+  statusEl.textContent = forks
+    ? `Done. It passed over the longest bar ${forks} time${forks > 1 ? 's' : ''} this run, so the next run will likely read differently`
+    : 'Done. This run it took the top candidate every time; run it again and the near-tied steps will fork';
+  btnRun.disabled = false;
+  btnRun.textContent = 'Watch again ↻';
+  running = false;
+}
+
+btnRun.addEventListener('click', () => {
+  if (btnRun.textContent.indexOf('Watch again') === 0) resetDemo();
+  setTimeout(runDemo, 50);
+});
+resetDemo();
+
+/* ── 数学翻车实验 ── */
+const MATH_CASES = [
+  {
+    q: '1 + 1 = ?',
+    hint: "It has seen this problem millions of times in its training data",
+    cands: [
+      { w: '2',  pct: 99 },
+      { w: '3',  pct: 0.6 },
+      { w: '11', pct: 0.4 },
+    ],
+    picked: '2',
+    verdict: '<span class="mv-ok">✓ Correct.</span> But don\'t be misled — it\'s not that it can do arithmetic; it\'s that <b>"2" follows "1+1=" an overwhelming number of times</b>, so it has effectively memorized the answer. Just like you finishing "Happy birthday to…" — no thinking required.',
+  },
+  {
+    q: '3847 × 2963 = ?',
+    hint: 'It has almost never seen this exact problem anywhere',
+    cands: [
+      { w: '11,397,461', pct: 23 },
+      { w: '11,398,661', pct: 21 },
+      { w: '11,402,381', pct: 18 },
+    ],
+    picked: '11,397,461',
+    verdict: '<span class="mv-bad">✗ Wrong.</span> The correct answer is <b>11,398,661</b> — sitting right there among its candidates, but it picked a higher-probability wrong one. Look closely: every candidate has <b>the right number of digits and a plausible start and end</b>, because it\'s finishing the sentence by "which number looks like an answer", not actually doing the math. No candidate has an overwhelming probability — <b>on problems where it has "no gut certainty" like this, it tends to fall flat</b>.',
+  },
+];
+
+const mathQ = document.getElementById('mathQ');
+const mathCands = document.getElementById('mathCands');
+const mathVerdict = document.getElementById('mathVerdict');
+let mathTimers = [];
+
+function runMath(i) {
+  mathTimers.forEach(t => clearTimeout(t));
+  mathTimers = [];
+  const c = MATH_CASES[i];
+  mathQ.innerHTML = c.q + '<span class="mq-hint">' + c.hint + '</span>';
+  mathVerdict.classList.remove('show');
+  mathCands.innerHTML = c.cands.map(x => `
+    <div class="cand-row" data-w="${x.w}">
+      <div class="cand-word">${x.w}</div>
+      <div class="cand-track"><div class="cand-fill" data-p="${x.pct}"></div></div>
+      <div class="cand-pct">${x.pct}%</div>
+    </div>`).join('');
+  mathTimers.push(setTimeout(() => {
+    mathCands.querySelectorAll('.cand-fill').forEach(el => el.style.width = Math.max(el.dataset.p, 2) + '%');
+  }, 80));
+  mathTimers.push(setTimeout(() => {
+    const row = mathCands.querySelector(`.cand-row[data-w="${c.picked}"]`);
+    if (row) row.classList.add('picked');
+  }, 950));
+  mathTimers.push(setTimeout(() => {
+    mathVerdict.innerHTML = c.verdict;
+    mathVerdict.classList.add('show');
+  }, 1500));
+}
+
+document.querySelectorAll('.math-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.math-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    runMath(+chip.dataset.i);
+  });
+});
+runMath(0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

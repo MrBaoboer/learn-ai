@@ -58,8 +58,28 @@
   flex-wrap: wrap;
 }
 .sl-label { font-size: 13px; font-weight: 700; color: var(--text); }
-input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); cursor: pointer; height: 28px; }
+input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; height: 28px; }
 .sl-val { font-size: 14px; font-weight: 800; color: var(--accent); white-space: nowrap; min-width: 170px; text-align: right; }
+
+/* 窗口大小只有 5 个离散档位。不把档位标出来，用户拖一点点看不到变化会以为卡住了 */
+.sl-track { flex: 1; min-width: 200px; }
+.sl-ticks { position: relative; height: 24px; margin: 0 9px; }  /* 左右留出半个滑块，让刻度对准可停位置 */
+.sl-ticks span {
+  position: absolute; transform: translateX(-50%);
+  font-size: 10.5px; font-weight: 700; color: var(--sub);
+  white-space: nowrap; transition: color 0.15s;
+}
+.sl-ticks span::before {
+  content: ''; display: block; width: 1px; height: 5px;
+  margin: 0 auto 3px; background: var(--border); transition: background 0.15s;
+}
+.sl-ticks span:nth-child(1) { left: 0; }
+.sl-ticks span:nth-child(2) { left: 25%; }
+.sl-ticks span:nth-child(3) { left: 50%; }
+.sl-ticks span:nth-child(4) { left: 75%; }
+.sl-ticks span:nth-child(5) { left: 100%; }
+.sl-ticks span.on { color: var(--accent); }
+.sl-ticks span.on::before { background: var(--accent); }
 
 /* Token 可视化 */
 .token-vis {
@@ -151,6 +171,10 @@ input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); curs
 <meta name="author" content="洛小山">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://xueai.app/slides/1-2-prompt-power.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/1-2-prompt-power.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/1-2-prompt-power.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/1-2-prompt-power.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/1-2-prompt-power.html">
 <!-- Open Graph -->
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="xueai.app · AI 产品经理培训">
@@ -175,7 +199,7 @@ input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); curs
   <header class="lesson-header">
     <div class="kicker">从补全到对话</div>
     <h1>为什么用提示词就够了？答案在上下文窗口</h1>
-    <p class="subtitle">PreTraining 之后：不用重新训练，把任务描述喂进去就行——但为什么？</p>
+    <p class="subtitle">PreTraining 之后：不用重新训练，把任务描述喂进去就行。但为什么？</p>
   </header>
 
   <div class="sec-label">推理链：一步步想清楚</div>
@@ -211,7 +235,7 @@ input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); curs
   <!-- 结论条（最后一步出现） -->
   <div class="conclusion-bar" id="conclusionBar">
     <span class="cb-q">核心结论：</span>
-    <span class="cb-a">提示词够用，因为大模型支持<span style="color:var(--success);">超大上下文窗口</span>——把任务说明、规则、样例全塞进前文，模型按前文推，<span style="color:var(--amber);">效果等同于专门训练</span>。</span>
+    <span class="cb-a">提示词够用，因为大模型支持<span style="color:var(--success);">超大上下文窗口</span>：把任务说明、规则、样例全塞进前文，模型按前文推，<span style="color:var(--amber);">效果等同于专门训练</span>。</span>
   </div>
 
   <div class="chain-replay-row">
@@ -226,7 +250,13 @@ input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); curs
     <!-- 滑块 -->
     <div class="slider-row">
       <span class="sl-label">拖动调整窗口大小，看 Token 怎么被截断</span>
-      <input type="range" id="winSlider" min="0" max="4" value="1" step="1" oninput="render(+this.value)">
+      <div class="sl-track">
+        <input type="range" id="winSlider" min="0" max="4" value="1" step="1" list="winTicks" oninput="render(+this.value)">
+        <datalist id="winTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option></datalist>
+        <div class="sl-ticks" id="slTicks" aria-hidden="true">
+          <span>极小</span><span>偏小</span><span>中等</span><span>充足</span><span>超大</span>
+        </div>
+      </div>
       <span class="sl-val" id="slVal"></span>
     </div>
 
@@ -291,6 +321,7 @@ input[type=range] { flex: 1; min-width: 160px; accent-color: var(--accent); curs
 
 </article>
 
+<script src="i18n.js?v=20260808"></script>
 <script src="lesson.js"></script>
 <script>
 // ── Token 数据 ──
@@ -341,6 +372,7 @@ let typingTimer = null;
 function render(lv) {
   const lvl = LEVELS[lv];
   document.getElementById('slVal').textContent = lvl.lbl;
+  document.querySelectorAll('#slTicks span').forEach((t, i) => t.classList.toggle('on', i === lv));
   const keep = lvl.keep;
   const nonSepTokens = TOKENS.filter(t => !t.sep);
   const cutCount = nonSepTokens.length - keep;
@@ -483,7 +515,7 @@ lessonOnView(document.getElementById('logicChain'), playChain);
 // 初始渲染
 render(1);
 </script>
-<script src="nav-inject.js?v=20260703b"></script>
-<!--seo:begin--><script src="watermark.js?v=20260806"></script><script src="paywall.js?v=20260806b"></script><!--seo:end-->
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260806b"></script><!--seo:end-->
 </body>
 </html>

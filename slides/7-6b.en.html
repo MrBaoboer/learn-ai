@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Multi-Agent Collaboration: When One Agent Isn't Enough, Deploy a Team | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── Scenario card ── */
+.scenario-card{background:var(--card);border:1.5px solid rgba(8,145,178,.25);border-radius:var(--radius);padding:14px 18px}
+.sc-label{font-size:12px;font-weight:800;color:var(--cyan);letter-spacing:.4px;margin-bottom:4px}
+.sc-text{font-size:15px;color:var(--text);line-height:1.6}
+
+/* ── Org chart ── */
+.org{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0 6px}
+.org-node{padding:6px 14px;border-radius:8px;font-size:14px;font-weight:700;text-align:center}
+.org-coord{background:rgba(0,102,255,.08);color:var(--accent);border:1.5px solid rgba(0,102,255,.3)}
+.org-line{width:1px;height:12px;background:var(--border)}
+.org-branches{display:flex;gap:10px;position:relative;width:100%;max-width:480px;justify-content:center}
+.org-branches::before{content:'';position:absolute;top:0;left:16%;right:16%;height:1px;background:var(--border)}
+.org-branch{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.org-branch-line{width:1px;height:8px;background:var(--border)}
+.org-sub{padding:5px 10px;border-radius:6px;font-size:12px;font-weight:700;text-align:center;white-space:nowrap}
+.org-sub-r{background:rgba(8,145,178,.08);color:var(--cyan);border:1px solid rgba(8,145,178,.2)}
+.org-sub-d{background:rgba(124,58,237,.06);color:var(--purple);border:1px solid rgba(124,58,237,.2)}
+.org-sub-t{background:rgba(22,163,74,.06);color:var(--success);border:1px solid rgba(22,163,74,.2)}
+
+/* ── Agent role card ── */
+.agent-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+.agent-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;transition:all .35s;box-shadow:var(--shadow-card)}
+.agent-card.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,102,255,.12)}
+.agent-card.done{border-color:var(--success);background:rgba(22,163,74,.02)}
+.ac-hd{display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap}
+.ac-icon{font-size:16px}
+.ac-name{font-size:15px;font-weight:800;color:var(--text)}
+.ac-role{font-size:12px;color:var(--sub);font-weight:600}
+.ac-task{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:6px}
+.ac-tools{display:flex;flex-wrap:wrap;gap:4px}
+.ac-tool{padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;background:rgba(0,0,0,.05);color:var(--sub);font-family:"SF Mono","Fira Code",Menlo,monospace}
+.ac-status{margin-top:6px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:4px}
+.typing-dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 1.4s infinite both}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
+
+/* ── Execution flow ── */
+.c-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.c-stats{display:flex;gap:16px;align-items:center}
+.c-stat{font-size:13px;color:var(--sub);font-weight:600}
+.c-stat span{font-weight:800;color:var(--text)}
+.btn-reset{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-reset:hover{color:var(--text);border-color:rgba(0,0,0,.15)}
+.ctrl-hint{font-size:13px;color:var(--sub)}
+.flow-area{display:flex;flex-direction:column;gap:8px;min-height:40px}
+
+.flow-item{border-radius:var(--radius-sm);padding:11px 14px;font-size:14px;line-height:1.6;opacity:0;transform:translateY(6px);transition:all .35s}
+.flow-item.show{opacity:1;transform:translateY(0)}
+.fi-coordinator{background:rgba(0,102,255,.05);border:1.5px solid rgba(0,102,255,.18)}
+.fi-researcher{background:rgba(8,145,178,.04);border:1.5px solid rgba(8,145,178,.18)}
+.fi-developer{background:rgba(124,58,237,.04);border:1.5px solid rgba(124,58,237,.15)}
+.fi-tester{background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.15)}
+.fi-event{background:var(--card);border:1.5px dashed var(--border)}
+.fi-label{font-size:11px;font-weight:800;letter-spacing:.4px;margin-bottom:3px}
+.fi-text{color:var(--text)}
+.fi-detail{color:var(--sub);font-size:13px;margin-top:2px}
+.parallel-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:rgba(8,145,178,.08);color:var(--cyan)}
+.sequential-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:rgba(0,102,255,.08);color:var(--accent)}
+
+/* ── Product decisions / core concepts ── */
+.dec-area{display:flex;flex-direction:column;gap:10px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius-sm);padding:12px 15px;font-size:14px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(4px);transition:all .35s}
+.dec-card.show{opacity:1;transform:translateY(0)}
+.dec-card b{color:var(--accent)}
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.concept-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 15px;font-size:13px;color:var(--text);line-height:1.6;box-shadow:var(--shadow-card)}
+.concept-card b{color:var(--purple)}
+
+@media (max-width:768px){
+  .agent-grid{grid-template-columns:1fr}
+  .concept-grid{grid-template-columns:1fr}
+  .org-branches{gap:6px}
+  .org-sub{font-size:11px;padding:4px 8px}
+}
+</style>
+<meta name="description" content="Multi-Agent collaboration: when a task is too complex for one Agent, deploy a team. The main Agent breaks down tasks, dispatches sub-Agents, and aggregates results. Read-only tasks run in parallel; write tasks run in series.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-6b.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-6b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-6b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-6b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-6b.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Multi-Agent Collaboration: When One Agent Isn't Enough, Deploy a Team">
+<meta property="og:url" content="https://xueai.app/slides/7-6b.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Multi-Agent Collaboration","name":"Multi-Agent Collaboration","url":"https://xueai.app/slides/7-6b.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Agent Engineering","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Multi-Agent collaboration: when a task is too complex for one Agent, deploy a team. The main Agent breaks down tasks, dispatches sub-Agents, and aggregates results. Read-only tasks run in parallel; write tasks run in series.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Agent Engineering</div>
+    <h1>Multi-Agent Collaboration: When One Agent Isn't Enough, Deploy a Team</h1>
+    <p class="subtitle">Main Agent breaks tasks → Sub-Agents each handle their specialty → Aggregate and deliver. Read-only tasks run in parallel for speed; write tasks run in series for safety.</p>
+  </header>
+
+  <div class="sec-label reveal">Scenario · Agent Team</div>
+
+  <div class="scenario-card reveal">
+    <div class="sc-label">User Instruction</div>
+    <div class="sc-text">"Help me refactor the user authentication module in this project"</div>
+  </div>
+
+  <div class="org reveal">
+    <div class="org-node org-coord">Main Agent · Coordinator</div>
+    <div class="org-line"></div>
+    <div class="org-branches">
+      <div class="org-branch"><div class="org-branch-line"></div><div class="org-sub org-sub-r">🔍 Researcher</div></div>
+      <div class="org-branch"><div class="org-branch-line"></div><div class="org-sub org-sub-d">💻 Developer</div></div>
+      <div class="org-branch"><div class="org-branch-line"></div><div class="org-sub org-sub-t">🧪 Tester</div></div>
+    </div>
+  </div>
+
+  <div class="agent-grid reveal paywall-locked xa-peek">
+    <div class="agent-card" id="agentResearcher">
+      <div class="ac-hd"><span class="ac-icon">🔍</span><span class="ac-name">Researcher</span><span class="ac-role">Read-only</span></div>
+      <div class="ac-task">Analyze the current auth module's code structure and dependencies</div>
+      <div class="ac-tools"><span class="ac-tool">read_file</span><span class="ac-tool">search_files</span><span class="ac-tool">grep</span></div>
+      <div class="ac-status" id="statusResearcher" style="color:var(--sub)">Unassigned</div>
+    </div>
+
+    <div class="agent-card" id="agentDeveloper">
+      <div class="ac-hd"><span class="ac-icon">💻</span><span class="ac-name">Developer</span><span class="ac-role">Read-write</span></div>
+      <div class="ac-task">Rewrite the auth middleware to use JWT</div>
+      <div class="ac-tools"><span class="ac-tool">read_file</span><span class="ac-tool">edit_file</span><span class="ac-tool">run_command</span></div>
+      <div class="ac-status" id="statusDeveloper" style="color:var(--sub)">Unassigned</div>
+    </div>
+
+    <div class="agent-card" id="agentTester">
+      <div class="ac-hd"><span class="ac-icon">🧪</span><span class="ac-name">Tester</span><span class="ac-role">Read + Run</span></div>
+      <div class="ac-task">Write and run unit tests for the auth module</div>
+      <div class="ac-tools"><span class="ac-tool">read_file</span><span class="ac-tool">edit_file</span><span class="ac-tool">run_command</span></div>
+      <div class="ac-status" id="statusTester" style="color:var(--sub)">Unassigned</div>
+    </div>
+  </div>
+
+  <div class="sec-label reveal paywall-locked">Core Concepts</div>
+
+  <div class="concept-grid reveal paywall-locked">
+    <div class="concept-card">
+      <b>Analogy</b><br>
+      Single Agent = one person doing everything<br>
+      Multi-Agent = a team, each with their specialty
+    </div>
+    <div class="concept-card">
+      <b>Technical Principle</b><br>
+      Sub-Agents run in isolated Worker Threads<br>
+      Memory is isolated—no interference<br>
+      Parent can terminate children at any time
+    </div>
+    <div class="concept-card">
+      <b>Event Communication</b><br>
+      subagent_start → sub-Agent launched<br>
+      subagent_chunk → streaming in progress<br>
+      subagent_end → sub-Agent complete
+    </div>
+  </div>
+
+  <div class="sec-label reveal paywall-locked">Execution Flow</div>
+
+  <div class="c-bar reveal paywall-locked" id="flowDemo">
+    <div class="c-stats">
+      <div class="c-stat">Sub-Agent <span id="agentCount">0</span>/3</div>
+      <div class="c-stat">Events <span id="eventCount">0</span></div>
+      <span class="ctrl-hint" id="hint">8 steps total · Watch how the main Agent orchestrates the team</span>
+    </div>
+    <button class="btn-reset" onclick="reset()">↺ Replay</button>
+  </div>
+  <div class="flow-area paywall-locked" id="flowArea"></div>
+
+  <div class="sec-label reveal paywall-locked">Product Decisions</div>
+
+  <div class="dec-area paywall-locked" id="decArea"></div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:28px">
+    <b>Takeaway</b> Complex tasks don't rely on a single Agent grinding through everything—they're broken into specialized sub-Agents: a Researcher reads code, a Developer changes code, a Tester validates. Read-only tasks parallelize for speed; write tasks serialize for safety. This is team collaboration in the Agent world.
+  </div>
+
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+var STEPS = [
+  {
+    hint: '1/8 · Main Agent receives task, starts breaking it down',
+    agents: 0, events: 1,
+    agentStates: {researcher:'Unassigned',developer:'Unassigned',tester:'Unassigned'},
+    agentActive: [],
+    flow: [
+      {type:'coordinator',label:'Main Agent · Coordinator',color:'var(--accent)',
+       text:'Task received: "Refactor the user authentication module." Analysis complete—breaking into 3 sub-tasks →',
+       detail:'① Analyze existing code structure  ② Rewrite auth middleware  ③ Write unit tests'}
+    ],
+    decision: '<b>📌 When do you need multi-Agent?</b><br>When a task can be broken into independent sub-tasks requiring different capabilities (read-only / read-write / run commands). If one Agent can handle it, don\'t deploy a team: each sub-Agent carries its own system prompt + context = extra Token cost.'
+  },
+  {
+    hint: '2/8 · Researcher launched, safe to parallelize in read-only mode',
+    agents: 1, events: 2,
+    agentStates: {researcher:'running',developer:'Unassigned',tester:'Unassigned'},
+    agentActive: ['researcher'],
+    flow: [
+      {type:'event',label:'Event',color:'var(--sub)',
+       text:'subagent_start → Researcher (Worker Thread #1)',
+       detail:'Read-only sub-Agent—will not modify any files'},
+      {type:'researcher',label:'🔍 Researcher',color:'var(--cyan)',
+       text:'Analyzing auth module… scanning auth/ directory, tracing dependency chain, identifying session storage logic',
+       badge:{text:'Read-only · Parallelizable',class:'parallel-badge'}}
+    ],
+    decision: '<b>📌 Advantage of read-only sub-Agents</b><br>The Researcher can only read, not write—so it can run in parallel with other read-only tasks (Promise.all). Like multiple people reviewing documents simultaneously, with no interference.'
+  },
+  {
+    hint: '3/8 · Researcher done, returns findings to coordinator',
+    agents: 1, events: 3,
+    agentStates: {researcher:'done',developer:'Unassigned',tester:'Unassigned'},
+    agentActive: [],
+    flow: [
+      {type:'event',label:'Event',color:'var(--sub)',
+       text:'subagent_end → Researcher complete',detail:''},
+      {type:'researcher',label:'🔍 Researcher · Report',color:'var(--cyan)',
+       text:'Findings: currently uses express-session + Redis; 3 auth middleware instances, 5 route guards, passwords hashed with bcrypt. Recommend migrating to JWT to remove Redis dependency.',
+       detail:'Result returned to main Agent via postMessage'}
+    ],
+    decision: '<b>📌 Value of sub-Agent isolation</b><br>The Researcher runs in an isolated Worker Thread with its own memory space. Even if it crashes, it won\'t affect the main Agent or other sub-Agents. Main Agent can postMessage → wait 2s → force terminate.'
+  },
+  {
+    hint: '4/8 · Developer launched, needs Researcher findings as context',
+    agents: 2, events: 4,
+    agentStates: {researcher:'done',developer:'running',tester:'Unassigned'},
+    agentActive: ['developer'],
+    flow: [
+      {type:'coordinator',label:'Main Agent · Coordinator',color:'var(--accent)',
+       text:'Injecting research report into Developer context → launching Developer sub-Agent',
+       detail:'Developer needs to know the existing code structure to safely refactor'},
+      {type:'event',label:'Event',color:'var(--sub)',
+       text:'subagent_start → Developer (Worker Thread #2)',detail:''},
+      {type:'developer',label:'💻 Developer',color:'var(--purple)',
+       text:'Refactoring auth middleware… removing session logic, implementing JWT issuance/verification, updating route guards…',
+       badge:{text:'Read-write · Must serialize',class:'sequential-badge'}}
+    ],
+    decision: '<b>📌 Core principle: parallel vs serial</b><br>The Developer modifies files—if two write Agents ran simultaneously, they could overwrite each other\'s code. So <b>read-only tasks can parallelize (fast); write tasks must serialize (safe)</b>. This is the most critical scheduling decision in multi-Agent systems.'
+  },
+  {
+    hint: '5/8 · Developer done, code has been modified',
+    agents: 2, events: 5,
+    agentStates: {researcher:'done',developer:'done',tester:'Unassigned'},
+    agentActive: [],
+    flow: [
+      {type:'event',label:'Event',color:'var(--sub)',
+       text:'subagent_end → Developer complete',detail:''},
+      {type:'developer',label:'💻 Developer · Delivery',color:'var(--purple)',
+       text:'Done: removed express-session, added jwt.middleware.ts, updated 5 route guards, added token refresh logic. Modified 8 files.',
+       detail:''}
+    ],
+    decision: '<b>📌 Token cost of sub-Agents</b><br>Each sub-Agent carries its own system prompt + full context. 3 sub-Agents ≈ 3× Token consumption. Only launch multi-Agent when the task genuinely requires different capabilities and the split actually improves efficiency.'
+  },
+  {
+    hint: '6/8 · Tester launched, needs Developer code changes',
+    agents: 3, events: 6,
+    agentStates: {researcher:'done',developer:'done',tester:'running'},
+    agentActive: ['tester'],
+    flow: [
+      {type:'coordinator',label:'Main Agent · Coordinator',color:'var(--accent)',
+       text:'Injecting Developer\'s changed file list into Tester context → launching Tester',
+       detail:'Tester needs to know which files changed to write targeted tests'},
+      {type:'event',label:'Event',color:'var(--sub)',
+       text:'subagent_start → Tester (Worker Thread #3)',detail:''},
+      {type:'tester',label:'🧪 Tester',color:'var(--success)',
+       text:'Writing tests… JWT issuance test, expired Token test, route guard auth test, Token refresh test…',
+       badge:{text:'Read-write · Must serialize',class:'sequential-badge'}}
+    ],
+    decision: '<b>📌 Serial dependency chain</b><br>Researcher → Developer → Tester: each depends on the previous step\'s output. Just like real team workflow: research first, then develop, then test. The main Agent is responsible for passing context in between.'
+  },
+  {
+    hint: '7/8 · Tester done, all tests pass',
+    agents: 3, events: 7,
+    agentStates: {researcher:'done',developer:'done',tester:'done'},
+    agentActive: [],
+    flow: [
+      {type:'event',label:'Event',color:'var(--sub)',
+       text:'subagent_end → Tester complete',detail:''},
+      {type:'tester',label:'🧪 Tester · Report',color:'var(--success)',
+       text:'Test results: all 12 test cases pass. Scenarios covered: normal login, Token expiry, invalid Token, refresh mechanism, route protection.',
+       detail:''}
+    ],
+    decision: '<b>📌 Termination and fault tolerance</b><br>If the Tester finds a critical bug, the main Agent can: ① pass the bug details back to the Developer for a fix  ② terminate the flow and report to the user. Parent notifies sub-Agent via postMessage → 2s grace period → force terminate.'
+  },
+  {
+    hint: '8/8 · Main Agent aggregates all results and delivers to user',
+    agents: 3, events: 8,
+    agentStates: {researcher:'done',developer:'done',tester:'done'},
+    agentActive: [],
+    flow: [
+      {type:'coordinator',label:'Main Agent · Aggregate & Deliver',color:'var(--accent)',
+       text:'Auth module refactoring complete. Researcher analyzed code structure; Developer migrated session to JWT (8 files modified); Tester validated all 12 cases. Redis dependency removed; Token refresh mechanism added.',
+       detail:'User sees only this final response—the result of 3 sub-Agents collaborating behind the scenes'}
+    ],
+    decision: '<b>📌 User perception vs actual process</b><br>User sent one sentence and received a complete report. But behind the scenes: 3 sub-Agents, 3 Worker Threads, 8 events. PMs must decide: should intermediate progress be surfaced to the user? (Cursor chose yes—users see each sub-Agent\'s real-time status.)'
+  }
+];
+
+var cur = 0;
+
+function setAgentState(id, state) {
+  var card = document.getElementById('agent' + id);
+  var status = document.getElementById('status' + id);
+  card.classList.remove('active','done');
+  if (state === 'running') {
+    card.classList.add('active');
+    status.innerHTML = '<span style="color:var(--accent)">Running </span><span class="typing-dots"><span></span><span></span><span></span></span>';
+  } else if (state === 'done') {
+    card.classList.add('done');
+    status.innerHTML = '<span style="color:var(--success)">✓ Done</span>';
+  } else {
+    status.innerHTML = '<span style="color:var(--sub)">' + state + '</span>';
+  }
+}
+
+function addFlow(item) {
+  var area = document.getElementById('flowArea');
+  var el = document.createElement('div');
+  var cls = 'flow-item';
+  if (item.type === 'coordinator') cls += ' fi-coordinator';
+  else if (item.type === 'researcher') cls += ' fi-researcher';
+  else if (item.type === 'developer') cls += ' fi-developer';
+  else if (item.type === 'tester') cls += ' fi-tester';
+  else cls += ' fi-event';
+
+  el.className = cls;
+  var html = '<div class="fi-label" style="color:' + item.color + '">' + item.label + '</div>';
+  html += '<div class="fi-text">' + item.text + '</div>';
+  if (item.detail) html += '<div class="fi-detail">' + item.detail + '</div>';
+  if (item.badge) html += '<div class="' + item.badge.class + '" style="margin-top:4px">' + item.badge.text + '</div>';
+  el.innerHTML = html;
+  area.appendChild(el);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    el.classList.add('show');
+  })});
+}
+
+var playTimer = null;
+
+function playStep() {
+  if (cur >= STEPS.length) return;
+  var s = STEPS[cur];
+
+  document.getElementById('agentCount').textContent = s.agents;
+  document.getElementById('eventCount').textContent = s.events;
+  document.getElementById('hint').textContent = s.hint;
+
+  var states = s.agentStates;
+  setAgentState('Researcher', states.researcher);
+  setAgentState('Developer', states.developer);
+  setAgentState('Tester', states.tester);
+
+  for (var i = 0; i < s.flow.length; i++) {
+    (function(item, delay){
+      setTimeout(function(){ addFlow(item); }, delay);
+    })(s.flow[i], i * 200);
+  }
+
+  var da = document.getElementById('decArea');
+  var dec = document.createElement('div');
+  dec.className = 'dec-card';
+  dec.innerHTML = s.decision;
+  da.innerHTML = '';
+  da.appendChild(dec);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    dec.classList.add('show');
+  })});
+
+  cur++;
+  if (cur >= STEPS.length) {
+    playTimer = null;
+  } else {
+    playTimer = setTimeout(playStep, 900);
+  }
+}
+
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
+function reset() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
+  cur = 0;
+  document.getElementById('flowArea').innerHTML = '';
+  document.getElementById('decArea').innerHTML = '';
+  document.getElementById('agentCount').textContent = '0';
+  document.getElementById('eventCount').textContent = '0';
+  document.getElementById('hint').textContent = 'Auto-playing…';
+
+  setAgentState('Researcher','Unassigned');
+  setAgentState('Developer','Unassigned');
+  setAgentState('Tester','Unassigned');
+  startPlay();
+}
+
+lessonOnView(document.getElementById('flowDemo'), function() {
+  document.getElementById('hint').textContent = 'Auto-playing…';
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

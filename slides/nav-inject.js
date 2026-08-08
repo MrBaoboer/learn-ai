@@ -4,6 +4,26 @@ const SLIDE_ORDER = [
   { file: '0-intro.html',               title: '我们在哪里',             num: 0  },
   { file: '0-how.html',                 title: '怎样学才有效',           num: 0  },
   { file: '0-why.html',                 title: '为什么要打基础',          num: 0  },
+  { file: 'zero-0.html',                title: 'AI 能干哪些神奇的活',     num: 0  },
+  { file: 'zero-1.html',                title: '它其实在玩「接话茬」',    num: 0  },
+  { file: 'zero-2.html',                title: '它不是搜索引擎',          num: 0  },
+  { file: 'zero-3.html',                title: '它会一本正经地胡说',      num: 0  },
+  { file: 'zero-4.html',                title: '把它当不了解你的新同事',   num: 0  },
+  { file: 'zero-5.html',                title: '万能开场白：先问我',       num: 0  },
+  { file: 'zero-q-prompt.html',         title: '提示词到底怎么写才好',     num: 0  },
+  { file: 'zero-q-prompt-engineering.html', title: '提示词工程有什么意义', num: 0  },
+  { file: 'zero-q-model-agent-app.html', title: '模型、Agent、应用的关系', num: 0  },
+  { file: 'zero-q-agent.html',          title: 'Agent 到底强在哪',        num: 0  },
+  { file: 'zero-q-skill.html',          title: '最近很火的 Skill 是什么',  num: 0  },
+  { file: 'zero-q-china-models.html',   title: '国产大模型怎么选',        num: 0  },
+  { file: 'zero-q-companies.html',      title: '还有哪些重要的 AI 公司',   num: 0  },
+  { file: 'zero-q-multimodal.html',     title: '为什么有的 AI 看不懂图',   num: 0  },
+  { file: 'zero-q-image-cost.html',     title: '生成一张图为什么贵',       num: 0  },
+  { file: 'zero-q-video-cost.html',     title: 'AI 视频为什么按秒收费',    num: 0  },
+  { file: 'zero-q-relay.html',          title: '什么是 API 中转站',       num: 0  },
+  { file: 'zero-q-reverse-proxy.html',  title: '拼车号、共享号是什么',     num: 0  },
+  { file: 'zero-6.html',                title: '放心用，还是要核实',       num: 0  },
+  { file: 'zero-final.html',            title: '你的下一步',              num: 0  },
   { file: 'training-data.html',         title: '训练数据规模',          num: 1  },
   { file: 'train-vs-infer.html',        title: '训练 vs 推理',          num: 2  },
   { file: '1-2-vocab.html',             title: '词表与训练',             num: 3  },
@@ -21,6 +41,7 @@ const SLIDE_ORDER = [
   { file: '1-2-mitigation-eval.html',   title: '评测 + 人工审核',        num: 15 },
   { file: 'summary-1.html',            title: '第一篇章汇总（上）',      num: 0  },
   { file: 'summary-1b.html',           title: '第一篇章汇总（下）',      num: 0  },
+  { file: 'interview-1.html',          title: '他们会这样考你 · 30 问',   num: 0  },
   { file: '5-1.html',                  title: '上下文窗口',              num: 16 },
   { file: '5-2.html',                  title: '上下文溢出策略',          num: 17 },
   { file: '6-0a.html',                title: '为什么选 Markdown',        num: 18 },
@@ -75,6 +96,7 @@ const SLIDE_ORDER = [
   { file: 'summary-final.html',        title: '课程总结',                num: 0  },
   { file: 'summary-final-1.html',      title: '总结（上）',              num: 0  },
   { file: 'summary-final-2.html',      title: '总结（下）',              num: 0  },
+  { file: 'interview-2.html',          title: '他们会这样考你 · 30 问',   num: 0  },
   { file: '9-1.html',                  title: '文生图 vs 垫图',          num: 43 },
   { file: '9-2.html',                  title: '用 AI 给 AI 写 Prompt',   num: 44 },
   { file: '9-3.html',                  title: '角色一致性',              num: 45 },
@@ -109,6 +131,7 @@ const SLIDE_ORDER = [
   { file: '9-32.html',                 title: 'AI 自加工具',            num: 74 },
   { file: '9-summary.html',            title: '实战全景图',              num: 0  },
   { file: '9-final.html',              title: '聊天套壳 vs Agent 产品', num: 0  },
+  { file: 'interview-3.html',          title: '他们会这样考你 · 30 问',   num: 0  },
   { file: '10-1.html',                 title: 'Workflow vs Agent',      num: 75 },
   { file: '10-2.html',                 title: '五种 Workflow 模式',     num: 76 },
   { file: '10-3.html',                 title: '上下文工程方法论',        num: 77 },
@@ -128,6 +151,7 @@ const SLIDE_ORDER = [
   { file: '10-17.html',                title: 'Contextual Retrieval',  num: 91 },
   { file: '10-summary.html',           title: '进阶全景图',              num: 0  },
   { file: '10-final.html',             title: 'Do the simplest thing', num: 0  },
+  { file: 'interview-4.html',          title: '他们会这样考你 · 30 问',   num: 0  },
   { file: '11-1.html',                 title: '从脚手架到自我改进',      num: 92 },
   { file: '11-2.html',                 title: 'Harness 三大设计模式',   num: 93 },
   { file: '11-3.html',                 title: '上下文工程自动进化',      num: 94 },
@@ -135,6 +159,25 @@ const SLIDE_ORDER = [
   { file: '11-5.html',                 title: '让 Harness 改进自己',    num: 96 },
   { file: '11-6.html',                 title: '进化搜索',                num: 97 },
   { file: '11-7.html',                 title: '未来挑战七道关',          num: 98 },
+  { file: 'interview-5.html',          title: '他们会这样考你 · 30 问',   num: 0  },
+  { file: 'oss-1.html',                title: '权重是什么',              num: 0  },
+  { file: 'oss-2.html',                title: '真开源 vs 假开源',        num: 0  },
+  { file: 'oss-3.html',                title: '开源是一门生意',          num: 0  },
+  { file: 'oss-4.html',                title: '涌现',                    num: 0  },
+  { file: 'oss-5.html',                title: '为什么要把模型做小',       num: 0  },
+  { file: 'oss-6.html',                title: '蒸馏是怎么做的',          num: 0  },
+  { file: 'oss-7.html',                title: '蒸馏的代价',              num: 0  },
+  { file: 'oss-8.html',                title: '你的电脑能跑多大的模型',   num: 0  },
+  { file: 'oss-9.html',                title: 'Ollama 与 LM Studio',    num: 0  },
+  { file: 'exam.html',                 title: '自测中心',                num: 0  },
+  { file: 'exam-1.html',               title: '第一篇章自测 · 50 题',    num: 0  },
+  { file: 'exam-2.html',               title: '第二篇章自测 · 50 题',    num: 0  },
+  { file: 'exam-3.html',               title: '第三篇章自测 · 50 题',    num: 0  },
+  { file: 'exam-4.html',               title: '第四篇章自测 · 50 题',    num: 0  },
+  { file: 'exam-5.html',               title: '第五篇章自测 · 50 题',    num: 0  },
+  { file: 'exam-6.html',               title: '第六篇章自测 · 50 题',    num: 0  },
+  { file: 'exam-7.html',               title: '第七篇章自测 · 50 题',    num: 0  },
+  { file: 'exam-all.html',             title: '全站综合考 · 35 题',      num: 0  },
 ];
 
 // 嵌入模式：被 learn.html 的 iframe 加载时（?embed=1 或在 iframe 内），
@@ -148,9 +191,24 @@ const EMBED_MODE = (function(){
   return false;
 })();
 
+// ── i18n 适配：i18n.js 未加载时按中文兜底 ──
+const I18N = window.XUEAI_I18N || {
+  lang: 'zh',
+  t: function (k) { return ({
+    toc: '目录', tocTitle: '在课程阅读器中打开，左侧带完整目录', askAuthor: '请教作者',
+    today: '今日', total: '总学习', backHomeTitle: '返回首页 (Cmd+↑返回目录)',
+    prevTitle: '上一页 (Cmd+←)', nextTitle: '下一页 (Cmd+→)', lastPage: '已是最后一页',
+    navHint: '→ 下一步<br>⌘→ 换页', rotateTitle: '请横屏观看',
+    rotateSub: '横屏后内容会按比例完整显示<br/>竖屏可关闭后继续浏览', rotateClose: '继续竖屏浏览'
+  })[k] || k; },
+  baseFile: function (f) { return f; },
+  locFile: function (f) { return f; },
+  slideTitle: function (f, zh) { return zh; }
+};
+
 (function() {
 
-  const cur = location.pathname.split('/').pop();
+  const cur = I18N.baseFile(location.pathname.split('/').pop());
   const idx = SLIDE_ORDER.findIndex(s => s.file === cur);
 
   // 无论是否在序列中，都注入顶部栏（请教作者 + PV）
@@ -174,15 +232,17 @@ const EMBED_MODE = (function(){
         overflow: hidden;
         max-width: calc(100vw - 16px);
       }
-      #nav-author-link {
+      #nav-author-link, #nav-toc-link {
         font-size: 12px; font-weight: 600; color: #6b6b70;
         text-decoration: none;
         padding: 7px 16px;
         transition: background 0.15s, color 0.15s;
         white-space: nowrap;
+        display: flex; align-items: center; gap: 5px;
       }
-      #nav-author-link:hover { background: rgba(0,102,255,0.06); color: #0066ff; }
-      #nav-top-sep {
+      #nav-author-link:hover, #nav-toc-link:hover { background: rgba(0,102,255,0.06); color: #0066ff; }
+      #nav-toc-link { color: #0066ff; }
+      .nav-top-sep {
         width: 1px; height: 20px; background: rgba(0,0,0,0.08); flex-shrink: 0;
       }
       #nav-pv-badge {
@@ -196,7 +256,7 @@ const EMBED_MODE = (function(){
       .nav-pv-num-total { color: #7c3aed; font-weight: 800; }
       @media (max-width: 768px) {
         #nav-top-bar { top: 8px; border-radius: 20px; }
-        #nav-author-link, #nav-pv-badge { padding: 6px 10px; font-size: 11px; }
+        #nav-author-link, #nav-toc-link, #nav-pv-badge { padding: 6px 10px; font-size: 11px; }
         .nav-pv-sep { margin: 0; }
       }
     `;
@@ -205,13 +265,15 @@ const EMBED_MODE = (function(){
     const topBar = document.createElement('div');
     topBar.id = 'nav-top-bar';
     topBar.innerHTML = `
-      <a id="nav-author-link" href="https://luoxiaoshan.cn/" target="_blank">请教作者</a>
-      <div id="nav-top-sep"></div>
+      <a id="nav-toc-link" href="${I18N.locFile('learn.html')}#${encodeURIComponent(cur)}" title="${I18N.t('tocTitle')}">☰ ${I18N.t('toc')}</a>
+      <div class="nav-top-sep"></div>
+      <a id="nav-author-link" href="https://luoxiaoshan.cn/" target="_blank">${I18N.t('askAuthor')}</a>
+      <div class="nav-top-sep"></div>
       <div id="nav-pv-badge">
-        <span class="nav-pv-label">今日</span>
+        <span class="nav-pv-label">${I18N.t('today')}</span>
         <span class="nav-pv-num-today" id="nav-pv-today">—</span>
         <div class="nav-pv-sep"></div>
-        <span class="nav-pv-label">总学习</span>
+        <span class="nav-pv-label">${I18N.t('total')}</span>
         <span class="nav-pv-num-total" id="nav-pv-total">—</span>
       </div>
     `;
@@ -222,7 +284,8 @@ const EMBED_MODE = (function(){
       .then(d => {
         function fmt(n) {
           n = Number(n) || 0;
-          if (n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + ' 万';
+          if (I18N.lang === 'zh' && n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + ' 万';
+          if (I18N.lang !== 'zh' && n >= 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
           return n.toLocaleString('en-US');
         }
         document.getElementById('nav-pv-today').textContent = fmt(d.today);
@@ -300,17 +363,17 @@ const EMBED_MODE = (function(){
   const nav = document.createElement('div');
   nav.id = 'slide-nav';
   nav.innerHTML = `
-    <button class="snav-home" onclick="location.href='home.html'" title="返回首页 (Cmd+↑返回目录)">☰</button>
+    <button class="snav-home" onclick="location.href='${I18N.locFile('home.html')}'" title="${I18N.t('backHomeTitle')}">☰</button>
     <div class="snav-sep"></div>
-    <button class="snav-btn" id="snav-prev" onclick="location.href='${prev ? prev.file : ''}'" ${!prev ? 'disabled' : ''} title="上一页 (Cmd+←)">
-      ← ${prev ? prev.title : ''}
+    <button class="snav-btn" id="snav-prev" onclick="location.href='${prev ? I18N.locFile(prev.file) : ''}'" ${!prev ? 'disabled' : ''} title="${I18N.t('prevTitle')}">
+      ← ${prev ? I18N.slideTitle(prev.file, prev.title) : ''}
     </button>
     <div class="snav-info">${idx + 1} / ${total}</div>
-    <button class="snav-btn" id="snav-next" onclick="location.href='${next ? next.file : ''}'" ${!next ? 'disabled' : ''} title="下一页 (Cmd+→)">
-      ${next ? next.title : '已是最后一页'} ${next ? '→' : ''}
+    <button class="snav-btn" id="snav-next" onclick="location.href='${next ? I18N.locFile(next.file) : ''}'" ${!next ? 'disabled' : ''} title="${I18N.t('nextTitle')}">
+      ${next ? I18N.slideTitle(next.file, next.title) : I18N.t('lastPage')} ${next ? '→' : ''}
     </button>
     <div class="snav-sep"></div>
-    <div style="font-size:10px;color:rgba(255,255,255,0.3);padding:0 4px;line-height:1.4;text-align:center">→ 下一步<br>⌘→ 换页</div>
+    <div style="font-size:10px;color:rgba(255,255,255,0.3);padding:0 4px;line-height:1.4;text-align:center">${I18N.t('navHint')}</div>
   `;
   // 触发热区
   const trigger = document.createElement('div');
@@ -363,23 +426,23 @@ const EMBED_MODE = (function(){
         'prompt-attack','prompt-attack-cases','prompt-defense',
         '7-1','7-2','7-3','7-4','7-5','8-1','8-2','8-2b','8-3','8-4','8-5','8-5b',
         '8-6','8-7','8-8','cost-eval','engineering-philosophy','summary-2','summary-2b'];
-      if (ch4Files.includes(base)) { location.href = 'learn.html#10-1.html'; }
-      else if (ch3Files.includes(base)) { location.href = 'learn.html#9-1.html'; }
-      else { location.href = ch2Files.includes(base) ? 'story-2.html' : 'llm-story.html'; }
+      if (ch4Files.includes(base)) { location.href = I18N.locFile('learn.html') + '#10-1.html'; }
+      else if (ch3Files.includes(base)) { location.href = I18N.locFile('learn.html') + '#9-1.html'; }
+      else { location.href = I18N.locFile(ch2Files.includes(base) ? 'story-2.html' : 'llm-story.html'); }
       return;
     }
 
     // Cmd + → → 下一页
     if (cmd && e.key === 'ArrowRight') {
       e.preventDefault();
-      if (next) location.href = next.file;
+      if (next) location.href = I18N.locFile(next.file);
       return;
     }
 
     // Cmd + ← → 上一页
     if (cmd && e.key === 'ArrowLeft') {
       e.preventDefault();
-      if (prev) location.href = prev.file;
+      if (prev) location.href = I18N.locFile(prev.file);
       return;
     }
 
@@ -416,8 +479,8 @@ const EMBED_MODE = (function(){
       const dx = e.changedTouches[0].clientX - startX;
       const dy = e.changedTouches[0].clientY - startY;
       if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-      if (dx < 0 && next) location.href = next.file;   // 左滑 → 下一页
-      if (dx > 0 && prev) location.href = prev.file;   // 右滑 → 上一页
+      if (dx < 0 && next) location.href = I18N.locFile(next.file);   // 左滑 → 下一页
+      if (dx > 0 && prev) location.href = I18N.locFile(prev.file);   // 右滑 → 上一页
     }, { passive: true });
   })();
 
@@ -520,9 +583,9 @@ const EMBED_MODE = (function(){
   const mask = document.createElement('div');
   mask.id = 'slide-rotate-mask';
   mask.innerHTML = '<div class="icon">↻</div>' +
-    '<div class="title">请横屏观看</div>' +
-    '<div class="sub">横屏后内容会按比例完整显示<br/>竖屏可关闭后继续浏览</div>' +
-    '<button id="slide-rotate-close" type="button">继续竖屏浏览</button>';
+    '<div class="title">' + I18N.t('rotateTitle') + '</div>' +
+    '<div class="sub">' + I18N.t('rotateSub') + '</div>' +
+    '<button id="slide-rotate-close" type="button">' + I18N.t('rotateClose') + '</button>';
   document.body.appendChild(mask);
 
   const MASK_DISMISS_KEY = 'slide_rotate_mask_dismissed';
@@ -609,33 +672,75 @@ const EMBED_MODE = (function(){
   applyCanvasScale();
 })();
 
-// ── 拍脸图广告（独立脚本，下架时删除此段及 interstitial-ad.js 即可） ──
-// 嵌入模式（Wiki iframe 内）不弹广告。
+// ── 站内推荐弹层（后台称「拍脸图」，独立脚本，下架时删除此段及 splash.js 即可） ──
+// 嵌入模式（Wiki iframe 内）不弹。
+// 脚本名不得含 ad：旧名 interstitial-ad.js 命中广告拦截插件的 `-ad.js` 规则，
+// 当天 23,039 次页面加载里只有 141 次真正请求到它，详见 splash.js 头部注释。
 (function () {
   if (EMBED_MODE) return;
   var s = document.createElement('script');
-  s.src = 'interstitial-ad.js';
+  s.src = 'splash.js?v=20260807';
   s.async = true;
   document.head.appendChild(s);
 })();
 
-// ── 访问上报（管理后台用户画像；带 xueai_sess Cookie 自动关联登录用户） ──
+// ── 行为埋点（管理后台用户画像；带 xueai_sess Cookie 自动关联登录用户） ──
+// 原先此处直接一发 /api/visit（只记路径，且 EMBED 模式不上报，阅读器内
+// 行为全丢）。现由 track.js 接管：会话 + 行为链路 + 每页停留时长上报到
+// /api/track，服务端同步写回 legacy visits/users 表，旧统计口径不断档。
+// EMBED 模式（learn.html iframe 内）也照常加载，学习行为不再丢失。
 (function () {
-  if (EMBED_MODE) return;
   try {
-    var body = 'path=' + encodeURIComponent(location.pathname);
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/visit', new Blob([body], { type: 'application/x-www-form-urlencoded' }));
-    } else {
-      fetch('/api/visit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body,
-        credentials: 'same-origin',
-        keepalive: true,
-      }).catch(function () {});
-    }
-  } catch (e) {}
+    var s = document.createElement('script');
+    s.src = 'track.js?v=20260806';
+    s.async = true;
+    document.head.appendChild(s);
+  } catch (e) { /* 埋点加载失败不影响浏览 */ }
+})();
+
+// ── 问问 Alice：划词提问/吐槽 + Alice 悬浮窗（独立脚本，下架删除此段即可）──
+// 「我要吐槽」也在这个脚本里：由 Alice 对话式引导后转交 /api/feedback，
+// 独立的 feedback.js 表单面板已于 2026-08-08 下线。
+// EMBED 模式（learn.html iframe 内）也照常加载：阅读器里同样可以划词提问。
+(function () {
+  try {
+    var s = document.createElement('script');
+    s.src = 'ask-alice.js?v=20260809s';
+    s.async = true;
+    document.head.appendChild(s);
+  } catch (e) { /* 加载失败不影响浏览 */ }
+})();
+
+// ── 嵌入模式下的站内跳页：交给外壳换 hash，别让 iframe 自己跳 ──
+// 课件正文里的站内链接（如 interview-* 的「用这些课程页组织答案」）写的是相对
+// 路径。iframe 自己跳过去的话，外壳 learn.html 的 hash 和左侧目录都不会动，用户
+// 落在一个没有目录、没有翻页条的裸页上，回不来。改成通知外壳换 hash 后，进度、
+// 目录高亮、上一节/下一节都照常跟随。
+// hash 里存的是中文基名（三个语言外壳共用一套 hash），所以要先还原语言后缀。
+(function () {
+  if (!EMBED_MODE) return;
+
+  // 只接管指向同目录课程页的链接，外链和目录外的页面一律放行
+  function targetLesson(a) {
+    if (a.target && a.target !== '_self') return null;
+    const href = a.getAttribute('href') || '';
+    if (!/^[\w.-]+\.html(#.*)?$/.test(href)) return null;
+    const file = I18N.baseFile(href.split('#')[0]);
+    return SLIDE_ORDER.some(s => s.file === file) ? file : null;
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // 新标签页打开，不拦
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a) return;
+    const file = targetLesson(a);
+    if (!file) return;
+    try {
+      window.top.location.hash = '#' + encodeURIComponent(file);
+      e.preventDefault();
+    } catch (err) { /* 拿不到外壳（理论上跨域）时按普通链接走 */ }
+  }, true);
 })();
 
 // 付费墙已停用，课程全部免费开放。

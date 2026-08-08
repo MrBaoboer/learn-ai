@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Truth About Function Calling: 5 Messages Behind One Conversation | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 双栏：用户视角 | Message List ── */
+.duo{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
+
+/* 左：用户视角（聊天模拟窗口，保留内部滚动） */
+.chat-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);position:sticky;top:16px}
+.l-label{padding:10px 16px;font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.chat-area{padding:12px;min-height:180px;max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;background:#eae7df}
+.chat-bubble{max-width:88%;padding:9px 13px;border-radius:14px;font-size:15px;line-height:1.6;opacity:0;transform:translateY(6px);transition:all .3s ease}
+.chat-bubble.show{opacity:1;transform:translateY(0)}
+.chat-user{align-self:flex-end;background:var(--cyan);color:white;border-bottom-right-radius:4px}
+.chat-bot{align-self:flex-start;background:var(--card);color:var(--text);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.chat-loading{align-self:flex-start;background:var(--card);color:var(--sub);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);font-size:14px;display:flex;align-items:center;gap:6px}
+.typing-dots span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--sub);animation:blink 1.4s infinite both}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
+.chat-tool-card{align-self:flex-start;background:var(--card);border:1.5px solid rgba(22,163,74,.2);border-radius:12px;padding:10px 12px;box-shadow:0 1px 4px rgba(0,0,0,.06);max-width:88%}
+.ctc-hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--success);margin-bottom:5px}
+.ctc-row{display:flex;justify-content:space-between;font-size:13px;padding:2px 0}
+.ctc-label{color:var(--sub)}
+.ctc-val{font-weight:600;color:var(--text)}
+
+/* 产品决策卡片 */
+.decision{padding:12px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(4px);transition:all .35s}
+.dec-card.show{opacity:1;transform:translateY(0)}
+.dec-card b{color:var(--accent)}
+
+/* 右：Message List */
+.ml-panel{min-width:0}
+.r-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.r-title{font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.5px}
+.r-stats{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.r-stat{font-size:13px;color:var(--sub);font-weight:600}
+.r-stat span{font-weight:800;color:var(--text)}
+.btn-reset{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--sub);cursor:pointer;font-family:inherit;min-height:32px}
+
+.ml-area{display:flex;flex-direction:column;gap:8px}
+
+/* 消息条目 — 仿 API 调试器 */
+.ml-entry{border:1.5px solid var(--border);border-radius:10px;overflow:hidden;opacity:0;transform:translateY(8px);transition:all .35s ease;background:var(--card)}
+.ml-entry.show{opacity:1;transform:translateY(0)}
+.ml-head{padding:6px 12px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;background:rgba(0,0,0,.025);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:4px}
+.ml-idx{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;font-weight:800;color:var(--sub)}
+.ml-role{display:flex;align-items:center;gap:6px}
+.ml-role-badge{padding:2px 7px;border-radius:4px;font-size:12px;font-weight:800;letter-spacing:.3px}
+.ml-tokens{color:var(--sub);font-weight:600;font-size:13px}
+.ml-body{padding:10px 12px 12px;font-size:14px;line-height:1.6;color:var(--text)}
+.ml-field{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;color:var(--sub);font-weight:600;margin-bottom:1px;word-break:break-word}
+.ml-field-val{color:var(--text);font-weight:400}
+.ml-body-muted{color:var(--sub);font-size:13px}
+.ml-tool-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:13px;font-weight:700;margin:2px 0}
+.ml-param{display:flex;gap:8px;font-size:13px;padding:2px 0;padding-left:16px;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.ml-param-k{color:var(--sub);min-width:40px}
+.ml-param-v{color:var(--text);font-weight:600}
+
+/* 框架动作行 */
+.ml-action{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:rgba(217,119,6,.04);border:1px dashed rgba(217,119,6,.3);font-size:13px;color:var(--amber);font-weight:600;opacity:0;transform:translateY(6px);transition:all .3s}
+.ml-action.show{opacity:1;transform:translateY(0)}
+.ml-action-icon{font-size:15px}
+
+/* 请求方向标记 */
+.ml-dir{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:13px;font-weight:700;color:var(--sub);opacity:0;transition:opacity .3s}
+.ml-dir.show{opacity:1}
+.ml-dir-arrow{font-size:15px}
+
+/* 折叠的工具列表 */
+.ml-tools-summary{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.ml-ts-chip{padding:3px 8px;border-radius:4px;font-size:13px;font-weight:700;background:rgba(0,0,0,.05);color:var(--sub)}
+
+/* JSON 格式参考（可折叠卡片） */
+.json-panel{border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:var(--shadow-card)}
+.json-toggle{padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--sub);user-select:none;transition:all .15s;min-height:44px}
+.json-toggle:hover{background:rgba(0,0,0,.02)}
+.json-panel.closed .json-ref{display:none}
+.json-ref{background:#1e1e2e;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px;line-height:1.7;color:#cdd6f4;white-space:pre;padding:14px 16px;overflow-x:auto}
+.json-ref .jr-k{color:#89b4fa}
+.json-ref .jr-v{color:#a6e3a1}
+.json-ref .jr-null{color:#f38ba8;font-style:italic}
+.json-ref .jr-cm{color:#6c7086}
+.json-ref .jr-brace{color:#cdd6f4}
+
+.hint-line{font-size:13px;color:var(--sub);margin-top:10px;min-height:20px}
+
+@media (max-width:768px){
+  .duo{grid-template-columns:1fr}
+  .chat-panel{position:static}
+  .chat-area{max-height:260px}
+}
+</style>
+<meta name="description" content="A complete anatomy of Function Calling: the left side shows the user-facing conversation; the right side shows the actual Message List transmitted via the API. Each step is annotated with design decisions for product managers.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-2a.en.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-2a.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-2a.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-2a.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-2a.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="The Truth About Function Calling: 5 Messages Behind One Conversation">
+<meta property="og:url" content="https://xueai.app/slides/7-2a.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"5 Messages Behind One Conversation","name":"5 Messages Behind One Conversation","url":"https://xueai.app/slides/7-2a.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Agent Engineering","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"A complete anatomy of Function Calling: the left side shows the user-facing conversation; the right side shows the actual Message List transmitted via the API. Each step is annotated with design decisions for product managers.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent Engineering</div>
+    <h1>5 Messages Behind One Conversation</h1>
+    <p class="subtitle">Left: what the user sees | Right: what actually happens in the API. Scroll down to auto-play what happens behind a single weather query.</p>
+  </header>
+
+  <div class="duo reveal" id="duoDemo">
+    <!-- 左：用户视角 + 设计决策 -->
+    <aside class="chat-panel">
+      <div class="l-label">User-Facing Interface</div>
+      <div class="chat-area" id="chatArea"></div>
+      <div class="decision" id="decArea"></div>
+    </aside>
+
+    <!-- 右：Message List -->
+    <div class="ml-panel">
+      <div class="r-bar">
+        <div class="r-title">Actual Execution Flow</div>
+        <div class="r-stats">
+          <div class="r-stat">Messages <span id="msgCount">0</span></div>
+          <div class="r-stat">Tokens <span id="tokenCount">0</span></div>
+          <div class="r-stat">API Calls <span id="apiCount">0</span></div>
+          <button class="btn-reset" onclick="reset()">↺ Replay</button>
+        </div>
+      </div>
+      <div class="ml-area" id="mlArea"></div>
+      <div class="hint-line" id="hint">7 steps · Watch what happens behind a single weather query</div>
+    </div>
+  </div>
+
+  <div class="sec-label reveal">JSON Format Reference</div>
+  <div class="json-panel open reveal paywall-locked xa-peek" id="jsonPanel">
+    <div class="json-toggle" onclick="toggleJson()">
+      <span id="jsonArrow">▼</span>
+      <span class="json-toggle-label">Complete format of the messages array</span>
+    </div>
+    <div class="json-ref"><span class="jr-brace">{</span>
+  <span class="jr-k">"messages"</span>: [
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"system"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"instruction"</span>
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"user"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"user message"</span>
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"assistant"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-null">null</span>,
+      <span class="jr-k">"tool_calls"</span>: [{
+        <span class="jr-k">"name"</span>: <span class="jr-v">"…"</span>,
+        <span class="jr-k">"arguments"</span>: {…}
+      }]
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"tool"</span>,
+      <span class="jr-k">"tool_call_id"</span>: <span class="jr-v">"…"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"result"</span>
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"assistant"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"final response"</span>
+    }
+  ]
+<span class="jr-brace">}</span>
+
+<span class="jr-cm">// 5 messages total</span>
+<span class="jr-cm">// 2 model API calls</span>
+<span class="jr-cm">// 1 tool call</span></div>
+  </div>
+
+  <div class="sec-label reveal paywall-locked">Takeaway</div>
+  <div class="l-callout reveal paywall-locked" id="insightBar">
+    <b>Takeaway</b>&nbsp;&nbsp;The user sees one response. Behind it: 5 messages, 2 model API calls, 1 external API call. The essence of product design is deciding which of these steps the user perceives — and which are handled silently.
+  </div>
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+var msgIdx = 0;
+
+var STEPS = [
+  {
+    msgs: 1, tokens: 220, apis: 0,
+    hint: '1/7 · Before every conversation, your code injects a system message',
+    chat: [],
+    decision: '<b>📌 Design Decision:</b> Which tools will you register in the system message? Each additional tool ≈ +60 tokens per turn. A product with 10 tools at 100 turns/day = 60,000 extra tokens spent daily on tool definitions.',
+    ml: [
+      { type:'dir', arrow:'→', text:'Your code sends the 1st request to the model API' },
+      { type:'entry', role:'system', roleColor:'#6b6b70', roleBg:'rgba(0,0,0,.06)', tokens: 220,
+        fields:[
+          {k:'role', v:'"system"'},
+          {k:'content', v:'"You are an intelligent assistant. You can use the following tools to help the user…"'},
+          {k:'tools', special:'chips', chips:['get_weather','send_email','web_search']}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 2, tokens: 250, apis: 0,
+    hint: '2/7 · The user\'s question is appended to the Message List',
+    chat: [{ type:'user', text:'What will the weather be like in Beijing tomorrow?' }],
+    decision: '<b>📌 Design Decision:</b> What do you show after the user sends a message? Most products show a "Thinking…" loading state first. But the user doesn\'t know that a tool call is about to be triggered — should you tell them?',
+    ml: [
+      { type:'entry', role:'user', roleColor:'#0891b2', roleBg:'rgba(8,145,178,.1)', tokens: 30,
+        fields:[
+          {k:'role', v:'"user"'},
+          {k:'content', v:'"What will the weather be like in Beijing tomorrow?"'}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 3, tokens: 310, apis: 1,
+    hint: '3/7 · The model didn\'t answer directly — it returned a tool_call',
+    chat: [{ type:'loading', text:'Thinking' }],
+    decision: '<b>📌 Key Insight:</b> Look at the right side: content is <b>null</b>! The model didn\'t respond to the user — it output tool_calls: a piece of structured text telling your code "I want to call this tool." The model itself executed nothing.',
+    ml: [
+      { type:'dir', arrow:'←', text:'Model API response received (1st call completed, 1.8s elapsed)' },
+      { type:'entry', role:'assistant', roleColor:'#7c3aed', roleBg:'rgba(124,58,237,.1)', tokens: 60,
+        fields:[
+          {k:'role', v:'"assistant"'},
+          {k:'content', v:'null', muted:true},
+          {k:'tool_calls', special:'tool_call', name:'get_weather', id:'call_abc123', args:[['city','"Beijing"'],['date','"2026-04-23"']]}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 3, tokens: 310, apis: 1,
+    hint: '4/7 · Your code takes over: validate params → call the real API',
+    chat: [{ type:'remove-loading' }, { type:'loading', text:'Querying weather' }],
+    decision: '<b>📌 Design Decision:</b> This is your engineering code running, not the model. Decisions to make: ① How strict is param validation? ② What\'s the timeout? ③ How many retries on failure? ④ Show "Querying weather" or keep showing "Thinking"?',
+    ml: [
+      { type:'action', icon:'⚙️', text:'Your code: parse tool_calls → validate params → city valid ✓, date format correct ✓ → calling weather API…' }
+    ]
+  },
+  {
+    msgs: 4, tokens: 360, apis: 1,
+    hint: '5/7 · The weather API returns results; your code injects them back into the messages array',
+    chat: [],
+    decision: '<b>📌 Design Decision:</b> The tool returned raw data. You can choose: inject the raw data directly into messages (simple but token-heavy), or pre-process/trim it (saves tokens but requires extra code).',
+    ml: [
+      { type:'action', icon:'✅', text:'Weather API returned successfully (0.8s) → your code constructs a tool message and appends it to messages' },
+      { type:'entry', role:'tool', roleColor:'#16a34a', roleBg:'rgba(22,163,74,.1)', tokens: 50,
+        fields:[
+          {k:'role', v:'"tool"'},
+          {k:'tool_call_id', v:'"call_abc123"', muted:true},
+          {k:'content', special:'json', rows:[['weather','"Light rain turning cloudy"'],['temp','"12°C ~ 20°C"'],['wind','"N wind force 3"']]}
+        ],
+        footnote:'This message is injected by your code, not generated by the model'
+      }
+    ]
+  },
+  {
+    msgs: 5, tokens: 480, apis: 2,
+    hint: '6/7 · Your code makes the 2nd model API call: sends all 4 messages',
+    chat: [{ type:'remove-loading' }],
+    decision: '<b>📌 Design Decision:</b> Now you make the 2nd model API call, sending all 4 messages so the model can see the tool result and generate its response. Note: the previous system, user, assistant, and tool messages are all sent again — tokens are billed again.',
+    ml: [
+      { type:'dir', arrow:'→', text:'Your code sends the 2nd request (with all 4 messages + tool result)' },
+      { type:'dir', arrow:'←', text:'Model returns final response (1.5s elapsed)' },
+      { type:'entry', role:'assistant', roleColor:'#7c3aed', roleBg:'rgba(124,58,237,.1)', tokens: 120,
+        fields:[
+          {k:'role', v:'"assistant"'},
+          {k:'content', v:'"Tomorrow Beijing will have light rain turning cloudy, 12–20°C, N wind force 3. Bring an umbrella when you go out."'}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 5, tokens: 480, apis: 2,
+    hint: '7/7 · The user sees the final response. Full flow: 2 model calls + 1 weather API call',
+    chat: [
+      { type:'bot', text:'Tomorrow Beijing: light rain turning cloudy, 12–20°C, N wind force 3. Bring an umbrella! ☂️' }
+    ],
+    decision: '<b>📌 Design Decision:</b> Final presentation: plain text only, or also show a structured card? A card provides a better experience but requires additional frontend work.<br><b>Full flow summary:</b> The user waited ~4 seconds; your system ran 5 messages, 2 model calls + 1 weather API call, spending 480 tokens (~¥0.003).',
+    ml: []
+  }
+];
+
+var cur = 0;
+
+function addChat(item) {
+  var area = document.getElementById('chatArea');
+  if (item.type === 'remove-loading') {
+    var ld = area.querySelector('.chat-loading');
+    if (ld) ld.remove();
+    return;
+  }
+  var el = document.createElement('div');
+  if (item.type === 'user') {
+    el.className = 'chat-bubble chat-user';
+    el.textContent = item.text;
+  } else if (item.type === 'bot') {
+    el.className = 'chat-bubble chat-bot';
+    el.textContent = item.text;
+  } else if (item.type === 'loading') {
+    el.className = 'chat-bubble chat-loading';
+    el.innerHTML = item.text + ' <span class="typing-dots"><span></span><span></span><span></span></span>';
+  } else if (item.type === 'tool-card') {
+    el.className = 'chat-tool-card';
+    var h = '<div class="ctc-hd">' + item.title + '</div>';
+    for (var i = 0; i < item.rows.length; i++) {
+      h += '<div class="ctc-row"><span class="ctc-label">' + item.rows[i][0] + '</span><span class="ctc-val">' + item.rows[i][1] + '</span></div>';
+    }
+    el.innerHTML = h;
+  }
+  area.appendChild(el);
+  requestAnimationFrame(function() { requestAnimationFrame(function() {
+    el.classList.add('show');
+    area.scrollTop = area.scrollHeight;
+  })});
+}
+
+function renderField(f) {
+  var h = '<div class="ml-field"><span style="color:var(--sub)">' + f.k + ':</span> ';
+  if (f.special === 'chips') {
+    h += '[</div><div class="ml-tools-summary" style="padding-left:16px">';
+    for (var c = 0; c < f.chips.length; c++) {
+      h += '<div class="ml-ts-chip">' + f.chips[c] + '</div>';
+    }
+    h += '</div><div class="ml-field" style="margin-top:2px">]</div>';
+  } else if (f.special === 'tool_call') {
+    h += '[{</div>';
+    h += '<div class="ml-param"><span class="ml-param-k">name</span><span class="ml-param-v">"' + f.name + '"</span></div>';
+    h += '<div class="ml-param"><span class="ml-param-k">id</span><span class="ml-param-v" style="color:var(--sub);font-weight:400">"' + f.id + '"</span></div>';
+    h += '<div class="ml-param"><span class="ml-param-k">arguments</span><span class="ml-param-v">{</span></div>';
+    for (var a = 0; a < f.args.length; a++) {
+      h += '<div class="ml-param" style="padding-left:32px"><span class="ml-param-k">' + f.args[a][0] + '</span><span class="ml-param-v">' + f.args[a][1] + '</span></div>';
+    }
+    h += '<div class="ml-param"><span class="ml-param-k"></span><span class="ml-param-v">}</span></div>';
+    h += '<div class="ml-field">}]</div>';
+  } else if (f.special === 'json') {
+    h += '{</div>';
+    for (var r = 0; r < f.rows.length; r++) {
+      h += '<div class="ml-param"><span class="ml-param-k">' + f.rows[r][0] + '</span><span class="ml-param-v">' + f.rows[r][1] + '</span></div>';
+    }
+    h += '<div class="ml-field">}</div>';
+  } else {
+    var valStyle = f.muted ? 'color:var(--sub);font-style:italic' : 'color:var(--text)';
+    h += '<span class="ml-field-val" style="' + valStyle + '">' + f.v + '</span></div>';
+  }
+  return h;
+}
+
+function addML(item) {
+  var area = document.getElementById('mlArea');
+  var el = document.createElement('div');
+  if (item.type === 'dir') {
+    el.className = 'ml-dir';
+    el.innerHTML = '<span class="ml-dir-arrow">' + item.arrow + '</span> ' + item.text;
+  } else if (item.type === 'action') {
+    el.className = 'ml-action';
+    el.innerHTML = '<span class="ml-action-icon">' + item.icon + '</span> ' + item.text;
+  } else if (item.type === 'entry') {
+    el.className = 'ml-entry';
+    var bodyHtml = '';
+    for (var i = 0; i < item.fields.length; i++) {
+      bodyHtml += renderField(item.fields[i]);
+    }
+    if (item.footnote) {
+      bodyHtml += '<div class="ml-body-muted" style="margin-top:4px;font-style:italic">' + item.footnote + '</div>';
+    }
+    el.innerHTML =
+      '<div class="ml-head">' +
+        '<div class="ml-role">' +
+          '<span class="ml-idx">messages[' + msgIdx + ']</span>' +
+          '<span class="ml-role-badge" style="background:' + item.roleBg + ';color:' + item.roleColor + '">' + item.role + '</span>' +
+        '</div>' +
+        '<span class="ml-tokens">' + item.tokens + ' Token</span>' +
+      '</div>' +
+      '<div class="ml-body">' + bodyHtml + '</div>';
+    msgIdx++;
+  }
+  area.appendChild(el);
+  setTimeout(function() {
+    el.classList.add('show');
+  }, 60);
+}
+
+var playTimer = null;
+
+function playStep() {
+  if (cur >= STEPS.length) return;
+  var s = STEPS[cur];
+
+  document.getElementById('msgCount').textContent = s.msgs;
+  document.getElementById('tokenCount').textContent = s.tokens;
+  document.getElementById('apiCount').textContent = s.apis;
+  document.getElementById('hint').textContent = s.hint;
+
+  for (var i = 0; i < s.chat.length; i++) addChat(s.chat[i]);
+  for (var j = 0; j < s.ml.length; j++) {
+    (function(item, delay) {
+      setTimeout(function() { addML(item); }, delay);
+    })(s.ml[j], j * 150);
+  }
+
+  var da = document.getElementById('decArea');
+  da.innerHTML = '<div class="dec-card">' + s.decision + '</div>';
+  requestAnimationFrame(function() { requestAnimationFrame(function() {
+    var dc = da.querySelector('.dec-card');
+    if (dc) dc.classList.add('show');
+  })});
+
+  cur++;
+  if (cur >= STEPS.length) {
+    playTimer = null;
+  } else {
+    playTimer = setTimeout(playStep, 900);
+  }
+}
+
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
+function toggleJson() {
+  var p = document.getElementById('jsonPanel');
+  var a = document.getElementById('jsonArrow');
+  if (p.classList.contains('open')) {
+    p.classList.remove('open');
+    p.classList.add('closed');
+    a.textContent = '▶';
+  } else {
+    p.classList.remove('closed');
+    p.classList.add('open');
+    a.textContent = '▼';
+  }
+}
+
+function reset() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
+  cur = 0;
+  msgIdx = 0;
+  document.getElementById('chatArea').innerHTML = '';
+  document.getElementById('mlArea').innerHTML = '';
+  document.getElementById('decArea').innerHTML = '';
+  document.getElementById('msgCount').textContent = '0';
+  document.getElementById('tokenCount').textContent = '0';
+  document.getElementById('apiCount').textContent = '0';
+  document.getElementById('hint').textContent = '7 steps · Auto-playing…';
+  startPlay();
+}
+
+lessonOnView(document.getElementById('duoDemo'), function() {
+  document.getElementById('hint').textContent = '7 steps · Auto-playing…';
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

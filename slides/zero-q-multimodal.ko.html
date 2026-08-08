@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>어떤 AI는 왜 이미지를 「못 알아볼까요」? 두 모델에게 사진을 하나씩 보내 보세요 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.qa-answer {
+  background: linear-gradient(135deg, rgba(8,145,178,0.06), rgba(0,102,255,0.05));
+  border: 1.5px solid rgba(8,145,178,0.3);
+  border-radius: var(--radius); padding: 22px 26px; margin: 4px 0 8px;
+}
+.qa-answer .qa-tag { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #0891b2; margin-bottom: 8px; }
+.qa-answer p { font-size: 16.5px; font-weight: 700; color: var(--text); line-height: 1.85; }
+.qa-answer p b { color: #0891b2; }
+
+/* 发图实验 */
+.send-box {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 22px 24px;
+}
+.send-btn {
+  width: 100%; background: var(--accent); color: #fff; border: none;
+  padding: 12px; border-radius: var(--radius-sm);
+  font-size: 14.5px; font-weight: 800; cursor: pointer; font-family: inherit;
+  transition: all 0.15s; margin-bottom: 16px;
+}
+.send-btn:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.send-btn:disabled { opacity: 0.5; cursor: default; }
+.send-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bot-card {
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 16px 18px; min-height: 150px;
+}
+.bot-card .bot-name { font-size: 12px; font-weight: 800; margin-bottom: 10px; }
+.bot-card.text-only .bot-name { color: var(--sub); }
+.bot-card.multi .bot-name { color: var(--accent); }
+.bot-msg {
+  font-size: 13px; color: var(--text); line-height: 1.85;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity 0.4s, transform 0.4s;
+}
+.bot-msg.show { opacity: 1; transform: translateY(0); }
+.bot-msg .bm-img {
+  display: inline-block; background: rgba(0,102,255,0.06);
+  border: 1px dashed rgba(0,102,255,0.3); border-radius: 10px;
+  padding: 6px 14px; font-size: 20px; margin-bottom: 8px;
+}
+.bot-msg .bm-fail { color: var(--sub); font-style: italic; }
+.bot-msg b { color: var(--accent); }
+
+/* 原理三卡 */
+.eye-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.eye-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-card);
+}
+.eye-card .ey-icon { font-size: 26px; margin-bottom: 8px; }
+.eye-card h4 { font-size: 14.5px; font-weight: 800; color: var(--text); margin-bottom: 5px; }
+.eye-card p { font-size: 12.5px; color: var(--sub); line-height: 1.8; }
+.eye-card p b { color: var(--text); }
+
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .send-grid, .eye-grid { grid-template-columns: 1fr; }
+  .qa-answer p { font-size: 15px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="어떤 AI는 사진을 보는데, 어떤 AI는 「글로 설명해 주세요」라고만 할까요? 「말하기」와 「보기」는 서로 독립적인 두 가지 능력이기 때문이에요: 언어 모델은 태생적으로 글만 알아보고, 사진을 보려면 「눈」(비전 인코더)을 따로 달아야 해요. 인터랙티브 실험으로 멀티모달을 풀어봅니다.">
+<meta name="keywords" content="AI가 이미지를 못 알아보는 이유,멀티모달이란,AI 이미지 인식 원리,비전 모델,멀티모달 대규모 모델,AI 입문 FAQ">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/zero-q-multimodal.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/zero-q-multimodal.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/zero-q-multimodal.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/zero-q-multimodal.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/zero-q-multimodal.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 트레이닝">
+<meta property="og:title" content="어떤 AI는 왜 이미지를 「못 알아볼까요」?">
+<meta property="og:description" content="「말하기」와 「보기」는 서로 독립적인 두 능력이에요. 인터랙티브 실험으로 멀티모달을 풀어봅니다.">
+<meta property="og:url" content="https://xueai.app/slides/zero-q-multimodal.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="어떤 AI는 왜 이미지를 「못 알아볼까요」?">
+<meta name="twitter:description" content="말하기와 보기는 서로 독립적인 두 능력이에요. 인터랙티브 실험으로 풀어봅니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"어떤 AI는 왜 이미지를 못 알아볼까요?","name":"어떤 AI는 왜 이미지를 못 알아볼까요?","url":"https://xueai.app/slides/zero-q-multimodal.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문에서 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 코스 · 왕초보 FAQ","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"어떤 AI는 사진을 보는데, 어떤 AI는 「글로 설명해 주세요」라고만 할까요? 「말하기」와 「보기」는 서로 독립적인 두 가지 능력이기 때문이에요: 언어 모델은 태생적으로 글만 알아보고, 사진을 보려면 「눈」(비전 인코더)을 따로 달아야 해요. 인터랙티브 실험으로 멀티모달을 풀어봅니다."}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">제로 챕터 · 왕초보 FAQ</div>
+    <h1>어떤 AI는 왜 이미지를 「못 알아볼까요」?</h1>
+    <p class="subtitle">이런 경험 있으실 거예요: AI에게 사진을 보냈더니 「죄송해요, 글로 설명해 주세요」라는 답이 온 것. 반면 사진 속 레시피까지 다 읽어내는 AI도 봤죠. 같은 AI인데 뭐가 다를까요?</p>
+  </header>
+
+  <div class="qa-answer">
+    <div class="qa-tag">한 줄 답변</div>
+    <p>「말하기」와 「보기」는 <b>서로 독립적인 두 가지 능력</b>이기 때문이에요. 언어 모델은 태생적으로 글만 알아봐요. 사진을 보게 하려면 「눈」을 따로 달아 줘야 하죠 — 단 것은 <b>멀티모달 모델</b>이라 부르고, 안 단 것은 사진 앞에서 죄송하다는 말밖에 못 해요.</p>
+  </div>
+
+  <div class="sec-label">작은 실험 · 두 모델에게 고양이 사진을 하나씩 보내 보세요</div>
+
+  <div class="send-box">
+    <button class="send-btn" id="sendBtn">📤 같은 고양이 사진을 두 모델에게 보내기</button>
+    <div class="send-grid">
+      <div class="bot-card text-only">
+        <div class="bot-name">모델 A · 텍스트 전용 모델(눈이 없음)</div>
+        <div class="bot-msg" id="msgA">
+          <span class="bm-img">🖼️ 고양이사진.jpg</span><br>
+          <span class="bm-fail">「죄송해요, 저는 이미지를 볼 수 없어요. 사진 내용을 설명해 주시면 분석을 도와드릴게요.」</span>
+        </div>
+      </div>
+      <div class="bot-card multi">
+        <div class="bot-name">모델 B · 멀티모달 모델(눈이 달림)</div>
+        <div class="bot-msg" id="msgB">
+          <span class="bm-img">🖼️ 고양이사진.jpg</span><br>
+          「치즈 고양이 한 마리가 창가에 엎드려 햇볕을 쬐고 있고, 오른쪽 앞발로 털실 뭉치를 누르고 있네요. 체형을 보아하니… <b>이 친구는 식단 조절이 좀 필요할지도요</b> 😄」
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">원리 · 「눈」은 어떻게 달아 줄까요</div>
+
+  <div class="eye-grid">
+    <div class="eye-card">
+      <div class="ey-icon">✂️</div>
+      <h4>1단계: 그림을 잘게 자르기</h4>
+      <p>「눈」(비전 인코더)이 이미지를 수많은 작은 조각으로 자르고, 조각마다 모델이 아는 「단어」로 번역해요 — <b>사진 한 장이 특별한 「글」 한 단락으로 바뀌는 거예요</b>.</p>
+    </div>
+    <div class="eye-card">
+      <div class="ey-icon">🔤</div>
+      <h4>2단계: 말처럼 이어받기</h4>
+      <p>번역이 끝나면, 모델에게 이미지는 글 한 단락과 다를 게 없어요. 평소처럼 「말을 이어받으면」 되죠. 그러니 이미지를 보는 능력의 본질도 결국 그 말 이어받기 기계예요.</p>
+    </div>
+    <div class="eye-card">
+      <div class="ey-icon">🏋️</div>
+      <h4>왜 전부 달지 않을까요?</h4>
+      <p>눈을 달려면 방대한 「이미지 + 글」 짝 데이터로 다시 훈련해야 해서 <b>비용이 크고, 모델도 더 크고 비싸져요</b>. 이미지를 볼 일이 없는 시나리오도 많아서, 텍스트 전용 모델이 오히려 더 빠르고 저렴해요.</p>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    자주 헷갈리는 것 하나를 짚고 갈게요: <b>「이미지를 알아보는 것」과 「이미지를 그려내는 것」도 별개의 일이에요.</b> 이미지를 보는 모델이 꼭 이미지를 생성할 수 있는 건 아니에요 — 전자는 「눈」이고, 후자는 완전히 다른 「그림 그리는 손」이거든요(다음 페이지에서 왜 그렇게 비싼지 다뤄요). 여러분이 쓰는 AI 앱이 보고 그리는 걸 다 한다면, 무대 뒤에서 서로 다른 모델 여러 개를 함께 연결해 둔 거예요.
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 이 페이지에서 나누고 싶은 것</h3>
+    <ul>
+      <li><b>말하기 ≠ 보기</b>: 이미지를 보려면 별도의 「눈」(비전 인코더)이 필요해요</li>
+      <li><b>눈의 원리</b>: 그림을 잘게 잘라 「특별한 글」로 번역한 뒤, 평소처럼 말을 이어받아요</li>
+      <li><b>눈이 없다고 뒤처진 게 아니에요</b>: 더 빠르고 저렴해서, 많은 시나리오에 충분해요</li>
+      <li><b>보기와 그리기는 별개</b>: 만능 앱 뒤에는 여러 모델이 분업하고 있어요</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 发图实验 ── */
+(function () {
+  var btn = document.getElementById('sendBtn');
+  var msgA = document.getElementById('msgA');
+  var msgB = document.getElementById('msgB');
+  btn.addEventListener('click', function () {
+    msgA.classList.remove('show');
+    msgB.classList.remove('show');
+    btn.disabled = true;
+    setTimeout(function () { msgA.classList.add('show'); }, 500);
+    setTimeout(function () {
+      msgB.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = '↻ 다시 보내기';
+    }, 1100);
+  });
+})();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

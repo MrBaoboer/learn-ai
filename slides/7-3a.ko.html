@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>단기 기억: 컨텍스트 윈도우가 바로 작업 공간입니다 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 레이아웃: 작업 공간 + 통계 패널 ── */
+.mem-layout{display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:start}
+
+/* 진행 바 */
+.progress-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow-card);margin-bottom:16px}
+.progress-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap}
+.progress-title{font-size:14px;font-weight:700;color:var(--text)}
+.progress-nums{font-size:13px;color:var(--sub);font-weight:600}
+.progress-nums span{font-weight:800}
+.progress-track{height:10px;background:rgba(0,0,0,.05);border-radius:5px;overflow:hidden;position:relative}
+.progress-fill{height:100%;border-radius:5px;transition:width .5s ease, background .3s ease;width:0;background:var(--success)}
+.progress-warn{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:800;color:var(--danger);opacity:0;transition:opacity .3s}
+.progress-warn.show{opacity:1}
+
+/* 작업 공간 영역 */
+.desk-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.desk-label{padding:10px 18px;font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.5px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.desk-label-icon{font-size:15px}
+.desk{padding:12px 16px;display:flex;flex-direction:column;gap:6px;background:linear-gradient(180deg,rgba(240,237,230,.5) 0%,rgba(229,226,218,.3) 100%);min-height:160px}
+
+/* 메시지 블록 */
+.msg-block{border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;opacity:0;transform:translateY(8px) scale(.98);transition:all .4s cubic-bezier(.4,.0,.2,1);border:1.5px solid transparent}
+.msg-block.show{opacity:1;transform:translateY(0) scale(1)}
+.msg-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.msg-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;color:white}
+.msg-info{min-width:0;flex:1}
+.msg-role{font-size:12px;font-weight:800;letter-spacing:.3px;margin-bottom:1px}
+.msg-text{font-size:13px;color:var(--sub);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:520px}
+.msg-tokens{font-size:13px;font-weight:800;white-space:nowrap;padding:3px 10px;border-radius:6px;flex-shrink:0}
+.msg-size{display:none;height:4px;border-radius:2px;margin-top:6px;background:rgba(0,0,0,.05);overflow:hidden;transition:all .3s}
+.msg-block.show .msg-size{display:block}
+.msg-size-fill{height:100%;border-radius:2px;transition:width .5s ease}
+
+/* 결정 카드 */
+.decision-area{margin-top:12px;min-height:20px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(4px);transition:all .35s}
+.dec-card.show{opacity:1;transform:translateY(0)}
+.dec-card b{color:var(--accent)}
+
+/* ── 우측 통계 패널 ── */
+.panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);position:sticky;top:16px}
+.panel-section{padding:14px 16px;border-bottom:1px solid var(--border)}
+.panel-title{font-size:12px;font-weight:800;color:var(--sub);letter-spacing:.5px;margin-bottom:10px}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0}
+.stat-label{font-size:13px;color:var(--sub)}
+.stat-val{font-size:15px;font-weight:800;color:var(--text)}
+.stat-val.warn{color:var(--amber)}
+.stat-val.danger{color:var(--danger)}
+
+/* 비용 계산기 */
+.cost-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px dashed var(--border);margin-top:4px}
+.cost-label{font-size:13px;color:var(--sub)}
+.cost-val{font-size:15px;font-weight:800;color:var(--accent)}
+
+/* 메시지 목록 */
+.msg-list{padding:10px 14px;display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto}
+.msg-chip{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;font-size:12px;opacity:0;transform:translateX(8px);transition:all .3s}
+.msg-chip.show{opacity:1;transform:translateX(0)}
+.msg-chip-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.msg-chip-role{font-weight:700;min-width:32px}
+.msg-chip-tk{color:var(--sub);font-weight:600;margin-left:auto}
+
+.hint-line{font-size:13px;color:var(--sub);margin-top:10px}
+.btn-reset{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--sub);cursor:pointer;font-family:inherit;min-height:32px}
+
+/* 작업 공간 초과 경고 */
+@keyframes pulse-warn{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.3)}50%{box-shadow:0 0 0 8px rgba(220,38,38,0)}}
+.desk.overflow{background:linear-gradient(180deg,rgba(220,38,38,.04) 0%,rgba(220,38,38,.08) 100%);animation:pulse-warn 2s ease infinite}
+
+@media (max-width:768px){
+  .mem-layout{grid-template-columns:1fr}
+  .panel{position:static}
+  .msg-text{max-width:none}
+}
+</style>
+<meta name="description" content="컨텍스트 윈도우는 모델의 유일한 단기 기억입니다. 시각화된 작업 공간 데모를 통해 128K Token이 다중 턴 대화에서 얼마나 빨리 채워지는지, 그리고 프로덕트 매니저가 내려야 할 설계 결정을 알아봅니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/7-3a.ko.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-3a.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-3a.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-3a.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-3a.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="단기 기억: 컨텍스트 윈도우는 나의 작업 공간">
+<meta property="og:url" content="https://xueai.app/slides/7-3a.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"단기 기억 = 컨텍스트 윈도우","name":"단기 기억 = 컨텍스트 윈도우","url":"https://xueai.app/slides/7-3a.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"초급~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Agent 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"컨텍스트 윈도우는 모델의 유일한 단기 기억입니다. 시각화된 작업 공간 데모를 통해 128K Token이 다중 턴 대화에서 얼마나 빨리 채워지는지, 그리고 프로덕트 매니저가 내려야 할 설계 결정을 알아봅니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 엔지니어링</div>
+    <h1>단기 기억 = 컨텍스트 윈도우</h1>
+    <p class="subtitle">컨텍스트 윈도우는 모델의 작업 공간입니다. 모델이 볼 수 있는 모든 것은 이 테이블 위에 놓여야 합니다. 아래로 스크롤하며 작업 공간이 채워지는 과정을 관찰해 보세요.</p>
+  </header>
+
+  <div class="progress-wrap reveal" id="memDemo">
+    <div class="progress-label">
+      <span class="progress-title">컨텍스트 윈도우 사용률</span>
+      <span class="progress-nums"><span id="pctText">0%</span>&nbsp;&nbsp;<span id="usedTokens">0</span> / 131,072 Token</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+      <div class="progress-warn" id="progressWarn">⚠️ 압축 전략 곧 실행</div>
+    </div>
+  </div>
+
+  <div class="mem-layout reveal paywall-locked xa-peek">
+    <!-- 메인 영역: 작업 공간 -->
+    <div class="main">
+      <div class="desk-wrap">
+        <div class="desk-label"><span class="desk-label-icon">🖥</span> 모델의 작업 공간 (컨텍스트 윈도우 = 128K Token)</div>
+        <div class="desk" id="desk"></div>
+      </div>
+      <div class="decision-area" id="decArea"></div>
+      <div class="hint-line"><span id="hint">총 10단계 · 작업 공간이 채워지는 과정을 관찰하세요</span>　<button class="btn-reset" onclick="reset()">↺ 다시 재생</button></div>
+    </div>
+
+    <!-- 우측: 통계 패널 -->
+    <aside class="panel">
+      <div class="panel-section">
+        <div class="panel-title">실시간 통계</div>
+        <div class="stat-row">
+          <span class="stat-label">총 Token 수</span>
+          <span class="stat-val" id="statTokens">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">메시지 수</span>
+          <span class="stat-val" id="statMsgs">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">사용률</span>
+          <span class="stat-val" id="statPct">0%</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-label">예상 비용</span>
+          <span class="cost-val" id="statCost">¥0.000</span>
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin-top:4px">¥0.006 / 1K Token 기준 추산</div>
+      </div>
+
+      <div style="padding:8px 16px;font-size:12px;font-weight:800;color:var(--sub);letter-spacing:.5px;border-bottom:1px solid var(--border)">메시지 구성</div>
+      <div class="msg-list" id="msgList"></div>
+    </aside>
+  </div>
+
+  <div class="sec-label reveal paywall-locked">Takeaway</div>
+  <div class="l-callout reveal paywall-locked">
+    <b>핵심 정리</b>　컨텍스트 윈도우는 모델의 유일한 작업 기억입니다. 128K Token은 커 보이지만 매 턴마다 전체 히스토리를 재전송해야 합니다. 10회의 심층 대화와 긴 문서 하나면 윈도우가 가득 찹니다. 컨텍스트를 관리한다는 것은 제품의 기억 수명을 관리하는 것입니다.
+  </div>
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+var TOTAL = 131072;
+var RATE = 0.006;
+
+var STEPS = [
+  {
+    tokens: 220, role: 'system', color: '#6b6b70', bg: 'rgba(107,107,112,.08)', border: 'rgba(107,107,112,.15)',
+    label: 'System Prompt', text: 'System Prompt + 도구 정의 (get_weather, search_docs, send_email…)',
+    decision: '<b>📌 설계 결정:</b> System Prompt는 매 요청의 고정 비용입니다. 도구 10개를 등록했나요? 대화 시작 전부터 기준치는 이미 200+ Token입니다. 아무 말도 하기 전에 이미 테이블 위에 서류 한 묶음이 놓여 있는 것입니다.'
+  },
+  {
+    tokens: 30, role: 'user', color: '#0891b2', bg: 'rgba(8,145,178,.06)', border: 'rgba(8,145,178,.15)',
+    label: '사용자', text: '사용자: 이 보고서를 분석해 주세요. 매출 트렌드와 리스크 요인 위주로요',
+    decision: '<b>📌 설계 결정:</b> 사용자 한 마디는 30 Token에 불과합니다. 하지만 이 문장은 이후 매 턴마다 반복 전송됩니다. 10번째 턴에서는 이미 10번 전송된 것입니다.'
+  },
+  {
+    tokens: 500, role: 'assistant', color: '#7c3aed', bg: 'rgba(124,58,237,.05)', border: 'rgba(124,58,237,.12)',
+    label: '어시스턴트', text: '어시스턴트: 네, 보고서를 분석해 드리겠습니다. 먼저 도구를 호출하여 문서 내용을 읽어야 합니다…',
+    decision: '<b>📌 설계 결정:</b> 모델 응답은 일반적으로 사용자 질문보다 10~20배 깁니다. max_tokens를 제한하지 않으면 응답 한 번에 4,000 Token이 소요될 수 있습니다. 응답 품질과 컨텍스트 수명 사이에서 균형을 찾아야 합니다.'
+  },
+  {
+    tokens: 8000, role: 'user', color: '#0891b2', bg: 'rgba(8,145,178,.06)', border: 'rgba(8,145,178,.15)',
+    label: '사용자 · 긴 문서', text: '사용자: [20페이지 보고서 업로드 — 연간 재무 보고서 전문]',
+    big: true,
+    decision: '<b>📌 설계 결정:</b> 20페이지 보고서 ≈ 8,000 Token으로 작업 공간의 6%를 순식간에 차지합니다. 프로덕트 매니저는 답해야 합니다: 최대 파일 크기는? 초과 시 어떻게 할 것인지 — 잘라내기, 요약, 또는 거부?'
+  },
+  {
+    tokens: 2000, role: 'tool', color: '#16a34a', bg: 'rgba(22,163,74,.05)', border: 'rgba(22,163,74,.12)',
+    label: '도구 반환', text: '도구 반환: 보고서 분석 결과 — 매출 YoY +23%, 총이익률 2.1% 하락, 현금 흐름 리스크…',
+    decision: '<b>📌 설계 결정:</b> 도구 반환 원시 데이터는 얼마나 클까요? 데이터베이스 쿼리 한 번에 5,000 Token의 JSON이 반환될 수 있습니다. 전량 컨텍스트에 넣을 것인지, 먼저 요약할 것인지? 이 결정이 컨텍스트 수명에 직접 영향을 줍니다.'
+  },
+  {
+    tokens: 1200, role: 'assistant', color: '#7c3aed', bg: 'rgba(124,58,237,.05)', border: 'rgba(124,58,237,.12)',
+    label: '어시스턴트', text: '어시스턴트: 보고서 분석 결과, 해당 기업은 강한 매출 성장을 보이나 이익률이 압박을 받고 있습니다. 세 가지 리스크 요인을 주시하시기 바랍니다…',
+    decision: '<b>📌 설계 결정:</b> 3번째 턴에 불과한데 윈도우가 이미 약 10% 사용되었습니다. 주의: 모든 API 호출마다 이전 메시지 전체를 재전송해야 합니다. 즉, 이 Token 비용은 반복적으로 청구됩니다.'
+  },
+  {
+    tokens: 50, role: 'user', color: '#0891b2', bg: 'rgba(8,145,178,.06)', border: 'rgba(8,145,178,.15)',
+    label: '사용자', text: '사용자: 작년 같은 기간 데이터와 비교해 주실 수 있나요?',
+    decision: '<b>📌 설계 결정:</b> 사용자의 추가 질문은 짧지만, 새로운 도구 호출을 트리거하여 컨텍스트에 대량의 도구 반환 데이터가 추가됩니다. 짧은 질문이 긴 체인을 유발할 수 있습니다.'
+  },
+  {
+    tokens: 6000, role: 'tool', color: '#16a34a', bg: 'rgba(22,163,74,.05)', border: 'rgba(22,163,74,.12)',
+    label: '도구 반환 · 과거 데이터', text: '도구 반환: 작년 같은 기간 데이터 — 12개월 월별 매출, 이익, 비용 명세…',
+    big: true,
+    decision: '<b>📌 설계 결정:</b> 또 대량 데이터가 유입됩니다! 데이터 정리 없이 도구 호출 두 번만으로 8,000 Token을 차지합니다. 제품에 오래된 데이터를 자동 압축하는 컨텍스트 매니저가 필요하지 않을까요?'
+  },
+  {
+    tokens: 1800, role: 'assistant', color: '#7c3aed', bg: 'rgba(124,58,237,.05)', border: 'rgba(124,58,237,.12)',
+    label: '어시스턴트', text: '어시스턴트: 비교 분석 완료. 전년 대비: 매출 +23%, 순이익 +15%, 하지만 운영비용 +31%… 세부 비교는 다음과 같습니다…',
+    decision: '<b>📌 핵심 인사이트:</b> 매 턴 Token 소비 = 이전 모든 메시지 Token 합산 + 현재 턴 추가분. 이는 <b>누적 구조</b>입니다: N번째 턴의 실제 Token 비용은 표면에 보이는 숫자보다 훨씬 큽니다.'
+  },
+  {
+    tokens: 45000, role: 'multi', color: '#dc2626', bg: 'rgba(220,38,38,.04)', border: 'rgba(220,38,38,.2)',
+    label: '이후 5턴 대화', text: '5~10턴: 사용자가 계속 심층 탐구 (경쟁사 비교, 예측 모델, 리스크 평가) + 여러 도구 호출 + 긴 응답…',
+    big: true,
+    decision: '<b>📌 설계 결정:</b> 10턴의 심층 대화 후 윈도우 사용률이 50%에 가까워집니다. 실제 비용은 표면 Token 수의 3~5배입니다(매 턴마다 히스토리를 재전송하기 때문). 제품에는 ① 대화 턴 상한선 ② 자동 요약 압축 ③ 핵심 정보 추출 전략이 필요합니다. 이는 제품 아키텍처 결정으로, 엔지니어에게만 맡길 수 없습니다.'
+  }
+];
+
+var cur = 0;
+var totalTokens = 0;
+var msgCount = 0;
+
+function getBarColor(pct) {
+  if (pct < 0.6) return 'var(--success)';
+  if (pct < 0.85) return 'var(--amber)';
+  return 'var(--danger)';
+}
+
+function updateStats() {
+  var pct = totalTokens / TOTAL;
+  var pctStr = (pct * 100).toFixed(1) + '%';
+  var cost = (totalTokens / 1000 * RATE).toFixed(3);
+
+  document.getElementById('pctText').textContent = pctStr;
+  document.getElementById('usedTokens').textContent = totalTokens.toLocaleString();
+
+  var fill = document.getElementById('progressFill');
+  fill.style.width = Math.min(pct * 100, 100) + '%';
+  fill.style.background = getBarColor(pct);
+
+  var warn = document.getElementById('progressWarn');
+  warn.classList.toggle('show', pct >= 0.4);
+
+  document.getElementById('statTokens').textContent = totalTokens.toLocaleString();
+  document.getElementById('statMsgs').textContent = msgCount;
+
+  var pctEl = document.getElementById('statPct');
+  pctEl.textContent = pctStr;
+  pctEl.className = 'stat-val' + (pct >= 0.85 ? ' danger' : pct >= 0.6 ? ' warn' : '');
+
+  document.getElementById('statCost').textContent = '¥' + cost;
+
+  var desk = document.getElementById('desk');
+  desk.classList.toggle('overflow', pct >= 0.85);
+}
+
+function addMsgChip(step) {
+  var list = document.getElementById('msgList');
+  var chip = document.createElement('div');
+  chip.className = 'msg-chip';
+  chip.style.background = step.bg;
+  chip.innerHTML =
+    '<span class="msg-chip-dot" style="background:' + step.color + '"></span>' +
+    '<span class="msg-chip-role" style="color:' + step.color + '">' + step.label.split('·')[0].trim() + '</span>' +
+    '<span class="msg-chip-tk">' + step.tokens.toLocaleString() + ' tk</span>';
+  list.appendChild(chip);
+  requestAnimationFrame(function() { requestAnimationFrame(function() {
+    chip.classList.add('show');
+    list.scrollTop = list.scrollHeight;
+  })});
+}
+
+function addBlock(step) {
+  var desk = document.getElementById('desk');
+  var block = document.createElement('div');
+  block.className = 'msg-block';
+  block.style.background = step.bg;
+  block.style.borderColor = step.border;
+
+  var height = step.big ? 'min-height:56px' : 'min-height:40px';
+  block.style.cssText += ';' + height;
+
+  var sizePct = Math.min((step.tokens / TOTAL) * 100, 100);
+  var sizeWidth = Math.max(sizePct * 15, 2);
+
+  block.innerHTML =
+    '<div class="msg-left">' +
+      '<div class="msg-icon" style="background:' + step.color + '">' + step.role.charAt(0).toUpperCase() + '</div>' +
+      '<div class="msg-info">' +
+        '<div class="msg-role" style="color:' + step.color + '">' + step.label + '</div>' +
+        '<div class="msg-text">' + step.text + '</div>' +
+        (step.big ? '<div class="msg-size" style="display:block"><div class="msg-size-fill" style="width:' + Math.min(sizeWidth, 100) + '%;background:' + step.color + '"></div></div>' : '') +
+      '</div>' +
+    '</div>' +
+    '<div class="msg-tokens" style="background:' + step.bg + ';color:' + step.color + ';border:1px solid ' + step.border + '">' + step.tokens.toLocaleString() + ' Token</div>';
+
+  desk.appendChild(block);
+  setTimeout(function() {
+    block.classList.add('show');
+  }, 60);
+}
+
+var playTimer = null;
+
+function playStep() {
+  if (cur >= STEPS.length) return;
+  var s = STEPS[cur];
+
+  totalTokens += s.tokens;
+  msgCount++;
+
+  addBlock(s);
+  addMsgChip(s);
+  updateStats();
+
+  var da = document.getElementById('decArea');
+  da.innerHTML = '<div class="dec-card">' + s.decision + '</div>';
+  requestAnimationFrame(function() { requestAnimationFrame(function() {
+    var dc = da.querySelector('.dec-card');
+    if (dc) dc.classList.add('show');
+  })});
+
+  cur++;
+  document.getElementById('hint').textContent = cur + ' / ' + STEPS.length + ' 단계';
+
+  if (cur >= STEPS.length) {
+    document.getElementById('hint').textContent = '데모 완료 · 작업 공간이 가득 찼습니다';
+    playTimer = null;
+  } else {
+    playTimer = setTimeout(playStep, 900);
+  }
+}
+
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
+function reset() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
+  cur = 0;
+  totalTokens = 0;
+  msgCount = 0;
+  document.getElementById('desk').innerHTML = '';
+  document.getElementById('desk').classList.remove('overflow');
+  document.getElementById('msgList').innerHTML = '';
+  document.getElementById('decArea').innerHTML = '';
+  document.getElementById('hint').textContent = '자동 재생 중…';
+  updateStats();
+  startPlay();
+}
+
+updateStats();
+
+lessonOnView(document.getElementById('memDemo'), function() {
+  document.getElementById('hint').textContent = '자동 재생 중…';
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

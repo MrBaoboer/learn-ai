@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>컨텍스트 압축: 4단계 방어선 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+:root{--l1:#16a34a;--l2:#d97706;--l3:#ea580c;--l4:#dc2626}
+
+/* ── 레이아웃: 탱크 + 4층 방어 ── */
+.tank-layout{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+
+/* 왼쪽: 탱크 */
+.tank-col{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);position:sticky;top:16px}
+.tank-info{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;line-height:1.7}
+.tank-info b{font-weight:800}
+.tank-info .model-max{color:var(--danger)}
+.tank-info .safe-val{color:var(--success)}
+.tank-area{display:flex;align-items:center;justify-content:center;padding:16px}
+.tank-vis{display:flex;align-items:stretch;gap:10px;height:320px}
+
+.tank-outer{width:120px;position:relative;border-radius:12px;border:2px solid #ccc;background:#eae7df;overflow:visible;flex-shrink:0}
+.tank-fill{position:absolute;bottom:0;left:0;right:0;border-radius:0 0 10px 10px;transition:height .5s cubic-bezier(.4,0,.2,1);background:linear-gradient(180deg,rgba(8,145,178,.25),rgba(8,145,178,.5))}
+.tank-fill-shine{position:absolute;top:0;left:0;right:0;height:6px;background:rgba(255,255,255,.3);filter:blur(3px)}
+
+/* 임계값 선 */
+.tl{position:absolute;left:-6px;right:-6px;height:0;border-top:2px dashed;z-index:3;pointer-events:none}
+.tl-label{position:absolute;left:calc(100% + 8px);top:-9px;font-size:11px;font-weight:800;white-space:nowrap;padding:1px 6px;border-radius:4px}
+.tl1{border-color:var(--l1)}.tl1 .tl-label{color:var(--l1);background:rgba(22,163,74,.08)}
+.tl2{border-color:var(--l2)}.tl2 .tl-label{color:var(--l2);background:rgba(217,119,6,.08)}
+.tl3{border-color:var(--l3)}.tl3 .tl-label{color:var(--l3);background:rgba(234,88,12,.08)}
+.tl4{border-color:var(--l4)}.tl4 .tl-label{color:var(--l4);background:rgba(220,38,38,.08)}
+.tl-safe{border-color:var(--danger);border-top-style:solid}
+.tl-safe .tl-label{color:white;background:var(--danger);font-size:12px}
+/* 위험 구역 */
+.danger-zone{position:absolute;left:0;right:0;top:0;background:repeating-linear-gradient(-45deg,transparent,transparent 3px,rgba(220,38,38,.05) 3px,rgba(220,38,38,.05) 6px);z-index:1;border-radius:10px 10px 0 0;pointer-events:none}
+
+/* 압축 플래시 */
+.compress-flash{position:absolute;left:50%;transform:translateX(-50%);padding:4px 10px;border-radius:6px;font-size:13px;font-weight:800;white-space:nowrap;opacity:0;z-index:10;pointer-events:none;transition:opacity .3s}
+.compress-flash.show{opacity:1;animation:flashPop .8s ease}
+@keyframes flashPop{0%{transform:translateX(-50%) scale(.8)}30%{transform:translateX(-50%) scale(1.15)}100%{transform:translateX(-50%) scale(1)}}
+
+/* 통계 */
+.tank-stats{padding:10px 16px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border)}
+.ts-row{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.ts-label{color:var(--sub)}
+.ts-val{font-weight:800;font-size:15px;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.ts-val.total{color:var(--cyan)}
+.ts-val.current{color:var(--text)}
+.ts-val.saved{color:var(--success)}
+.ts-bar{height:4px;border-radius:2px;background:rgba(0,0,0,.05);overflow:hidden}
+.ts-bar-fill{height:100%;border-radius:2px;transition:width .5s}
+
+/* 슬라이더 */
+.slider-area{padding:10px 16px 8px;border-top:1px solid var(--border)}
+.slider-label{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-bottom:2px}
+.tank-slider{width:100%;accent-color:var(--cyan);cursor:pointer;height:28px}
+.ctrl-row{display:flex;gap:6px;padding:4px 16px 14px}
+.btn{padding:9px 16px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:40px}
+.btn-p{background:var(--accent);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-r{background:rgba(0,0,0,.04);color:var(--sub);border:1px solid var(--border)}
+
+/* 오른쪽: 4층 상세 */
+.layers-col{min-width:0;display:flex;flex-direction:column;gap:10px}
+.layers-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.layers-title{font-size:14px;font-weight:800;color:var(--text)}
+.status-badge{padding:4px 10px;border-radius:6px;font-size:13px;font-weight:800;margin-left:auto;transition:all .3s}
+.layers-scroll{display:flex;flex-direction:column;gap:8px}
+
+.layer-card{border:2px solid var(--border);border-radius:12px;overflow:hidden;transition:all .35s;opacity:.4;transform:scale(.98);background:var(--card)}
+.layer-card.active{opacity:1;transform:scale(1)}
+.layer-card.firing{animation:fireGlow .8s ease}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(234,88,12,.3)}50%{box-shadow:0 0 20px 6px rgba(234,88,12,.2)}100%{box-shadow:none}}
+
+.lc-hd{padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:800;transition:background .3s;flex-wrap:wrap}
+.lc-name{flex:1;min-width:160px}
+.lc-trigger{font-size:13px;font-weight:800;padding:2px 8px;border-radius:5px;white-space:nowrap}
+.lc-saved{font-size:12px;font-weight:800;margin-left:6px;padding:2px 8px;border-radius:5px;opacity:0;transition:opacity .3s}
+.layer-card.active .lc-saved{opacity:1}
+
+.lc-body{padding:0 14px;max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease}
+.layer-card.active .lc-body{max-height:300px;padding:6px 14px 12px}
+
+.lc-desc{font-size:13px;line-height:1.6;color:var(--sub);margin-bottom:6px}
+.lc-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:start}
+.lc-cmp-box{border-radius:8px;padding:6px 10px;font-size:12px;line-height:1.5}
+.lc-cmp-label{font-size:11px;font-weight:800;margin-bottom:2px;letter-spacing:.3px}
+.lc-cmp-arrow{align-self:center;font-size:16px;color:var(--sub);font-weight:700}
+
+/* 결정 카드 */
+.dec-area{margin-top:2px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text);line-height:1.6;transition:all .3s}
+.dec-card b{color:var(--accent)}
+
+@keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}50%{box-shadow:0 0 16px 4px rgba(220,38,38,.25)}}
+.tank-outer.danger{animation:pulse-red 1.2s ease infinite;border-color:var(--danger)}
+
+@media (max-width:768px){
+  .tank-layout{grid-template-columns:1fr}
+  .tank-col{position:static}
+  .tank-vis{height:280px}
+  .lc-compare{grid-template-columns:1fr}
+  .lc-cmp-arrow{transform:rotate(90deg);justify-self:center}
+  .layer-card.active .lc-body{max-height:420px}
+}
+</style>
+<meta name="description" content="컨텍스트 압축 4단계 방어선: 60% Snip, 75% MicroCompact, 85% Collapse, 95% AutoCompact.">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.app/slides/7-3b.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/7-3b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/7-3b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/7-3b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/7-3b.html">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"컨텍스트 압축: 4단계 방어선","name":"컨텍스트 압축: 4단계 방어선","url":"https://xueai.app/slides/7-3b.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Agent 엔지니어링","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"컨텍스트 압축 4단계 방어선: 60% Snip, 75% MicroCompact, 85% Collapse, 95% AutoCompact.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 엔지니어링</div>
+    <h1>컨텍스트 압축: 4단계 방어선</h1>
+    <p class="subtitle">슬라이더를 드래그하여 대화 증가를 시뮬레이션하고, 압축이 어떻게 컨텍스트 수명을 연장하는지 관찰합니다.</p>
+  </header>
+
+  <div class="tank-layout paywall-locked xa-peek">
+    <!-- 왼쪽: 탱크 -->
+    <aside class="tank-col">
+      <div class="tank-info">
+        모델 컨텍스트 창 = <b class="model-max">256K</b> Token<br>
+        안전 공간 = <b class="safe-val">200K</b>(56K는 모델 응답 예비)
+      </div>
+      <div class="tank-area">
+        <div class="tank-vis">
+          <div class="tank-outer" id="tankOuter">
+            <div class="danger-zone" id="dangerZone"></div>
+            <div class="tank-fill" id="tankFill"><div class="tank-fill-shine"></div></div>
+
+            <div class="tl tl1" id="line1"><span class="tl-label">60% Snip</span></div>
+            <div class="tl tl2" id="line2"><span class="tl-label">75% MicroCompact</span></div>
+            <div class="tl tl3" id="line3"><span class="tl-label">85% Collapse</span></div>
+            <div class="tl tl4" id="line4"><span class="tl-label">95% AutoCompact</span></div>
+            <div class="tl tl-safe" id="lineSafe"><span class="tl-label">안전 상한</span></div>
+
+            <div class="compress-flash" id="compFlash"></div>
+          </div>
+        </div>
+      </div>
+      <div class="tank-stats">
+        <div class="ts-row">
+          <span class="ts-label">총 생성</span>
+          <span class="ts-val total" id="vTotal">0K</span>
+        </div>
+        <div class="ts-row">
+          <span class="ts-label">현재 컨텍스트</span>
+          <span class="ts-val current" id="vCurrent">0K / 200K</span>
+        </div>
+        <div class="ts-bar"><div class="ts-bar-fill" id="tsBar" style="width:0;background:var(--cyan)"></div></div>
+        <div class="ts-row">
+          <span class="ts-label">압축으로 절약</span>
+          <span class="ts-val saved" id="vSaved">0K</span>
+        </div>
+      </div>
+      <div class="slider-area">
+        <div class="slider-label"><span>대화 시작</span><span>대화 지속 →</span></div>
+        <input type="range" min="0" max="500" value="0" class="tank-slider" id="slider" oninput="onSlider(+this.value)">
+      </div>
+      <div class="ctrl-row">
+        <button class="btn btn-p" onclick="autoPlay()" id="autoBtn">▶ 자동 시연</button>
+        <button class="btn btn-r" onclick="resetAll()">초기화</button>
+      </div>
+    </aside>
+
+    <!-- 오른쪽: 4층 압축 레이어 -->
+    <div class="layers-col">
+      <div class="layers-top">
+        <span class="layers-title">4단계 압축 전략</span>
+        <span class="status-badge" id="statusBadge" style="background:rgba(8,145,178,.08);color:var(--cyan)">안전 구간</span>
+      </div>
+      <div class="layers-scroll" id="layersScroll">
+        <div class="layer-card" id="lc0">
+          <div class="lc-hd" style="background:rgba(22,163,74,.04)">
+            <span class="lc-name" style="color:var(--l1)">1단계 · Snip</span>
+            <span class="lc-trigger" style="background:rgba(22,163,74,.1);color:var(--l1)">120K (60%)</span>
+            <span class="lc-saved" style="background:rgba(22,163,74,.1);color:var(--l1)">-36K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">초기 도구가 반환한 초장 원시 데이터를 삭제하고 요약만 유지합니다. 사용자는 <b>전혀 알아채지 못합니다</b>.</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">압축 전</div>
+                날씨 API가 1,200 Token JSON 반환: 7일간 시간별 예보…
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(22,163,74,.04)">
+                <div class="lc-cmp-label" style="color:var(--l1)">압축 후</div>
+                도구 요약: 내일 베이징 흐림 12~20°C (80 Token)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card" id="lc1">
+          <div class="lc-hd" style="background:rgba(217,119,6,.04)">
+            <span class="lc-name" style="color:var(--l2)">2단계 · MicroCompact</span>
+            <span class="lc-trigger" style="background:rgba(217,119,6,.1);color:var(--l2)">150K (75%)</span>
+            <span class="lc-saved" style="background:rgba(217,119,6,.1);color:var(--l2)">-50K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">초기 긴 대화를 짧은 요약으로 교체합니다. <b>약간의 정보 손실</b>, 핵심 정보는 유지.</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">압축 전</div>
+                3번째 턴: "그 파일은 PDF 형식이 아니에요, Word 버전이 필요하고, 제목을 바꿔주세요…"
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(217,119,6,.04)">
+                <div class="lc-cmp-label" style="color:var(--l2)">압축 후</div>
+                요약: 사용자가 Word 형식, 제목 변경, 색상 조정 요청
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card" id="lc2">
+          <div class="lc-hd" style="background:rgba(234,88,12,.04)">
+            <span class="lc-name" style="color:var(--l3)">3단계 · Collapse</span>
+            <span class="lc-trigger" style="background:rgba(234,88,12,.1);color:var(--l3)">170K (85%)</span>
+            <span class="lc-saved" style="background:rgba(234,88,12,.1);color:var(--l3)">-80K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">여러 초기 대화 턴을 하나의 요약 메시지로 접습니다. <b>세부 정보 손실</b>, 하지만 주선은 유지됩니다.</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">압축 전</div>
+                1~8번째 턴 (12개 메시지, 4,200 Token): 요구사항 논의, 방안 확정, 3차례 수정…
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(234,88,12,.04)">
+                <div class="lc-cmp-label" style="color:var(--l3)">압축 후</div>
+                세션 요약: React + TS 프로젝트, 현재 보고서 페이지 수정 중 (350 Token)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card" id="lc3">
+          <div class="lc-hd" style="background:rgba(220,38,38,.04)">
+            <span class="lc-name" style="color:var(--l4)">4단계 · AutoCompact</span>
+            <span class="lc-trigger" style="background:rgba(220,38,38,.1);color:var(--l4)">190K (95%)</span>
+            <span class="lc-saved" style="background:rgba(220,38,38,.1);color:var(--l4)">-110K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">전면 압축: system + 전체 요약 + 최근 3턴만 유지. <b>명확한 정보 손실</b>, 하지만 중단을 방지합니다.</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">압축 전</div>
+                완전한 20턴 대화 (38개 메시지, 18,000 Token)
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--l4)">압축 후</div>
+                system + 요약 + 최근 3턴 (2,500 Token)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dec-area" id="decArea">
+        <div class="dec-card" id="decCard">
+          <b>📌 설계 결정:</b> 슬라이더를 드래그하여 관찰하세요: 압축 없이는 200K 컨텍스트로 긴 대화 한 번밖에 못합니다. 4단계 압축이 있으면 동일한 창으로 5배 이상의 대화량을 지원할 수 있습니다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">핵심 정리</div>
+  <div class="l-callout paywall-locked">
+    <b>핵심 정리</b>&emsp;모델 창 256K, 안전 공간 200K. 4단계 압축은 홍수 방벽처럼 작동합니다: 가득 찰 때마다 자동으로 수위를 낮춰 동일한 창이 200K를 훨씬 초과하는 대화량을 처리하도록 합니다. 진정으로 더 이상 삭제할 것이 없을 때만 한도를 초과합니다.
+  </div>
+</article>
+
+<script>
+var SAFE = 200, MAX_CTX = 256;
+
+var KF = [
+  [0,   0],
+  [100, 120],
+  [101, 84],
+  [200, 150],
+  [201, 100],
+  [310, 170],
+  [311, 90],
+  [420, 190],
+  [421, 80],
+  [500, 260]
+];
+
+var COMP_POINTS = [
+  {at:100, layer:0, from:120, to:84,  label:'Snip! -36K',  color:'var(--l1)'},
+  {at:200, layer:1, from:150, to:100, label:'MicroCompact! -50K', color:'var(--l2)'},
+  {at:310, layer:2, from:170, to:90,  label:'Collapse! -80K',  color:'var(--l3)'},
+  {at:420, layer:3, from:190, to:80,  label:'AutoCompact! -110K', color:'var(--l4)'}
+];
+
+var DECISIONS = [
+  '<b>📌 설계 결정:</b> 컨텍스트가 60% 미만이면 안전합니다. 하지만 매 대화 턴마다 Token을 소비합니다. PM은 미리 예측해야 합니다: 평균 사용자 대화는 얼마나 길까요? 첫 번째 방어선에 언제 닿을까요?',
+  '<b>📌 설계 결정:</b> Snip은 도구가 반환한 불필요한 데이터만 삭제하며 사용자는 전혀 모릅니다. 결정이 필요합니다: 어떤 도구 출력을 요약할 수 있나요? 어떤 것은 반드시 보존해야 하나요(예: 코드 실행 결과)?',
+  '<b>📌 설계 결정:</b> MicroCompact가 초기 대화를 줄이기 시작합니다. 처음부터 압축하지 않는 이유는? 모델이 사용자 의도를 이해하려면 완전한 컨텍스트가 필요하기 때문입니다 — 너무 일찍 압축하면 기억 상실이 발생합니다.',
+  '<b>📌 설계 결정:</b> Collapse가 여러 대화 턴을 하나의 요약으로 만듭니다. 누가 요약을 작성하나요? 모델 스스로 요약하도록 할까요? 전용 압축 Prompt를 사용할까요? 요약 품질이 이후 정확도에 직접 영향을 미칩니다.',
+  '<b>📌 설계 결정:</b> AutoCompact는 마지막 방어선입니다 — 정보 손실이 분명하지만 대화는 중단되지 않습니다. Alice의 4단계 전략 vs 단순한 "가득 차면 오류" 방식 — 어느 쪽 경험이 더 나을까요?',
+  '<b>📌 ⚠️ 초과!</b> 4단계 압축이 모두 소진되었고 컨텍스트가 안전 공간을 초과했습니다. 계속 증가하여 256K 모델 한도를 넘으면 API가 context_length_exceeded 오류를 반환합니다. 이것이 컨텍스트 응급 처치가 최후의 보루로 필요한 이유입니다.'
+];
+
+function lerp(val) {
+  if (val <= 0) return 0;
+  for (var i = 0; i < KF.length - 1; i++) {
+    if (val >= KF[i][0] && val <= KF[i + 1][0]) {
+      var r = KF[i + 1][0] - KF[i][0];
+      if (r === 0) return KF[i][1];
+      var t = (val - KF[i][0]) / r;
+      return KF[i][1] + t * (KF[i + 1][1] - KF[i][1]);
+    }
+  }
+  return KF[KF.length - 1][1];
+}
+
+function getActiveLayer(val) {
+  if (val >= 420) return 3;
+  if (val >= 310) return 2;
+  if (val >= 200) return 1;
+  if (val >= 100) return 0;
+  return -1;
+}
+
+function positionLines() {
+  var pcts = [120, 150, 170, 190, 200];
+  var ids = ['line1','line2','line3','line4','lineSafe'];
+  for (var i = 0; i < ids.length; i++) {
+    document.getElementById(ids[i]).style.bottom = ((pcts[i] / MAX_CTX) * 100) + '%';
+  }
+  document.getElementById('dangerZone').style.height = ((1 - SAFE / MAX_CTX) * 100) + '%';
+}
+
+function update(val) {
+  var ctxK = lerp(val);
+  var fillPct = Math.min((ctxK / MAX_CTX) * 100, 100);
+  var safePct = (ctxK / SAFE) * 100;
+
+  var fill = document.getElementById('tankFill');
+  fill.style.height = fillPct + '%';
+
+  if (ctxK > SAFE) {
+    fill.style.background = 'linear-gradient(180deg,rgba(220,38,38,.35),rgba(220,38,38,.65))';
+    document.getElementById('tankOuter').classList.add('danger');
+  } else if (safePct > 95) {
+    fill.style.background = 'linear-gradient(180deg,rgba(220,38,38,.25),rgba(220,38,38,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else if (safePct > 85) {
+    fill.style.background = 'linear-gradient(180deg,rgba(234,88,12,.25),rgba(234,88,12,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else if (safePct > 75) {
+    fill.style.background = 'linear-gradient(180deg,rgba(217,119,6,.25),rgba(217,119,6,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else if (safePct > 60) {
+    fill.style.background = 'linear-gradient(180deg,rgba(22,163,74,.2),rgba(22,163,74,.45))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else {
+    fill.style.background = 'linear-gradient(180deg,rgba(8,145,178,.25),rgba(8,145,178,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  }
+
+  var totalK = Math.round(val * 0.6);
+  var curK = Math.round(ctxK);
+  var savedK = Math.max(0, totalK - curK);
+  document.getElementById('vTotal').textContent = totalK + 'K';
+  document.getElementById('vCurrent').textContent = curK + 'K / ' + SAFE + 'K';
+  document.getElementById('vSaved').textContent = savedK + 'K';
+  document.getElementById('tsBar').style.width = Math.min(safePct, 130) + '%';
+  var bar = document.getElementById('tsBar');
+  bar.style.background = ctxK > SAFE ? 'var(--danger)' : safePct > 85 ? 'var(--l3)' : safePct > 60 ? 'var(--amber)' : 'var(--cyan)';
+
+  var active = getActiveLayer(val);
+  for (var i = 0; i < 4; i++) {
+    var card = document.getElementById('lc' + i);
+    var on = i <= active;
+    card.classList.toggle('active', on);
+    card.style.borderColor = on ? ['var(--l1)','var(--l2)','var(--l3)','var(--l4)'][i] : '';
+  }
+
+  var badge = document.getElementById('statusBadge');
+  if (ctxK > SAFE) {
+    badge.textContent = '⚠️ 안전 상한 초과!';
+    badge.style.color = 'var(--danger)';
+    badge.style.background = 'rgba(220,38,38,.1)';
+  } else if (active === 3) {
+    badge.textContent = 'AutoCompact 활성';
+    badge.style.color = 'var(--l4)';
+    badge.style.background = 'rgba(220,38,38,.08)';
+  } else if (active === 2) {
+    badge.textContent = 'Collapse 활성';
+    badge.style.color = 'var(--l3)';
+    badge.style.background = 'rgba(234,88,12,.08)';
+  } else if (active === 1) {
+    badge.textContent = 'MicroCompact 활성';
+    badge.style.color = 'var(--l2)';
+    badge.style.background = 'rgba(217,119,6,.08)';
+  } else if (active === 0) {
+    badge.textContent = 'Snip 활성';
+    badge.style.color = 'var(--l1)';
+    badge.style.background = 'rgba(22,163,74,.08)';
+  } else {
+    badge.textContent = '안전 구간';
+    badge.style.color = 'var(--cyan)';
+    badge.style.background = 'rgba(8,145,178,.08)';
+  }
+
+  var di = ctxK > SAFE ? 5 : active >= 0 ? active + 1 : 0;
+  document.getElementById('decCard').innerHTML = DECISIONS[di];
+
+  document.getElementById('slider').value = val;
+}
+
+function showFlash(cp) {
+  var fl = document.getElementById('compFlash');
+  var pct = (cp.from / MAX_CTX) * 100;
+  fl.style.bottom = pct + '%';
+  fl.style.background = cp.color;
+  fl.style.color = 'white';
+  fl.textContent = cp.label;
+  fl.classList.remove('show');
+  void fl.offsetWidth;
+  fl.classList.add('show');
+  setTimeout(function() { fl.classList.remove('show'); }, 1200);
+}
+
+function fireCard(idx) {
+  var card = document.getElementById('lc' + idx);
+  card.classList.remove('firing');
+  void card.offsetWidth;
+  card.classList.add('firing');
+}
+
+function onSlider(val) {
+  if (autoId) { cancelAnimationFrame(autoId); autoId = null; document.getElementById('autoBtn').textContent = '▶ 자동 시연'; }
+  update(val);
+}
+
+var autoId = null;
+function autoPlay() {
+  if (autoId) { cancelAnimationFrame(autoId); autoId = null; document.getElementById('autoBtn').textContent = '▶ 자동 시연'; return; }
+  document.getElementById('autoBtn').textContent = '⏸ 일시정지';
+  var v = 0;
+  var compIdx = 0;
+  var pauseUntil = 0;
+  var speed = 0.8;
+
+  function step(ts) {
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(step); return; }
+
+    if (compIdx < COMP_POINTS.length && v >= COMP_POINTS[compIdx].at && v < COMP_POINTS[compIdx].at + 2) {
+      showFlash(COMP_POINTS[compIdx]);
+      fireCard(COMP_POINTS[compIdx].layer);
+      pauseUntil = ts + 1200;
+      compIdx++;
+      v = v + 1;
+      update(v);
+      autoId = requestAnimationFrame(step);
+      return;
+    }
+
+    v += speed;
+    if (v > 500) {
+      v = 500;
+      update(v);
+      autoId = null;
+      document.getElementById('autoBtn').textContent = '▶ 다시보기';
+      return;
+    }
+    update(v);
+    autoId = requestAnimationFrame(step);
+  }
+  update(0);
+  autoId = requestAnimationFrame(step);
+}
+
+function resetAll() {
+  if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+  document.getElementById('autoBtn').textContent = '▶ 자동 시연';
+  update(0);
+}
+
+positionLines();
+update(0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

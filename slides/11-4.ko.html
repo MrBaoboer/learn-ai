@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>워크플로우 설계：수동에서 자동 탐색으로 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.hero-banner{background:linear-gradient(135deg,#0f172a 0%,#1a2e1a 60%,#1e3a2e 100%);border-radius:var(--radius);padding:48px 36px;margin-bottom:32px;color:#fff;position:relative;overflow:hidden}
+.hero-banner::after{content:'';position:absolute;top:-50%;right:-20%;width:60%;height:200%;background:radial-gradient(ellipse,rgba(16,185,129,.15) 0%,transparent 70%);pointer-events:none}
+.hero-banner .hb-kicker{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(167,243,208,.8);margin-bottom:12px}
+.hero-banner h2{font-size:26px;font-weight:900;line-height:1.4;margin-bottom:14px}
+@media(max-width:768px){.hero-banner h2{font-size:20px}}
+.hero-banner .hb-sub{font-size:15px;color:rgba(255,255,255,.7);line-height:1.7;max-width:640px}
+
+.method-section{margin:40px 0}
+.method-section .sec-label{margin-bottom:20px}
+
+.method-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:28px 28px 24px;margin:20px 0;box-shadow:var(--shadow-card);position:relative;overflow:hidden}
+.method-card .mc-badge{position:absolute;top:0;right:0;background:var(--accent);color:#fff;font-size:11px;font-weight:800;padding:6px 14px;border-radius:0 0 0 12px;letter-spacing:.5px}
+.method-card .mc-head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.method-card .mc-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px}
+.method-card .mc-title{font-size:18px;font-weight:800;color:var(--text)}
+.method-card .mc-subtitle{font-size:13px;color:var(--sub);font-weight:500;margin-top:2px}
+.method-card .mc-body{font-size:14.5px;color:var(--sub);line-height:1.8}
+.method-card .mc-body b{color:var(--text)}
+
+.pipeline-list{list-style:none;padding:0;margin:16px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pipeline-list li{background:rgba(0,102,255,.06);border:1px solid rgba(0,102,255,.15);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--accent)}
+.pipeline-list .arrow{background:none;border:none;padding:0 4px;color:var(--sub);font-size:16px}
+
+.role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0}
+.role-chip{background:var(--bg-dim,#f8f9fa);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;font-size:13px;font-weight:700;color:var(--text)}
+.role-chip span{display:block;font-size:11px;font-weight:400;color:var(--sub);margin-top:4px}
+
+.fig-wrap{margin:28px 0;text-align:center}
+.fig-wrap img{max-width:100%;border-radius:var(--radius);border:1.5px solid var(--border);box-shadow:var(--shadow-card)}
+.fig-wrap .fig-cap{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.6}
+
+.mcts-steps{list-style:none;padding:0;margin:20px 0;counter-reset:mcts}
+.mcts-steps li{position:relative;padding:14px 18px 14px 54px;margin-bottom:10px;background:var(--bg-dim,#f8f9fa);border-radius:10px;font-size:14px;line-height:1.7;color:var(--text);counter-increment:mcts}
+.mcts-steps li::before{content:counter(mcts);position:absolute;left:16px;top:14px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.mcts-steps li b{color:var(--accent)}
+
+.compare-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);margin:24px 0;font-size:13.5px}
+.compare-table th{padding:12px 16px;font-weight:700;text-align:left;background:var(--bg-dim,#f8f9fa);color:var(--sub)}
+.compare-table td{padding:11px 16px;border-top:1px solid var(--border);line-height:1.6;color:var(--text)}
+.compare-table tr:hover td{background:rgba(0,102,255,.02)}
+
+.insight-box{background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1.5px solid #a7f3d0;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.insight-box h3{font-size:17px;font-weight:800;color:#065f46;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.insight-box ul{list-style:none;padding:0;margin:0}
+.insight-box li{font-size:14.5px;color:#1e3a2e;line-height:1.8;padding:6px 0 6px 22px;position:relative}
+.insight-box li::before{content:'';position:absolute;left:0;top:14px;width:8px;height:8px;border-radius:50%;background:#10b981}
+.insight-box li b{color:#065f46}
+
+.mcts-steps{margin:24px 0}
+.mcts-step-card{display:flex;gap:16px;align-items:flex-start;padding:18px 20px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:12px;box-shadow:var(--shadow-card);transition:border-color .2s}
+.mcts-step-card:hover{border-color:rgba(0,102,255,.2)}
+.msc-num{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.msc-body{flex:1;min-width:0}
+.msc-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:8px}
+.msc-flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.flow-chip{padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap}
+.flow-chip.root{background:rgba(100,116,139,.1);color:#475569;border:1px solid rgba(100,116,139,.2)}
+.flow-chip.c1{background:rgba(59,130,246,.08);color:#2563eb;border:1px solid rgba(59,130,246,.2)}
+.flow-chip.c2{background:rgba(139,92,246,.08);color:#7c3aed;border:1px solid rgba(139,92,246,.2)}
+.flow-chip.c3{background:rgba(245,158,11,.08);color:#d97706;border:1px solid rgba(245,158,11,.2)}
+.flow-chip.c4{background:rgba(59,130,246,.08);color:#2563eb;border:1px solid rgba(59,130,246,.2)}
+.flow-chip.selected{background:rgba(59,130,246,.15);border:1.5px solid #3b82f6;box-shadow:0 0 8px rgba(59,130,246,.15)}
+.flow-chip.best{background:rgba(16,185,129,.1);color:#059669;border:1.5px solid #10b981;box-shadow:0 0 8px rgba(16,185,129,.15)}
+.flow-chip.pruned{background:rgba(0,0,0,.04);color:#9ca3af;border:1px solid rgba(0,0,0,.08);text-decoration:line-through}
+.flow-score{font-size:12px;font-weight:800;color:var(--sub)}
+.flow-score.best-score{color:#059669}
+.msc-desc{font-size:13px;color:var(--sub);line-height:1.7}
+
+.plain-talk{background:linear-gradient(135deg,#fffbeb,#fef9c3);border:1.5px dashed #fbbf24;border-radius:var(--radius);padding:16px 20px;margin:14px 0 28px;font-size:14px;color:#713f12;line-height:1.85;display:flex;gap:12px;align-items:flex-start}
+.plain-talk .pt-icon{flex-shrink:0;font-size:18px;line-height:1.5}
+.plain-talk b{color:#92400e}
+.plain-talk .pt-tag{font-weight:800;color:#b45309}
+
+.sim-controls{display:flex;gap:10px;align-items:center;padding:16px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--shadow-card)}
+.sim-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;font-family:inherit}
+.sim-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sim-btn.playing{background:var(--accent);color:#fff;border-color:var(--accent);pointer-events:none}
+.sim-status{font-size:13px;color:var(--sub);font-weight:600;margin-left:auto;font-variant-numeric:tabular-nums}
+
+/* 默认全部可见；仅在动画模式下通过 .sim-running 隐藏后逐步展示 */
+.mcts-steps.interactive .mcts-step-card{transition:all .4s cubic-bezier(.23,1,.32,1)}
+.mcts-steps.interactive .flow-chip{transition:all .3s ease}
+/* 动画模式 */
+.mcts-steps.interactive.sim-running .mcts-step-card{opacity:0;transform:translateX(-20px);display:none}
+.mcts-steps.interactive.sim-running .mcts-step-card.sim-show{opacity:1;transform:translateX(0);display:flex}
+.mcts-steps.interactive.sim-running .flow-chip{opacity:0;transform:scale(.8)}
+.mcts-steps.interactive.sim-running .flow-chip.sim-show{opacity:1;transform:scale(1)}
+
+/* best 流片动态呼吸 */
+.flow-chip.best{animation:bestGlow 2s ease-in-out infinite alternate !important}
+@keyframes bestGlow{from{box-shadow:0 0 8px rgba(16,185,129,.15)}to{box-shadow:0 0 16px rgba(16,185,129,.35)}}
+
+@media(max-width:600px){
+  .method-card{padding:20px 18px}
+  .pipeline-list{flex-direction:column;align-items:flex-start}
+  .pipeline-list .arrow{transform:rotate(90deg)}
+  .role-grid{grid-template-columns:1fr 1fr}
+  .mcts-sim{padding:18px}
+  .mcts-tree{min-height:180px;padding:14px}
+}
+</style>
+<meta name="description" content="AI Scientist부터 AFlow까지：워크플로우 설계는 더 이상 수작업이 아니라 알고리즘으로 탐색하고 최적화할 수 있는 공간입니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"워크플로우 설계：수동에서 자동 탐색으로","name":"워크플로우 설계：수동에서 자동 탐색으로","url":"https://xueai.app/slides/11-4.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Harness 최적화","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"AI Scientist부터 AFlow까지：워크플로우 설계는 더 이상 수작업이 아니라 알고리즘으로 탐색하고 최적화할 수 있는 공간입니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/11-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/11-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/11-4.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/11-4.html">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">PART 5 · Harness와 자기 개선</div>
+    <h1>워크플로우 설계：수동에서 <em>자동 탐색</em>으로</h1>
+    <p class="subtitle">워크플로우의 설계 공간은 방대합니다. 알고리즘으로 탐색해야 하며, 수동 설계만으로는 결코 충분하지 않습니다.</p>
+  </header>
+
+  <div class="hero-banner reveal">
+    <div class="hb-kicker">Workflow Design &amp; Automated Search</div>
+    <h2>워크플로우 자체가 탐색 공간이 되는 순간, 설계는 예술에서 엔지니어링으로 바뀝니다</h2>
+    <div class="hb-sub">완전히 수작업으로 이루어지던 파이프라인 설계에서, MCTS로 최적 워크플로우를 자동 탐색하는 방식까지 — Agent 시스템의 설계 패러다임이 근본적으로 변화하고 있습니다. 코드는 Harness를 정의하는 범용 언어입니다.</div>
+  </div>
+
+  <!-- Section 1: Hand-Designed Workflows -->
+  <div class="sec-label reveal">수동으로 설계된 워크플로우</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">쉽게 말하면：</span>워크플로우는 AI에게 배정된 <b>업무 체크리스트</b>입니다. 신입 직원에게 「먼저 A를 하고, 다음에 B를 하고, 문제가 생기면 C에게 확인해」라고 알려주는 것과 같습니다. 예전에는 이 체크리스트를 전부 사람이 한 단계씩 작성했고, 아래 두 예시가 인간이 손으로 만든 가장 강력한 체크리스트입니다.</span>
+  </div>
+
+  <div class="method-card reveal">
+    <div class="mc-badge">Lu et al. 2026</div>
+    <div class="mc-head">
+      <div class="mc-icon" style="background:rgba(99,102,241,.1);color:#6366f1">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </div>
+      <div>
+        <div class="mc-title">AI Scientist</div>
+        <div class="mc-subtitle">완전한 과학 연구 자동화 파이프라인 구축</div>
+      </div>
+    </div>
+    <div class="mc-body">
+      <b>핵심 아이디어：</b>과학 연구의 전체 프로세스를 Agent 시스템이 자동으로 완료하도록 맡깁니다：처음부터 완전한 연구 사이클을 실행합니다.<br><br>
+      <b>파이프라인 흐름：</b>
+    </div>
+    <ul class="pipeline-list">
+      <li>연구 아이디어 제안</li>
+      <li class="arrow">→</li>
+      <li>코드 작성</li>
+      <li class="arrow">→</li>
+      <li>실험 실행</li>
+      <li class="arrow">→</li>
+      <li>결과 분석</li>
+      <li class="arrow">→</li>
+      <li>논문 작성</li>
+      <li class="arrow">→</li>
+      <li>동료 심사</li>
+    </ul>
+    <div class="mc-body">
+      <b>핵심 혁신：</b>모든 단계가 LLM으로 구동되어 엔드투엔드 자동화 연구 시스템을 형성합니다. 심사 단계에는 LLM-as-judge를 도입해 품질을 관리합니다.
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/ai-scientist.png" alt="AI Scientist Pipeline" loading="lazy">
+    <div class="fig-cap">AI Scientist의 완전한 파이프라인：연구 구상부터 논문 작성 및 동료 심사까지 모두 Agent가 자동 실행합니다. (Lu et al. 2026)</div>
+  </div>
+
+  <div class="method-card reveal">
+    <div class="mc-badge">Kulikov et al. 2026</div>
+    <div class="mc-head">
+      <div class="mc-icon" style="background:rgba(245,158,11,.1);color:#d97706">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+      </div>
+      <div>
+        <div class="mc-title">Autodata</div>
+        <div class="mc-subtitle">데이터 과학자 Agent：난이도가 딱 맞는 데이터 합성</div>
+      </div>
+    </div>
+    <div class="mc-body">
+      <b>핵심 아이디어：</b>다중 역할 협업을 통해 훈련 데이터를 자동 합성하고 난이도를 정밀하게 제어합니다：<b>strong solver는 풀 수 있고 weak solver는 풀 수 없는</b> 난이도.<br><br>
+      <b>역할 체계：</b>
+    </div>
+    <div class="role-grid">
+      <div class="role-chip">Challenger<span>출제자</span></div>
+      <div class="role-chip">Weak Solver<span>약한 해결자</span></div>
+      <div class="role-chip">Strong Solver<span>강한 해결자</span></div>
+      <div class="role-chip">Verifier / Judge<span>검증 심판</span></div>
+    </div>
+    <div class="mc-body">
+      <b>핵심 혁신：</b>난이도 격차를 데이터 품질 신호로 활용합니다：강한 해결자는 풀 수 있고 약한 해결자는 풀 수 없는 문제만 보존하여 합성 데이터의 모델 향상 가치를 극대화합니다.
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal">
+    <img src="images/harness/autodata.png" alt="Autodata System" loading="lazy">
+    <div class="fig-cap">Autodata의 다중 역할 협업 체계：Challenger 출제, Strong/Weak Solver 풀이 시도, Verifier 데이터 품질 중재. (Kulikov et al. 2026)</div>
+  </div>
+
+  <!-- Section 2: ADAS -->
+  <div class="sec-label reveal">ADAS: Agent 시스템 자동화 설계</div>
+
+  <div class="plain-talk reveal">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">쉽게 말하면：</span>체크리스트를 손으로 작성하는 것은 너무 힘듭니다. 그렇다면 <b>AI가 AI를 위한 체크리스트를 설계하게 할 수는 없을까요</b>？ADAS가 바로 그 발상입니다：'설계자 AI'를 고용하여 새로운 체크리스트를 계속 그리고, 실행하고, 점수를 매기고, 좋은 것을 남기게 합니다. 숙련된 전문가가 후배를 가르치는 작업도 자동화한 셈입니다.</span>
+  </div>
+
+  <div class="method-card reveal paywall-locked xa-peek">
+    <div class="mc-badge">Hu et al. 2025</div>
+    <div class="mc-head">
+      <div class="mc-icon" style="background:rgba(139,92,246,.1);color:#7c3aed">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <div>
+        <div class="mc-title">ADAS — Automated Design of Agentic Systems</div>
+        <div class="mc-subtitle">Agent 설계 자체를 최적화 문제로 취급</div>
+      </div>
+    </div>
+    <div class="mc-body">
+      <b>핵심 아이디어：</b><b>"Meta-Agent"</b>가 Agent 설계 공간에서 최적 솔루션을 자동으로 탐색하여 수동 Agent 아키텍처 설계를 대체합니다. 이것이 <b>"meta-agent search"</b>입니다.<br><br>
+      <b>작동 방식：</b><br>
+      1. Meta-Agent가 먼저 <b>고수준 설명</b>(Agent 아키텍처, 도구 사용, 추론 전략)을 생성합니다<br>
+      2. 고수준 설명을 <b>실행 가능한 코드로 구현</b>합니다<br>
+      3. <b>self-refine</b>으로 새로움을 검증합니다：기존 솔루션을 단순 반복하지 않는지 확인<br>
+      4. 벤치마크 태스크에서 평가하고 가장 성능 좋은 설계를 보존합니다<br><br>
+      <b>핵심 혁신：</b>코드를 Agent 설계 탐색 공간의 표현으로 사용하여 설계를 자동으로 생성, 수정, 평가할 수 있게 합니다.
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal paywall-locked">
+    <img src="images/harness/adas.png" alt="ADAS Meta-Agent Search" loading="lazy">
+    <div class="fig-cap">ADAS Meta-Agent Search：Meta-Agent가 후보 Agent 설계 생성 → 코드로 구현 → 평가 → 반복 최적화. (Hu et al. 2025)</div>
+  </div>
+
+  <!-- Section 3: AFlow -->
+  <div class="sec-label reveal paywall-locked">AFlow：MCTS 기반 워크플로우 탐색</div>
+
+  <div class="plain-talk reveal paywall-locked">
+    <span class="pt-icon">💬</span>
+    <span><span class="pt-tag">쉽게 말하면：</span>ADAS는 AI가 자유롭게 새로운 방안을 떠올리는 방식이라면, AFlow는 한 단계 더 나아가 체스 AI와 똑같은 <b>보드 시뮬레이션 기법(MCTS, 몬테카를로 트리 탐색)</b>으로 최적 프로세스를 찾습니다. AlphaGo가 수백 수를 시뮬레이션하며 「내가 여기 두면 상대방은 어떻게 할까」를 생각하듯, AFlow도 수백 가지 워크플로우 변형을 머릿속에서 시뮬레이션하고 점수가 높은 방향으로 깊이 파고듭니다.</span>
+  </div>
+
+  <div class="method-card reveal paywall-locked">
+    <div class="mc-badge">Zhang et al. 2025</div>
+    <div class="mc-head">
+      <div class="mc-icon" style="background:rgba(16,185,129,.1);color:#059669">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div>
+        <div class="mc-title">AFlow</div>
+        <div class="mc-subtitle">Agent 워크플로우를 그래프로 표현하고 MCTS로 자동 최적화</div>
+      </div>
+    </div>
+    <div class="mc-body">
+      <b>핵심 아이디어：</b>워크플로우를 <b>방향성 그래프</b>로 표현합니다：노드는 LLM 호출 액션, 엣지는 코드의 논리 연산(조건 분기, 루프, 데이터 전달)입니다. 그런 다음 <b>몬테카를로 트리 탐색(MCTS)</b>으로 이 그래프 공간에서 최적 워크플로우를 자동으로 탐색합니다.<br><br>
+      <b>MCTS 최적화 흐름：</b>
+    </div>
+    <ol class="mcts-steps">
+      <li><b>초기화</b> 시작 워크플로우를 탐색 트리의 루트 노드로 설정</li>
+      <li><b>soft mixture of score and uniform exploration</b>을 사용해 확장할 노드를 선택(활용과 탐색의 균형)</li>
+      <li>LLM이 <b>수정된 워크플로우 변형</b>을 생성하도록 합니다(노드와 엣지 추가/삭제/수정)</li>
+      <li>목표 태스크에서 새 워크플로우의 성능을 <b>실행하고 평가</b>합니다</li>
+      <li>개선이 있으면 <b>탐색 트리에 추가</b>하여 새로운 후보로 등록합니다</li>
+      <li>top-k 평균 점수가 안정되거나 계산 예산에 도달할 때까지 <b>반복</b>합니다</li>
+    </ol>
+    <div class="mc-body">
+      <b>핵심 혁신：</b>워크플로우 설계 문제를 트리 탐색 문제로 변환하여, MCTS의 탐색-활용 균형 메커니즘이 좋은 워크플로우 구조를 자동으로 발견합니다 — 인간의 수동 설계 불필요.
+    </div>
+  </div>
+
+  <div class="fig-wrap reveal paywall-locked">
+    <img src="images/harness/aflow.png" alt="AFlow Architecture" loading="lazy">
+    <div class="fig-cap">AFlow의 그래프 표현과 MCTS 탐색：워크플로우는 노드(LLM 액션)와 엣지(논리 연산)로 구성된 방향성 그래프로 표현됩니다. (Zhang et al. 2025)</div>
+  </div>
+
+  <div class="sec-label reveal paywall-locked">AFlow 실험 결과</div>
+
+  <table class="compare-table reveal paywall-locked">
+    <thead>
+      <tr>
+        <th>방법</th>
+        <th>설계 방식</th>
+        <th>탐색 전략</th>
+        <th>핵심 장점</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>수동 설계</b></td>
+        <td>인간 전문가 반복</td>
+        <td>없음(직관 기반)</td>
+        <td>높은 해석 가능성</td>
+      </tr>
+      <tr>
+        <td><b>ADAS</b></td>
+        <td>Meta-Agent + 코드</td>
+        <td>Self-refine</td>
+        <td>자동화 설계</td>
+      </tr>
+      <tr>
+        <td><b>AFlow</b></td>
+        <td>그래프 표현 + MCTS</td>
+        <td>몬테카를로 트리 탐색</td>
+        <td>체계적 탐색 + 안정적 수렴</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="fig-wrap reveal paywall-locked">
+    <img src="images/harness/aflow-exp.png" alt="AFlow Experimental Results" loading="lazy">
+    <div class="fig-cap">QA, 코드 생성, 수학적 추론 등 태스크에서 AFlow 성능 비교：체계적 탐색이 수동 설계와 ADAS를 능가합니다. (Zhang et al. 2025)</div>
+  </div>
+
+  <!-- Interactive: MCTS search steps demo -->
+  <div class="sec-label paywall-locked">단계별 체험：AFlow의 MCTS 탐색 과정</div>
+
+  <div class="sim-controls paywall-locked" style="margin-bottom: 16px;">
+    <button id="btn-play-mcts" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      MCTS 단계별 시연
+    </button>
+    <button id="btn-reset-mcts" class="sim-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      초기화
+    </button>
+    <span id="mcts-status" class="sim-status">준비됨</span>
+  </div>
+
+  <div class="mcts-steps interactive paywall-locked" id="mcts-container">
+    <div class="mcts-step-card">
+      <div class="msc-num">1</div>
+      <div class="msc-body">
+        <div class="msc-title">초기화</div>
+        <div class="msc-flow">
+          <span class="flow-chip root">W₀: Plan → Execute</span>
+          <span class="flow-score">점수 52</span>
+        </div>
+        <div class="msc-desc">가장 단순한 단일 단계 워크플로우에서 시작합니다. 반성 없음, 검증 없음, 병렬 없음.</div>
+      </div>
+    </div>
+    <div class="mcts-step-card">
+      <div class="msc-num">2</div>
+      <div class="msc-body">
+        <div class="msc-title">확장：LLM이 변형 제안</div>
+        <div class="msc-flow">
+          <span class="flow-chip c1">W₁: +Reflect</span><span class="flow-score">61</span>
+          <span class="flow-chip c2">W₂: +Verify</span><span class="flow-score">58</span>
+          <span class="flow-chip c3">W₃: +Decompose</span><span class="flow-score">55</span>
+        </div>
+        <div class="msc-desc">LLM이 W₀을 기반으로 반성, 검증, 태스크 분해를 각각 추가한 세 가지 수정안을 생성합니다.</div>
+      </div>
+    </div>
+    <div class="mcts-step-card">
+      <div class="msc-num">3</div>
+      <div class="msc-body">
+        <div class="msc-title">평가 &amp; 부모 노드 선택</div>
+        <div class="msc-flow">
+          <span class="flow-chip c1 selected">W₁: 61 ← 선택됨</span>
+        </div>
+        <div class="msc-desc">W₁이 가장 높은 점수(61 > 58 > 55)를 얻어 다음 라운드 확장의 부모 노드로 선택됩니다.</div>
+      </div>
+    </div>
+    <div class="mcts-step-card">
+      <div class="msc-num">4</div>
+      <div class="msc-body">
+        <div class="msc-title">재확장</div>
+        <div class="msc-flow">
+          <span class="flow-chip c4">W₄: Reflect×2</span><span class="flow-score">65</span>
+          <span class="flow-chip best">W₅: Reflect+Verify</span><span class="flow-score best-score">78 🏆</span>
+        </div>
+        <div class="msc-desc">W₁에서 두 가지 변형을 확장합니다：이중 반성 vs 반성+검증 조합. 후자가 대폭 앞섭니다!</div>
+      </div>
+    </div>
+    <div class="mcts-step-card">
+      <div class="msc-num">5</div>
+      <div class="msc-body">
+        <div class="msc-title">가지치기 &amp; 수렴</div>
+        <div class="msc-flow">
+          <span class="flow-chip pruned">W₃: 55 ✗</span>
+          <span class="flow-chip pruned">W₆: 56 ✗</span>
+          <span class="flow-chip best">W₅: 78 ✓ 최적</span>
+        </div>
+        <div class="msc-desc">임계값 이하의 워크플로우는 가지치기됩니다. W₅(Plan → Execute → Reflect → Verify → Output)가 탐색된 최적 솔루션으로 확정됩니다. 수동 설계보다 50% 향상!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core Insights -->
+  <div class="insight-box reveal paywall-locked">
+    <h3>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+      핵심 인사이트
+    </h3>
+    <ul>
+      <li><b>방대한 탐색 공간</b>：워크플로우의 조합 가능성은 인간이 수동으로 탐색할 수 있는 범위를 훨씬 초과합니다 — 수동 설계는 빙산의 일각에 불과합니다</li>
+      <li><b>설계는 탐색이다</b>：워크플로우 설계를 탐색 문제로 취급하고, 직관 대신 알고리즘(예：MCTS)으로 좋은 솔루션을 찾으세요</li>
+      <li><b>코드는 범용 언어</b>：Harness는 본질적으로 prompt, 도구 호출, 서브 Agent, 제어 흐름, 메모리, 워크플로우 로직을 조율하는 코드입니다</li>
+      <li><b>ADAS에서 AFlow로의 진화</b>：Agent 설계의 자동화 수준이 계속 향상되고 있습니다 — LLM이 설계하는 방식에서 알고리즘이 체계적으로 탐색하는 방식으로</li>
+    </ul>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){
+  var ob = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); ob.unobserve(e.target); }});
+  }, {threshold:0.15});
+  ob.observe(el);
+});
+
+// ═══════ MCTS Interactive Demo ═══════
+(function(){
+  var btnPlay = document.getElementById('btn-play-mcts');
+  var btnReset = document.getElementById('btn-reset-mcts');
+  var statusTxt = document.getElementById('mcts-status');
+  var container = document.getElementById('mcts-container');
+  var cards = container.querySelectorAll('.mcts-step-card');
+  
+  var isPlaying = false;
+  var timer = null;
+
+  function resetSim() {
+    clearTimeout(timer);
+    isPlaying = false;
+    btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> MCTS 단계별 시연';
+    btnPlay.classList.remove('playing');
+    statusTxt.textContent = '버튼을 클릭하여 단계별 탐색 과정을 확인하세요';
+    // Restore static preview: remove sim-running, all cards visible automatically
+    container.classList.remove('sim-running');
+    cards.forEach(function(card){
+      card.classList.remove('sim-show');
+      card.querySelectorAll('.flow-chip').forEach(function(chip){
+        chip.classList.remove('sim-show');
+      });
+    });
+  }
+
+  function playSim() {
+    if(isPlaying) return;
+    isPlaying = true;
+    btnPlay.innerHTML = '시연 중...';
+    btnPlay.classList.add('playing');
+    
+    // Enter animation mode: hide all cards
+    container.classList.add('sim-running');
+    cards.forEach(function(card){
+      card.classList.remove('sim-show');
+      card.querySelectorAll('.flow-chip').forEach(function(chip){
+        chip.classList.remove('sim-show');
+      });
+    });
+
+    var stepIdx = 0;
+    
+    function nextStep() {
+      if(stepIdx >= cards.length) {
+        statusTxt.textContent = '탐색 완료：최적 워크플로우 W₅ 발견';
+        btnPlay.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> 다시 시연';
+        btnPlay.classList.remove('playing');
+        isPlaying = false;
+        container.classList.remove('sim-running');
+        return;
+      }
+      
+      var card = cards[stepIdx];
+      card.classList.add('sim-show');
+      var title = card.querySelector('.msc-title').textContent;
+      statusTxt.textContent = '단계 ' + (stepIdx+1) + ': ' + title;
+      
+      var chips = card.querySelectorAll('.flow-chip');
+      var chipIdx = 0;
+      
+      function nextChip() {
+        if(chipIdx < chips.length) {
+          chips[chipIdx].classList.add('sim-show');
+          chipIdx++;
+          timer = setTimeout(nextChip, 400);
+        } else {
+          stepIdx++;
+          timer = setTimeout(nextStep, 1000);
+        }
+      }
+      
+      // Start showing chips with slight delay
+      timer = setTimeout(nextChip, 300);
+    }
+    
+    nextStep();
+  }
+
+  btnPlay.addEventListener('click', playSim);
+  btnReset.addEventListener('click', resetSim);
+  
+  resetSim();
+})();
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

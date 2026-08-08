@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI는 검색 엔진이 아니에요: 인터넷에서 답을 찾아 주는 게 아닙니다 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 问题切换 ── */
+.q-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.q-chip {
+  border: 1.5px solid var(--border); background: var(--card);
+  border-radius: 999px; padding: 8px 18px;
+  font-size: 13.5px; font-weight: 700; color: var(--text);
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+}
+.q-chip:hover { border-color: rgba(0,102,255,0.4); }
+.q-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ── 对比面板 ── */
+.vs-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.vs-panel {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-card);
+  display: flex; flex-direction: column;
+}
+.vs-panel-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; font-size: 13px; font-weight: 800;
+  border-bottom: 1px solid var(--border);
+}
+.vs-panel.search .vs-panel-head { background: rgba(100,116,139,0.06); color: #475569; }
+.vs-panel.ai .vs-panel-head { background: rgba(0,102,255,0.05); color: var(--accent); }
+.vs-panel-body { padding: 14px 16px; flex: 1; min-height: 240px; }
+
+/* 搜索结果模拟 */
+.search-bar {
+  display: flex; align-items: center; gap: 8px;
+  border: 1.5px solid var(--border); border-radius: 999px;
+  padding: 7px 14px; font-size: 13px; color: var(--text);
+  margin-bottom: 12px; background: #fff;
+}
+.search-bar svg { flex-shrink: 0; color: #94a3b8; }
+.sr-item { padding: 9px 4px; border-bottom: 1px solid rgba(0,0,0,0.04); }
+.sr-item.ad .sr-title::before {
+  content: '광고'; font-size: 10px; font-weight: 800; color: #b45309;
+  background: rgba(217,119,6,0.12); border-radius: 4px;
+  padding: 1px 5px; margin-right: 6px; vertical-align: 1px;
+}
+.sr-title { font-size: 14px; font-weight: 700; color: #1d4ed8; margin-bottom: 2px; }
+.sr-url { font-size: 11px; color: #16a34a; margin-bottom: 2px; }
+.sr-snip { font-size: 12px; color: var(--sub); line-height: 1.6; }
+.sr-note {
+  margin-top: 10px; font-size: 12px; color: var(--sub); font-weight: 600;
+  padding: 8px 12px; background: rgba(100,116,139,0.06); border-radius: 8px; line-height: 1.7;
+}
+.search-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 190px; gap: 8px; color: var(--sub); text-align: center;
+}
+.search-empty .big { font-size: 30px; }
+.search-empty p { font-size: 13px; line-height: 1.7; max-width: 260px; }
+
+/* AI 回答模拟 */
+.ai-answer { font-size: 13.5px; line-height: 1.85; color: var(--text); }
+.ai-answer p { margin-bottom: 8px; }
+.ai-answer b { color: var(--accent); }
+.ai-note {
+  margin-top: 10px; font-size: 12px; color: var(--accent); font-weight: 600;
+  padding: 8px 12px; background: rgba(0,102,255,0.05); border-radius: 8px; line-height: 1.7;
+}
+
+/* ── 图书馆比喻 ── */
+.lib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lib-card {
+  border-radius: var(--radius); padding: 22px 24px;
+  border: 1.5px solid var(--border); background: var(--card); box-shadow: var(--shadow-card);
+}
+.lib-card.search-side { border-color: rgba(100,116,139,0.3); }
+.lib-card.ai-side { border-color: rgba(0,102,255,0.3); background: rgba(0,102,255,0.02); }
+.lib-emoji { font-size: 34px; margin-bottom: 10px; }
+.lib-card h4 { font-size: 16px; font-weight: 800; margin-bottom: 8px; }
+.lib-card.search-side h4 { color: #475569; }
+.lib-card.ai-side h4 { color: var(--accent); }
+.lib-card p { font-size: 13.5px; color: var(--sub); line-height: 1.85; }
+.lib-card p b { color: var(--text); }
+
+/* ── 三个后果 ── */
+.conseq-list { display: flex; flex-direction: column; gap: 12px; }
+.conseq-item {
+  display: flex; gap: 16px; align-items: flex-start;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px; box-shadow: var(--shadow-card);
+}
+.conseq-num {
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 900; color: var(--amber);
+  background: rgba(217,119,6,0.1);
+}
+.conseq-item h4 { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.conseq-item p { font-size: 13.5px; color: var(--sub); line-height: 1.8; }
+.conseq-item p b { color: var(--text); }
+
+/* ── 何时用哪个表 ── */
+.when-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.when-table th, .when-table td { padding: 12px 16px; text-align: left; }
+.when-table th {
+  font-size: 12.5px; font-weight: 800; color: var(--sub);
+  border-bottom: 2px solid var(--border); letter-spacing: 0.4px;
+}
+.when-table td { border-bottom: 1px solid rgba(0,0,0,0.05); line-height: 1.7; }
+.when-table tr:last-child td { border-bottom: none; }
+.pill {
+  display: inline-block; font-size: 12px; font-weight: 800;
+  padding: 3px 12px; border-radius: 999px; white-space: nowrap;
+}
+.pill.search-p { background: rgba(100,116,139,0.12); color: #475569; }
+.pill.ai-p { background: rgba(0,102,255,0.1); color: var(--accent); }
+.pill.both-p { background: rgba(22,163,74,0.1); color: var(--success); }
+
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .vs-panels, .lib-grid { grid-template-columns: 1fr; }
+  .vs-panel-body { min-height: 0; }
+  .when-table { font-size: 13px; }
+  .when-table th, .when-table td { padding: 10px 8px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="많은 사람이 AI를 더 똑똑한 검색 엔진이라고 생각하지만, 사실 전혀 다른 물건이에요. 검색 엔진은 다른 사람이 쓴 웹페이지를 찾아 주고, AI는 「읽어 본 기억」으로 직접 답합니다. 이 차이를 이해하면 언제 검색이 어울리고, 언제 AI에게 물어야 하고, 어떤 말은 한 번 확인해 볼 가치가 있는지 알게 됩니다.">
+<meta name="keywords" content="AI와 검색 엔진의 차이,ChatGPT 인터넷 연결,AI 지식 마감일,AI 사용법,인공지능 입문">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/zero-2.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/zero-2.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/zero-2.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/zero-2.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/zero-2.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="AI는 검색 엔진이 아니에요: 인터넷에서 답을 찾아 주는 게 아닙니다">
+<meta property="og:description" content="검색 엔진은 다른 사람이 쓴 웹페이지를 찾아 주고, AI는 「읽어 본 기억」으로 직접 답합니다. 이 차이를 이해하면 언제 무엇을 써야 할지 알게 됩니다.">
+<meta property="og:url" content="https://xueai.app/slides/zero-2.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI는 검색 엔진이 아니에요: 인터넷에서 답을 찾아 주는 게 아닙니다">
+<meta name="twitter:description" content="검색 엔진은 다른 사람이 쓴 웹페이지를 찾아 주고, AI는 「읽어 본 기억」으로 직접 답합니다. 이 차이를 이해하면 언제 무엇을 써야 할지 알게 됩니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"AI는 검색 엔진이 아니에요","name":"AI는 검색 엔진이 아니에요","url":"https://xueai.app/slides/zero-2.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문~심화","isPartOf":{"@type":"Course","name":"AI 실전 강의 · AI란 대체 무엇인가","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":true,"description":"많은 사람이 AI를 더 똑똑한 검색 엔진이라고 생각하지만, 사실 전혀 다른 물건이에요. 검색 엔진은 다른 사람이 쓴 웹페이지를 찾아 주고, AI는 「읽어 본 기억」으로 직접 답합니다. 이 차이를 이해하면 언제 검색이 어울리고, 언제 AI에게 물어야 하고, 어떤 말은 한 번 확인해 볼 가치가 있는지 알게 됩니다."}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">제로 챕터 · AI란 대체 무엇인가</div>
+    <h1>AI는 인터넷에서 답을 검색해 주는 게 아니에요</h1>
+    <p class="subtitle">AI에 대해 초보자가 가장 흔히 하는 오해는 「그냥 더 똑똑한 검색창 아니야?」예요—전혀 다른 물건입니다. 지난 수업에서 AI가 「이어 말하기」를 한다는 걸 배웠죠. 이번 수업에서 검색 엔진과의 본질적인 차이를 확인하고 나면, <b>언제 무엇을 써야 할지</b> 알게 될 거예요.</p>
+  </header>
+
+  <div class="sec-label">같은 질문 · 완전히 다른 두 가지 반응</div>
+
+  <div class="q-chips" id="qChips"></div>
+
+  <div class="vs-panels">
+    <div class="vs-panel search">
+      <div class="vs-panel-head">🔍 검색 엔진</div>
+      <div class="vs-panel-body" id="searchBody"></div>
+    </div>
+    <div class="vs-panel ai">
+      <div class="vs-panel-head">🤖 AI 어시스턴트</div>
+      <div class="vs-panel-body" id="aiBody"></div>
+    </div>
+  </div>
+
+  <div class="sec-label">왜 이렇게 다를까요? 비유 하나</div>
+
+  <div class="lib-grid">
+    <div class="lib-card search-side">
+      <div class="lib-emoji">🗂️</div>
+      <h4>검색 엔진 = 도서관 사서</h4>
+      <p>찾고 싶은 걸 말하면, <b>책장 앞까지 데려가서</b> 관련 있을 법한 책 열 권을 가리켜 줍니다 (광고 두 권도 슬쩍 끼워 넣고요). 책은 다른 사람이 쓴 것이고, 사서 본인은 <b>한 글자도 읽어 본 적이 없어요</b>. 읽을지 말지, 믿을지 말지는 내 몫입니다.</p>
+    </div>
+    <div class="lib-card ai-side">
+      <div class="lib-emoji">🧠</div>
+      <h4>AI = 도서관을 통째로 다 읽은 사람</h4>
+      <p><b>도서관의 거의 모든 책을 미리 다 읽고</b>, 책은 전부 반납해 버렸어요. 질문을 받을 때 손에는 책이 한 권도 없죠—오직 <b>소화된 기억</b>만으로, 그 자리에서 답을 「이어」 냅니다.</p>
+    </div>
+  </div>
+
+  <div class="sec-label">「기억으로 답한다」는 것이 가져오는 세 가지 결과</div>
+
+  <div class="conseq-list">
+    <div class="conseq-item">
+      <div class="conseq-num">1</div>
+      <div>
+        <h4>기억이 뒤섞일 수 있어요</h4>
+        <p>읽은 책이 너무 많아서, 두 책의 내용이 기억 속에서 <b>뒤엉키는</b> 일은 흔합니다. A 작가의 책을 B 작가 것이라 하고, 비슷한 두 사건의 세부 사항을 섞어 말하기도 해요. 그런데 잘못 기억할 때도 <b>맞게 기억할 때와 똑같이 자신만만한 말투</b>죠—다음 수업에서 이 이야기만 따로 합니다.</p>
+      </div>
+    </div>
+    <div class="conseq-item">
+      <div class="conseq-num">2</div>
+      <div>
+        <h4>지식에 「마감일」이 있어요</h4>
+        <p>책 읽기는 <b>과거의 어느 시점</b>에 끝났고, 그 이후 세상에서 일어난 일은 하나도 모릅니다. 어제 뉴스, 오늘 날씨, 지금 주가를 물으면, 솔직하게 모른다고 하거나 <b>옛 기억으로 아무렇게나 이어 버리거나</b> 둘 중 하나예요—후자가 더 위험하죠.</p>
+      </div>
+    </div>
+    <div class="conseq-item">
+      <div class="conseq-num">3</div>
+      <div>
+        <h4>결론은 주지만, 책장은 안 보여 줘요</h4>
+        <p>검색 결과에는 항목마다 주소가 있어서 들어가서 확인할 수 있지만, AI가 주는 것은 <b>완성된 한 단락의 말</b>이라 자연스러운 「출처」가 없습니다. 말이 매끄러울수록, 「이거 진짜야?」 하고 물어보는 걸 잊기 쉬워요.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>그런데 왜 어떤 AI는 오늘 뉴스도 찾아 줄까요?</b> 요즘 많은 AI 제품에는 「웹 검색」이 달려 있어요. 먼저 검색 엔진 노릇을 해서 자료를 찾아온 뒤, 이어 말하기 기계 노릇으로 그 자료를 <b>알기 쉬운 말로 요약</b>하는 거죠. 모순이 아니에요—자료를 찾는 건 부가 기능이고, 말을 조직하는 건 여전히 그 이어 말하기 기계니까요. AI 답변에 「출처 인용」이 붙어 있다면, 보통 이 모드가 작동 중인 겁니다.
+  </div>
+
+  <div class="sec-label">실전 치트 시트 · 어떤 일은 누구에게 맡길까</div>
+
+  <div class="l-card" style="padding:8px 16px;">
+    <table class="when-table">
+      <tr><th>하고 싶은 일</th><th>누구에게</th><th>왜</th></tr>
+      <tr>
+        <td>오늘의 날씨, 뉴스, 주가, 영업시간 확인</td>
+        <td><span class="pill search-p">검색 / AI 웹 검색</span></td>
+        <td>필요한 건 「지금 이 순간의 사실」—기억만으로 답하는 AI는 알 수가 없어요</td>
+      </tr>
+      <tr>
+        <td>이해 안 되는 개념, 용어, 건강검진 결과 설명</td>
+        <td><span class="pill ai-p">AI에게 질문</span></td>
+        <td>어떤 웹페이지보다 많은 설명을 읽었고, 추가 질문을 따라가며 설명해 줍니다</td>
+      </tr>
+      <tr>
+        <td>고쳐 쓰기, 다듬기, 번역, 이름 짓기, 아이디어 내기</td>
+        <td><span class="pill ai-p">AI에게 질문</span></td>
+        <td>이런 일에는 「정답이 적힌 웹페이지」가 없어요—AI만의 강점입니다</td>
+      </tr>
+      <tr>
+        <td>중요한 사실 확인 (법 조항, 약 용량, 데이터)</td>
+        <td><span class="pill both-p">AI로 먼저 이해 + 검색으로 확인</span></td>
+        <td>AI로 빠르게 감을 잡되, 결정하기 전에 원 출처를 찾아야 해요</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 이 수업에서 나누고 싶은 것</h3>
+    <ul>
+      <li><b>검색 엔진은 책장을, AI는 결론을 줍니다</b>: 하나는 남이 쓴 웹페이지를 찾아 주고, 하나는 소화된 기억으로 직접 답해요</li>
+      <li><b>기억에 의존 = 뒤섞일 수 있음</b>: AI는 틀리게 기억할 때도 맞을 때와 똑같이 자신만만해요</li>
+      <li><b>지식에는 마감일이 있어요</b>: 「지금 이 순간의 사실」은 검색이나 AI의 웹 검색 기능에 맡기세요</li>
+      <li><b>중요한 사실은 출처를 확인할 가치가 있어요</b>: 답이 매끄러울수록, 한 번 더 확인해 볼 만합니다</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+const QA = [
+  {
+    chip: '고양이가 밥을 안 먹으면 어떡하죠?',
+    query: '고양이가 밥을 안 먹어요 어떡하죠',
+    search: `
+      <div class="sr-item ad">
+        <div class="sr-title">XX 동물병원 24시간 온라인 상담</div>
+        <div class="sr-url">www.example-petad.com</div>
+        <div class="sr-snip">고양이 식욕부진? 전문 수의사가 온라인으로 답해 드립니다. 지금 바로 상담…</div>
+      </div>
+      <div class="sr-item">
+        <div class="sr-title">고양이가 밥을 안 먹는 8가지 이유 - 반려동물 백과</div>
+        <div class="sr-url">baike.example.com › 고양이 건강</div>
+        <div class="sr-snip">고양이의 식욕 저하는 스트레스, 구강 질환, 소화 불량 등으로 생길 수 있습니다. 이 글에서 자세히…</div>
+      </div>
+      <div class="sr-item">
+        <div class="sr-title">급해요! 고양이가 3일째 밥을 안 먹어요 - 어느 커뮤니티</div>
+        <div class="sr-url">bbs.example.com › 도움 요청</div>
+        <div class="sr-snip">저희 고양이가 3일째 아무것도 안 먹는데, 집사님들 이런 적 있으세요? 급하게 기다립니다…</div>
+      </div>
+      <div class="sr-note">링크 10개를 주고 직접 고르고, 직접 읽고, 직접 종합하게 합니다—어느 게 믿을 만한지는 내가 판단할 몫이에요.</div>`,
+    ai: `
+      <div class="ai-answer">
+        <p>고양이가 밥을 안 먹으면 먼저 두 가지를 보세요. <b>기력 상태</b>와 <b>지속 시간</b>이에요.</p>
+        <p>기력이 괜찮고 한두 끼만 거른 거라면, 사료를 바꿨거나 더위, 가벼운 스트레스 때문일 수 있어요. 원래 사료로 돌려 주고 미지근한 물을 주면서 하루 정도 지켜보세요.</p>
+        <p>하지만 <b>24시간 넘게 아무것도 안 먹거나</b>, 구토를 하거나 축 늘어져 움직이지 않는다면 기다리지 말고 빨리 동물병원에 가세요—고양이는 오래 공복이면 지방간 위험이 있어요.</p>
+        <p>필요하시면 고양이 나이와 최근 달라진 점을 알려 주세요. 좀 더 판단을 도와드릴게요.</p>
+      </div>
+      <div class="ai-note">「읽어 본 모든 고양이 지식」을 나에게 맞춘 한 단락으로 종합해 주고, 계속 물어볼 수도 있어요.</div>`,
+  },
+  {
+    chip: '어젯밤 경기 누가 이겼어?',
+    query: '어젯밤 경기 누가 이겼어',
+    search: `
+      <div class="sr-item">
+        <div class="sr-title">어젯밤 경기 리포트: 스코어, 하이라이트, 경기 후 인터뷰 - 스포츠 뉴스</div>
+        <div class="sr-url">sports.example.com › 어제 23:47</div>
+        <div class="sr-snip">방금 끝난 경기에서…… (몇 분 전에 업데이트된 페이지, 결과 정확)</div>
+      </div>
+      <div class="sr-item">
+        <div class="sr-title">전체 경기 다시보기와 기록 통계</div>
+        <div class="sr-url">video.example.com</div>
+        <div class="sr-snip">경기 전체 영상 및 데이터 통계…</div>
+      </div>
+      <div class="sr-note">검색 엔진의 강점: 웹페이지가 <b>방금</b> 업데이트됐어요. 「지금 이 순간의 사실」에는 검색이 가장 믿을 만합니다.</div>`,
+    ai: `
+      <div class="ai-answer">
+        <p>죄송해요, <b>어젯밤</b> 경기 결과는 알 수가 없어요—제 지식은 훈련이 끝난 그날에 멈춰 있어서, 그 뒤에 일어난 일은 모릅니다.</p>
+        <p>검색해 보시거나, 제 「웹 검색」 기능을 켜 주시면 결과를 찾아온 뒤에 요약하고 분석해 드릴 수 있어요.</p>
+      </div>
+      <div class="ai-note">정직한 AI는 지식에 마감일이 있음을 인정해요. 위험한 건 가끔 <b>옛 기억으로 스코어를 지어내는</b> 경우죠—말투는 또 엄청 확신에 차 있고요.</div>`,
+  },
+  {
+    chip: '이 문장을 좀 부드럽게 고쳐 줘',
+    query: '이 문장을 좀 부드럽게 고쳐 줘: 「이 기획안은 안 되겠어요, 다시 하세요」',
+    search: `
+      <div class="search-empty">
+        <div class="big">🤷</div>
+        <p><b>검색 엔진은 이 일을 못 합니다.</b><br>「내가 쓴 이 문장」의 부드러운 버전이 적힌 웹페이지는 세상에 존재하지 않으니까요. 검색은 남이 써 둔 것을 찾을 수 있을 뿐, <b>나를 위해 새것을 만들어 주지는 못해요</b>.</p>
+      </div>`,
+    ai: `
+      <div class="ai-answer">
+        <p>이렇게 고쳐 볼 수 있어요:</p>
+        <p style="background:rgba(0,102,255,0.05);border-radius:8px;padding:10px 14px;">「이 기획안은 아직 저희가 기대한 방향과 조금 거리가 있는 것 같아요. 수고스럽겠지만 한 번 더 다듬어 주시겠어요? 구체적으로 몇 가지 짚어 볼 부분이 있는데, 먼저 맞춰 보면 재작업을 줄일 수 있을 것 같아요.」</p>
+        <p>더 완곡하게 할까요, 아니면 약간의 단호함은 남겨 둘까요? 다른 어조의 버전을 두 개 더 드릴 수 있어요.</p>
+      </div>
+      <div class="ai-note">고쳐 쓰기, 다듬기, 번역, 이름 짓기, 아이디어 내기—이런 「정답 웹페이지가 없는」 일이 AI만의 강점이에요.</div>`,
+  },
+];
+
+const chipsEl = document.getElementById('qChips');
+const searchBody = document.getElementById('searchBody');
+const aiBody = document.getElementById('aiBody');
+
+function renderQA(i) {
+  const q = QA[i];
+  searchBody.innerHTML = `
+    <div class="search-bar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      ${q.query}
+    </div>${q.search}`;
+  aiBody.innerHTML = q.ai;
+}
+
+QA.forEach((q, i) => {
+  const b = document.createElement('button');
+  b.className = 'q-chip' + (i === 0 ? ' active' : '');
+  b.textContent = q.chip;
+  b.addEventListener('click', () => {
+    chipsEl.querySelectorAll('.q-chip').forEach(c => c.classList.remove('active'));
+    b.classList.add('active');
+    renderQA(i);
+  });
+  chipsEl.appendChild(b);
+});
+renderQA(0);
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

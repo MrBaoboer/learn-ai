@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI로 AI를 위한 Prompt 작성하기 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.translate-flow{display:flex;flex-direction:column;gap:0;margin-top:8px;align-items:center}
+.flow-card{width:100%;max-width:600px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow-card);opacity:0;transform:translateY(12px);transition:all .5s ease}
+.flow-card.show{opacity:1;transform:translateY(0)}
+.flow-card .step-badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px}
+.flow-card .step-badge.user{background:rgba(0,102,255,.1);color:var(--accent)}
+.flow-card .step-badge.llm{background:rgba(124,58,237,.1);color:var(--purple)}
+.flow-card .step-badge.result{background:rgba(22,163,74,.1);color:var(--success)}
+.flow-card .user-input{font-size:18px;font-weight:700;color:var(--text)}
+.flow-card .translated-prompt{font-size:13px;line-height:1.8;color:var(--text);background:rgba(124,58,237,.04);border:1px solid rgba(124,58,237,.15);border-radius:var(--radius-sm);padding:14px 16px;font-family:"SF Mono","Fira Code",Menlo,monospace;white-space:pre-wrap}
+.flow-connector{width:2px;height:28px;background:var(--border);position:relative}
+.flow-connector::after{content:'↓';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);color:var(--sub);font-size:12px;background:var(--bg);padding:0 4px}
+.flow-result-img{max-width:100%;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);display:block;margin:0 auto}
+
+.example-divider{width:100%;max-width:600px;text-align:center;font-size:13px;font-weight:700;color:var(--sub);padding:24px 0 8px;letter-spacing:1px}
+
+.play-btn{display:block;margin:20px auto 0;background:var(--accent);color:#fff;border:none;padding:10px 24px;border-radius:999px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(0,102,255,.25);transition:transform .15s,box-shadow .15s}
+.play-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,102,255,.35)}
+.play-btn:active{transform:translateY(0)}
+
+.takeaway{background:rgba(124,58,237,.04);border:1.5px solid rgba(124,58,237,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--purple)}
+</style>
+<meta name="description" content="사용자가 한 마디를 하면, LLM이 이미지 생성 모델에 필요한 상세한 Prompt로 번역합니다. 이 2단계 번역 아키텍처가 이미지 생성 제품의 핵심 설계입니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/9-2.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/9-2.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/9-2.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/9-2.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/9-2.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="AI로 AI를 위한 Prompt 작성하기">
+<meta property="og:url" content="https://xueai.app/slides/9-2.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"AI로 AI를 위한 Prompt 작성하기","name":"AI로 AI를 위한 Prompt 작성하기","url":"https://xueai.app/slides/9-2.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · AI 이미지 생성","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":true,"description":"사용자가 한 마디를 하면, LLM이 이미지 생성 모델에 필요한 상세한 Prompt로 번역합니다. 이 2단계 번역 아키텍처가 이미지 생성 제품의 핵심 설계입니다."}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">AI 이미지 생성</div>
+    <h1>AI로 AI를 위한 Prompt 작성하기</h1>
+    <p class="subtitle">사용자가 「Alice가 발코니에서 멍 때리고 있다」고 말합니다. 이미지 생성 모델에게는 길고 정확한 시각적 설명이 필요하며, 그 한 문장만으로는 전혀 부족합니다. 중간에 번역 단계가 있습니다：LLM을 사용해 일상 언어를 이미지 생성 언어로 번역하는 것입니다.</p>
+  </header>
+
+  <div class="sec-label">예시 1：발코니에서 멍 때리기</div>
+
+  <div class="translate-flow" id="flow1">
+    <div class="flow-card" id="f1-step1">
+      <div class="step-badge user">사용자가 말함</div>
+      <div class="user-input">「Alice가 발코니에서 멍 때리고 있다」</div>
+    </div>
+    <div class="flow-connector"></div>
+    <div class="flow-card" id="f1-step2">
+      <div class="step-badge llm">LLM이 이미지 생성 Prompt로 번역</div>
+      <div class="translated-prompt">A young woman named Alice standing on a sunlit balcony, leaning against the railing, gazing into the distance with a dreamy expression. She has shoulder-length dark hair, wearing a white blouse with a small star necklace. Soft afternoon golden hour lighting, potted plants on the balcony, blurred city skyline in background. Illustration style, warm color palette, peaceful mood. Upper body to full body composition.</div>
+    </div>
+    <div class="flow-connector"></div>
+    <div class="flow-card" id="f1-step3">
+      <div class="step-badge result">이미지 생성 모델 출력</div>
+      <img src="images/alice/life_balcony_daydream.webp" alt="발코니에서 멍 때리는 Alice" class="flow-result-img">
+    </div>
+  </div>
+
+  <div class="example-divider">예시 하나 더</div>
+
+  <div class="sec-label">예시 2：아침 요리</div>
+
+  <div class="translate-flow" id="flow2">
+    <div class="flow-card" id="f2-step1">
+      <div class="step-badge user">사용자가 말함</div>
+      <div class="user-input">「Alice가 요리하고 있다」</div>
+    </div>
+    <div class="flow-connector"></div>
+    <div class="flow-card" id="f2-step2">
+      <div class="step-badge llm">LLM이 이미지 생성 Prompt로 번역</div>
+      <div class="translated-prompt">A young woman named Alice in a bright modern kitchen during morning time, cooking breakfast. She has shoulder-length dark hair, wearing a casual cardigan over a white top with a star necklace. Warm natural light streaming through windows, kitchen utensils and ingredients on counter, steam rising from pan. Illustration style, cozy domestic atmosphere, soft warm tones. Wide shot showing kitchen environment.</div>
+    </div>
+    <div class="flow-connector"></div>
+    <div class="flow-card" id="f2-step3">
+      <div class="step-badge result">이미지 생성 모델 출력</div>
+      <img src="images/alice/life_kitchen_morning.webp" alt="주방에서 아침을 만드는 Alice" class="flow-result-img">
+    </div>
+  </div>
+
+  <button class="play-btn" onclick="replayAll()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-1px;margin-right:3px"><polygon points="5 3 19 12 5 21 5 3"/></svg> 애니메이션 다시 재생</button>
+
+  <div class="l-callout reveal" style="margin-top:24px">
+    <b>왜 이 번역 레이어가 필요한가요？</b><br>
+    ① 사용자는 이미지 생성 Prompt를 작성할 줄 모릅니다：golden hour lighting을 지정해야 하는지 illustration style을 지정해야 하는지 모릅니다<br>
+    ② 이미지 생성 모델은 모호한 의도를 이해하지 못합니다：「멍 때리다」는 모델에게 시각적 설명이 아닙니다<br>
+    ③ 각 이미지 생성 모델마다 방언이 다릅니다：Midjourney, DALL-E, Stable Diffusion은 각기 다른 Prompt 스타일을 선호합니다
+  </div>
+
+  <div class="takeaway reveal">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>사용자가 상상하는 것과 이미지 생성 모델이 필요로 하는 것은 완전히 다른 언어입니다。</b>Alice에서는 모든 이미지 생성 뒤에 번역을 수행하는 LLM이 있습니다：사용자의 한 문장을 수백 token의 상세한 시각적 설명으로 확장합니다. 이건 부가 기능이 아니라 필수 아키텍처입니다.</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+function animateFlow(containerId, delays) {
+  var cards = document.querySelectorAll('#' + containerId + ' .flow-card');
+  for (var i = 0; i < cards.length; i++) {
+    cards[i].classList.remove('show');
+  }
+  for (var i = 0; i < cards.length; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        cards[idx].classList.add('show');
+      }, delays[idx]);
+    })(i);
+  }
+}
+
+function replayAll() {
+  animateFlow('flow1', [300, 1000, 2000]);
+  animateFlow('flow2', [2800, 3500, 4500]);
+}
+
+lessonOnView(document.getElementById('flow1'), function() {
+  animateFlow('flow1', [300, 1000, 2000]);
+}, 0.2);
+
+lessonOnView(document.getElementById('flow2'), function() {
+  animateFlow('flow2', [300, 900, 1800]);
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

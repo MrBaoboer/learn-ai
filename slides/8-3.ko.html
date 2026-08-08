@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>동적 타임스탬프：가장 비싼 System Prompt 안티패턴 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+/* ── 错误 vs 正确设计 ── */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sys-box{border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:var(--shadow-card)}
+.sys-box-h{padding:9px 16px;font-size:15px;font-weight:700;border-bottom:1px solid var(--border)}
+.sys-box-b{padding:14px 16px}
+.sys-box.bad .sys-box-h{background:rgba(220,38,38,.06);color:var(--danger)}
+.sys-box.good .sys-box-h{background:rgba(22,163,74,.06);color:var(--success)}
+.code-blk{background:#1e1b2e;border-radius:7px;padding:11px 13px;font-size:13px;font-family:'Fira Code','SF Mono',Menlo,monospace;line-height:1.65;color:#cdd6f4;margin-bottom:10px;overflow-x:auto}
+.code-blk .ts{background:rgba(220,38,38,.3);border-radius:2px;padding:0 2px;color:#f38ba8}
+.code-blk .stable{background:rgba(22,163,74,.25);border-radius:2px;padding:0 2px;color:#a6e3a1}
+.metric-row{display:flex;gap:8px}
+.metric-item{flex:1;text-align:center;background:var(--bg);border-radius:6px;padding:8px 5px}
+.metric-item .v{font-size:17px;font-weight:700}
+.metric-item .l{font-size:11px;color:var(--sub)}
+
+.killer-box{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.killer-box b{color:var(--amber)}
+.killer-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.killer-tag{background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);color:var(--danger);padding:4px 11px;border-radius:5px;font-size:14px;font-weight:600}
+
+/* ── 实时对比面板 ── */
+.live-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.live-header{padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg);font-size:14px;font-weight:700;color:var(--sub);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.live-clock{font-family:'SF Mono',Menlo,monospace;font-size:18px;font-weight:900;color:var(--text);letter-spacing:1px}
+.live-body{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+
+.vs-col{background:var(--card);display:flex;flex-direction:column}
+.vs-col-h{padding:9px 12px;font-size:14px;font-weight:800;border-bottom:1px solid var(--border)}
+.vs-col.bad-col .vs-col-h{background:rgba(220,38,38,.05);color:var(--danger)}
+.vs-col.good-col .vs-col-h{background:rgba(22,163,74,.05);color:var(--success)}
+
+.sys-display{margin:10px 12px;border-radius:7px;padding:9px 12px;font-family:'Fira Code','SF Mono',Menlo,monospace;font-size:12.5px;line-height:1.65;background:#1e1b2e;color:#cdd6f4;transition:all .25s;overflow-x:auto}
+.dyn-ts{color:#f38ba8;font-weight:800;transition:all .2s}
+.static-ts{color:#a6e3a1;font-weight:800}
+
+.cache-status{margin:0 12px 10px;border-radius:8px;padding:10px 12px;font-size:14px;font-weight:700;text-align:center;transition:all .3s}
+.cache-status.hit{background:rgba(22,163,74,.1);color:var(--success);border:1.5px solid rgba(22,163,74,.3)}
+.cache-status.miss{background:rgba(220,38,38,.1);color:var(--danger);border:1.5px solid rgba(220,38,38,.3)}
+@keyframes flash-miss{0%{background:rgba(220,38,38,.5);transform:scale(1.02)}50%{background:rgba(220,38,38,.2)}100%{background:rgba(220,38,38,.1);transform:scale(1)}}
+.cache-status.miss.flash{animation:flash-miss .4s ease}
+
+.hit-bar-wrap{margin:0 12px 10px;display:flex;flex-direction:column;gap:4px}
+.hit-bar-label{font-size:13px;font-weight:700;color:var(--sub);display:flex;justify-content:space-between}
+.hit-bar-track{height:10px;background:var(--bg);border-radius:5px;overflow:hidden}
+.hit-bar-fill{height:100%;border-radius:5px;transition:width .5s ease}
+.vs-col.bad-col .hit-bar-fill{background:var(--danger)}
+.vs-col.good-col .hit-bar-fill{background:var(--success)}
+
+.req-log{height:160px;overflow-y:auto;margin:0 12px 12px;display:flex;flex-direction:column;gap:4px}
+.req-item{font-size:12px;padding:4px 8px;border-radius:5px;display:flex;align-items:center;gap:6px;flex-shrink:0;animation:log-in .2s ease}
+@keyframes log-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.req-item.hit{background:rgba(22,163,74,.07);color:var(--success)}
+.req-item.miss{background:rgba(220,38,38,.07);color:var(--danger)}
+.req-item .req-ts{font-family:'SF Mono',Menlo,monospace;flex:1}
+.req-item .req-tag{font-weight:800;font-size:11px}
+
+/* ── 统计行 ── */
+.live-stats{display:flex;gap:10px;margin-top:12px}
+.live-stat{flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;box-shadow:var(--shadow-card)}
+.live-stat .sv{font-size:20px;font-weight:900}
+.live-stat .sl{font-size:11px;color:var(--sub);font-weight:600}
+.live-stat.bad-stat .sv{color:var(--danger)}
+.live-stat.good-stat .sv{color:var(--success)}
+.live-stat.neutral .sv{color:var(--text)}
+
+/* ── 控制 ── */
+.ctrl-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn-ctrl{padding:10px 22px;border-radius:8px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-start{background:var(--success);color:white}
+.btn-stop{background:rgba(220,38,38,.15);color:var(--danger);border:1.5px solid rgba(220,38,38,.3)}
+.btn-reset{background:var(--card);color:var(--sub);border:1px solid var(--border)}
+.ctrl-hint{flex:1;font-size:13px;color:var(--sub);min-width:180px}
+
+.takeaway{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.2);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:16px}
+.takeaway b{color:var(--success)}
+
+@media (max-width:768px){
+  .compare-grid{grid-template-columns:1fr}
+  .live-body{grid-template-columns:1fr}
+  .live-stats{flex-wrap:wrap}
+  .live-stat{min-width:calc(50% - 5px)}
+  .req-log{height:120px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="System Prompt에 현재 타임스탬프를 삽입하는 것은 가장 흔하고 비용이 많이 드는 AI 개발 안티패턴 중 하나입니다. KV Cache가 절대 히트되지 않아 매 요청마다 재계산됩니다. 이 페이지에서 문제와 올바른 방법을 분석합니다.">
+<meta name="keywords" content="System Prompt 안티패턴,KV Cache 무효화,동적 타임스탬프,AI 개발 실수,Prompt 설계">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/8-3.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/8-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/8-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/8-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/8-3.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 트레이닝">
+<meta property="og:title" content="동적 타임스탬프：가장 비싼 System Prompt 안티패턴">
+<meta property="og:description" content="System Prompt에 현재 타임스탬프를 삽입하는 것은 가장 흔하고 비용이 많이 드는 AI 개발 안티패턴 중 하나입니다. KV Cache가 절대 히트되지 않아 매 요청마다 재계산됩니다.">
+<meta property="og:url" content="https://xueai.app/slides/8-3.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="동적 타임스탬프：가장 비싼 System Prompt 안티패턴">
+<meta name="twitter:description" content="System Prompt에 현재 타임스탬프를 삽입하는 것은 가장 흔하고 비용이 많이 드는 AI 개발 안티패턴 중 하나입니다. KV Cache가 절대 히트되지 않아 매 요청마다 재계산됩니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"동적 타임스탬프：가장 비싼 System Prompt 안티패턴","name":"동적 타임스탬프：가장 비싼 System Prompt 안티패턴","url":"https://xueai.app/slides/8-3.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~중급","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 비용 최적화와 모델 선택","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"System Prompt에 현재 타임스탬프를 삽입하는 것은 가장 흔하고 비용이 많이 드는 AI 개발 안티패턴 중 하나입니다. KV Cache가 절대 히트되지 않아 매 요청마다 재계산됩니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">비용 최적화</div>
+    <h1>동적 타임스탬프：가장 비싼 System Prompt</h1>
+    <p class="subtitle">작은 설계 실수 하나가 KV Cache를 완전히 무효화하고 매 대화 비용을 두 배로 만들 수 있습니다：System Prompt에 동적 시간을 쓰는 것입니다.</p>
+  </header>
+
+  <div class="sec-label">잘못된 설계 vs 올바른 설계</div>
+
+  <div class="compare-grid">
+    <div class="sys-box bad">
+      <div class="sys-box-h">❌ 잘못된 설계</div>
+      <div class="sys-box-b">
+        <div class="code-blk">System: 당신은 어시스턴트입니다.
+현재 시간: <span class="ts">2026-04-10 14:35:22</span>
+...</div>
+        <div class="metric-row">
+          <div class="metric-item"><div class="v" style="color:var(--danger)">0%</div><div class="l">캐시 히트율</div></div>
+          <div class="metric-item"><div class="v" style="color:var(--danger)">+100%</div><div class="l">추가 비용</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="sys-box good">
+      <div class="sys-box-h">✅ 올바른 설계</div>
+      <div class="sys-box-b">
+        <div class="code-blk">System: 당신은 어시스턴트입니다.
+<span class="stable">（시간 미포함）</span>
+User: [<span class="stable">2026-04-10</span>] 도와주세요...</div>
+        <div class="metric-row">
+          <div class="metric-item"><div class="v" style="color:var(--success)">~95%</div><div class="l">캐시 히트율</div></div>
+          <div class="metric-item"><div class="v" style="color:var(--success)">-70%</div><div class="l">비용 절감</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">실시간 비교 시뮬레이션</div>
+
+  <div class="live-panel paywall-locked xa-peek">
+    <div class="live-header">
+      <span>실시간 비교</span>
+      <span class="live-clock" id="liveClock">--:--:--</span>
+      <span style="font-size:13px;color:var(--sub)">초당 1회 요청 발송</span>
+    </div>
+    <div class="live-body">
+      <!-- 좌：동적 타임스탬프（나쁨） -->
+      <div class="vs-col bad-col">
+        <div class="vs-col-h">❌ 동적 타임스탬프（초 단위）</div>
+        <div class="sys-display" id="badSysPrompt">System: 당신은 어시스턴트입니다.<br>현재 시간: <span class="dyn-ts" id="dynTs">--:--:--</span><br>...</div>
+        <div class="cache-status miss" id="badCacheStatus">⏳ 요청 대기 중...</div>
+        <div class="hit-bar-wrap">
+          <div class="hit-bar-label"><span>캐시 히트율</span><span id="badHitPct">0%</span></div>
+          <div class="hit-bar-track"><div class="hit-bar-fill" id="badHitBar" style="width:0%"></div></div>
+        </div>
+        <div class="req-log" id="badLog"></div>
+      </div>
+      <!-- 우：정적 Prompt（좋음） -->
+      <div class="vs-col good-col">
+        <div class="vs-col-h">✅ 정적 System Prompt</div>
+        <div class="sys-display" id="goodSysPrompt">System: 당신은 어시스턴트입니다.<br><span class="static-ts">（시간 미포함）</span><br>User: [<span class="static-ts" id="staticDate">--</span>] ...</div>
+        <div class="cache-status hit" id="goodCacheStatus">⏳ 요청 대기 중...</div>
+        <div class="hit-bar-wrap">
+          <div class="hit-bar-label"><span>캐시 히트율</span><span id="goodHitPct">0%</span></div>
+          <div class="hit-bar-track"><div class="hit-bar-fill" id="goodHitBar" style="width:0%"></div></div>
+        </div>
+        <div class="req-log" id="goodLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="live-stats paywall-locked">
+    <div class="live-stat neutral"><div class="sv" id="statReqs">0</div><div class="sl">총 요청 수</div></div>
+    <div class="live-stat bad-stat"><div class="sv" id="statBadMiss">0</div><div class="sl">좌측 Cache Miss</div></div>
+    <div class="live-stat good-stat"><div class="sv" id="statGoodHit">0</div><div class="sl">우측 Cache Hit</div></div>
+    <div class="live-stat good-stat"><div class="sv" id="statSave">—</div><div class="sl">우측 비용 절감</div></div>
+  </div>
+
+  <div class="ctrl-row paywall-locked">
+    <button class="btn-ctrl btn-start" id="btnStart" onclick="startSim()">▶ 시뮬레이션 시작</button>
+    <button class="btn-ctrl btn-stop" id="btnStop" onclick="stopSim()" style="display:none">⏹ 일시정지</button>
+    <button class="btn-ctrl btn-reset" onclick="resetSim()">초기화</button>
+    <div class="ctrl-hint" id="ctrlHint">시작 후 매초 자동으로 요청을 발송하며 양측의 KV Cache 히트 차이를 관찰합니다</div>
+  </div>
+
+  <div class="sec-label paywall-locked">다른 흔한 캐시 킬러들</div>
+
+  <div class="killer-box paywall-locked">
+    <b>다른 흔한 KV Cache 킬러들：</b>
+    <div class="killer-tags">
+      <span class="killer-tag">초 단위 타임스탬프</span>
+      <span class="killer-tag">무작위 Session ID</span>
+      <span class="killer-tag">사용자 ID 접두사</span>
+      <span class="killer-tag">A/B 테스트 변수</span>
+      <span class="killer-tag">무작위 emoji 접두사</span>
+      <span class="killer-tag">동적 광고 문구</span>
+    </div>
+    <div style="font-size:14px;margin-top:10px;color:var(--sub)">System Prompt를 매번 다르게 만드는 모든 내용은 캐시를 완전히 무효화합니다.</div>
+  </div>
+
+  <div class="takeaway paywall-locked">
+    <span style="flex-shrink:0">🔒</span>
+    <span><b>원칙：System Prompt = 고정 접두사.</b> 동적 내용（시간, 사용자 정보, 랜덤 콘텐츠）은 User 메시지에 넣고, System Prompt에 넣지 마세요.</span>
+  </div>
+
+</article>
+
+<script>
+let simTimer = null;
+let totalReqs = 0, badMiss = 0, goodHit = 0;
+let lastBadSysHash = null;  // 이전 bad 측 system prompt의 "지문"
+
+// 시뮬레이션 클록 기준（가속：매 tick = +1초）
+let simSec = 0;
+const BASE_DATE = '2026-04-10';
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+function getSimTime() {
+  const h = pad(Math.floor(simSec / 3600) % 24);
+  const m = pad(Math.floor(simSec / 60) % 60);
+  const s = pad(simSec % 60);
+  return { hms: `${h}:${m}:${s}`, date: BASE_DATE };
+}
+
+function addLog(logEl, ts, isHit, label) {
+  const item = document.createElement('div');
+  item.className = 'req-item ' + (isHit ? 'hit' : 'miss');
+  item.innerHTML = `<span class="req-ts">${ts}</span><span class="req-tag">${isHit ? '✓ HIT' : '✗ MISS'}</span><span style="font-size:11px">${label}</span>`;
+  logEl.appendChild(item);
+  // 최근 6개만 유지
+  while (logEl.children.length > 6) logEl.removeChild(logEl.firstChild);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function flashMiss(el) {
+  el.classList.remove('flash');
+  void el.offsetWidth; // reflow
+  el.classList.add('flash');
+}
+
+function tick() {
+  simSec++;
+  totalReqs++;
+  const { hms, date } = getSimTime();
+
+  // 클록 업데이트
+  document.getElementById('liveClock').textContent = hms;
+  document.getElementById('dynTs').textContent = hms;
+  document.getElementById('staticDate').textContent = date;
+
+  // ── Bad 측：System Prompt에 초 단위 타임스탬프 포함, 매초 반드시 MISS ──
+  const badHash = hms; // 매초 다름
+  const badIsHit = (badHash === lastBadSysHash);
+  lastBadSysHash = badHash;
+
+  const badStatusEl = document.getElementById('badCacheStatus');
+  if (badIsHit) {
+    badStatusEl.className = 'cache-status hit';
+    badStatusEl.textContent = '✓ 캐시 히트';
+  } else {
+    badMiss++;
+    badStatusEl.className = 'cache-status miss flash';
+    badStatusEl.textContent = '✗ Cache MISS — 캐시 재구성！';
+    flashMiss(badStatusEl);
+    // sys-display 타임스탬프 빨간색 깜박임
+    const dynEl = document.getElementById('dynTs');
+    dynEl.style.background = 'rgba(220,38,38,.5)';
+    dynEl.style.color = '#ff6b6b';
+    setTimeout(() => {
+      dynEl.style.background = '';
+      dynEl.style.color = '';
+    }, 350);
+  }
+  addLog(document.getElementById('badLog'), hms, badIsHit, badIsHit ? '' : '전체 재계산');
+  const badHitCount = totalReqs - badMiss;
+  const badHitPct = totalReqs > 0 ? Math.round(badHitCount / totalReqs * 100) : 0;
+  document.getElementById('badHitPct').textContent = badHitPct + '%';
+  document.getElementById('badHitBar').style.width = badHitPct + '%';
+
+  // ── Good 측：System Prompt 고정, 최초 1회 캐시 구성, 이후 모두 히트 ──
+  const goodIsHit = (totalReqs > 1); // 최초 구성, 이후 전부 히트
+  if (goodIsHit) goodHit++;
+  const goodStatusEl = document.getElementById('goodCacheStatus');
+  if (goodIsHit) {
+    goodStatusEl.className = 'cache-status hit';
+    goodStatusEl.textContent = '✓ 캐시 히트 — 신규 Token만 계산';
+  } else {
+    goodStatusEl.className = 'cache-status miss';
+    goodStatusEl.textContent = '⚡ 최초 캐시 구성（1회만）';
+  }
+  addLog(document.getElementById('goodLog'), hms, goodIsHit, goodIsHit ? '신규만 계산' : '초기화');
+  const goodHitPct = totalReqs > 0 ? Math.round(goodHit / totalReqs * 100) : 0;
+  document.getElementById('goodHitPct').textContent = goodHitPct + '%';
+  document.getElementById('goodHitBar').style.width = goodHitPct + '%';
+
+  // 통계
+  document.getElementById('statReqs').textContent = totalReqs;
+  document.getElementById('statBadMiss').textContent = badMiss;
+  document.getElementById('statGoodHit').textContent = goodHit;
+  const savePct = totalReqs > 1 ? Math.round(goodHit / totalReqs * 100) : 0;
+  document.getElementById('statSave').textContent = savePct > 0 ? '~' + savePct + '%' : '—';
+
+  // 힌트 텍스트
+  if (totalReqs > 3) {
+    document.getElementById('ctrlHint').textContent =
+      `좌측 ${totalReqs}회 요청, ${badMiss}회 MISS；우측 ${goodHit}회 히트, 약 ${savePct}% 비용 절감`;
+  }
+
+  if (totalReqs >= 20) stopSim();
+}
+
+function startSim() {
+  if (simTimer) return;
+  document.getElementById('btnStart').style.display = 'none';
+  document.getElementById('btnStop').style.display = '';
+  simTimer = setInterval(tick, 800);
+  tick();
+}
+
+function stopSim() {
+  clearInterval(simTimer);
+  simTimer = null;
+  document.getElementById('btnStart').style.display = '';
+  document.getElementById('btnStop').style.display = 'none';
+  if (totalReqs >= 20) {
+    document.getElementById('btnStart').textContent = '▶ 계속';
+    document.getElementById('ctrlHint').textContent = '20라운드 데모 완료 — 「초기화」를 눌러 다시 시작하세요';
+  }
+}
+
+function resetSim() {
+  stopSim();
+  totalReqs = 0; badMiss = 0; goodHit = 0; simSec = 0; lastBadSysHash = null;
+  document.getElementById('btnStart').textContent = '▶ 시뮬레이션 시작';
+  document.getElementById('liveClock').textContent = '--:--:--';
+  document.getElementById('dynTs').textContent = '--:--:--';
+  document.getElementById('staticDate').textContent = '--';
+  document.getElementById('badCacheStatus').className = 'cache-status miss';
+  document.getElementById('badCacheStatus').textContent = '⏳ 요청 대기 중...';
+  document.getElementById('goodCacheStatus').className = 'cache-status hit';
+  document.getElementById('goodCacheStatus').textContent = '⏳ 요청 대기 중...';
+  document.getElementById('badLog').innerHTML = '';
+  document.getElementById('goodLog').innerHTML = '';
+  document.getElementById('badHitPct').textContent = '0%';
+  document.getElementById('goodHitPct').textContent = '0%';
+  document.getElementById('badHitBar').style.width = '0%';
+  document.getElementById('goodHitBar').style.width = '0%';
+  document.getElementById('statReqs').textContent = '0';
+  document.getElementById('statBadMiss').textContent = '0';
+  document.getElementById('statGoodHit').textContent = '0';
+  document.getElementById('statSave').textContent = '—';
+  document.getElementById('ctrlHint').textContent = '시작 후 매초 자동으로 요청을 발송하며 양측의 KV Cache 히트 차이를 관찰합니다';
+}
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>학습 vs 추론: 완전히 다른 두 가지 과정 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* ── 비유 바 ── */
+.analogy-bar {
+  background: var(--card); border-radius: var(--radius); padding: 16px 20px;
+  border: 1.5px solid var(--border); font-size: 15px; color: var(--text); line-height: 1.7;
+  box-shadow: var(--shadow-card);
+}
+.analogy-bar b { color: var(--accent); }
+
+/* ── 비교 컬럼 ── */
+.cmp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.cmp-col {
+  border-radius: var(--radius); padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.cmp-col.train { background: rgba(8,145,178,0.05);  border: 1.5px solid rgba(8,145,178,0.2); }
+.cmp-col.infer { background: rgba(22,163,74,0.05);  border: 1.5px solid rgba(22,163,74,0.2); }
+
+.cmp-title { font-size: 17px; font-weight: 800; }
+.train .cmp-title { color: var(--cyan); }
+.infer .cmp-title { color: var(--success); }
+.cmp-desc { font-size: 13px; color: var(--sub); line-height: 1.7; }
+
+.metrics { display: flex; flex-direction: column; gap: 8px; }
+.m-row { display: flex; align-items: center; gap: 8px; }
+.m-lbl { font-size: 13px; font-weight: 700; color: var(--sub); width: 64px; flex-shrink: 0; }
+.m-val { font-size: 13px; font-weight: 700; padding: 3px 12px; border-radius: 20px; }
+.train .m-val { background: rgba(8,145,178,0.1); color: var(--cyan); }
+.infer .m-val { background: rgba(22,163,74,0.1); color: var(--success); }
+
+/* ── 인터랙티브 실험 ── */
+.experiment {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* 입력 행 */
+.input-row { display: flex; gap: 8px; }
+.chat-input {
+  flex: 1; border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; font-size: 14px; font-family: inherit; color: var(--text);
+  background: var(--card); outline: none; resize: none;
+  transition: border-color 0.2s;
+}
+.chat-input:focus { border-color: var(--accent); }
+.send-btn {
+  background: var(--accent); color: white; border: none;
+  border-radius: 10px; padding: 0 20px; font-size: 14px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  min-height: 44px;
+}
+.send-btn:hover { filter: brightness(1.1); }
+
+/* 시각화 영역 */
+.vis-area {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+
+/* context window */
+.ctx-box {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ctx-title { font-size: 11px; font-weight: 800; color: var(--sub); text-transform: uppercase; letter-spacing: 0.4px; }
+.ctx-messages {
+  height: 220px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.msg {
+  padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5;
+  max-width: 90%; opacity: 0; transform: translateY(6px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.msg.in { opacity: 1; transform: translateY(0); }
+.msg.user { background: rgba(0,102,255,0.08); color: var(--text); align-self: flex-end; border: 1px solid rgba(0,102,255,0.15); }
+.msg.ai   { background: rgba(22,163,74,0.07); color: var(--text); align-self: flex-start; border: 1px solid rgba(22,163,74,0.15); }
+.msg-role { font-size: 10px; font-weight: 800; margin-bottom: 3px; }
+.user .msg-role { color: var(--accent); }
+.ai   .msg-role { color: var(--success); }
+
+/* params box */
+.params-box {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.params-title { font-size: 11px; font-weight: 800; color: var(--sub); text-transform: uppercase; letter-spacing: 0.4px; }
+.params-grid {
+  flex: 1; display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start;
+  min-height: 140px;
+}
+.param-dot {
+  width: 12px; height: 12px; border-radius: 3px;
+  background: rgba(0,102,255,0.15);
+  transition: background 0.3s;
+}
+.param-dot.frozen { background: rgba(8,145,178,0.2); }
+
+.frozen-badge {
+  background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.2);
+  border-radius: 8px; padding: 10px 12px;
+  font-size: 13px; font-weight: 700; color: var(--danger); line-height: 1.5; text-align: center;
+}
+
+/* conclusion */
+.conclusion-bar {
+  background: rgba(220,38,38,0.04); border: 1.5px solid rgba(220,38,38,0.18);
+  border-radius: var(--radius); padding: 16px 20px;
+  font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.7;
+}
+.conclusion-bar b { color: var(--danger); }
+
+/* shake animation */
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-5px)}
+  40%{transform:translateX(5px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}
+.shake { animation: shake 0.4s ease; }
+
+@media (max-width: 768px) {
+  .cmp-cols { grid-template-columns: 1fr; }
+  .vis-area { grid-template-columns: 1fr; }
+  .ctx-messages { height: 180px; }
+  .params-grid { min-height: 100px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="학습과 추론은 대형 언어 모델의 완전히 다른 두 단계입니다. 학습 단계의 경사 하강법과 가중치 업데이트, 추론 단계의 자기회귀 생성을 상세히 설명하여 두 가지의 본질적 차이와 리소스 소비를 이해할 수 있습니다.">
+<meta name="keywords" content="LLM 학습,LLM 추론,자기회귀 생성,경사 하강법,사전 학습">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/train-vs-infer.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/train-vs-infer.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/train-vs-infer.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/train-vs-infer.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/train-vs-infer.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="학습 vs 추론: 완전히 다른 두 가지 과정">
+<meta property="og:description" content="학습과 추론은 대형 언어 모델의 완전히 다른 두 단계입니다. 학습 단계의 경사 하강법과 가중치 업데이트, 추론 단계의 자기회귀 생성을 상세히 설명하여 두 가지의 본질적 차이와 리소스 소비를 이해할 수 있습니다.">
+<meta property="og:url" content="https://xueai.app/slides/train-vs-infer.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="학습 vs 추론: 완전히 다른 두 가지 과정">
+<meta name="twitter:description" content="학습과 추론은 대형 언어 모델의 완전히 다른 두 단계입니다. 학습 단계의 경사 하강법과 가중치 업데이트, 추론 단계의 자기회귀 생성을 상세히 설명하여 두 가지의 본질적 차이와 리소스 소비를 이해할 수 있습니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"학습 vs 추론: 두 가지 다른 과정","name":"학습 vs 추론: 두 가지 다른 과정","url":"https://xueai.app/slides/train-vs-infer.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 기초 원리","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"학습과 추론은 대형 언어 모델의 완전히 다른 두 단계입니다. 학습 단계의 경사 하강법과 가중치 업데이트, 추론 단계의 자기회귀 생성을 상세히 설명합니다.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">기초 원리</div>
+    <h1>학습 vs 추론: 완전히 다른 두 가지 과정</h1>
+    <p class="subtitle">많은 사람들이 AI가 매번 답변할 때 학습한다고 생각합니다. 실제로는 전혀 그렇지 않습니다.</p>
+  </header>
+
+  <div class="sec-label">비교</div>
+
+  <div class="analogy-bar">
+    학생 시험에 비유하자면: <b>학습(Training)</b> = 수년간 준비, 반복 연습, 지식 암기 &nbsp;→&nbsp; <b>추론(Inference)</b> = 시험장에서 답변, 파라미터 동결, 더 이상 새것을 배우지 않음
+  </div>
+
+  <div class="cmp-cols paywall-locked xa-peek">
+    <div class="cmp-col train reveal" id="colTrain">
+      <div class="cmp-title">학습(Training)</div>
+      <div class="cmp-desc">방대한 데이터로 수십억 개의 파라미터를 조정하여 모델이 세계 지식을 기억하게 합니다.</div>
+      <div class="metrics">
+        <div class="m-row"><span class="m-lbl">실행 빈도</span><span class="m-val">일회성</span></div>
+        <div class="m-row"><span class="m-lbl">연산 요구</span><span class="m-val">1K–10K GPU</span></div>
+        <div class="m-row"><span class="m-lbl">파라미터</span><span class="m-val">지속 업데이트</span></div>
+        <div class="m-row"><span class="m-lbl">비용</span><span class="m-val">수억 달러</span></div>
+        <div class="m-row"><span class="m-lbl">소요 시간</span><span class="m-val">수주~수개월</span></div>
+      </div>
+    </div>
+
+    <div class="cmp-col infer reveal" id="colInfer">
+      <div class="cmp-title">추론(Inference)</div>
+      <div class="cmp-desc">고정된 파라미터를 사용하여 입력에 대한 응답을 생성합니다. 매 대화마다 파라미터는 완전히 변하지 않습니다.</div>
+      <div class="metrics">
+        <div class="m-row"><span class="m-lbl">실행 빈도</span><span class="m-val">매 대화</span></div>
+        <div class="m-row"><span class="m-lbl">연산 요구</span><span class="m-val">1~수 GPU</span></div>
+        <div class="m-row"><span class="m-lbl">파라미터</span><span class="m-val">완전 동결</span></div>
+        <div class="m-row"><span class="m-lbl">과금</span><span class="m-val">Token당 과금</span></div>
+        <div class="m-row"><span class="m-lbl">소요 시간</span><span class="m-val">1~10초/회</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">인터랙티브 실험: 당신의 말이 파라미터를 바꿀까요?</div>
+
+  <div class="experiment paywall-locked">
+
+    <div class="input-row">
+      <textarea class="chat-input" id="chatInput" rows="1"
+        placeholder="AI에게 한 마디를 입력하고 파라미터가 변하는지 확인해보세요…"
+        onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" onclick="sendMsg()">전송</button>
+    </div>
+
+    <div class="vis-area">
+
+      <!-- 컨텍스트 창 -->
+      <div class="ctx-box">
+        <div class="ctx-title">Context Window (컨텍스트 창)</div>
+        <div class="ctx-messages" id="msgList">
+          <div class="msg ai in">
+            <div class="msg-role">AI</div>
+            안녕하세요! 무엇을 도와드릴까요?
+          </div>
+        </div>
+      </div>
+
+      <!-- 파라미터 영역 -->
+      <div class="params-box">
+        <div class="params-title">모델 파라미터 (예시)</div>
+        <div class="params-grid" id="paramGrid"></div>
+        <div class="frozen-badge" id="frozenBadge">
+          🔒 파라미터 완전 동결<br>
+          <span style="font-weight:400;color:var(--sub);font-size:11px;">대화는 어떤 가중치도 변경하지 않습니다</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="conclusion-bar reveal" id="concl">
+      AI에게 하는 말은 <b>어떤 파라미터도 수정하지 않습니다</b>. 오늘 "당신 이름은 민준이에요"라고 말해도, 내일 새 대화를 시작하면 기억하지 못합니다. 대화는 컨텍스트 창에만 존재하기 때문입니다. <b>대화는 학습이 아닙니다.</b>
+    </div>
+
+  </div>
+
+</article>
+
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script>
+// ── 파라미터 그리드 초기화 ──
+const grid = document.getElementById('paramGrid');
+const PARAM_COUNT = 80;
+for (let i = 0; i < PARAM_COUNT; i++) {
+  const d = document.createElement('div');
+  d.className = 'param-dot frozen';
+  d.id = 'p' + i;
+  grid.appendChild(d);
+}
+
+// ── 키보드 전송 ──
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent?.isComposing) {
+    e.preventDefault();
+    sendMsg();
+  }
+}
+
+const AI_REPLIES = [
+  '이해했습니다 — 이번 대화에 기록되었습니다.',
+  '네! 단, 페이지를 새로고침하면 이 대화를 잊게 됩니다.',
+  '수신 완료! 이 내용은 컨텍스트 창에 있으며 파라미터는 변경되지 않았습니다.',
+  '알겠습니다! 제 파라미터는 여전히 학습이 끝났을 때 그대로이며, 당신의 입력으로 변하지 않습니다.',
+  '확인했습니다! 매 추론 시 현재 대화 내용만 읽으며, 새것을 학습하지 않습니다.',
+];
+let replyIdx = 0;
+
+function sendMsg() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  // 사용자 메시지 추가
+  addMsg('user', text);
+
+  // 파라미터 "흔들림" 하지만 색상 변화 없음 → shake 애니메이션
+  const badge = document.getElementById('frozenBadge');
+  badge.classList.remove('shake');
+  void badge.offsetWidth;
+  badge.classList.add('shake');
+
+  // 일부 param dot 잠깐 깜빡임(처리 중인 척), 색상은 즉시 복원
+  const dots = grid.querySelectorAll('.param-dot');
+  const flashIdx = Array.from({length: 8}, () => Math.floor(Math.random() * PARAM_COUNT));
+  flashIdx.forEach(i => {
+    dots[i].style.background = 'rgba(22,163,74,0.5)';
+    setTimeout(() => dots[i].style.background = '', 400);
+  });
+
+  // AI 응답
+  setTimeout(() => {
+    const reply = AI_REPLIES[replyIdx % AI_REPLIES.length];
+    replyIdx++;
+    addMsg('ai', reply);
+  }, 600);
+}
+
+function addMsg(role, text) {
+  const list = document.getElementById('msgList');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="msg-role">${role === 'user' ? '나' : 'AI'}</div>${text}`;
+  list.appendChild(div);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => div.classList.add('in'));
+  });
+  list.scrollTop = list.scrollHeight;
+}
+</script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260807c"></script><!--seo:end-->
+</body>
+</html>

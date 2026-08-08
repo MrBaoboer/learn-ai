@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>权重是什么？一个模型的全部本事 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css">
+<link rel="stylesheet" href="oss.css?v=20260808b">
+<style>
+/* 权重矩阵：把抽象的「一堆浮点数」变成可以看见的东西 */
+.w-matrix { margin: 16px 0; }
+.wm-grid {
+  display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px;
+  margin-bottom: 10px;
+}
+.wm-cell {
+  aspect-ratio: 1; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: rgba(255,255,255,.92);
+  font-family: "SF Mono", Menlo, monospace;
+  transition: transform .15s;
+}
+.wm-cell:hover { transform: scale(1.18); z-index: 2; }
+.wm-legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--sub); flex-wrap: wrap; }
+.wm-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+@media (max-width: 768px) { .wm-grid { grid-template-columns: repeat(8, 1fr); } }
+</style>
+<!-- SEO Start -->
+<meta name="description" content="权重是什么？它是模型训练完之后留下的一堆浮点数，一个模型的全部本事都在里面。拿到权重文件，你就能在自己的机器上跑出一模一样的模型。理解这一点，才能看懂后面所有关于开源的争论。">
+<meta name="keywords" content="模型权重是什么,AI权重文件,大模型参数量,权重开源,模型体积,本地部署">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/oss-1.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/oss-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/oss-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/oss-1.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/oss-1.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="权重是什么？一个模型的全部本事">
+<meta property="og:description" content="权重是模型训练完之后留下的一堆浮点数。拿到权重文件，你就能在自己的机器上跑出一模一样的模型。">
+<meta property="og:url" content="https://xueai.app/slides/oss-1.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="权重是什么？一个模型的全部本事">
+<meta name="twitter:description" content="权重是模型训练完之后留下的一堆浮点数。拿到权重文件，你就能在自己的机器上跑出一模一样的模型。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"权重是什么？一个模型的全部本事","name":"权重是什么？一个模型的全部本事","url":"https://xueai.app/slides/oss-1.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 开源到底开的是什么","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"权重是什么？它是模型训练完之后留下的一堆浮点数，一个模型的全部本事都在里面。拿到权重文件，你就能在自己的机器上跑出一模一样的模型。理解这一点，才能看懂后面所有关于开源的争论。"}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">开源专题 · 开源到底开的是什么</div>
+    <h1>权重是什么？一个模型的全部本事</h1>
+    <p class="subtitle">新闻里天天说「某某模型开源了」。开源的到底是什么东西？是代码吗？其实主要是一个文件：<b>权重</b>。搞清楚它是什么，后面所有关于开源的争论你都能自己判断。</p>
+  </header>
+
+  <div class="sec-label">先说结论</div>
+
+  <div class="l-callout">
+    <b>权重就是模型训练完之后留下的一堆数字。</b>训练花掉的几千万美元、几个月的算力，最后全部凝结成这一个文件。拿到它，你就能在自己的机器上跑出一模一样的模型，不需要联网，不需要向任何人付费。
+  </div>
+
+  <div class="oss-why">
+    <p><b>这一章的例子基本都取自 Qwen，先说清楚为什么。</b></p>
+    <ul>
+      <li><b>尺寸铺得最全。</b>Ollama 官方库里 Qwen3.5 一代从 0.8B 一直排到 122B，中间有 2B、4B、9B、27B、35B。本章后面每讲到一档设备，都能对应上一个真能下载下来的文件，不用换品牌凑数。</li>
+      <li><b>别人拿它当底座。</b>DeepSeek-R1 放出的六个蒸馏版里有四个用的是 Qwen 底座——这是第三方的选择，不是自家宣传。</li>
+      <li><b>它自己就是个反面教材。</b>Qwen2.5 时期的 3B 和 72B 用过非标准许可证，正好拿来讲「开源」这两个字有多不可靠，这一节在<b>第二节</b>。</li>
+    </ul>
+    <p>中文社区里有人管它叫<b>「源神」</b>，开源之神。这是网友的戏称，不是评价标准，也不代表它每一项都最强。<b>本章拿它举例是因为素材齐、方便动手，不是因为它最好。</b>你学完这一章要拿到的是判断标准，不是一个品牌名——同一套标准套到任何一家身上都应该照样能用。</p>
+  </div>
+
+  <div class="sec-label">它长什么样</div>
+
+  <p>模型内部没有规则、没有知识库、没有 if-else。有的只是一个巨大的数字表格。下面这些格子里的每个数，就是一个权重，颜色深浅表示它的绝对值大小。</p>
+
+  <div class="w-matrix">
+    <div class="wm-grid" id="wmGrid"></div>
+    <div class="wm-legend">
+      <span><i style="background:rgba(79,70,229,.75)"></i>正值</span>
+      <span><i style="background:rgba(220,38,38,.75)"></i>负值</span>
+      <span>颜色越深，绝对值越大</span>
+    </div>
+  </div>
+
+  <p>上面是 36 个数。一个 <code>Qwen3-8B</code> 模型有 <b>80 亿个</b>这样的数。训练的全部意义，就是把这几十亿个数从随机值一点点调整到合适的值。调完了，参数冻结，模型就定型了。</p>
+
+  <div class="oss-warn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    <div>这也解释了第一篇章讲过的那件事：模型跟你聊天时并不会学到任何东西。权重是训练阶段定死的，对话阶段只读不写。你告诉它的事，它下次就忘了。</div>
+  </div>
+
+  <div class="sec-label">参数量决定文件体积</div>
+
+  <p>每个权重占多少字节，取决于存储精度。模型发布时通常用 FP16，也就是每个数占 <b>2 个字节</b>。所以文件体积有一个很好记的估算：</p>
+
+  <div class="l-callout" style="margin:14px 0">
+    <b>权重文件体积（GB）≈ 参数量（B）× 2</b><br>
+    <span style="font-size:14px;color:var(--sub)">80 亿参数 × 2 字节 = 160 亿字节 ≈ 16 GB</span>
+  </div>
+
+  <p>公式记住了，但它到底意味着什么，拖一下就知道了。下面这个滑块从 0.5B 拖到 2.4 万亿，你可以顺手切换存储精度，看同一个模型的文件是怎么胀大和缩小的。</p>
+
+  <div class="oss-lab" data-lab="动手试试">
+    <div class="lab-q">把参数量拖到 8B，然后在 FP16 和 INT4 之间来回切一次。</div>
+
+    <div class="lab-ctrl">
+      <div class="lab-row">
+        <span class="lab-label">参数量</span>
+        <input type="range" class="lab-range" id="wSlider" min="0" max="1000" value="0" aria-label="参数量">
+        <span class="lab-val" id="wParams">8 B</span>
+      </div>
+      <div class="lab-row">
+        <span class="lab-label">存储精度</span>
+        <div class="lab-seg" id="wPrec" role="group" aria-label="存储精度">
+          <button type="button" data-p="fp32">FP32</button>
+          <button type="button" data-p="fp16" class="is-on">FP16</button>
+          <button type="button" data-p="int8">INT8</button>
+          <button type="button" data-p="int4">INT4</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="lab-out">
+      <div class="lab-big"><span id="wSize">16 GB</span><small id="wFormula"></small></div>
+      <div class="lab-note" id="wNote"></div>
+      <div class="lab-lamps" id="wLamps"></div>
+      <div class="lab-verdict" id="wVerdict"></div>
+    </div>
+  </div>
+
+  <p>下面用一组真实的模型对比一下。这里选 Qwen 系列做尺子，是因为它的尺寸谱系目前最完整，从 0.6B 一直到 2.4T 都有公开型号，同一个系列内部比较不会掺进架构差异的干扰。</p>
+
+  <div class="oss-bars" id="sizeBars">
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3-0.6B</strong><span>约 1.2 GB</span></div>
+      <div class="ob-track"><i data-w="2"></i></div>
+    </div>
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3-8B</strong><span>约 16 GB</span></div>
+      <div class="ob-track"><i data-w="8"></i></div>
+    </div>
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3-32B</strong><span>约 64 GB</span></div>
+      <div class="ob-track"><i data-w="22"></i></div>
+    </div>
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3-235B-A22B</strong><span>约 470 GB</span></div>
+      <div class="ob-track"><i data-w="55" class="is-big"></i></div>
+    </div>
+    <div class="oss-bar">
+      <div class="ob-meta"><strong>Qwen3.8-Max（2.4 万亿参数）</strong><span>数 TB 量级</span></div>
+      <div class="ob-track"><i data-w="100" class="is-big"></i></div>
+    </div>
+  </div>
+
+  <div class="oss-src">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>参数规模来自各模型官方发布说明；体积为 FP16 下的理论估算值，实际文件会因分片方式与附带的配置文件略有出入。Qwen3.8-Max 总参数 2.4 万亿、激活 950 亿，发布于 2026-08-03。</span>
+  </div>
+
+  <div class="sec-label">一个容易混淆的地方</div>
+
+  <p>存储体积和运行时占用是两码事。文件 16 GB，不代表 16 GB 显存就能跑起来。模型运行时还要额外开销一块地方存放对话的中间状态，也就是第二篇章讲过的 KV Cache。算下来通常要在参数量的基础上多留三到五成。</p>
+
+  <p>这一章最后有一页交互工具，你可以直接选自己的显卡或者 Mac 型号，看能跑哪些模型。这里先记住结论：<b>看文件大小估显存，会低估。</b></p>
+
+  <div class="sec-label">为什么权重这么关键</div>
+
+  <p>把上面的事情串起来，权重的意义就清楚了。它不只是一个文件，它是<b>控制权</b>。</p>
+
+  <div class="oss-facts">
+    <div class="oss-fact">
+      <div class="of-num">离线</div>
+      <div class="of-label">不依赖任何服务商</div>
+      <div class="of-desc">拔掉网线也能跑，对方涨价、限流、下架都影响不到你</div>
+    </div>
+    <div class="oss-fact">
+      <div class="of-num">可改</div>
+      <div class="of-label">能在它基础上继续训练</div>
+      <div class="of-desc">用自己的数据微调出一个专属版本，这是调 API 做不到的</div>
+    </div>
+    <div class="oss-fact">
+      <div class="of-num">留痕</div>
+      <div class="of-label">数据不出自己的机器</div>
+      <div class="of-desc">医疗、法务、内部代码这类不能外发的场景，只有这一条路</div>
+    </div>
+  </div>
+
+  <p>反过来说，只提供 API 的模型，你租的是使用权。价格、可用性、什么时候下线，都由对方决定。这个区别在做技术选型时会直接变成风险，也是下一节要拆的东西：<b>各家嘴里的「开源」，含义差得非常远。</b></p>
+
+</article>
+
+<script src="oss-interact.js?v=20260808"></script>
+<script>
+/**
+ * 背景：权重对新手是个纯抽象概念，光说「一堆浮点数」建立不起画面感。
+ * 设计意图：随机生成一组数值渲染成色块矩阵，让读者直观看到权重的物理形态。
+ * 用随机值而非真实权重，是因为真实权重的数值分布反而看不出规律，
+ * 教学上这里要传达的是「形态」，不是具体数值。
+ * 约束：正负用两种色相区分，深浅表示绝对值，与图例说明保持一致。
+ */
+(function () {
+  var grid = document.getElementById('wmGrid');
+  if (!grid) { return; }
+  var html = '';
+  for (var i = 0; i < 36; i++) {
+    var v = Math.random() * 2 - 1;
+    var pos = v > 0;
+    var alpha = Math.abs(v) * 0.68 + 0.22;
+    var rgb = pos ? '79,70,229' : '220,38,38';
+    html += '<div class="wm-cell" style="background:rgba(' + rgb + ',' + alpha.toFixed(2) + ')"'
+         +  ' title="权重值 ' + v.toFixed(4) + '">' + v.toFixed(1) + '</div>';
+  }
+  grid.innerHTML = html;
+
+  /* 体积条进入视口后再铺开，避免读者滚到这里时动画已经放完 */
+  var bars = document.getElementById('sizeBars');
+  if (!bars) { return; }
+  var played = false;
+  var play = function () {
+    if (played) { return; }
+    played = true;
+    bars.querySelectorAll('.ob-track i').forEach(function (el) {
+      setTimeout(function () { el.style.width = el.dataset.w + '%'; }, 60);
+    });
+  };
+  if (!('IntersectionObserver' in window)) { play(); return; }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) { if (en.isIntersecting) { play(); io.disconnect(); } });
+  }, { threshold: 0.25 });
+  io.observe(bars);
+})();
+
+/* 体积换算实验台。
+   这一节的公式只有一条，但学员读完往往还是没有量感，不知道 16 GB 到底是
+   多还是少。让他自己拖到 8B 再切一次精度，「装不进 8GB 显卡，量化后就进去了」
+   这件事是他自己撞出来的，比读一句结论记得牢。 */
+(function () {
+  var C = window.OSSInteract;
+  var slider = document.getElementById('wSlider');
+  if (!C || !slider) { return; }
+
+  var t = C.dict();
+  var state = { precision: 'fp16' };
+
+  var elSize = document.getElementById('wSize');
+  var elParams = document.getElementById('wParams');
+  var elFormula = document.getElementById('wFormula');
+  var elNote = document.getElementById('wNote');
+  var elLamps = document.getElementById('wLamps');
+  var elVerdict = document.getElementById('wVerdict');
+
+  /* 滑块每动一格 render 都会跑，但真正值得提示的只有「某张卡从装得下变成
+     装不下」这一刻。记住上一次的判定结果，只给翻转的那张卡加动效，否则
+     整排灯会跟着滑块一路闪，反而看不出临界点在哪。 */
+  var lastFits = null;
+  var anim = {};
+
+  function render() {
+    var params = C.posToParams(slider.value);
+    var size = C.fileSize(params, state.precision);
+    var spec = C.BYTES[state.precision];
+    var cards = C.fitCards(size);
+
+    elParams.textContent = t.paramLabel(params);
+    elSize.textContent = t.fileOf(size);
+    elFormula.textContent = params + ' × ' + spec.bytes;
+    elNote.textContent = t.bytesNote(spec.bytes, spec.label);
+
+    elLamps.innerHTML = cards.map(function (c) {
+      return '<div class="lab-lamp ' + (c.fit ? 'is-yes' : 'is-no') + '">'
+        + '<div class="ll-name">' + t.cardLabel(c.vram) + '</div>'
+        + '<div class="ll-state">' + (c.fit ? t.fitYes : t.fitNo) + '</div>'
+        + '</div>';
+    }).join('');
+
+    if (lastFits) {
+      cards.forEach(function (c, i) {
+        if (lastFits[i] !== c.fit) { C.fire(elLamps.children[i]); }
+      });
+    }
+    lastFits = cards.map(function (c) { return c.fit; });
+
+    /* 结论跟着当前取值走，而不是写死一句话。学员拖到哪里，这里就说哪里的事。 */
+    var fitCount = cards.filter(function (c) { return c.fit; }).length;
+    var v = elVerdict;
+    v.classList.toggle('is-warn', fitCount === 0);
+    if (fitCount === 0) {
+      v.innerHTML = '<b>' + t.fileOf(size) + '</b> ' + LAB.none;
+    } else if (fitCount === 3) {
+      v.innerHTML = '<b>' + t.fileOf(size) + '</b> ' + LAB.all;
+    } else {
+      v.innerHTML = '<b>' + t.fileOf(size) + '</b> ' + LAB.some;
+    }
+
+    /* 体积数字每格都在变，跳一下会抖成一片，所以只在跨过整数量级时提示。
+       结论条则按文案是否换了来判断。 */
+    C.fireOnChange(elSize.parentNode, Math.floor(Math.log10(Math.max(size, 0.1))), anim, 'mag');
+    C.fireOnChange(v, fitCount, anim, 'fit');
+  }
+
+  /* 三句结论文案跟着页面语言走，与模块里的语言包同源 */
+  var LAB = (function () {
+    var lang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
+    if (lang.indexOf('ko') === 0) {
+      return {
+        none: '는 여기 있는 어떤 그래픽카드에도 들어가지 않습니다. 정밀도를 낮추거나 더 작은 모델을 고르는 수밖에 없습니다.',
+        some: '는 일부 카드에만 들어갑니다. 정밀도를 한 단계 낮추면 문턱이 바로 내려갑니다.',
+        all: '는 세 카드 모두에 들어갑니다. 다만 이건 파일 크기일 뿐이고, 실제로 돌릴 때는 여유가 더 필요합니다.',
+      };
+    }
+    if (lang.indexOf('en') === 0) {
+      return {
+        none: ' does not fit on any card here. Your options are a lower precision or a smaller model.',
+        some: ' fits on some of these cards. Dropping one precision level lowers the bar immediately.',
+        all: ' fits on all three. Keep in mind this is the file size, and actually running it needs more headroom.',
+      };
+    }
+    return {
+      none: '在这里的每一张卡上都放不下。你的选择是降精度，或者换更小的模型。',
+      some: '只放得进其中一部分卡。把精度降一档，门槛立刻就下来了。',
+      all: '三张卡都放得下。但记住这只是文件体积，真跑起来还要更多余量。',
+    };
+  })();
+
+  /* 初值让模块算，不在 HTML 里写死刻度位置。滑块刻度改过一次，硬编码的
+     初值当场失准（本该停在 8B 的滑块停到了 129B），交给 paramsToPos 就
+     不会再漂。 */
+  slider.max = C.SLIDER_STEPS;
+  slider.value = C.paramsToPos(8);
+
+  document.getElementById('wPrec').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-p]');
+    if (!btn) { return; }
+    state.precision = btn.dataset.p;
+    this.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('is-on', b === btn);
+    });
+    render();
+  });
+
+  C.bindRange(slider, render);
+})();
+</script>
+<script src="i18n.js?v=20260808"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260809q"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>
