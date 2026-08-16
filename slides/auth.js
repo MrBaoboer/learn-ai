@@ -5,12 +5,12 @@
  * 本地预览没有该接口时静默降级为「未登录」，不影响页面其他功能。
  *
  * 对外暴露 window.XueaiAuth：
- *   ready        Promise<state>，state = {loggedIn, nickname}
+ *   ready        Promise<state>，state = {loggedIn, nickname, avatarUrl}
  *   state        最近一次获取的登录状态
  *   isFree(file) 该课程文件是否免登录（每个篇章前 2 节，另有整章开放的篇章，
  *                见 FREE_ALL_PREFIXES；判定口径必须与服务端一致）
  *   openLoginModal(next) 弹出登录告知弹窗，确认后跳米羊登录
- *   mount(slotEl) 在指定节点渲染 登录按钮 / 昵称+退出
+ *   mount(slotEl) 在指定节点渲染登录按钮或头像账号菜单
  */
 (function(){
   /* ── 语言检测：优先读 i18n.js 注入的 window.XUEAI_I18N.lang，
@@ -26,6 +26,9 @@
       loginBtn:           '登录',
       logoutBtn:          '退出',
       userTitle:          '米羊个人中心 · AI 学习进展',
+      accountLabel:       '账号菜单',
+      signedInLabel:      '已登录米羊账号',
+      profileBtn:         '个人中心',
       /* 登录邀请弹窗 */
       heroTitle:          '全部免费',
       heroSub:            '登录即可解锁完整课程',
@@ -52,7 +55,7 @@
       groupHint:          '微信扫一扫入群，或关注公众号与 X 获取更新',
       chan0Name:          '交流群',
       chan0Desc:          '微信扫码入群<br>聊课程与 AI 实战',
-      chan0Alt:           '小山学 AI 交流群二维码',
+      chan0Alt:           '小山学堂 交流群二维码',
       chan1Name:          '公众号',
       chan1Desc:          '洛小山<br>文章与课程更新',
       chan1Alt:           '洛小山公众号二维码',
@@ -78,6 +81,9 @@
       loginBtn:           'Log in',
       logoutBtn:          'Log out',
       userTitle:          'Miyang Profile · My Learning Progress',
+      accountLabel:       'Account menu',
+      signedInLabel:      'Signed in with Miyang',
+      profileBtn:         'Profile',
       heroTitle:          'Totally Free',
       heroSub:            'Log in to unlock the full course',
       modalTitle:         'What you get after logging in',
@@ -101,7 +107,7 @@
       groupHint:          'Scan to join the group, or follow us on WeChat Official Account & X for updates',
       chan0Name:          'Study Group',
       chan0Desc:          'Scan with WeChat to join<br>Discuss courses & AI practice',
-      chan0Alt:           'Luo Xiaoshan AI study group QR code',
+      chan0Alt:           'Xiaoshan Academy study group QR code',
       chan1Name:          'WeChat Official Account',
       chan1Desc:          'Luo Xiaoshan<br>Articles & course updates',
       chan1Alt:           'Luo Xiaoshan WeChat Official Account QR code',
@@ -126,6 +132,9 @@
       loginBtn:           '로그인',
       logoutBtn:          '로그아웃',
       userTitle:          '미양 프로필 · 학습 현황',
+      accountLabel:       '계정 메뉴',
+      signedInLabel:      '미양 계정으로 로그인됨',
+      profileBtn:         '프로필',
       heroTitle:          '완전 무료',
       heroSub:            '로그인하면 전체 강의를 이용할 수 있습니다',
       modalTitle:         '로그인 후 이용할 수 있는 혜택',
@@ -149,7 +158,7 @@
       groupHint:          '위챗으로 스캔하여 그룹에 참여하거나, 위챗 공식 계정과 X를 팔로우하여 업데이트를 받으세요',
       chan0Name:          '스터디 그룹',
       chan0Desc:          '위챗으로 스캔하여 참여<br>강의와 AI 실전 토론',
-      chan0Alt:           '뤄샤오산 AI 스터디 그룹 QR코드',
+      chan0Alt:           '샤오산 아카데미 스터디 그룹 QR코드',
       chan1Name:          '위챗 공식 계정',
       chan1Desc:          '뤄샤오산<br>아티클 및 강의 업데이트',
       chan1Alt:           '뤄샤오산 위챗 공식 계정 QR코드',
@@ -175,11 +184,11 @@
      和实际能不能打开会对不上：每个篇章前 2 节，外加雷军创业课整章放开 */
   var FREE_PER_PART = 2;
   /* 整章免登录的篇章前缀，必须与 ops/auth-service.py 的 CHAPTER_FREE_OVERRIDE
-     逐项一致。这里漏一个，侧边栏就会给服务端明明放行的课程画上锁——第零篇章
+     逐项一致。这里漏一个，侧边栏就会给服务端明明放行的课程画上锁——零基础入门篇
      17 节曾因此一直带锁。tests/test_auth_js_free_sync.py 会比对两边。 */
   var FREE_ALL_PREFIXES = ['lei-', 'zero-', '0-'];
   /* 三个联系渠道。二维码都放本地 assets，不走 CDN，弹窗才不会因为外域挂掉而开天窗 */
-  var GROUP_QR = 'assets/group-qrcode.png';
+  var GROUP_QR = 'assets/group-qrcode.png?v=20260817a';
   var GZH_QR = 'assets/qrcode.jpg';
   var X_QR = 'assets/x-qrcode.png';
   var X_URL = 'https://x.com/luoxiaoshan_ai';
@@ -203,15 +212,37 @@
     });
   }
 
-  var state = { loggedIn:false, nickname:'' };
+  var state = { loggedIn:false, nickname:'', avatarUrl:'' };
   var slots = [];
+
+  /* 首帧用上次缓存的登录态渲染账号插槽，避免 /auth/me 返回后
+     「登录」按钮突然换成更宽的头像胶囊、把整排导航项往左推（顶栏伸缩感的来源）。
+     /auth/me 返回后仍以服务器为准重渲染并刷新缓存。 */
+  var ME_CACHE_KEY = 'xa_me_v1';
+  try{
+    var cachedMe = JSON.parse(localStorage.getItem(ME_CACHE_KEY) || 'null');
+    if(cachedMe && cachedMe.loggedIn === true){
+      state = {
+        loggedIn:true,
+        nickname:String(cachedMe.nickname || ''),
+        avatarUrl:safeAvatarUrl(cachedMe.avatarUrl)
+      };
+    }
+  }catch(e){}
 
   var ready = fetch('/auth/me', {credentials:'same-origin'})
     .then(function(r){ return r.json(); })
     .then(function(d){
       if(d && d.logged_in){
-        state = { loggedIn:true, nickname:d.nickname || T.defaultNickname };
+        state = {
+          loggedIn:true,
+          nickname:d.nickname || T.defaultNickname,
+          avatarUrl:safeAvatarUrl(d.avatar_url)
+        };
+      }else{
+        state = { loggedIn:false, nickname:'', avatarUrl:'' };
       }
+      try{ localStorage.setItem(ME_CACHE_KEY, JSON.stringify(state)); }catch(e){}
       return state;
     })
     .catch(function(){ return state; });
@@ -283,20 +314,44 @@
 
     /* 顶栏登录区 */
     + '.xa-slot{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;}'
-    + '.xa-login-btn{display:inline-flex;align-items:center;gap:6px;background:#4f7bff;color:#fff;font-weight:700;font-size:13px;padding:8px 16px;border-radius:10px;border:none;cursor:pointer;transition:all .2s;font-family:inherit;box-shadow:0 3px 12px rgba(79,123,255,0.3);}'
+    /* 高度与圆角取顶栏变量：交流群、登录、账号按钮和宿主页面自己的主题/语言按钮
+       同处一行，尺寸只能有一个来源，否则每加一个按钮就多一档高度 */
+    + '.xa-login-btn{height:var(--xa-ctl-h,38px);display:inline-flex;align-items:center;gap:6px;background:#4f7bff;color:#fff;font-weight:700;font-size:13px;padding:0 16px;border-radius:var(--xa-ctl-r,11px);border:none;cursor:pointer;transition:all .2s;font-family:inherit;box-shadow:0 3px 12px rgba(79,123,255,0.3);}'
     + '.xa-login-btn:hover{background:#3d6bff;}'
-    + '.xa-user{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--text-h,#0f1729);text-decoration:none;cursor:pointer;transition:color .2s;}'
-    + '.xa-user:hover{color:#4f7bff;}'
-    + '[data-theme="dark"] .xa-user{color:#fff;}'
-    + '[data-theme="dark"] .xa-user:hover{color:#7b9cff;}'
-    + '.xa-user .xa-dot{width:7px;height:7px;border-radius:50%;background:#34d399;}'
-    + '.xa-logout{font-size:12px;font-weight:600;color:var(--text-f,#94a3b8);cursor:pointer;background:none;border:none;padding:2px 4px;font-family:inherit;}'
-    + '.xa-logout:hover{color:#ef4444;}'
+    + '.xa-account{position:relative;}'
+    + '.xa-account-btn{height:var(--xa-ctl-h,38px);max-width:168px;display:inline-flex;align-items:center;gap:8px;padding:3px 9px 3px 4px;border:1px solid var(--card-border,rgba(0,0,0,.1));border-radius:var(--xa-ctl-r,11px);background:var(--card,#fff);color:var(--text-h,#0f1729);font:700 13px/1 inherit;cursor:pointer;box-shadow:0 2px 10px rgba(15,23,42,.06);transition:border-color .18s,background .18s,box-shadow .18s;}'
+    + '.xa-account-btn:hover,.xa-account.open .xa-account-btn{border-color:rgba(79,123,255,.38);background:var(--pill-bg,#f8fafc);box-shadow:0 4px 16px rgba(15,23,42,.09);}'
+    /* 头像跟着按钮高度缩放：写死 30px 时按钮一变矮就被头像顶破 */
+    + '.xa-avatar{position:relative;overflow:hidden;width:calc(var(--xa-ctl-h,38px) - 8px);height:calc(var(--xa-ctl-h,38px) - 8px);border-radius:9px;display:inline-flex;align-items:center;justify-content:center;flex:none;background:linear-gradient(135deg,#4f7bff,#8b5cf6);color:#fff;font-size:13px;font-weight:800;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);}'
+    + '.xa-avatar svg{width:16px;height:16px;stroke-width:2.2;}'
+    + '.xa-avatar-img{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;border-radius:inherit;background:inherit;}'
+    + '.xa-account-name{min-width:0;max-width:92px;overflow:hidden;text-overflow:ellipsis;}'
+    + '.xa-account-caret{width:12px;height:12px;flex:none;opacity:.48;transition:transform .18s;}'
+    + '.xa-account.open .xa-account-caret{transform:rotate(180deg);}'
+    + '.xa-account-menu{position:absolute;right:0;top:calc(100% + 8px);width:224px;padding:7px;background:var(--card,#fff);border:1px solid var(--card-border,rgba(0,0,0,.09));border-radius:15px;box-shadow:0 18px 48px rgba(15,23,42,.18);display:none;z-index:10020;text-align:left;}'
+    + '.xa-account.open .xa-account-menu{display:block;animation:xa-account-in .14s ease-out;}'
+    + '@keyframes xa-account-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}'
+    + '.xa-account-head{display:flex;align-items:center;gap:10px;padding:9px 9px 11px;border-bottom:1px solid var(--card-border,rgba(0,0,0,.08));margin-bottom:5px;}'
+    + '.xa-account-head .xa-avatar{width:34px;height:34px;border-radius:10px;}'
+    + '.xa-account-meta{min-width:0;}'
+    + '.xa-account-meta strong{display:block;color:var(--text-h,#0f1729);font-size:13px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;}'
+    + '.xa-account-meta span{display:block;color:var(--text-f,#94a3b8);font-size:10.5px;line-height:1.5;margin-top:1px;}'
+    + '.xa-account-item{width:100%;height:38px;display:flex;align-items:center;gap:9px;padding:0 10px;border:0;border-radius:9px;background:transparent;color:var(--text-s,#475569);font:600 12.5px/1 inherit;text-decoration:none;cursor:pointer;text-align:left;}'
+    + '.xa-account-item:hover{background:var(--pill-bg,#f1f5f9);color:var(--text-h,#0f1729);}'
+    + '.xa-account-item svg{width:16px;height:16px;flex:none;}'
+    + '.xa-account-logout:hover{background:rgba(239,68,68,.08);color:#dc2626;}'
+    + '[data-theme="dark"] .xa-account-btn,[data-theme="dark"] .xa-account-menu{background:#16162a;border-color:rgba(255,255,255,.11);color:#fff;}'
+    + '[data-theme="dark"] .xa-account-btn:hover,[data-theme="dark"] .xa-account.open .xa-account-btn,[data-theme="dark"] .xa-account-item:hover{background:rgba(255,255,255,.07);}'
+    + '[data-theme="dark"] .xa-account-meta strong{color:#fff;}'
+    + '[data-theme="dark"] .xa-account-item{color:rgba(255,255,255,.7);}'
+    + '[data-theme="dark"] .xa-account-item:hover{color:#fff;}'
+    /* 手机上收成正方形图标键：宽高仍读顶栏变量，头像由 .xa-avatar 的 calc 跟着缩 */
+    + '@media(max-width:600px){.xa-account-btn{width:var(--xa-ctl-h,38px);padding:3px;box-shadow:none;}.xa-account-btn .xa-avatar{border-radius:8px;}.xa-account-name,.xa-account-caret{display:none;}.xa-account-menu{position:fixed;right:max(12px,env(safe-area-inset-right));top:62px;width:min(224px,calc(100vw - 24px));}}'
     /* 交流群按钮 */
-    + '.xa-group{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#059669;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:7px 14px;border-radius:10px;text-decoration:none;transition:all .2s;white-space:nowrap;}'
+    + '.xa-group{height:var(--xa-ctl-h,38px);display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#059669;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:0 14px;border-radius:var(--xa-ctl-r,11px);text-decoration:none;transition:all .2s;white-space:nowrap;}'
     + '.xa-group:hover{background:rgba(16,185,129,0.18);transform:translateY(-1px);}'
     + '.xa-group svg{width:14px;height:14px;}'
-    + '@media(max-width:600px){.xa-group .xa-group-txt{display:none;}.xa-group{padding:7px 9px;}}'
+    + '@media(max-width:600px){.xa-group .xa-group-txt{display:none;}.xa-group{padding:0 9px;}}'
     /* 交流群二维码弹窗 */
     + '.xa-qr-modal{text-align:center;max-width:580px;max-height:88vh;overflow-y:auto;}'
     + '.xa-qr-hint{font-size:13.5px;color:var(--text-s,#475569);line-height:1.7;margin:2px 0 18px;}'
@@ -539,12 +594,42 @@
 
   function renderSlot(el){
     if(state.loggedIn){
+      var nickname = state.nickname || T.defaultNickname;
       el.innerHTML =
-        '<a class="xa-user" href="https://miyang.cn/profile" target="_blank" rel="noopener" title="' + T.userTitle + '"><span class="xa-dot"></span>'
-        + escapeHtml(state.nickname)
-        + '</a><button class="xa-logout" type="button">' + T.logoutBtn + '</button>';
-      el.querySelector('.xa-logout').addEventListener('click', function(){
+        '<div class="xa-account">' +
+          '<button class="xa-account-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="' + escapeHtml(T.accountLabel) + '" title="' + escapeHtml(T.userTitle) + '">' +
+            accountAvatarHtml() +
+            '<span class="xa-account-name">' + escapeHtml(nickname) + '</span>' +
+            '<svg class="xa-account-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>' +
+          '</button>' +
+          '<div class="xa-account-menu" role="menu">' +
+            '<div class="xa-account-head">' +
+              accountAvatarHtml() +
+              '<div class="xa-account-meta"><strong>' + escapeHtml(nickname) + '</strong><span>' + escapeHtml(T.signedInLabel) + '</span></div>' +
+            '</div>' +
+            '<a class="xa-account-item" href="/auth/handoff?target=profile" target="_blank" rel="noopener" role="menuitem">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>' +
+              escapeHtml(T.profileBtn) +
+            '</a>' +
+            '<button class="xa-account-item xa-account-logout" type="button" role="menuitem">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg>' +
+              escapeHtml(T.logoutBtn) +
+            '</button>' +
+          '</div>' +
+        '</div>';
+      var account = el.querySelector('.xa-account');
+      var accountBtn = el.querySelector('.xa-account-btn');
+      accountBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var open = !account.classList.contains('open');
+        closeAccountMenus();
+        setAccountOpen(account, open);
+      });
+      el.querySelector('.xa-account-logout').addEventListener('click', function(){
         location.href = '/auth/logout?next=' + encodeURIComponent(currentNext());
+      });
+      el.querySelectorAll('.xa-avatar-img').forEach(function(img){
+        img.addEventListener('error', function(){ img.remove(); }, {once:true});
       });
     }else{
       el.innerHTML = '<button class="xa-login-btn" type="button">' + T.loginBtn + '</button>';
@@ -559,6 +644,49 @@
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
     });
   }
+
+  function safeAvatarUrl(value){
+    if(!value) return '';
+    try{
+      var url = new URL(String(value), location.origin);
+      return url.protocol === 'https:' ? url.href : '';
+    }catch(e){
+      return '';
+    }
+  }
+
+  function accountAvatarHtml(){
+    var avatarUrl = safeAvatarUrl(state.avatarUrl);
+    return '<span class="xa-avatar" aria-hidden="true">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">' +
+        '<circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/>' +
+      '</svg>' +
+      (avatarUrl
+        ? '<img class="xa-avatar-img" src="' + escapeHtml(avatarUrl) + '" alt="" decoding="async" referrerpolicy="no-referrer">'
+        : '') +
+      '</span>';
+  }
+
+  function setAccountOpen(account, open){
+    if(!account) return;
+    account.classList.toggle('open', !!open);
+    var btn = account.querySelector('.xa-account-btn');
+    if(btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function closeAccountMenus(){
+    slots.forEach(function(slot){
+      setAccountOpen(slot.querySelector('.xa-account'), false);
+    });
+  }
+
+  document.addEventListener('click', function(e){
+    var inside = e.target.closest && e.target.closest('.xa-account');
+    if(!inside) closeAccountMenus();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeAccountMenus();
+  });
 
   function mount(el){
     if(!el) return;

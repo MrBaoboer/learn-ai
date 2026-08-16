@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>오류 방지와 가역성: 사용자가 겁내지 않고 누르게 | 인터랙션 엔지니어링</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="ixd.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="사후에 오류를 알리기보다, 오류가 애초에 나지 않게 하세요: 쓸 수 없는 항목은 비활성화하고, 위험한 조작은 거리를 두고, 안전한 기본값으로 받쳐 주세요. 되돌리기가 있으면 탐색이 안전해지고, 확인 팝업은 가장 약한 오류 방지입니다. 직접 연락처 하나를 지워 보며 확인 팝업과 되돌리기 toast를 비교하고, 늑대 실험도 한 번 해 보세요.">
+<meta name="keywords" content="인터랙션 엔지니어링,오류 방지,되돌리기,확인 팝업,가역성,About Face,위험한 조작">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ixd-3.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ixd-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ixd-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ixd-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ixd-3.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="샤오산 아카데미">
+<meta property="og:title" content="오류 방지와 가역성: 사용자가 겁내지 않고 누르게">
+<meta property="og:description" content="확인 팝업은 손미끄러짐을 막지 못해요—사용자는 읽지도 않고 닫습니다. 오류 방지가 오류 메시지보다 낫고, 되돌리기가 확인보다 낫습니다.">
+<meta property="og:url" content="https://xueai.app/slides/ixd-3.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="오류 방지와 가역성: 사용자가 겁내지 않고 누르게">
+<meta name="twitter:description" content="확인 팝업은 손미끄러짐을 막지 못해요—사용자는 읽지도 않고 닫습니다. 오류 방지가 오류 메시지보다 낫고, 되돌리기가 확인보다 낫습니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 主教具：删一条数据，两种善后 ──
+   A 面确认弹窗、B 面立即删除 + 可撤销 toast，
+   toast 滑入、倒计时条、撤销弹回是本页的动画重头戏。
+   v1.3 质感：两面通讯录各装一个 .mockwin 外壳，联系人列表
+   按真产品做（32px 头像、12.5/10.5 两级文字、16px 边距）；
+   A 面弹窗保持「AI 默认产出」的平庸感，工艺不糙。 */
+.x3-lab{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.x3-win{min-width:0;}
+.x3-panel{background:#fff;overflow:hidden;}
+.x3-ph{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid #f1f3f5;font-size:15px;font-weight:800;color:#111827;}
+.x3-ph .pt{font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;margin-left:auto;white-space:nowrap;}
+.x3-body{position:relative;min-height:224px;padding:6px 16px 52px;font-size:12.5px;line-height:1.5;}
+.x3-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #f1f3f5;color:#111827;overflow:hidden;max-height:64px;transition:max-height .3s ease,opacity .3s ease,padding .3s ease;}
+.x3-row.gone{max-height:0;opacity:0;padding-top:0;padding-bottom:0;border-bottom-color:transparent;}
+.x3-row.back{animation:ixd-pop .3s cubic-bezier(.34,1.56,.64,1);}
+.x3-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;background:#93c5fd;box-shadow:inset 0 -1px 2px rgba(0,0,0,.08);}
+.x3-row:nth-child(2) .x3-av{background:#60a5fa;}
+.x3-row:nth-child(3) .x3-av{background:#3b82f6;}
+.x3-rname{font-weight:700;font-size:12.5px;}
+.x3-rsub{color:#9ca3af;font-size:10.5px;}
+.x3-rdel{margin-left:auto;padding:4px 14px;border-radius:8px;border:1px solid #fca5a5;color:#dc2626;font-size:10.5px;font-weight:700;cursor:pointer;background:#fff;transition:background .15s ease;flex-shrink:0;}
+.x3-rdel:hover{background:#fef2f2;}
+/* A 面确认弹窗 */
+.x3-veil{position:absolute;inset:0;background:rgba(15,23,42,.32);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+.x3-veil.show{opacity:1;pointer-events:auto;}
+.x3-dlg{width:212px;background:#fff;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.22);padding:18px 16px;text-align:center;transform:scale(.92);transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
+.x3-veil.show .x3-dlg{transform:scale(1);}
+.x3-dlg .dh{font-weight:800;color:#111827;font-size:12.5px;margin-bottom:6px;}
+.x3-dlg .dp{color:#6b7280;font-size:10.5px;line-height:1.7;margin-bottom:14px;}
+.x3-dlg .db{display:flex;gap:8px;justify-content:center;}
+.x3-dbtn{padding:5px 18px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid #d1d5db;background:#fff;color:#374151;font-family:inherit;}
+.x3-dbtn.danger{background:#dc2626;border-color:#dc2626;color:#fff;}
+/* B 面撤销 toast */
+.x3-toast{position:absolute;left:16px;right:16px;bottom:10px;display:flex;align-items:center;gap:8px;background:#111827;color:#e5e7eb;border-radius:10px;padding:9px 14px;font-size:11px;box-shadow:0 4px 16px rgba(17,24,39,.3);transform:translateY(56px);opacity:0;transition:transform .3s cubic-bezier(.22,1,.36,1),opacity .3s ease;overflow:hidden;}
+.x3-toast.show{transform:translateY(0);opacity:1;}
+.x3-toast .tundo{margin-left:auto;color:#93c5fd;font-weight:800;cursor:pointer;padding:2px 8px;border-radius:6px;flex-shrink:0;}
+.x3-toast .tundo:hover{background:rgba(147,197,253,.14);}
+.x3-tbar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#3b82f6;transform-origin:left;}
+.x3-toast.show .x3-tbar{transition:transform 5s linear;transform:scaleX(0);}
+/* 计分板 */
+.x3-score{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
+.x3-sc{background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px;font-size:12.5px;color:var(--sub);line-height:1.7;}
+.x3-sc b{color:var(--ct-deep);font-variant-numeric:tabular-nums;}
+.x3-reset{margin-top:12px;border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 16px;font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;transition:color .15s,border-color .15s;}
+.x3-reset:hover{border-color:var(--ct-line);color:var(--ct-deep);}
+.x3-note{display:none;margin-top:12px;padding:14px 18px;border-radius:10px;background:var(--ct-soft);border:1.5px solid var(--ct-line);font-size:13.5px;line-height:1.8;color:var(--text);}
+.x3-note.show{display:block;}
+.x3-note b{color:var(--ct-deep);}
+
+/* ── 狼来了实验 ──
+   v1.3 质感：舞台装进 .mockwin（OA 日报页），背景用一叠
+   淡色文档线暗示「你正在写的日报」，弹窗压在文档上更像真事故。 */
+.x3-wolf{min-height:240px;display:flex;align-items:center;justify-content:center;position:relative;background:#f8fafc;overflow:hidden;}
+.x3-wolf::before{content:"";position:absolute;inset:20px 24px;background:repeating-linear-gradient(180deg,#e8edf3 0 9px,transparent 9px 26px);border-radius:4px;opacity:.65;}
+.x3-wolf>*{position:relative;}
+.x3-wstart{text-align:center;padding:24px;}
+.x3-wstart .ws-t{font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px;}
+.x3-wstart .ws-p{font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:16px;max-width:360px;}
+.x3-go{border:none;background:var(--ct);color:#fff;border-radius:10px;padding:10px 32px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:transform .15s ease,box-shadow .15s ease;}
+.x3-go:hover{transform:translateY(-1px);box-shadow:var(--shadow-pop);}
+.x3-wdlg{width:248px;background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.2);padding:20px;text-align:center;}
+.x3-wdlg .wd-n{font-size:10px;font-weight:800;color:#9ca3af;margin-bottom:8px;}
+.x3-wdlg .wd-t{font-size:13px;font-weight:800;color:#111827;line-height:1.6;margin-bottom:16px;min-height:40px;}
+.x3-wdlg .wd-b{display:flex;gap:8px;justify-content:center;}
+.x3-wres{width:100%;padding:16px;background:#f8fafc;}
+.x3-wres .wr-big{font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px;}
+.x3-wres .wr-p{font-size:13px;color:var(--sub);line-height:1.75;}
+.x3-wtimes{display:flex;gap:4px;align-items:flex-end;margin:12px 0;height:64px;}
+.x3-wt{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px;color:var(--sub);}
+.x3-wt .wtb{width:100%;border-radius:4px 4px 0 0;background:var(--ct-line);transition:height .35s ease-out;height:0;}
+.x3-wt.hot .wtb{background:var(--bad);}
+.x3-wt .wtv{font-variant-numeric:tabular-nums;}
+
+/* ── 防错三板斧表格配图标 ── */
+.x3-axe{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px;}
+.x3-axecard{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow-card);}
+.x3-axecard .ax-ic{width:32px;height:32px;border-radius:10px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+.x3-axecard .ax-ic svg{width:16px;height:16px;}
+.x3-axecard .ax-t{font-size:13.5px;font-weight:800;color:var(--ct-deep);margin-bottom:4px;}
+.x3-axecard .ax-d{font-size:12.5px;color:var(--sub);line-height:1.7;}
+
+@media (max-width:768px){
+  .x3-lab{grid-template-columns:1fr;}
+  .x3-score{grid-template-columns:1fr;}
+  .x3-axe{grid-template-columns:1fr;}
+}
+@media (prefers-reduced-motion:reduce){
+  .x3-row,.x3-veil,.x3-dlg,.x3-toast,.x3-wt .wtb,.x3-go{transition:none;}
+  .x3-toast.show .x3-tbar{transition:none;transform:scaleX(0);}
+  .x3-row.back{animation:none;}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"오류 방지와 가역성: 사용자가 겁내지 않고 누르게","name":"오류 방지와 가역성: 사용자가 겁내지 않고 누르게","url":"https://xueai.app/slides/ixd-3.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 좋은 인터랙션을 알아보는 네 가지 손잡이","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"사후에 오류를 알리기보다, 오류가 애초에 나지 않게 하세요: 쓸 수 없는 항목은 비활성화하고, 위험한 조작은 거리를 두고, 안전한 기본값으로 받쳐 주세요. 되돌리기가 있으면 탐색이 안전해지고, 확인 팝업은 가장 약한 오류 방지입니다. 직접 연락처 하나를 지워 보며 확인 팝업과 되돌리기 toast를 비교하고, 늑대 실험도 한 번 해 보세요.","datePublished":"2026-08-11","dateModified":"2026-08-12","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">인터랙션 엔지니어링 · 3 / 10</div>
+    <h1>오류 방지와 가역성: 사용자가 겁내지 않고 누르게</h1>
+    <p class="subtitle">지난 레슨은 오류를 어떻게 말할지를 다뤘어요. 이번엔 한 발 앞으로: <b>오류가 아예 나지 않게 하고, 났더라도 한 번에 되돌리게</b>. AI가 만든 앱은 확인 팝업을 보험처럼 좋아하지만, 그건 가장 약한 방어선이에요. 직접 연락처 두 개를 지워 보면 알 수 있어요.</p>
+    <div class="chips"><span class="chip">오류 방지 3수</span><span class="chip">되돌리기 toast</span><span class="chip">늑대 실험</span><span class="chip">개조 연습</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>사후 오류 알림보다 오류가 나지 않게; 되돌리기가 탐색을 안전하게 만들고, 확인 팝업은 가장 약한 오류 방지. 위험한 버튼 세 개를 직접 고쳐 보세요</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">사용자는 탐색 중이에요—탐색을 실수로 취급하지 마세요</div>
+    <p class="desc">Cooper는 《About Face 4》 15장에서 이렇게 말해요. 사용자 멘탈 모델로 보면 「잘못된 조작」이란 건 없어요. 소프트웨어를 쓰는 일은 곧 탐색이에요—이것 눌러 보고, 저것 시도해 보고, 막다른 골목에 들어갔다가 다시 나오는 게 도구를 배우는 정상 경로죠. 탐색을 오류로 낙인찍고 툭하면 팝업으로 막는 소프트웨어일수록, 사용자는 갈수록 위축돼요.</p>
+    <p class="desc" style="margin-top:16px">되돌리기에 대한 비유도 생생해요. 동굴 탐험을 할 때 입구에 언제든 올라올 수 있는 밧줄 사다리가 걸려 있으면 훨씬 대담해지죠. 되돌리기가 그 사다리예요. 실제로 구해 주는 횟수는 많지 않아도, 걸려 있어야 사용자가 더 깊이 들어가 봐요.</p>
+    <div class="quote-card" style="margin-top:16px">「하라, 묻지 마라.」<br><b>Alan Cooper, 《About Face 4》: 팝업으로 확인을 받기보다, 자신 있게 실행한 뒤 되돌리기를 준비해 두세요.</b></div>
+    <p class="desc" style="margin-top:16px">겁내지 않고 누르는 심리 메커니즘(방어 심리, 통제감)은 심리학 부에 한 레슨이 있어요. 여기엔 점프 카드만 두고, 다시 가르치진 않을게요.</p>
+    <a class="xref" href="psy-6.html">
+      <span class="xref-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></span>
+      <span><span class="xref-t">교차 부 · 방어 심리: 사용자는 못 쓰는 게 아니라, 감히 못 쓰는 거예요</span><span class="xref-d">가역성이 어떻게 통제감을 주는지, 왜 한 번 잘못 누르면 다시는 손을 못 대는지—심리학 부 6레슨에서 다 다뤄요. 여기를 눌러 건너가세요.</span></span>
+    </a>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">오류 방지 3수: 오류 메시지의 최고 경지는 알릴 오류가 없는 것</div>
+    <p class="desc">15장의 순서는 분명해요. 오류 메시지를 아무리 잘 써도, 오류가 나지 않게 하는 것보다 못해요. AI 산출물을 검수할 때 이 3수가 들어갔는지부터 보세요. 세 가지 모두 싸고, AI도 다 할 수 있어요—당신이 요청하기만 하면요.</p>
+    <div class="x3-axe">
+      <div class="x3-axecard">
+        <span class="ax-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg></span>
+        <div class="ax-t">쓸 수 없는 항목 비활성화</div>
+        <div class="ax-d">조건이 안 된 버튼은 회색으로 두고, 옆에 뭐가 부족한지 적으세요. 일단 누르게 한 뒤 오류를 띄우는 건, 함정을 파 두고 밟히길 기다리는 셈이에요.</div>
+      </div>
+      <div class="x3-axecard">
+        <span class="ax-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 8v8"/></svg></span>
+        <div class="ax-t">위험한 조작은 거리를 두기</div>
+        <div class="ax-d">「비우기」를 「저장」 옆에 두지 마세요. Cooper의 비유: 해롭지 않은 기능과 비상 탈출 레버를 나란히 두는 건, 열린 바비큐 그릴 옆에 앉는 것과 같아요.</div>
+      </div>
+      <div class="x3-axecard">
+        <span class="ax-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        <div class="ax-t">안전한 기본값으로 받치기</div>
+        <div class="ax-d">기본 옵션은 언제나 가장 안전한 쪽이어야 해요. 단체 메일의 기본값이 전원에게 보내기라면, 손미끄러짐 비용을 최대로 미리 설정해 둔 셈이죠.</div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:16px">3수가 대부분을 막고, 나머지는 가역성에 맡기세요. 그래서 질문이 생겨요: 삭제처럼 민감한 동작에서 AI가 제일 자주 내는 답이 확인 팝업인데, 그게 정말 버틸까요? 실험해 보죠.</p>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">직접 해보기 · 데이터 하나 삭제, 두 가지 수습</div>
+    <p class="desc">좌우 주소록은 데이터가 같아요. 왼쪽은 AI가 좋아하는 <b>확인 팝업</b>, 오른쪽은 <b>즉시 삭제 + 되돌릴 수 있는 toast</b>예요. 양쪽에서 하나씩 지운 뒤, 지운 걸 살려 보세요—체감이 결론을 내려 줄 거예요.</p>
+    <div class="toy" id="x3Lab">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+        <span class="toy-t">확인 팝업 vs 되돌리기 toast</span>
+        <span class="toy-badge" id="x3LabBadge">양쪽 다 지워 보세요</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">행 끝의 「삭제」를 누르세요. B면은 지운 뒤 5초 안에 되돌릴 수 있고, 카운트다운 바가 끝나면 정말 사라져요</div>
+        <div class="x3-lab">
+          <div class="mockwin x3-win">
+            <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">contacts.example.com</span></div>
+            <div class="x3-panel">
+            <div class="x3-ph">주소록<span class="pt">A · 확인 팝업 방식</span></div>
+            <div class="x3-body" id="x3A">
+              <div class="x3-row"><span class="x3-av">왕</span><span><span class="x3-rname">왕샤오후</span><br><span class="x3-rsub">프로덕트 · 138****2201</span></span><span class="x3-rdel" data-n="왕샤오후">삭제</span></div>
+              <div class="x3-row"><span class="x3-av">임</span><span><span class="x3-rname">임만청</span><br><span class="x3-rsub">디자인 · 139****8842</span></span><span class="x3-rdel" data-n="임만청">삭제</span></div>
+              <div class="x3-row"><span class="x3-av">진</span><span><span class="x3-rname">진대강</span><br><span class="x3-rsub">운영 · 137****0917</span></span><span class="x3-rdel" data-n="진대강">삭제</span></div>
+              <div class="x3-veil" id="x3Veil">
+                <div class="x3-dlg">
+                  <div class="dh">정말 삭제할까요?</div>
+                  <div class="dp" id="x3DlgP">삭제하면 되돌릴 수 없어요.</div>
+                  <div class="db">
+                    <button class="x3-dbtn" id="x3Cancel" type="button">취소</button>
+                    <button class="x3-dbtn danger" id="x3Confirm" type="button">확인</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </div>
+          </div>
+          <div class="mockwin x3-win">
+            <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">contacts.example.com</span></div>
+            <div class="x3-panel">
+            <div class="x3-ph">주소록<span class="pt">B · 되돌리기 toast 방식</span></div>
+            <div class="x3-body" id="x3B">
+              <div class="x3-row"><span class="x3-av">왕</span><span><span class="x3-rname">왕샤오후</span><br><span class="x3-rsub">프로덕트 · 138****2201</span></span><span class="x3-rdel" data-n="왕샤오후">삭제</span></div>
+              <div class="x3-row"><span class="x3-av">임</span><span><span class="x3-rname">임만청</span><br><span class="x3-rsub">디자인 · 139****8842</span></span><span class="x3-rdel" data-n="임만청">삭제</span></div>
+              <div class="x3-row"><span class="x3-av">진</span><span><span class="x3-rname">진대강</span><br><span class="x3-rsub">운영 · 137****0917</span></span><span class="x3-rdel" data-n="진대강">삭제</span></div>
+              <div class="x3-toast" id="x3Toast">
+                <span id="x3ToastTxt">삭제됨</span>
+                <span class="tundo" id="x3Undo">되돌리기</span>
+                <span class="x3-tbar" id="x3Tbar"></span>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+        <div class="x3-score">
+          <div class="x3-sc">A면이 팝업으로 <b id="x3ScA">0</b>번 끊었어요. 지운 걸 살릴 수 있나요? 없어요. 팝업은 사전에 한 번 막을 뿐, 막은 뒤에는 손을 털어요.</div>
+          <div class="x3-sc">B면은 데이터 <b id="x3ScB">0</b>개를 살렸고, 팝업은 제로예요. 삭제는 바로 적용되고 흐름을 끊지 않으며, 후회 창은 5초 동안 열려 있어요.</div>
+        </div>
+        <div class="x3-note" id="x3Note"></div>
+        <button class="x3-reset" id="x3Reset" type="button">양쪽 데이터 초기화</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">늑대 실험 · 확인 팝업이 왜 당신을 못 막나</div>
+    <p class="desc">납득이 안 될 수도 있어요: 팝업이 어쨌든 한 번은 막았는데, 왜 제일 약하냐고요. Cooper의 설명은 습관화예요. 늘 같은 자리에 뜨는 확인창은 금세 읽지도 않고 닫히고, 진짜 위험이 오면 손가락이 머리보다 빨라요. 이 실험은 20초, 직접 검증해 보세요.</p>
+    <div class="toy" id="x3Wolf">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+        <span class="toy-t">팝업 여덟 개를 연달아 눌러 보고, 몇 번째를 막을 수 있는지 보세요</span>
+        <span class="toy-badge" id="x3WolfBadge">실험</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">규칙: 팝업 여덟 개를 최대한 빨리 처리하세요. 어떻게 눌러도 돼요. 끝나면 결과가 나와요</div>
+        <div class="mockwin">
+          <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">oa.example.com/daily-report</span></div>
+          <div class="x3-wolf" id="x3WolfStage">
+            <div class="x3-wstart" id="x3WolfStart">
+              <div class="ws-t">일일 보고를 서두르는 중이고, 팝업이 하나씩 뜰 거예요</div>
+              <div class="ws-p">평소처럼 처리하면 돼요. 빠를수록 좋고, 시스템이 시간을 재요.</div>
+              <button class="x3-go" id="x3WolfGo" type="button">실험 시작</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">연습 · 위험한 버튼 세 개 개조하기</div>
+    <p class="desc">3수와 가역성까지 갖춰졌으니, 손대고 고쳐 보죠. 세 장면 모두 AI 산출물의 흔한 병이에요. <b>장면마다 가장 맞는 오류 방지 수단을 고르세요</b>. 틀리면 설명이 나오고, 맞을 때까지 고르면 돼요.</p>
+    <div class="toy" id="x3Fix1">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+        <span class="toy-t">장면 1: 툴바에 「캔버스 비우기」가 「저장」 바로 옆에 있고, 이미 손미끄러짐이 났어요</span>
+        <span class="toy-badge">객관식</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>「캔버스 비우기」를 누를 때 확인창을 띄운다</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>「캔버스 비우기」를 메뉴 깊숙이 옮기고 「저장」과 거리를 둔 뒤, 되돌리기를 붙인다</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>「캔버스 비우기」 버튼을 빨간색으로 바꿔 경고한다</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>비우기 전에 백업 파일을 로컬로 자동 내보낸다</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+    <div class="toy" id="x3Fix2">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
+        <span class="toy-t">장면 2: 단체 알림 팝업에서 수신자가 기본으로 「모든 멤버(2841명)」에 체크되어 있다</span>
+        <span class="toy-badge">객관식</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>보내기 전 확인창을 띄우고 수신자 수를 보여 준다</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>「모든 멤버」 옵션을 없앤다</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>기본값을 「내가 고른 사람에게만」으로 바꾸고, 「모든 멤버」를 고르면 그 자리에서 인원 수를 보여 준다</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>보낸 뒤 회수를 허용하면, 그 안전망이면 충분하다</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+    <div class="toy" id="x3Fix3">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <span class="toy-t">장면 3: 폼을 다 안 채워도 「제출」이 눌리고, 누르면 「정보가 불완전합니다」가 뜬다</span>
+        <span class="toy-badge">객관식</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>오류 문구를 3요소에 맞춰 더 친절하게 고친다</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>다 안 채웠을 때 「제출」을 막고, 버튼 옆에 무엇이 남았는지 적는다</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>제출 시 빈 칸에 기본값을 자동으로 채운다</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>확인창에 빈 칸을 나열하고, 계속할지 돌아갈지 고르게 한다</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">퀴즈 · 네 방어선을 순위로</div>
+    <div class="toy" id="x3Quiz">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+        <span class="toy-t">네 방어선 중 어느 것이 가장 약할까요?</span>
+        <span class="toy-badge">객관식</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">틀려도 설명이 나오고, 맞을 때까지 고르면 돼요</div>
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>쓸 수 없는 항목을 비활성화하고, 설명을 붙인다</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>위험한 조작과 자주 쓰는 조작의 거리를 둔다</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>삭제 전에 확인창을 띄운다</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>즉시 실행하고, 되돌릴 수 있게 한다</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">핵심 요점</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>사용자는 탐색 중이에요—실수로 취급하지 마세요:</b> 되돌리기는 동굴 입구의 밧줄 사다리예요. 걸려 있어야 사용자가 더 깊이 들어가요(Cooper, 《About Face 4》 15장).</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>오류 방지 3수:</b> 쓸 수 없는 항목을 비활성화하고 설명하고, 위험한 조작은 거리를 두고, 기본값은 가장 안전한 쪽. 오류 메시지의 최고 경지는 알릴 오류가 없는 것.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>확인 팝업은 가장 약한 방어선:</b> 늑대 효과—일상 팝업은 읽지도 않고 닫히고, 진짜 위험이 올 때쯤엔 이미 죽어 있어요. 하라, 묻지 마라—그리고 되돌리기를 준비하세요.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>AI에게 쓰는 요청 말투:</b> 「삭제는 즉시 적용하고, 되돌릴 수 있는 toast를 5초 띄워 줘」가 「삭제에 확인이 있어야 해」보다 한 단계 나은 산출을 내요. 흐름의 군더더기 단계를 어떻게 자를지는 다음 레슨에서요.</p></div>
+    </div>
+    <p class="src-note"><b>콘텐츠 출처:</b> 샤오산 아카데미 「인터랙션 엔지니어링」 특집 오리지널; 일부 원칙은 《About Face 4: 인터랙션 디자인의 정수》에서 정리.</p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="taste.js?v=20260810a"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* ── 主教具：删一条数据，两种善后 ──
+   背景：「确认弹窗最弱、撤销更强」光讲道理没人信，
+   要让读者两边各删一条，亲手体会打断感和后悔权的差别。
+   设计意图：A 面弹窗用遮罩淡入 + 对话框弹性放大（200ms），
+   B 面是本页动画重头戏：行塌缩、toast 滑入、倒计时条 5 秒
+   线性走完、点撤销行以 ixd-pop 弹回。计分板实时记两个数，
+   两边都体验过之后判词才出现（状态跳变只给一次）。
+   约束：B 面同时只保留一条待撤销记录，新删除会顶掉旧倒计时
+   （旧的那条直接定死），与主流 toast 实现一致。 */
+(function () {
+  var panelA = document.getElementById('x3A');
+  var panelB = document.getElementById('x3B');
+  var veil = document.getElementById('x3Veil');
+  var dlgP = document.getElementById('x3DlgP');
+  var toast = document.getElementById('x3Toast');
+  var toastTxt = document.getElementById('x3ToastTxt');
+  var tbar = document.getElementById('x3Tbar');
+  var badge = document.getElementById('x3LabBadge');
+  var note = document.getElementById('x3Note');
+  var scA = 0, scB = 0, triedA = false, triedB = false, judged = false;
+  var pendingRow = null, undoRow = null, timer = null;
+
+  function collapse(row) { row.classList.add('gone'); }
+  function restore(row) {
+    row.classList.remove('gone');
+    row.classList.add('back');
+    row.addEventListener('animationend', function h() {
+      row.classList.remove('back');
+      row.removeEventListener('animationend', h);
+    });
+  }
+
+  function judge() {
+    if (judged || !(triedA && triedB)) return;
+    judged = true;
+    note.innerHTML = '<b>체감을 맞춰 볼까요.</b> A면은 하나 지울 때마다 팝업을 먼저 모셔야 하고, 지운 뒤 정말 후회해도 도와줄 수 없어요. 「복구 불가」는 솔직하죠. B면은 한 마디도 묻지 않고, 잘못 지웠으면 5초 안에 되돌리기를 누르면 돌아와요. Cooper의 결론이 여기 떨어져요: 확인 팝업은 책임을 사용자에게 미루고, 되돌리기는 책임을 소프트웨어에 남겨 둡니다. AI에게는 「삭제는 즉시 적용, 되돌릴 수 있는 toast 붙여」라고 바로 쓰세요.';
+    note.classList.add('show', 'ixd-slide-up');
+    badge.textContent = '비교 완료';
+    badge.classList.add('solved');
+  }
+
+  /* A 面：确认弹窗 */
+  panelA.addEventListener('click', function (e) {
+    var del = e.target.closest('.x3-rdel');
+    if (del) {
+      pendingRow = del.closest('.x3-row');
+      dlgP.textContent = '「' + del.dataset.n + '」삭제하면 되돌릴 수 없어요.';
+      veil.classList.add('show');
+      scA++;
+      document.getElementById('x3ScA').textContent = scA;
+    }
+  });
+  document.getElementById('x3Cancel').addEventListener('click', function () {
+    veil.classList.remove('show');
+    pendingRow = null;
+  });
+  document.getElementById('x3Confirm').addEventListener('click', function () {
+    veil.classList.remove('show');
+    if (pendingRow) { collapse(pendingRow); pendingRow = null; }
+    triedA = true;
+    judge();
+  });
+
+  /* B 面：立即删除 + 可撤销 toast */
+  function killTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+  function hideToast() {
+    toast.classList.remove('show');
+    tbar.style.transition = 'none';
+    tbar.style.transform = 'scaleX(1)';
+  }
+  panelB.addEventListener('click', function (e) {
+    var del = e.target.closest('.x3-rdel');
+    if (del) {
+      killTimer();
+      undoRow = del.closest('.x3-row');
+      collapse(undoRow);
+      toastTxt.textContent = '\'' + del.dataset.n + '\' 삭제됨';
+      hideToast();
+      /* 强制回流后重启倒计时条，让 5s 过渡从头走 */
+      void toast.offsetWidth;
+      tbar.style.transition = '';
+      tbar.style.transform = '';
+      toast.classList.add('show');
+      timer = setTimeout(function () {
+        hideToast();
+        undoRow = null;
+        triedB = true;
+        judge();
+      }, 5000);
+      triedB = true;
+      judge();
+    }
+  });
+  document.getElementById('x3Undo').addEventListener('click', function () {
+    killTimer();
+    hideToast();
+    if (undoRow) {
+      restore(undoRow);
+      undoRow = null;
+      scB++;
+      document.getElementById('x3ScB').textContent = scB;
+    }
+  });
+
+  /* 重置：两边的行都复位，计分保留（打断次数是累计证据） */
+  document.getElementById('x3Reset').addEventListener('click', function () {
+    killTimer();
+    hideToast();
+    veil.classList.remove('show');
+    undoRow = null;
+    pendingRow = null;
+    document.querySelectorAll('#x3Lab .x3-row').forEach(function (r) {
+      r.classList.remove('gone', 'back');
+    });
+  });
+})();
+
+/* ── 狼来了实验 ──
+   背景：「确认弹窗会被习惯化」需要一次亲身打脸才有说服力。
+   设计意图：八个弹窗逐个弹出（ixd-pop），前六个全是日常琐事，
+   第七个悄悄换成毁灭性操作，第八个又变回琐事作掩护；逐个记录
+   反应毫秒数，结束后柱状图揭晓：多数人在第七个上的耗时和其他
+   弹窗没有差别，甚至更快。若读者在第七个点了「取消」，判词换成
+   祝贺版本，但指出真实用户没有第二次机会。
+   约束：反应计时从弹窗渲染完成起算；柱状图高度上限 900ms 截断。 */
+(function () {
+  var stage = document.getElementById('x3WolfStage');
+  var badge = document.getElementById('x3WolfBadge');
+  var DLGS = [
+    '편집 모드를 종료할까요?',
+    '이 일일 보고를 읽음으로 표시할까요?',
+    '임시함의 초안 2개를 비울까요?',
+    '새 편집기로 전환할까요?',
+    '자동 저장 알림을 끌까요?',
+    '지금 필터를 기본 보기로 저장할까요?',
+    '계정과 모든 과거 데이터를 삭제할까요?',
+    '나가기 전에 최신 내용을 한 번 동기화할까요?'
+  ];
+  var HOT = 6;
+  var times = [], choices = [], idx = 0, t0 = 0;
+
+  function showDlg() {
+    stage.innerHTML =
+      '<div class="x3-wdlg ixd-pop">' +
+        '<div class="wd-n">팝업 ' + (idx + 1) + ' / 8</div>' +
+        '<div class="wd-t">' + DLGS[idx] + '</div>' +
+        '<div class="wd-b">' +
+          '<button class="x3-dbtn" data-c="0" type="button">취소</button>' +
+          '<button class="x3-dbtn danger" data-c="1" type="button">확인</button>' +
+        '</div>' +
+      '</div>';
+    t0 = performance.now();
+  }
+
+  function bars() {
+    var html = '<div class="x3-wtimes">';
+    times.forEach(function (ms, i) {
+      var h = Math.min(ms, 900) / 900 * 56 + 8;
+      html += '<div class="x3-wt' + (i === HOT ? ' hot' : '') + '"><span class="wtb" data-h="' + h + '"></span><span class="wtv">' + Math.round(ms) + '</span></div>';
+    });
+    return html + '</div>';
+  }
+
+  function finish() {
+    var hotMs = Math.round(times[HOT]);
+    var others = times.filter(function (m, i) { return i !== HOT; });
+    var avg = Math.round(others.reduce(function (a, b) { return a + b; }, 0) / others.length);
+    var saved = choices[HOT] === 0;
+    var head, body;
+    if (saved) {
+      head = '일곱 번째 팝업을 막으셨네요. 축하해요—너무 안심하진 마세요.';
+      body = '여기는 수업이라 경계심을 갖고 왔어요. 실제 사용자는 일일 보고를 서두르고, 앞의 여섯 팝업이 이미 클릭 기계로 훈련시켜 일곱 번째도 그대로 눌러요. 당신 데이터도 말해요: 팝업 하나 처리에 평균 <b>' + avg + '</b>ms밖에 안 걸려요—한 줄도 못 읽는 시간이에요.';
+    } else {
+      head = '일곱 번째 팝업이 방금 계정과 모든 과거 데이터를 지웠어요.';
+      body = '<b>' + hotMs + '</b>ms 만에 닫았고, 다른 팝업은 평균 <b>' + avg + '</b>ms예요. 손가락이 뇌에 글자를 읽을 시간을 안 줬죠. 이게 Cooper가 말한 늑대예요: 위험 없는 곳에서 확인창이 여섯 번 외쳤고, 일곱 번째에 진짜 늑대가 왔을 때 당신은 이미 안 들려요.';
+    }
+    stage.innerHTML =
+      '<div class="x3-wres ixd-slide-up">' +
+        '<div class="wr-big">' + head + '</div>' +
+        bars() +
+        '<div class="wr-p">빨간 막대가 일곱 번째 팝업(ms)이에요. ' + body + ' 결론: 확인 팝업은 손미끄러짐을 못 막고, 되돌릴 수 있어야 막아요.</div>' +
+      '</div>';
+    /* 下一帧再赋高度，柱子做生长过渡 */
+    requestAnimationFrame(function () {
+      stage.querySelectorAll('.wtb').forEach(function (b) {
+        b.style.height = b.dataset.h + 'px';
+      });
+    });
+    badge.textContent = '공개됨';
+    badge.classList.add('solved');
+  }
+
+  stage.addEventListener('click', function (e) {
+    if (e.target.id === 'x3WolfGo') {
+      idx = 0; times = []; choices = [];
+      showDlg();
+      return;
+    }
+    var btn = e.target.closest('.x3-dbtn');
+    if (!btn) return;
+    times.push(performance.now() - t0);
+    choices.push(+btn.dataset.c);
+    idx++;
+    if (idx < DLGS.length) { showDlg(); } else { finish(); }
+  });
+})();
+
+/* 改造演练一：挨着保存的清空按钮。对症的是拉开距离 + 撤销。 */
+tasteQuiz('x3Fix1', {
+  answer: 1,
+  why: [
+    '팝업은 증상만 고쳐요. 「비우기」를 손미끄러짐으로 누른 사람은 대개 팝업도 손미끄러짐으로 닫아요—위 실험이 방금 보여 줬죠.',
+    '정답에 가깝습니다. 병의 뿌리는 위험한 조작과 자주 쓰는 조작이 너무 가까운 것. 「비우기」를 황금 자리에서 치우면 손미끄러짐의 물리적 조건이 사라지고, 되돌리기까지 붙이면 방어선 두 줄이 단단해져요.',
+    '빨간색은 보는 사람을 일깨울 뿐, 손이 빠른 사람을 못 막아요. 손미끄러짐은 조준 단계에서 나고, 색은 조준을 돕지 못해요.',
+    '백업은 재해 복구예요. 사용자가 그 파일을 못 찾을 수도 있어요. 재해가 안 나게 할 수 있다면, 복구에 기대지 마세요.'
+  ]
+});
+
+/* 改造演练二：群发默认全选。对症的是안전한 기본값으로 받치기。 */
+tasteQuiz('x3Fix2', {
+  answer: 2,
+  why: [
+    '또 팝업이네요. 알림을 하루에 여덟 번 보내는 사람은 세 번째부터 눈 감고 확인을 눌러요. 2841명은 그대로 받아요.',
+    '한칼에 없애면 진짜 니즈도 잘려요. 전원 공지가 필요할 때도 있어요. 오류 방지는 의외를 막아야지, 의도를 막으면 안 돼요.',
+    '정답에 가깝습니다. 안전한 기본값: 손미끄러짐 비용은 기본 옵션에 달려 있어요. 기본을 최소 범위로 두면 「모든 멤버」는 일부러 고르는 결정이 되고, 인원 수 힌트까지 붙이면 뜻밖의 단체 발송은 사라져요.',
+    '회수는 좋은 안전망이지만, 2841명 중엔 이미 읽은 손 빠른 사람이 있어요. 기본값은 사고를 안 나게 하고, 회수는 사고만 줄여요.'
+  ]
+});
+
+/* 改造演练三：没填完也能点的提交按钮。对症的是禁用 + 说明。 */
+tasteQuiz('x3Fix3', {
+  answer: 1,
+  why: [
+    '문구를 아무리 친절하게 고쳐도, 일단 벽에 부딪히게 한 뒤 밴드를 주는 셈이에요. 3요소는 오류가 난 뒤의 수습이고, 여기선 오류가 안 나도 돼요.',
+    '정답에 가깝습니다. 쓸 수 없는 항목을 비활성화하고 「휴대폰 번호와 배송지가 아직 남았어요」처럼 한 줄을 붙이면, 사용자는 시행착오 없이 길을 알아요. 설명은 꼭 붙이세요—회색만 두고 말이 없으면 새 수수께끼가 돼요.',
+    '기본값으로는 여기가 안 받쳐져요: 배송지를 사용자 대신 지어 낼 수 없고, 지어 내면 그게 진짜 사고예요.',
+    '팝업에 목록을 띄우는 건 「버튼 옆 한 줄」을 「한 번 끊기」로 업그레이드하는 셈—정보는 같고 비용은 두 배예요.'
+  ]
+});
+
+/* 点选题：四道防线排序。判词把每个选项放回防错光谱。 */
+tasteQuiz('x3Quiz', {
+  answer: 2,
+  why: [
+    '비활성화+설명은 단단한 방어선: 잘못된 입구가 물리적으로 없어서, 실수하고 싶어도 길이 없어요.',
+    '거리를 두는 것도 단단한 방어선: 손미끄러짐엔 물리적 조건이 필요하고, 거리를 벌리면 조건이 사라져요.',
+    '맞아요. 확인 팝업은 방어선처럼 보이지만 사실 소품 배경이에요: 늑대 효과로 몇 주 만에 죽고, 사용자는 눈 감고 확인을 눌러요. 책임도 소프트웨어에서 사용자에게 미루죠.',
+    '되돌릴 수 있음이 가장 강한 부드러운 방어선: 막지는 않지만 언제나 받아 줘요. 「하라, 묻지 마라」의 배짱이 바로 그것이에요.'
+  ]
+});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.ko.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

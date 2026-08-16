@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Error Prevention & Reversibility: So Users Aren't Afraid to Click | Interaction Engineering</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="ixd.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="Rather than report errors after the fact, stop them from happening: disable what's unavailable, keep dangerous actions at a distance, and ship safe defaults. Undo makes exploration safe; confirm dialogs are the weakest defense. Delete a contact yourself, compare a confirm dialog vs an undo toast, then run a cry-wolf experiment.">
+<meta name="keywords" content="Interaction Engineering,error prevention,undo,confirm dialog,reversibility,About Face,dangerous actions">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ixd-3.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ixd-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ixd-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ixd-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ixd-3.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Xiaoshan Academy">
+<meta property="og:title" content="Error Prevention & Reversibility: So Users Aren't Afraid to Click">
+<meta property="og:description" content="Confirm dialogs don't stop fat-finger mistakes—users dismiss them without reading. Prevention beats error messages; undo beats confirm.">
+<meta property="og:url" content="https://xueai.app/slides/ixd-3.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Error Prevention & Reversibility: So Users Aren't Afraid to Click">
+<meta name="twitter:description" content="Confirm dialogs don't stop fat-finger mistakes—users dismiss them without reading. Prevention beats error messages; undo beats confirm.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 主教具：删一条数据，两种善后 ──
+   A 面确认弹窗、B 面立即删除 + 可撤销 toast，
+   toast 滑入、倒计时条、撤销弹回是本页的动画重头戏。
+   v1.3 质感：两面通讯录各装一个 .mockwin 外壳，联系人列表
+   按真产品做（32px 头像、12.5/10.5 两级文字、16px 边距）；
+   A 面弹窗保持「AI 默认产出」的平庸感，工艺不糙。 */
+.x3-lab{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.x3-win{min-width:0;}
+.x3-panel{background:#fff;overflow:hidden;}
+.x3-ph{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid #f1f3f5;font-size:15px;font-weight:800;color:#111827;}
+.x3-ph .pt{font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;margin-left:auto;white-space:nowrap;}
+.x3-body{position:relative;min-height:224px;padding:6px 16px 52px;font-size:12.5px;line-height:1.5;}
+.x3-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #f1f3f5;color:#111827;overflow:hidden;max-height:64px;transition:max-height .3s ease,opacity .3s ease,padding .3s ease;}
+.x3-row.gone{max-height:0;opacity:0;padding-top:0;padding-bottom:0;border-bottom-color:transparent;}
+.x3-row.back{animation:ixd-pop .3s cubic-bezier(.34,1.56,.64,1);}
+.x3-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;background:#93c5fd;box-shadow:inset 0 -1px 2px rgba(0,0,0,.08);}
+.x3-row:nth-child(2) .x3-av{background:#60a5fa;}
+.x3-row:nth-child(3) .x3-av{background:#3b82f6;}
+.x3-rname{font-weight:700;font-size:12.5px;}
+.x3-rsub{color:#9ca3af;font-size:10.5px;}
+.x3-rdel{margin-left:auto;padding:4px 14px;border-radius:8px;border:1px solid #fca5a5;color:#dc2626;font-size:10.5px;font-weight:700;cursor:pointer;background:#fff;transition:background .15s ease;flex-shrink:0;}
+.x3-rdel:hover{background:#fef2f2;}
+/* A 面确认弹窗 */
+.x3-veil{position:absolute;inset:0;background:rgba(15,23,42,.32);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+.x3-veil.show{opacity:1;pointer-events:auto;}
+.x3-dlg{width:212px;background:#fff;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.22);padding:18px 16px;text-align:center;transform:scale(.92);transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
+.x3-veil.show .x3-dlg{transform:scale(1);}
+.x3-dlg .dh{font-weight:800;color:#111827;font-size:12.5px;margin-bottom:6px;}
+.x3-dlg .dp{color:#6b7280;font-size:10.5px;line-height:1.7;margin-bottom:14px;}
+.x3-dlg .db{display:flex;gap:8px;justify-content:center;}
+.x3-dbtn{padding:5px 18px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid #d1d5db;background:#fff;color:#374151;font-family:inherit;}
+.x3-dbtn.danger{background:#dc2626;border-color:#dc2626;color:#fff;}
+/* B 面撤销 toast */
+.x3-toast{position:absolute;left:16px;right:16px;bottom:10px;display:flex;align-items:center;gap:8px;background:#111827;color:#e5e7eb;border-radius:10px;padding:9px 14px;font-size:11px;box-shadow:0 4px 16px rgba(17,24,39,.3);transform:translateY(56px);opacity:0;transition:transform .3s cubic-bezier(.22,1,.36,1),opacity .3s ease;overflow:hidden;}
+.x3-toast.show{transform:translateY(0);opacity:1;}
+.x3-toast .tundo{margin-left:auto;color:#93c5fd;font-weight:800;cursor:pointer;padding:2px 8px;border-radius:6px;flex-shrink:0;}
+.x3-toast .tundo:hover{background:rgba(147,197,253,.14);}
+.x3-tbar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#3b82f6;transform-origin:left;}
+.x3-toast.show .x3-tbar{transition:transform 5s linear;transform:scaleX(0);}
+/* 计分板 */
+.x3-score{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
+.x3-sc{background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px;font-size:12.5px;color:var(--sub);line-height:1.7;}
+.x3-sc b{color:var(--ct-deep);font-variant-numeric:tabular-nums;}
+.x3-reset{margin-top:12px;border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 16px;font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;transition:color .15s,border-color .15s;}
+.x3-reset:hover{border-color:var(--ct-line);color:var(--ct-deep);}
+.x3-note{display:none;margin-top:12px;padding:14px 18px;border-radius:10px;background:var(--ct-soft);border:1.5px solid var(--ct-line);font-size:13.5px;line-height:1.8;color:var(--text);}
+.x3-note.show{display:block;}
+.x3-note b{color:var(--ct-deep);}
+
+/* ── 狼来了实验 ──
+   v1.3 质感：舞台装进 .mockwin（OA 日报页），背景用一叠
+   淡色文档线暗示「你正在写的日报」，弹窗压在文档上更像真事故。 */
+.x3-wolf{min-height:240px;display:flex;align-items:center;justify-content:center;position:relative;background:#f8fafc;overflow:hidden;}
+.x3-wolf::before{content:"";position:absolute;inset:20px 24px;background:repeating-linear-gradient(180deg,#e8edf3 0 9px,transparent 9px 26px);border-radius:4px;opacity:.65;}
+.x3-wolf>*{position:relative;}
+.x3-wstart{text-align:center;padding:24px;}
+.x3-wstart .ws-t{font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px;}
+.x3-wstart .ws-p{font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:16px;max-width:360px;}
+.x3-go{border:none;background:var(--ct);color:#fff;border-radius:10px;padding:10px 32px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:transform .15s ease,box-shadow .15s ease;}
+.x3-go:hover{transform:translateY(-1px);box-shadow:var(--shadow-pop);}
+.x3-wdlg{width:248px;background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.2);padding:20px;text-align:center;}
+.x3-wdlg .wd-n{font-size:10px;font-weight:800;color:#9ca3af;margin-bottom:8px;}
+.x3-wdlg .wd-t{font-size:13px;font-weight:800;color:#111827;line-height:1.6;margin-bottom:16px;min-height:40px;}
+.x3-wdlg .wd-b{display:flex;gap:8px;justify-content:center;}
+.x3-wres{width:100%;padding:16px;background:#f8fafc;}
+.x3-wres .wr-big{font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px;}
+.x3-wres .wr-p{font-size:13px;color:var(--sub);line-height:1.75;}
+.x3-wtimes{display:flex;gap:4px;align-items:flex-end;margin:12px 0;height:64px;}
+.x3-wt{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px;color:var(--sub);}
+.x3-wt .wtb{width:100%;border-radius:4px 4px 0 0;background:var(--ct-line);transition:height .35s ease-out;height:0;}
+.x3-wt.hot .wtb{background:var(--bad);}
+.x3-wt .wtv{font-variant-numeric:tabular-nums;}
+
+/* ── 防错三板斧表格配图标 ── */
+.x3-axe{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px;}
+.x3-axecard{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow-card);}
+.x3-axecard .ax-ic{width:32px;height:32px;border-radius:10px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+.x3-axecard .ax-ic svg{width:16px;height:16px;}
+.x3-axecard .ax-t{font-size:13.5px;font-weight:800;color:var(--ct-deep);margin-bottom:4px;}
+.x3-axecard .ax-d{font-size:12.5px;color:var(--sub);line-height:1.7;}
+
+@media (max-width:768px){
+  .x3-lab{grid-template-columns:1fr;}
+  .x3-score{grid-template-columns:1fr;}
+  .x3-axe{grid-template-columns:1fr;}
+}
+@media (prefers-reduced-motion:reduce){
+  .x3-row,.x3-veil,.x3-dlg,.x3-toast,.x3-wt .wtb,.x3-go{transition:none;}
+  .x3-toast.show .x3-tbar{transition:none;transform:scaleX(0);}
+  .x3-row.back{animation:none;}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Error Prevention & Reversibility: So Users Aren't Afraid to Click","name":"Error Prevention & Reversibility: So Users Aren't Afraid to Click","url":"https://xueai.app/slides/ixd-3.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Four Handles for Spotting Good Interaction","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Rather than report errors after the fact, stop them from happening: disable what's unavailable, keep dangerous actions at a distance, and ship safe defaults. Undo makes exploration safe; confirm dialogs are the weakest defense. Delete a contact yourself, compare a confirm dialog vs an undo toast, then run a cry-wolf experiment.","datePublished":"2026-08-11","dateModified":"2026-08-12","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Interaction Engineering · 3 / 10</div>
+    <h1>Error Prevention &amp; Reversibility: So Users Aren't Afraid to Click</h1>
+    <p class="subtitle">Last lesson was how to word errors. This one steps earlier: <b>stop errors from happening at all—and if they do, let users undo in one click</b>. AI-built apps love confirm dialogs as insurance, but that's the weakest line of defense. Delete two contacts yourself and you'll see why.</p>
+    <div class="chips"><span class="chip">Three prevention moves</span><span class="chip">Undo toast</span><span class="chip">Cry-wolf experiment</span><span class="chip">Fix drills</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Stop errors before they happen; undo makes exploration safe; confirm dialogs are the weakest defense. Redesign three dangerous buttons yourself</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">Users are exploring—don't treat exploration as mistakes</div>
+    <p class="desc">In <i>About Face 4</i>, chapter 15, Cooper takes a clear stance: from the user's mental model, there is no such thing as an "error action." People explore software—tap this, try that, hit a dead end, back out. That's how you learn a tool. Software that labels exploration as error and pops dialogs at every turn makes users more timid with every use.</p>
+    <p class="desc" style="margin-top:16px">His metaphor for undo is vivid: explorers entering a cave feel braver when a rope ladder hangs at the mouth, ready to climb back out. Undo is that ladder. It may rarely save you—but because it's there, users dare go deeper.</p>
+    <div class="quote-card" style="margin-top:16px">"Do, don't ask."<br><b>Alan Cooper, <i>About Face 4</i>: instead of asking for confirmation, act confidently—then keep undo ready.</b></div>
+    <p class="desc" style="margin-top:16px">The psychology behind daring to click (defensive mindset, sense of control) has a full lesson in the Psychology Part—here's a jump card; we won't re-teach it.</p>
+    <a class="xref" href="psy-6.html">
+      <span class="xref-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></span>
+      <span><span class="xref-t">Cross-Part · Defensive mindset: users aren't unable—they're afraid to use it</span><span class="xref-d">How reversibility gives users a sense of control, and why one mis-tap can scare them off forever—Psychology Part, lesson 6 covers it. Tap to jump.</span></span>
+    </a>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Three prevention moves: the best error message is no error to report</div>
+    <p class="desc">Chapter 15 ranks it clearly: the best-written error message still loses to stopping the error. When you review AI output, check whether these three moves are in place—they're cheap, AI can do all three, if you ask.</p>
+    <div class="x3-axe">
+      <div class="x3-axecard">
+        <span class="ax-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg></span>
+        <div class="ax-t">Disable what's unavailable</div>
+        <div class="ax-d">Gray out buttons whose conditions aren't met, and say what's missing nearby. Letting users click first then fail is setting a trap.</div>
+      </div>
+      <div class="x3-axecard">
+        <span class="ax-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 8v8"/></svg></span>
+        <div class="ax-t">Keep dangerous actions at a distance</div>
+        <div class="ax-d">"Clear all" shouldn't sit next to "Save." Cooper's line: putting a harmless control next to the ejection-seat lever is like sitting beside an open barbecue grill.</div>
+      </div>
+      <div class="x3-axecard">
+        <span class="ax-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        <div class="ax-t">Safe defaults as a backstop</div>
+        <div class="ax-d">The default should always be the safest option. Mass email defaulting to everyone maxes out the cost of a fat-finger slip.</div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:16px">The three moves catch most of it; reversibility covers the rest. So here's the question: for delete, AI's favorite fix is a confirm dialog—does it actually hold? Let's experiment.</p>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">Try it · Delete one row, two ways to recover</div>
+    <p class="desc">Two contact lists, same data. Left uses AI's favorite <b>confirm dialog</b>; right uses <b>instant delete + undo toast</b>. Delete one on each side, then try to save what you deleted—your gut will write the conclusion.</p>
+    <div class="toy" id="x3Lab">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+        <span class="toy-t">Confirm dialog vs undo toast</span>
+        <span class="toy-badge" id="x3LabBadge">Try deleting on both sides</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">Tap "Delete" at the end of a row. On side B you can undo within 5 seconds—when the countdown bar finishes, it's gone for real</div>
+        <div class="x3-lab">
+          <div class="mockwin x3-win">
+            <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">contacts.example.com</span></div>
+            <div class="x3-panel">
+            <div class="x3-ph">Contacts<span class="pt">A · Confirm dialog</span></div>
+            <div class="x3-body" id="x3A">
+              <div class="x3-row"><span class="x3-av">W</span><span><span class="x3-rname">Xiaohu Wang</span><br><span class="x3-rsub">Product · 138****2201</span></span><span class="x3-rdel" data-n="Xiaohu Wang">Delete</span></div>
+              <div class="x3-row"><span class="x3-av">L</span><span><span class="x3-rname">Wanqing Lin</span><br><span class="x3-rsub">Design · 139****8842</span></span><span class="x3-rdel" data-n="Wanqing Lin">Delete</span></div>
+              <div class="x3-row"><span class="x3-av">C</span><span><span class="x3-rname">Dajiang Chen</span><br><span class="x3-rsub">Ops · 137****0917</span></span><span class="x3-rdel" data-n="Dajiang Chen">Delete</span></div>
+              <div class="x3-veil" id="x3Veil">
+                <div class="x3-dlg">
+                  <div class="dh">Delete this contact?</div>
+                  <div class="dp" id="x3DlgP">This can't be undone.</div>
+                  <div class="db">
+                    <button class="x3-dbtn" id="x3Cancel" type="button">Cancel</button>
+                    <button class="x3-dbtn danger" id="x3Confirm" type="button">Confirm</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </div>
+          </div>
+          <div class="mockwin x3-win">
+            <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">contacts.example.com</span></div>
+            <div class="x3-panel">
+            <div class="x3-ph">Contacts<span class="pt">B · Undo toast</span></div>
+            <div class="x3-body" id="x3B">
+              <div class="x3-row"><span class="x3-av">W</span><span><span class="x3-rname">Xiaohu Wang</span><br><span class="x3-rsub">Product · 138****2201</span></span><span class="x3-rdel" data-n="Xiaohu Wang">Delete</span></div>
+              <div class="x3-row"><span class="x3-av">L</span><span><span class="x3-rname">Wanqing Lin</span><br><span class="x3-rsub">Design · 139****8842</span></span><span class="x3-rdel" data-n="Wanqing Lin">Delete</span></div>
+              <div class="x3-row"><span class="x3-av">C</span><span><span class="x3-rname">Dajiang Chen</span><br><span class="x3-rsub">Ops · 137****0917</span></span><span class="x3-rdel" data-n="Dajiang Chen">Delete</span></div>
+              <div class="x3-toast" id="x3Toast">
+                <span id="x3ToastTxt">Deleted</span>
+                <span class="tundo" id="x3Undo">Undo</span>
+                <span class="x3-tbar" id="x3Tbar"></span>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+        <div class="x3-score">
+          <div class="x3-sc">Side A interrupted you with <b id="x3ScA">0</b> dialog(s). Can you save what you deleted? No. The dialog only blocks beforehand—after that, it shrugs.</div>
+          <div class="x3-sc">Side B recovered <b id="x3ScB">0</b> contact(s), zero dialogs. Delete takes effect immediately without interrupting; the regret window stays open for 5 seconds.</div>
+        </div>
+        <div class="x3-note" id="x3Note"></div>
+        <button class="x3-reset" id="x3Reset" type="button">Reset both lists</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Cry wolf · Why confirm dialogs can't stop you</div>
+    <p class="desc">You might push back: the dialog at least blocked once—how is that weakest? Cooper's answer is habituation: confirm boxes that keep showing in the usual spot get dismissed unread. When real danger arrives, the finger beats the brain. This experiment takes 20 seconds—prove it yourself.</p>
+    <div class="toy" id="x3Wolf">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+        <span class="toy-t">Click through eight dialogs—see which one you actually stop</span>
+        <span class="toy-badge" id="x3WolfBadge">Experiment</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">Rules: clear eight dialogs as fast as you can—any click counts. Results at the end</div>
+        <div class="mockwin">
+          <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">oa.example.com/daily-report</span></div>
+          <div class="x3-wolf" id="x3WolfStage">
+            <div class="x3-wstart" id="x3WolfStart">
+              <div class="ws-t">You're rushing a daily report; dialogs will pop one after another</div>
+              <div class="ws-p">Handle them like you normally would—faster is better. The system times you.</div>
+              <button class="x3-go" id="x3WolfGo" type="button">Start experiment</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Drill · Fix three dangerous buttons</div>
+    <p class="desc">You've got the three moves plus reversibility—time to fix. All three scenes are common AI-output bugs. <b>For each, pick the prevention that fits best</b>. Wrong answers come with explanations; keep going until you're right.</p>
+    <div class="toy" id="x3Fix1">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+        <span class="toy-t">Scene 1: "Clear canvas" sits next to "Save" on the toolbar—users have already fat-fingered it</span>
+        <span class="toy-badge">Single choice</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>Show a confirm dialog when they tap "Clear canvas"</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>Move "Clear canvas" deeper into a menu, keep it away from "Save", and add undo</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>Make the "Clear canvas" button red as a warning</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>Auto-export a local backup before clearing</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+    <div class="toy" id="x3Fix2">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
+        <span class="toy-t">Scene 2: In a broadcast dialog, recipients default to "All members (2,841 people)"</span>
+        <span class="toy-badge">Single choice</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>Confirm before send, showing the recipient count</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>Remove the "All members" option</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>Default to "Only people I selected"; when they pick "All members", show the count in place</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>Allow recall after send—a backstop is enough</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+    <div class="toy" id="x3Fix3">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <span class="toy-t">Scene 3: Incomplete forms still let you tap "Submit", then pop "Information incomplete"</span>
+        <span class="toy-badge">Single choice</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>Rewrite the error copy with the three elements, friendlier</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>Disable "Submit" until complete, and list what's still missing beside the button</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>Auto-fill empty fields with defaults on submit</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>Pop a dialog listing empty fields; let users continue or go back</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Quiz · Rank the four lines of defense</div>
+    <div class="toy" id="x3Quiz">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+        <span class="toy-t">Of the four defenses, which is weakest?</span>
+        <span class="toy-badge">Single choice</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">Wrong answers come with explanations; keep going until you're right</div>
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>Disable unavailable items, with an explanation</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>Keep dangerous actions away from everyday ones</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>Confirm dialog before delete</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>Do it immediately, with undo</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Key Takeaways</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Users are exploring—don't treat it as error:</b> undo is the rope ladder at the cave mouth; because it's there, users dare go deeper (Cooper, <i>About Face 4</i>, ch. 15).</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Three prevention moves:</b> disable what's unavailable and explain, keep dangerous actions at a distance, pick the safest default. The best error message is no error to report.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Confirm dialogs are the weakest defense:</b> cry-wolf effect—routine dialogs get dismissed unread, so they're already dead when real danger arrives. Do, don't ask—then keep undo ready.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>How to brief AI:</b> "Delete takes effect immediately; show an undo toast for 5 seconds" beats "require confirmation on delete" by a full tier. How to cut extra steps in a flow—next lesson.</p></div>
+    </div>
+    <p class="src-note"><b>Source:</b> Original to Xiaoshan Academy's Interaction Engineering series; some principles adapted from <i>About Face 4: The Essentials of Interaction Design</i>.</p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="taste.js?v=20260810a"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* ── 主教具：删一条数据，两种善后 ──
+   背景：「确认弹窗最弱、撤销更强」光讲道理没人信，
+   要让读者两边各删一条，亲手体会打断感和后悔权的差别。
+   设计意图：A 面弹窗用遮罩淡入 + 对话框弹性放大（200ms），
+   B 面是本页动画重头戏：行塌缩、toast 滑入、倒计时条 5 秒
+   线性走完、点撤销行以 ixd-pop 弹回。计分板实时记两个数，
+   两边都体验过之后判词才出现（状态跳变只给一次）。
+   约束：B 面同时只保留一条待撤销记录，新删除会顶掉旧倒计时
+   （旧的那条直接定死），与主流 toast 实现一致。 */
+(function () {
+  var panelA = document.getElementById('x3A');
+  var panelB = document.getElementById('x3B');
+  var veil = document.getElementById('x3Veil');
+  var dlgP = document.getElementById('x3DlgP');
+  var toast = document.getElementById('x3Toast');
+  var toastTxt = document.getElementById('x3ToastTxt');
+  var tbar = document.getElementById('x3Tbar');
+  var badge = document.getElementById('x3LabBadge');
+  var note = document.getElementById('x3Note');
+  var scA = 0, scB = 0, triedA = false, triedB = false, judged = false;
+  var pendingRow = null, undoRow = null, timer = null;
+
+  function collapse(row) { row.classList.add('gone'); }
+  function restore(row) {
+    row.classList.remove('gone');
+    row.classList.add('back');
+    row.addEventListener('animationend', function h() {
+      row.classList.remove('back');
+      row.removeEventListener('animationend', h);
+    });
+  }
+
+  function judge() {
+    if (judged || !(triedA && triedB)) return;
+    judged = true;
+    note.innerHTML = '<b>Line up the feel.</b> Side A makes you serve a dialog for every delete; once it\'s gone, regret has no help—\'can\'t be undone\' is honest. Side B asks nothing; if you delete wrong, Undo within 5 seconds brings it back. Cooper lands here: confirm dialogs push responsibility onto the user; undo keeps it with the software. When briefing AI, write: \'Delete takes effect immediately, with an undo toast.\'';
+    note.classList.add('show', 'ixd-slide-up');
+    badge.textContent = 'Compared';
+    badge.classList.add('solved');
+  }
+
+  /* A 面：确认弹窗 */
+  panelA.addEventListener('click', function (e) {
+    var del = e.target.closest('.x3-rdel');
+    if (del) {
+      pendingRow = del.closest('.x3-row');
+      dlgP.textContent = '「' + del.dataset.n + '」This can\'t be undone.';
+      veil.classList.add('show');
+      scA++;
+      document.getElementById('x3ScA').textContent = scA;
+    }
+  });
+  document.getElementById('x3Cancel').addEventListener('click', function () {
+    veil.classList.remove('show');
+    pendingRow = null;
+  });
+  document.getElementById('x3Confirm').addEventListener('click', function () {
+    veil.classList.remove('show');
+    if (pendingRow) { collapse(pendingRow); pendingRow = null; }
+    triedA = true;
+    judge();
+  });
+
+  /* B 面：立即删除 + 可撤销 toast */
+  function killTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+  function hideToast() {
+    toast.classList.remove('show');
+    tbar.style.transition = 'none';
+    tbar.style.transform = 'scaleX(1)';
+  }
+  panelB.addEventListener('click', function (e) {
+    var del = e.target.closest('.x3-rdel');
+    if (del) {
+      killTimer();
+      undoRow = del.closest('.x3-row');
+      collapse(undoRow);
+      toastTxt.textContent = 'Deleted \'' + del.dataset.n + '\'';
+      hideToast();
+      /* 强制回流后重启倒计时条，让 5s 过渡从头走 */
+      void toast.offsetWidth;
+      tbar.style.transition = '';
+      tbar.style.transform = '';
+      toast.classList.add('show');
+      timer = setTimeout(function () {
+        hideToast();
+        undoRow = null;
+        triedB = true;
+        judge();
+      }, 5000);
+      triedB = true;
+      judge();
+    }
+  });
+  document.getElementById('x3Undo').addEventListener('click', function () {
+    killTimer();
+    hideToast();
+    if (undoRow) {
+      restore(undoRow);
+      undoRow = null;
+      scB++;
+      document.getElementById('x3ScB').textContent = scB;
+    }
+  });
+
+  /* 重置：两边的行都复位，计分保留（打断次数是累计证据） */
+  document.getElementById('x3Reset').addEventListener('click', function () {
+    killTimer();
+    hideToast();
+    veil.classList.remove('show');
+    undoRow = null;
+    pendingRow = null;
+    document.querySelectorAll('#x3Lab .x3-row').forEach(function (r) {
+      r.classList.remove('gone', 'back');
+    });
+  });
+})();
+
+/* ── 狼来了实验 ──
+   背景：「确认弹窗会被习惯化」需要一次亲身打脸才有说服力。
+   设计意图：八个弹窗逐个弹出（ixd-pop），前六个全是日常琐事，
+   第七个悄悄换成毁灭性操作，第八个又变回琐事作掩护；逐个记录
+   反应毫秒数，结束后柱状图揭晓：多数人在第七个上的耗时和其他
+   弹窗没有差别，甚至更快。若读者在第七个点了「取消」，判词换成
+   祝贺版本，但指出真实用户没有第二次机会。
+   约束：反应计时从弹窗渲染完成起算；柱状图高度上限 900ms 截断。 */
+(function () {
+  var stage = document.getElementById('x3WolfStage');
+  var badge = document.getElementById('x3WolfBadge');
+  var DLGS = [
+    'Exit edit mode?',
+    'Mark this daily report as read?',
+    'Clear the 2 drafts in your draft box?',
+    'Switch to the new editor?',
+    'Turn off auto-save reminders?',
+    'Save the current filter as the default view?',
+    'Delete your account and all historical data?',
+    'Sync the latest content before leaving?'
+  ];
+  var HOT = 6;
+  var times = [], choices = [], idx = 0, t0 = 0;
+
+  function showDlg() {
+    stage.innerHTML =
+      '<div class="x3-wdlg ixd-pop">' +
+        '<div class="wd-n">Dialog ' + (idx + 1) + ' / 8</div>' +
+        '<div class="wd-t">' + DLGS[idx] + '</div>' +
+        '<div class="wd-b">' +
+          '<button class="x3-dbtn" data-c="0" type="button">Cancel</button>' +
+          '<button class="x3-dbtn danger" data-c="1" type="button">Confirm</button>' +
+        '</div>' +
+      '</div>';
+    t0 = performance.now();
+  }
+
+  function bars() {
+    var html = '<div class="x3-wtimes">';
+    times.forEach(function (ms, i) {
+      var h = Math.min(ms, 900) / 900 * 56 + 8;
+      html += '<div class="x3-wt' + (i === HOT ? ' hot' : '') + '"><span class="wtb" data-h="' + h + '"></span><span class="wtv">' + Math.round(ms) + '</span></div>';
+    });
+    return html + '</div>';
+  }
+
+  function finish() {
+    var hotMs = Math.round(times[HOT]);
+    var others = times.filter(function (m, i) { return i !== HOT; });
+    var avg = Math.round(others.reduce(function (a, b) { return a + b; }, 0) / others.length);
+    var saved = choices[HOT] === 0;
+    var head, body;
+    if (saved) {
+      head = 'You stopped the seventh dialog. Congrats—and don\'t get too comfortable.';
+      body = 'This is a classroom; you came in wary. Real users are rushing a report. The first six dialogs already trained them into click machines—the seventh gets the same treatment. Your own numbers say it: average time per dialog was <b>' + avg + '</b> ms—not enough to finish a line of text.';
+    } else {
+      head = 'The seventh dialog just deleted your account and all historical data.';
+      body = 'You dismissed it in <b>' + hotMs + '</b> ms; other dialogs averaged <b>' + avg + '</b> ms. Your finger never left the brain time to read. That\'s Cooper\'s cry wolf: the confirm box yelled six times with no danger; the seventh time the wolf was real, and you couldn\'t hear it.';
+    }
+    stage.innerHTML =
+      '<div class="x3-wres ixd-slide-up">' +
+        '<div class="wr-big">' + head + '</div>' +
+        bars() +
+        '<div class="wr-p">The red bar is the seventh dialog (ms). ' + body + ' Verdict: confirm dialogs don\'t stop fat-finger mistakes—undo does.</div>' +
+      '</div>';
+    /* 下一帧再赋高度，柱子做生长过渡 */
+    requestAnimationFrame(function () {
+      stage.querySelectorAll('.wtb').forEach(function (b) {
+        b.style.height = b.dataset.h + 'px';
+      });
+    });
+    badge.textContent = 'Revealed';
+    badge.classList.add('solved');
+  }
+
+  stage.addEventListener('click', function (e) {
+    if (e.target.id === 'x3WolfGo') {
+      idx = 0; times = []; choices = [];
+      showDlg();
+      return;
+    }
+    var btn = e.target.closest('.x3-dbtn');
+    if (!btn) return;
+    times.push(performance.now() - t0);
+    choices.push(+btn.dataset.c);
+    idx++;
+    if (idx < DLGS.length) { showDlg(); } else { finish(); }
+  });
+})();
+
+/* 改造演练一：挨着保存的清空按钮。对症的是拉开距离 + 撤销。 */
+tasteQuiz('x3Fix1', {
+  answer: 1,
+  why: [
+    'A dialog treats the symptom: people who fat-finger "Clear" will usually fat-finger the dialog too—the experiment above just showed that.',
+    'Right fit. The root is dangerous and everyday actions sitting too close. Move "Clear" off the golden spot and the physical conditions for a slip vanish; add undo as a backstop—two hard defenses.',
+    'Red warns people who look; it doesn\'t stop fast hands. Fat-finger happens at aiming time—color can\'t help aiming.',
+    'A backup is disaster recovery; users may never find the file. If you can stop the disaster, don\'t bet on rebuilding.'
+  ]
+});
+
+/* 改造演练二：群发默认全选。对症的是Safe defaults as a backstop。 */
+tasteQuiz('x3Fix2', {
+  answer: 2,
+  why: [
+    'Another dialog. People who broadcast eight times a day start blind-tapping Confirm by the third—2,841 people still get it.',
+    'Cutting it entirely kills a real need; sometimes you do need all-hands. Prevention should block accidents, not intent.',
+    'Right fit. Safe defaults: the cost of a slip depends on the default. Set the default to the smallest scope so "All members" becomes an active choice, then show the count—surprise broadcasts go extinct.',
+    'Recall is a good backstop, but someone among 2,841 already read it. Defaults stop the accident; recall only shrinks it.'
+  ]
+});
+
+/* 改造演练三：没填完也能点的提交按钮。对症的是禁用 + 说明。 */
+tasteQuiz('x3Fix3', {
+  answer: 1,
+  why: [
+    'Friendlier copy still lets people hit the wall, then hands them a bandage. The three elements are after-the-fact recovery—here the error need not happen.',
+    'Right fit. Disable what\'s unavailable, with a line like "still need phone and shipping address," so users know the path without trial-and-error. Note: explain it—grayed-out with silence becomes a new puzzle.',
+    'Defaults can\'t cover this: you can\'t invent a shipping address for the user—that would be the real accident.',
+    'A dialog listing fields upgrades "one line beside the button" into "one interruption"—same info, double the cost.'
+  ]
+});
+
+/* 点选题：四道防线排序。判词把每个选项放回防错光谱。 */
+tasteQuiz('x3Quiz', {
+  answer: 2,
+  why: [
+    'Disable-plus-explain is a hard defense: the wrong entry physically isn\'t there—you can\'t err even if you try.',
+    'Distance is also a hard defense: fat-finger needs physical conditions; open the gap and they vanish.',
+    'Right. A confirm dialog looks like defense and acts like stage scenery: cry-wolf kills it in weeks; users blind-tap Confirm. It also shoves responsibility from software onto the user.',
+    'Undo is the strongest soft defense: it doesn\'t stop you, but it always catches you. The backbone of "Do, don\'t ask" is this.'
+  ]
+});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.en.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

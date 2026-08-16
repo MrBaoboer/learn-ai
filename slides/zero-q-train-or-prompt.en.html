@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>"I Trained a Model" — What Did They Actually Train? | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+.qa-answer {
+  background: linear-gradient(135deg, rgba(8,145,178,0.06), rgba(0,102,255,0.05));
+  border: 1.5px solid rgba(8,145,178,0.3);
+  border-radius: var(--radius); padding: 22px 26px; margin: 4px 0 8px;
+}
+.qa-answer .qa-tag { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #0891b2; margin-bottom: 8px; }
+.qa-answer p { font-size: 16.5px; font-weight: 700; color: var(--text); line-height: 1.85; }
+.qa-answer p b { color: #0891b2; }
+
+/* 四层梯子 */
+.ladder { display: flex; flex-direction: column-reverse; gap: 10px; }
+.ladder-rung {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  overflow: hidden; cursor: pointer; transition: border-color 0.2s;
+}
+.ladder-rung:hover { border-color: rgba(0,102,255,0.35); }
+.rung-head { display: flex; align-items: center; gap: 12px; padding: 15px 18px; }
+.rung-lv {
+  flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: #fff;
+}
+.rung-l1 .rung-lv { background: #16a34a; }
+.rung-l2 .rung-lv { background: #0891b2; }
+.rung-l3 .rung-lv { background: #d97706; }
+.rung-l4 .rung-lv { background: #7c3aed; }
+.rung-title { flex: 1; }
+.rung-title h4 { font-size: 15px; font-weight: 800; color: var(--text); }
+.rung-title .rung-hint { font-size: 12px; color: var(--sub); margin-top: 2px; }
+.rung-arrow { font-size: 13px; color: var(--sub); transition: transform 0.25s; flex-shrink: 0; }
+.ladder-rung.open .rung-arrow { transform: rotate(90deg); }
+.rung-body {
+  max-height: 0; overflow: hidden; transition: max-height 0.35s ease;
+  border-top: 0 solid var(--border);
+}
+.ladder-rung.open .rung-body { max-height: 400px; border-top: 1px solid var(--border); }
+.rung-facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 14px 18px; }
+.rung-fact { background: rgba(0,0,0,0.025); border-radius: var(--radius-sm); padding: 10px 13px; }
+.rung-fact .rf-k { font-size: 11px; font-weight: 800; letter-spacing: 0.5px; color: var(--sub); margin-bottom: 3px; }
+.rung-fact .rf-v { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.6; }
+.rung-desc { padding: 0 18px 15px; font-size: 13px; color: var(--sub); line-height: 1.8; }
+.rung-desc b { color: var(--accent); }
+
+/* 对号入座小测 */
+.quiz-item {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 18px 20px; margin-bottom: 14px;
+}
+.quiz-item .qz-say {
+  font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.8;
+  margin-bottom: 12px;
+}
+.qz-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.qz-opt {
+  border: 1.5px solid var(--border); background: var(--card);
+  border-radius: 999px; padding: 7px 15px;
+  font-size: 12.5px; font-weight: 800; color: var(--sub);
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.qz-opt:hover { border-color: rgba(0,102,255,0.4); color: var(--accent); }
+.qz-opt:disabled { cursor: default; }
+.qz-opt.hit { border-color: var(--success); background: rgba(22,163,74,0.08); color: var(--success); }
+.qz-opt.miss { border-color: var(--danger); background: rgba(220,38,38,0.06); color: var(--danger); }
+.qz-opt.dim { opacity: 0.45; }
+.qz-reveal {
+  display: none; margin-top: 12px; padding: 12px 15px;
+  border-radius: var(--radius-sm); background: rgba(8,145,178,0.05);
+  border: 1px solid rgba(8,145,178,0.2);
+  font-size: 13px; color: var(--text); line-height: 1.8;
+}
+.qz-reveal.show { display: block; }
+.qz-reveal b { color: #0891b2; }
+.quiz-score {
+  display: none; margin-top: 4px; padding: 14px 18px;
+  border-radius: var(--radius); text-align: center;
+  background: rgba(22,163,74,0.06); border: 1.5px solid rgba(22,163,74,0.25);
+  font-size: 14px; font-weight: 800; color: var(--success);
+}
+.quiz-score.show { display: block; }
+
+/* 三连问卡 */
+.pt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pt-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-card);
+}
+.pt-card .pt-icon { font-size: 26px; margin-bottom: 8px; }
+.pt-card h4 { font-size: 14.5px; font-weight: 800; color: var(--text); margin-bottom: 5px; }
+.pt-card p { font-size: 12.5px; color: var(--sub); line-height: 1.8; }
+.pt-card p b { color: var(--text); }
+
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .pt-grid { grid-template-columns: 1fr; }
+  .qa-answer p { font-size: 15px; }
+  .rung-facts { grid-template-columns: 1fr; }
+  .qz-opts { gap: 6px; }
+  .qz-opt { padding: 8px 13px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Someone at dinner always says they 'trained a model' — what did they actually do? Training means changing the model's parameters, and it costs from hundreds of thousands to over a hundred million yuan. Most people wrote a prompt or attached a knowledge base. A four-rung ladder tells the layers apart; three follow-ups let you hear which layer they're on.">
+<meta name="keywords" content="what does training a model mean,fine-tuning vs prompts,what is RAG,pretraining cost,LLM training,AI beginner FAQ,prompt engineering">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/zero-q-train-or-prompt.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/zero-q-train-or-prompt.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/zero-q-train-or-prompt.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/zero-q-train-or-prompt.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/zero-q-train-or-prompt.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="&quot;I Trained a Model&quot; — What Did They Actually Train?">
+<meta property="og:description" content="Training means changing the model's parameters, costing hundreds of thousands to over a hundred million yuan. When most people say they 'trained a model,' they wrote a prompt — five minutes versus fifty million.">
+<meta property="og:url" content="https://xueai.app/slides/zero-q-train-or-prompt.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="&quot;I Trained a Model&quot; — What Did They Actually Train?">
+<meta name="twitter:description" content="A four-rung ladder: rewrite the prompt, attach a knowledge base, fine-tune, or pretrain from scratch — five minutes versus fifty million.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"\"I Trained a Model\" — What Did They Actually Train?","name":"\"I Trained a Model\" — What Did They Actually Train?","url":"https://xueai.app/slides/zero-q-train-or-prompt.en.html","inLanguage":"en","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Beginner FAQ","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"Someone at dinner always says they 'trained a model' — what did they actually do? Training means changing the model's parameters, and it costs from hundreds of thousands to over a hundred million yuan. Most people wrote a prompt or attached a knowledge base. A four-rung ladder tells the layers apart; three follow-ups let you hear which layer they're on.","datePublished":"2026-08-09","dateModified":"2026-08-12"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"\"I Trained a Model\" — What Did They Actually Train?","acceptedAnswer":{"@type":"Answer","text":"In AI, training means changing the model's own parameters, costing from hundreds of thousands to over a hundred million yuan. When most people say they 'trained a model,' they actually wrote a prompt or attached a knowledge base — that's five minutes versus fifty million."}}]}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Chapter Zero · Beginner FAQ</div>
+    <h1>"I Trained a Model" — What Did They Actually Train?</h1>
+    <p class="subtitle">Someone at a dinner party, glass in hand, says "I trained a model recently." The exaggeration in that sentence can run from zero to ninety-nine percent. This page helps you <b>hear what they actually did</b>, and along the way pick up two follow-ups that can quiet the whole table.</p>
+  </header>
+
+  <div class="qa-answer">
+    <div class="qa-tag">One-sentence answer</div>
+    <p>In AI, training means <b>changing the model's own parameters</b>, and it costs from hundreds of thousands to over a hundred million yuan. When most people say they "trained a model," they actually <b>wrote a prompt, or attached a knowledge base</b> — that's five minutes versus fifty million.</p>
+  </div>
+
+  <div class="sec-label">Let's be clear · What "training" actually means in the field</div>
+
+  <p class="l-p">A large model holds <b>tens of billions to over a trillion parameters</b>. Think of parameters as the neural connections in a brain: every bit of what the model can do lives in those numbers. Training means washing those numbers over and over with massive amounts of data, nudging them into place. It burns electricity, GPUs, and money — about as expensive as putting a child through twenty years of school. It's a heavy-asset project.</p>
+
+  <p class="l-p">When you tell an AI "you're a senior editor, please polish this," or upload a company document, <b>you haven't touched a single parameter</b>. An analogy: the first is raising a college student from scratch; the second is handing an already-trained graduate a sticky note or a handbook. The sticky note is useful — but you don't get to say you "raised a college student."</p>
+
+  <p class="l-p">So next time you hear "I trained a model," your first reaction can be: did they change any parameters? How many? The ladder below sorts every case into four layers.</p>
+
+  <div class="sec-label">The four-rung ladder · From five minutes to fifty million</div>
+
+  <p class="l-p">From the bottom up, each rung <b>raises the cost and the barrier exponentially</b>. Click a layer to see its time, cost, and barrier. Nine out of ten dinner-party "I trained a model" stories happen on the bottom two rungs.</p>
+
+  <div class="ladder" id="ladder">
+    <div class="ladder-rung rung-l1" data-rung="1">
+      <div class="rung-head">
+        <div class="rung-lv">L1</div>
+        <div class="rung-title">
+          <h4>Rewrite the prompt</h4>
+          <div class="rung-hint">Say it differently so the AI gets you</div>
+        </div>
+        <span class="rung-arrow">▶</span>
+      </div>
+      <div class="rung-body">
+        <div class="rung-facts">
+          <div class="rung-fact"><div class="rf-k">Time</div><div class="rf-v">A few minutes</div></div>
+          <div class="rung-fact"><div class="rf-k">Cost range</div><div class="rf-v">Free</div></div>
+          <div class="rung-fact"><div class="rf-k">Barrier</div><div class="rf-v">Anyone can do it</div></div>
+          <div class="rung-fact"><div class="rf-k">What you did</div><div class="rf-v">Write the AI a brief</div></div>
+        </div>
+        <div class="rung-desc">Give the model a role, a workflow, and output requirements — e.g. "You're a careful lawyer; list the risks before you answer." <b>Not one parameter moved</b>, but the output quality can be night and day. For nine out of ten everyday needs, this layer is enough.</div>
+      </div>
+    </div>
+    <div class="ladder-rung rung-l2" data-rung="2">
+      <div class="rung-head">
+        <div class="rung-lv">L2</div>
+        <div class="rung-title">
+          <h4>Attach a knowledge base (RAG)</h4>
+          <div class="rung-hint">Give the AI a bookshelf it can flip through</div>
+        </div>
+        <span class="rung-arrow">▶</span>
+      </div>
+      <div class="rung-body">
+        <div class="rung-facts">
+          <div class="rung-fact"><div class="rf-k">Time</div><div class="rf-v">Hours to days</div></div>
+          <div class="rung-fact"><div class="rf-k">Cost range</div><div class="rf-v">Hundreds to tens of thousands of yuan</div></div>
+          <div class="rung-fact"><div class="rf-k">Barrier</div><div class="rf-v">If you can configure it, you're in</div></div>
+          <div class="rung-fact"><div class="rf-k">What you did</div><div class="rf-v">Put the documents within the AI's reach</div></div>
+        </div>
+        <div class="rung-desc">Organize company docs and product manuals onto a "bookshelf." Before answering, the AI flips through it and answers from the material. Sounds like you "taught it something," but <b>the model itself didn't change</b> — it just has a reference book nearby. Take the book away and it snaps right back.</div>
+      </div>
+    </div>
+    <div class="ladder-rung rung-l3" data-rung="3">
+      <div class="rung-head">
+        <div class="rung-lv">L3</div>
+        <div class="rung-title">
+          <h4>Fine-tuning</h4>
+          <div class="rung-hint">Parameters really moved — but the base is someone else's</div>
+        </div>
+        <span class="rung-arrow">▶</span>
+      </div>
+      <div class="rung-body">
+        <div class="rung-facts">
+          <div class="rung-fact"><div class="rf-k">Time</div><div class="rf-v">Days to weeks</div></div>
+          <div class="rung-fact"><div class="rf-k">Cost range</div><div class="rf-v">Thousands to hundreds of thousands of yuan</div></div>
+          <div class="rung-fact"><div class="rf-k">Barrier</div><div class="rf-v">You need data and engineers</div></div>
+          <div class="rung-fact"><div class="rf-k">What you did</div><div class="rf-v">Specialized training on a finished brain</div></div>
+        </div>
+        <div class="rung-desc">Take a trained open-source model and keep training it on your own thousands to hundreds of thousands of examples — <b>the parameters really get changed</b>. Like giving a college graduate specialized job training. At this layer, saying "I trained a model" barely holds — but remember: that base brain was still built by someone else.</div>
+      </div>
+    </div>
+    <div class="ladder-rung rung-l4" data-rung="4">
+      <div class="rung-head">
+        <div class="rung-lv">L4</div>
+        <div class="rung-title">
+          <h4>Pretrain from scratch</h4>
+          <div class="rung-hint">Build a brain from zero</div>
+        </div>
+        <span class="rung-arrow">▶</span>
+      </div>
+      <div class="rung-body">
+        <div class="rung-facts">
+          <div class="rung-fact"><div class="rf-k">Time</div><div class="rf-v">Months</div></div>
+          <div class="rung-fact"><div class="rf-k">Cost range</div><div class="rf-v">Tens of millions to over a hundred million yuan</div></div>
+          <div class="rung-fact"><div class="rf-k">Barrier</div><div class="rf-v">Only a handful of companies on earth can afford it</div></div>
+          <div class="rung-fact"><div class="rf-k">What you did</div><div class="rf-v">Train from zero on half the internet</div></div>
+        </div>
+        <div class="rung-desc">Start from a pile of random numbers, throw massive data and thousands of GPUs at it for months, and produce a brand-new brain. The companies that can do this <b>you can count on one hand with fingers left over</b>. If someone at dinner mentions this casually, you're probably watching a legend — or a punchline.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">Match the line · Which layer are they actually on?</div>
+
+  <p class="l-p">A quick quiz: the five lines below are dinner-party classics. Guess which layer <b>each one most likely sits on</b>. Tap an option to reveal the answer.</p>
+
+  <div id="quizWrap">
+    <div class="quiz-item" data-q="0">
+      <div class="qz-say">"I used ChatGPT to train a model that knows our company"</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>Mostly L1 or L2.</b> In a chat product, all you can really do is write prompts and upload files. They probably set up a custom assistant and added company docs. Useful, worth credit — but still two floors short of "training a model."</div>
+    </div>
+    <div class="quiz-item" data-q="1">
+      <div class="qz-say">"We fine-tuned an open-source model for customer service"</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>L3 — and this one is actually honest.</b> They named their layer accurately: parameters moved, the base is an open-source model. People who talk like this have usually done the work.</div>
+    </div>
+    <div class="quiz-item" data-q="2">
+      <div class="qz-say">"I use it every day, and I've trained it to understand me better and better"</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>L0 — it doesn't even count as L1.</b> Everyday chat doesn't change any of the model's parameters. If it "understands you better," that's probably memory features, or you've gotten better at asking. Why chatting doesn't train a model: <a href="learn.html#zero-q-ai-learning.html" target="_top">Does AI learn from chat?</a></div>
+    </div>
+    <div class="quiz-item" data-q="3">
+      <div class="qz-say">"We built our own industry LLM"</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>Could be L3, could be L4 — ask follow-ups.</b> "Built our own" is a very stretchy phrase: pretraining from scratch counts, and so does fine-tuning an open-source model. That's when you pull out the three follow-ups in the next section.</div>
+    </div>
+    <div class="quiz-item" data-q="4">
+      <div class="qz-say">"I wrote the AI a persona and a workflow"</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>L1 — and they said it clearly, which deserves credit.</b> They didn't borrow the big word "training"; they just described what they did. That kind of phrasing is more decent than a lot of launch events.</div>
+    </div>
+  </div>
+  <div class="quiz-score" id="quizScore"></div>
+
+  <div class="sec-label">How to listen, how to ask · Carry these three follow-ups</div>
+
+  <p class="l-p">Can't tell which layer they're on? Don't guess — just ask. These three questions pin down <b>cost, data, and the base model</b>. Anyone who can't answer will slide down a layer on their own.</p>
+
+  <div class="pt-grid">
+    <div class="pt-card">
+      <div class="pt-icon">💰</div>
+      <h4>"How much compute did it cost?"</h4>
+      <p>Training is burned out of real money. L3 starts with renting GPUs; L4 burns tens of millions to over a hundred million. <b>"Training" that can't name a cost range probably never happened.</b></p>
+    </div>
+    <div class="pt-card">
+      <div class="pt-icon">📚</div>
+      <h4>"Where did the data come from?"</h4>
+      <p>Changing parameters needs training data at scale. If they say "we just fed it the company docs," that's basically L2 — a knowledge base. <b>Not one parameter of the model itself moved.</b></p>
+    </div>
+    <div class="pt-card">
+      <div class="pt-icon">🏗️</div>
+      <h4>"What's the base model?"</h4>
+      <p>L1 through L3 all stand on someone else's base. That's nothing to be ashamed of — but it's worth saying clearly. <b>Anyone who hedges with "core tech, can't disclose" can be defaulted to L1.</b></p>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    These three follow-ups also have a full advanced version, built for the talking points at launch events and on social feeds. Want to practice? Play a round of <a href="learn.html#zero-q-jargon-translator.html" target="_top">the AI jargon translator</a>. One fair word at the end: <b>rewriting the prompt is nothing to be ashamed of</b>. It's the highest-ROI layer of the four, and it covers nine out of ten needs. The only shameful thing is standing on L1 and claiming you're on L4.
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ What this page wants to share with you</h3>
+    <ul>
+      <li><b>Training = changing model parameters</b>: writing a prompt or attaching a knowledge base doesn't touch parameters; strictly speaking both are "using a model"</li>
+      <li><b>Four-rung ladder</b>: rewrite the prompt, attach a knowledge base, fine-tune, pretrain from scratch — each rung up, the barrier rises exponentially</li>
+      <li><b>When you hear "I trained a model," ask about cost and data first</b>: anyone who can't answer will slide down a layer on their own</li>
+      <li><b>Rewriting the prompt is nothing to be ashamed of</b>: it covers nine out of ten needs. The shame is standing on L1 and claiming L4</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 四层梯子：点击展开 ── */
+(function () {
+  var rungs = document.querySelectorAll('.ladder-rung');
+  rungs.forEach(function (rung) {
+    rung.querySelector('.rung-head').addEventListener('click', function () {
+      rung.classList.toggle('open');
+    });
+  });
+})();
+
+/* ── 对号入座小测 ── */
+(function () {
+  var LEVELS = [
+    { id: 0, label: 'L0 just chatting' },
+    { id: 1, label: 'L1 rewrite the prompt' },
+    { id: 2, label: 'L2 attach a knowledge base' },
+    { id: 3, label: 'L3 fine-tuning' },
+    { id: 4, label: 'L4 pretrain from scratch' },
+  ];
+  /* 每题的正确层级（数组表示多个都算对） */
+  var ANSWERS = [[1, 2], [3], [0], [3, 4], [1]];
+  var answered = 0;
+  var hits = 0;
+  var items = document.querySelectorAll('.quiz-item');
+  var scoreBox = document.getElementById('quizScore');
+
+  items.forEach(function (item) {
+    var qi = parseInt(item.getAttribute('data-q'), 10);
+    var correct = ANSWERS[qi];
+    var optsBox = item.querySelector('.qz-opts');
+    var reveal = item.querySelector('.qz-reveal');
+    var done = false;
+
+    LEVELS.forEach(function (lv) {
+      var btn = document.createElement('button');
+      btn.className = 'qz-opt';
+      btn.type = 'button';
+      btn.textContent = lv.label;
+      btn.addEventListener('click', function () {
+        if (done) return;
+        done = true;
+        answered += 1;
+        var isHit = correct.indexOf(lv.id) !== -1;
+        if (isHit) hits += 1;
+
+        optsBox.querySelectorAll('.qz-opt').forEach(function (b, bi) {
+          b.disabled = true;
+          if (correct.indexOf(LEVELS[bi].id) !== -1) {
+            b.classList.add('hit');
+          } else if (b === btn) {
+            b.classList.add('miss');
+          } else {
+            b.classList.add('dim');
+          }
+        });
+        reveal.classList.add('show');
+
+        if (answered === items.length) {
+          var line;
+          if (hits === items.length) {
+            line = 'Perfect! ' + hits + ' / ' + items.length + ' — next dinner, you\'ll be the one who quiets the table.';
+          } else if (hits >= 3) {
+            line = 'You got ' + hits + ' / ' + items.length + ' — you can already hear most of the fluff. Memorize the three follow-ups and you\'re set.';
+          } else {
+            line = 'You got ' + hits + ' / ' + items.length + ' — no worries. Climb that ladder one more time and your ear will come in fast.';
+          }
+          scoreBox.textContent = line;
+          scoreBox.classList.add('show');
+        }
+      });
+      optsBox.appendChild(btn);
+    });
+  });
+})();
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

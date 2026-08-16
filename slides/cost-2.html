@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Token 怎么数：BPE 与隐形的 Token 税 | Token 降本增效</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Token 既不是字符也不是单词，而是基于统计规律生成的子词。从词级、字符级到 BPE 的演进，中英文 Token 计算的量化对比，以及中文用户为什么天生要多付 2 倍的隐形 Token 税。">
+<meta name="keywords" content="Token,BPE,分词,tiktoken,cl100k_base,Token 税,中文分词,大模型计费">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-2.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="Token 怎么数：BPE 与隐形的 Token 税">
+<meta property="og:description" content="中文为什么天生贵 2 倍？从 BPE 合并规则讲到隐形的 Token 税。">
+<meta property="og:url" content="https://xueai.app/slides/cost-2.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Token 怎么数：BPE 与隐形的 Token 税">
+<meta name="twitter:description" content="中文为什么天生贵 2 倍？从 BPE 合并规则讲到隐形的 Token 税。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+
+/* 步骤卡 */
+.steps{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.step{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 17px;box-shadow:var(--shadow-card)}
+.step-num{width:28px;height:28px;border-radius:9px;background:var(--ct-soft);color:var(--ct-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;margin-top:2px}
+.step p{font-size:14px;color:var(--sub);line-height:1.75;margin:0}
+.step p b{color:var(--ct-deep)}
+
+/* 对比表 */
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl td.warn{color:var(--warn);font-weight:800}
+.tbl-wrap{overflow-x:auto}
+
+/* 交互：Token 税估算 */
+.tk-demo{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.tk-row{display:flex;flex-wrap:wrap;gap:9px}
+.tk-btn{padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:700;color:var(--text);transition:all .18s;min-height:42px}
+.tk-btn.on{border-color:var(--ct);background:var(--ct-soft);color:var(--ct-deep)}
+.tk-stage{margin-top:16px;min-height:120px}
+.tk-text{font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px;word-break:break-all}
+.tk-bars{display:flex;flex-direction:column;gap:10px}
+.tkb{display:flex;align-items:center;gap:10px}
+.tkb .n{font-size:12.5px;font-weight:700;color:var(--sub);width:110px;flex-shrink:0}
+.tkb .t{flex:1;height:24px;background:rgba(0,0,0,.045);border-radius:7px;overflow:hidden}
+.tkb .f{height:100%;border-radius:7px;transition:width .3s;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:12px;font-weight:800;color:#fff;min-width:60px}
+.tkb.en .f{background:#2563eb}
+.tkb.zh .f{background:var(--warn)}
+.tk-note{margin-top:12px;font-size:13.5px;color:var(--sub);line-height:1.75}
+.tk-note b{color:var(--ct-deep)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Token 怎么数：BPE 与隐形的 Token 税","name":"Token 怎么数：BPE 与隐形的 Token 税","url":"https://xueai.app/slides/cost-2.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 定价即架构","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"Token 既不是字符也不是单词，而是基于统计规律生成的子词。从词级、字符级到 BPE 的演进，中英文 Token 计算的量化对比，以及中文用户为什么天生要多付 2 倍的隐形 Token 税。","datePublished":"2026-08-10","dateModified":"2026-08-17"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 降本增效 · 2 / 13</div>
+    <h1>Token 怎么数：BPE 与隐形的「Token 税」</h1>
+    <p class="subtitle">账单按 Token 结算，但 Token 到底是怎么数出来的？它既不是字符，也不是单词，而是基于统计规律生成的「子词」。理解这套规则，你才会明白：同样一句话，中文为什么天生比英文贵 2 倍。</p>
+    <div class="chips"><span class="chip">BPE</span><span class="chip">子词分词</span><span class="chip">tiktoken</span><span class="chip">Token 税</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>从字符到子词的演进、BPE 的合并规则，以及中文为什么天生贵 2 倍；「给主人留下些什么吧」的诡异合并</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">从字符到子词：两个极端的平衡点</div>
+    <p class="desc">早期 NLP 走过两个极端。<b>词级别分词</b>语义明确，但英语几十万个单词加上词形变化（look / looks / looking / looked），词表直接爆炸，还处理不了没见过的新词（OOV 问题）。<b>字符级别分词</b>什么词都拆得开，但序列太长、单个字符信息量太低，推理效率极差。</p>
+    <p class="desc" style="margin-top:10px">现代大模型选择了中间路线——<b>子词分词（Subword Tokenization）</b>：常见的词保留为完整 Token，不常见的词拆成有意义的片段。词表控制在 32k 到 200k 之间，既不爆炸，又什么都能表示。</p>
+    <div class="fig-wrap">
+      <img src="images/cost/tokenize-evolution.webp" alt="Tokenization 从字符级、单词级到子词级的演进" loading="lazy">
+      <div class="fig-cap">Token 不是单纯的字符或单词，而是基于统计规律生成的「子词」。BPE 通过平衡词表大小和语义表达，成为现代大模型训练与推理的基石。（图：作者分享原稿）</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">BPE：按出现频率合并出来的词表</div>
+    <p class="desc">GPT 系列、Llama 3 都用 <b>BPE（Byte-Pair Encoding，字节对编码）</b>。它的词表不是人工编的，而是从语料里「合并」出来的：</p>
+    <div class="steps">
+      <div class="step"><span class="step-num">1</span><p><b>初始化：</b>把语料库全部拆成最小单位（对 Unicode 文本先做 UTF-8 编码，以字节为单位）。</p></div>
+      <div class="step"><span class="step-num">2</span><p><b>统计频次：</b>数一数所有相邻字节对在语料库里出现的频率。</p></div>
+      <div class="step"><span class="step-num">3</span><p><b>合并最频繁的一对：</b>比如 "u" 和 "g" 经常相邻，就合并成新符号 "ug" 加入词表。</p></div>
+      <div class="step"><span class="step-num">4</span><p><b>迭代：</b>重复第 2、3 步，直到词表达到预设大小——Llama 2 是 32,000，GPT-4 的 cl100k_base 是 100,277。</p></div>
+    </div>
+    <p class="desc" style="margin-top:12px">推理时反过来查：常见词 "hug" 直接是一个 Token；生僻词 "bug" 拆成 ["b", "ug"] 两个。<b>词表越大、你的文本越「常见」，Token 就越少，账单就越薄。</b>这就是为什么 GPT-4 换用 10 万词表后，还专门把多层缩进的空格序列并成单一 Token——代码生成的效率直接翻了几倍。</p>
+    <div class="fig-wrap">
+      <img src="images/cost/bpe.webp" alt="BPE 的训练与推理过程" loading="lazy">
+      <div class="fig-cap">左：BPE 训练时迭代合并最高频字节对构建词表。右：推理时先按正则预分词，再按合并优先级贪婪合并。（图：作者分享原稿）</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">隐形的「Token 税」：中文天生贵 2 倍</div>
+    <p class="desc">主流模型的 Tokenizer 训练语料以英文为主，BPE 学到的合并规则高度偏向英语词汇。结果是：<b>非拉丁语系（中文、日文、韩文）在 Token 化时面临严重的效率劣势</b>，业界称之为「Token 税」。</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>语言</th><th>示例</th><th>Token 数</th><th>比率</th><th>现象解释</th></tr>
+      <tr><td><b>英语</b></td><td>Donald John Trump</td><td>3</td><td>~0.75 Token/词</td><td>常见单词直接映射为 1 个 Token</td></tr>
+      <tr><td><b>中文</b></td><td>唐纳德·约翰·特朗普</td><td class="warn">6</td><td class="warn">~1.5 – 2.5 Token/字</td><td>常见字是 1 个 Token，生僻字被拆成 2–3 个字节 Token</td></tr>
+      <tr><td><b>韩语</b></td><td>도널드 존 트럼프</td><td class="warn">7</td><td class="warn">~1.5 – 3.0 Token/字</td><td>编码空间覆盖不足，经常回退到字节编码</td></tr>
+    </table></div>
+    <p class="desc" style="margin-top:12px">表达同样的语义，中文用户要消耗比英文用户<b>多 2 倍以上的 Token</b>：既多付了 API 的钱，又变相缩短了上下文窗口。</p>
+    <div class="fig-wrap">
+      <img src="images/cost/token-tax.webp" alt="多语言环境下的 Token 计算差异" loading="lazy">
+      <div class="fig-cap">BPE 偏向英语：同样的语义，中文被切得更碎，上下文窗口也变相更短。（图：作者分享原稿）</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">交互演示 · 同一句话的中英文账单</div>
+    <p class="desc">点选一句话，对比它的中英文版本各要消耗多少 Token（按典型比率估算）。想看精确切分，去 <a href="https://platform.openai.com/tokenizer" target="_blank" rel="noopener">OpenAI Tokenizer</a> 亲手试。</p>
+    <div class="tk-demo" id="tkDemo">
+      <div class="tk-row" id="tkRow"></div>
+      <div class="tk-stage">
+        <div class="tk-text" id="tkText">点上面任意一句开始。</div>
+        <div class="tk-bars" id="tkBars" style="display:none">
+          <div class="tkb en"><span class="n">英文版</span><div class="t"><div class="f" id="tkEnBar"></div></div></div>
+          <div class="tkb zh"><span class="n">中文版</span><div class="t"><div class="f" id="tkZhBar"></div></div></div>
+        </div>
+        <p class="tk-note" id="tkNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">中文的另一个坑：没有空格的「裸奔」</div>
+    <p class="desc">英文有天然的护栏：BPE 合并前先按空格<b>预分词</b>，合并只发生在单词内部，Token 边界基本符合语言学直觉。中文没有空格，BPE 只能<b>完全依赖统计共现频率</b>来决定边界——一段文本（哪怕是一句毫无逻辑的广告语）在语料里重复出现千万次，BPE 就会把它整个合并成一个「不可分割的最小语义单元」。</p>
+    <p class="desc" style="margin-top:10px">最有名的例子是「<b>给主人留下些什么吧</b>」：这句网络博客时代的高频留言，在 GPT 的词表里被强行合并成了独立 Token，成了著名的「故障 Token」。这不是段子，是 BPE 统计逻辑的必然产物。</p>
+    <div class="fig-wrap">
+      <img src="images/cost/zh-bpe.webp" alt="英文预分词护栏与中文依赖共现频率的对比" loading="lazy">
+      <div class="fig-cap">英文靠空格预分词，边界符合直觉；中文靠共现频率，高频文本会被强行合并成单一 Token。（图：作者分享原稿）</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">本节要点</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Token 是统计出来的子词，</b>不是字符也不是单词。BPE 按语料频率迭代合并，词表大小是超参数。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>中文天生要交 Token 税：</b>同样语义比英文多花 2 倍以上，还变相缩短上下文窗口。估算预算时别按英文经验拍脑袋。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>词表决定压缩率。</b>cl100k_base 十万词表 + 空格合并优化，是 GPT-4 代码效率高的直接原因。选模型时 Tokenizer 效率也是成本参数。</p></div>
+    </div>
+    <p class="src-note">
+      <b>内容来源：</b>整理自作者团队内部分享《AI Token 降本增效策略分享》第一部分「Token 的构成」。BPE 细节可参考 <a href="https://platform.openai.com/tokenizer" target="_blank" rel="noopener">OpenAI Tokenizer</a> 与 tiktoken 开源库。想复习分词和词表的底层原理，回看<a href="1-2-vocab.html">大模型原理 · 词表与训练</a>。
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* ── Token 税对比：按典型比率估算（英文 ~0.75 Token/词，中文 ~1.8 Token/字） ── */
+var TK = [
+  {label:'日常一句话', en:'Please summarize this meeting in three sentences.', zh:'请用三句话总结这场会议。',
+   note:'短句差距还不明显，但中文每个字都在计费，而英文一个词常常就是一个 Token。'},
+  {label:'客服回复', en:'We have received your refund request and will process it within 3 business days.', zh:'我们已收到您的退款申请，将在 3 个工作日内为您处理完毕。',
+   note:'注意中文里的礼貌用语（您、为您、完毕）都在乖乖交税。系统提示词里这类话千万条调用积累下来非常可观。'},
+  {label:'专业术语', en:'Retrieval-Augmented Generation reduces hallucination.', zh:'检索增强生成技术能够降低大模型幻觉。',
+   note:'英文术语 RAG 相关词汇在语料里高频出现，合并充分；中文技术词往往被拆成单字甚至字节。'},
+  {label:'生僻内容', en:'The ancient bronze tripod bears inscriptions.', zh:'这尊青铜鼎镌刻着铭文，饕餮纹饰斑驳。',
+   note:'「镌」「饕餮」这类生僻字会被拆成 2–3 个字节 Token，一个字顶英文好几个词的价钱。'}
+];
+function tkEstEn(s){ return Math.round(s.split(/\s+/).length * 1.05); }
+function tkEstZh(s){ return Math.round(s.replace(/[^\u4e00-\u9fa5]/g,'').length * 1.8 + s.replace(/[\u4e00-\u9fa5\s]/g,'').length * 0.6); }
+var tkCur = -1;
+function tkRender(){
+  var row = document.getElementById('tkRow'); row.innerHTML='';
+  TK.forEach(function(t,i){
+    var b=document.createElement('button'); b.className='tk-btn'+(i===tkCur?' on':''); b.type='button';
+    b.textContent=t.label; b.onclick=function(){tkPick(i);}; row.appendChild(b);
+  });
+}
+function tkPick(i){
+  tkCur=i; var t=TK[i];
+  document.getElementById('tkText').innerHTML='EN：'+t.en+'<br>中：'+t.zh;
+  document.getElementById('tkBars').style.display='flex';
+  var en=tkEstEn(t.en), zh=tkEstZh(t.zh), mx=Math.max(en,zh);
+  var eb=document.getElementById('tkEnBar'), zb=document.getElementById('tkZhBar');
+  eb.style.width=Math.max(15,Math.round(en/mx*100))+'%'; eb.textContent='≈'+en+' Tokens';
+  zb.style.width=Math.max(15,Math.round(zh/mx*100))+'%'; zb.textContent='≈'+zh+' Tokens';
+  document.getElementById('tkNote').innerHTML='中文约为英文的 <b>'+(zh/en).toFixed(1)+' 倍</b>。'+t.note+'（估算值，精确切分请用官方 Tokenizer）';
+  tkRender();
+}
+tkRender();
+lessonOnView(document.getElementById('tkDemo'), function(){ if(tkCur<0) tkPick(0); });
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

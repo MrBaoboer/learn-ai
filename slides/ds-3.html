@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>栈：Cmd+Z 和「爆栈」的秘密 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="栈是什么？后进先出（LIFO）一句话讲不清，亲手玩就懂：撤销键 Cmd+Z 的真身是一叠操作牌、函数调用靠栈记住「回到哪」、没写终止条件的递归怎么把栈压爆（Stack Overflow）。Agent 的子任务和最大步数保险丝，也是同一回事。">
+<meta name="keywords" content="栈是什么,后进先出,LIFO,Stack Overflow,爆栈,函数调用栈,递归,撤销原理,数据结构栈">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-3.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="栈：Cmd+Z 和「爆栈」的秘密">
+<meta property="og:description" content="撤销键的真身是一叠操作牌，函数调用靠栈记住「回到哪」，没写终止条件的递归会把栈压爆——亲手压栈弹栈，3 分钟看懂 LIFO。">
+<meta property="og:url" content="https://xueai.app/slides/ds-3.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="栈：Cmd+Z 和「爆栈」的秘密">
+<meta name="twitter:description" content="撤销键的真身是一叠操作牌，函数调用靠栈记住「回到哪」，没写终止条件的递归会把栈压爆——亲手压栈弹栈，3 分钟看懂 LIFO。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-op{background:var(--card);color:var(--text);border:1.5px solid var(--border);padding:8px 16px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s,transform .1s}
+.btn-op:hover{border-color:var(--ds-line);background:var(--ds-soft)}
+.btn-op:active{transform:scale(.96)}
+.btn-undo{background:#1c1c1e;color:#fff;border:none;padding:9px 20px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .1s}
+.btn-undo:hover{filter:brightness(1.35)}
+.btn-undo:active{transform:scale(.96)}
+
+/* ── 撤销演示 ── */
+.undo-wrap{display:grid;grid-template-columns:1.2fr 1fr;gap:14px}
+.undo-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);display:flex;flex-direction:column;overflow:hidden}
+.undo-head{padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.undo-head h4{font-size:14px;font-weight:800;color:var(--text)}
+.undo-head p{font-size:11.5px;color:var(--sub);margin-top:2px}
+.doc-stage{padding:16px;flex:1;min-height:220px}
+.doc-line{font-size:13.5px;line-height:1.6;padding:6px 10px;border-radius:8px;background:rgba(0,0,0,.03);margin-bottom:6px;color:var(--text);font-weight:600;animation:lineIn .3s ease}
+.doc-line.red{color:var(--danger);background:rgba(220,38,38,.07)}
+.doc-empty{font-size:12.5px;color:var(--sub);opacity:.6;padding:8px 2px}
+@keyframes lineIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.doc-toolbar{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stack-stage{padding:16px;flex:1;min-height:220px;display:flex;flex-direction:column;gap:7px;justify-content:flex-start;overflow-y:auto;max-height:320px}
+.op-card{border-radius:10px;padding:9px 13px;font-size:12.5px;font-weight:700;border:1.5px solid;display:flex;align-items:center;gap:8px;animation:cardIn .35s cubic-bezier(.25,1,.5,1);transition:transform .25s,opacity .25s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes cardIn{from{opacity:0;transform:translateY(-14px) scale(.9)}to{opacity:1;transform:none}}
+.op-card.popping{transform:translateX(50px);opacity:0}
+.op-card.t-type{background:rgba(2,132,199,.08);border-color:rgba(2,132,199,.3);color:var(--ds-deep)}
+.op-card.t-del{background:rgba(217,119,6,.08);border-color:rgba(217,119,6,.35);color:#92400e}
+.op-card.t-red{background:rgba(220,38,38,.07);border-color:rgba(220,38,38,.3);color:var(--danger)}
+.op-card.t-clear{background:rgba(124,58,237,.07);border-color:rgba(124,58,237,.3);color:var(--purple)}
+.op-card .top-tag{margin-left:auto;font-size:10px;font-weight:900;color:var(--ds);background:var(--ds-soft);padding:1px 8px;border-radius:99px;flex-shrink:0}
+.stack-empty{font-size:12.5px;color:var(--sub);opacity:.6;padding:8px 2px}
+.undo-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+.undo-status{font-size:12.5px;color:var(--sub);font-weight:600;line-height:1.7}
+.undo-status b{color:var(--ds-deep)}
+
+/* ── 函数调用栈 ── */
+.call-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 20px}
+.call-grid{display:grid;grid-template-columns:1fr 190px;gap:18px;align-items:stretch}
+.call-say{font-size:14px;line-height:1.9;color:var(--text);font-weight:600;min-height:120px}
+.call-say .cs-step{color:var(--ds);font-weight:900;font-size:12px;letter-spacing:.5px;display:block;margin-bottom:6px}
+.call-stack{border:2px dashed var(--ds-line);border-top:none;border-radius:0 0 12px 12px;min-height:190px;display:flex;flex-direction:column-reverse;gap:6px;padding:10px;position:relative}
+.call-stack::after{content:'调用栈（口朝上）';position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--bg);padding:0 8px;font-size:10.5px;font-weight:800;color:var(--sub);letter-spacing:.5px}
+.call-frame{border-radius:9px;padding:9px 12px;font-size:13px;font-weight:800;text-align:center;font-family:"SF Mono","Fira Code",Menlo,monospace;animation:cardIn .4s cubic-bezier(.25,1,.5,1);transition:transform .3s,opacity .3s}
+.call-frame.popping{transform:translateY(-24px);opacity:0}
+.call-frame.f0{background:rgba(2,132,199,.1);color:var(--ds-deep);border:1.5px solid rgba(2,132,199,.3)}
+.call-frame.f1{background:rgba(22,163,74,.1);color:#166534;border:1.5px solid rgba(22,163,74,.3)}
+.call-frame.f2{background:rgba(217,119,6,.1);color:#92400e;border:1.5px solid rgba(217,119,6,.35)}
+.call-bar{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+
+/* ── 爆栈现场 ── */
+.so-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 20px}
+.so-grid{display:grid;grid-template-columns:1fr 210px;gap:18px}
+.so-code{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px;line-height:1.9;color:var(--text);background:rgba(0,0,0,.035);border-radius:10px;padding:14px 16px;white-space:pre;overflow-x:auto}
+.so-code .cm{color:var(--sub);opacity:.7}
+.so-code .guard{color:var(--success);font-weight:700;transition:opacity .3s}
+.so-code .guard.off{text-decoration:line-through;opacity:.32}
+.so-stage{border:2px solid var(--border);border-radius:12px;height:250px;display:flex;flex-direction:column-reverse;gap:4px;padding:8px;overflow:hidden;position:relative;transition:border-color .3s,background .3s}
+.so-stage.boom{border-color:var(--danger);background:rgba(220,38,38,.06);animation:shake .4s}
+@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.so-frame{flex-shrink:0;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:800;font-family:"SF Mono","Fira Code",Menlo,monospace;background:rgba(2,132,199,.1);color:var(--ds-deep);border:1px solid rgba(2,132,199,.3);text-align:center;animation:cardIn .18s ease;transition:transform .2s,opacity .2s,background .2s,color .2s,border-color .2s}
+.so-frame.base{background:rgba(22,163,74,.14);color:#166534;border-color:rgba(22,163,74,.45)}
+.so-frame.popping{transform:translateY(-16px);opacity:0}
+.so-boom-tag{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(220,38,38,.88);color:#fff;font-weight:900;font-size:18px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .3s}
+.so-boom-tag small{font-size:11.5px;font-weight:700;opacity:.9}
+.so-stage.boom .so-boom-tag{opacity:1}
+.so-bar{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+.so-toggle{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--text);cursor:pointer;user-select:none}
+.so-toggle input{width:18px;height:18px;accent-color:var(--success);cursor:pointer}
+.so-status{font-size:12.5px;color:var(--sub);font-weight:600;line-height:1.7}
+.so-status b{color:var(--danger)}
+.so-status .ok{color:var(--success);font-weight:800}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .undo-wrap{grid-template-columns:1fr}
+  .call-grid{grid-template-columns:1fr}
+  .call-stack{min-height:160px}
+  .so-grid{grid-template-columns:1fr}
+  .so-stage{height:220px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"栈：Cmd+Z 和「爆栈」的秘密","name":"栈：Cmd+Z 和「爆栈」的秘密","url":"https://xueai.app/slides/ds-3.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 线性结构：你天天在用","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"栈是什么？后进先出（LIFO）一句话讲不清，亲手玩就懂：撤销键 Cmd+Z 的真身是一叠操作牌、函数调用靠栈记住「回到哪」、没写终止条件的递归怎么把栈压爆（Stack Overflow）。Agent 的子任务和最大步数保险丝，也是同一回事。","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">编程基础篇 · 线性结构：你天天在用</div>
+    <h1>栈：Cmd+Z 和「爆栈」的秘密</h1>
+    <p class="subtitle">第二种收纳方式长得像一摞盘子：<b>只能从最上面放、也只能从最上面拿</b>，这叫栈。听着限制很大？可你每天按的撤销键、程序里每一次函数调用，靠的都是它。这一课先亲手玩坏一个文档再一键撤回来，最后围观一场「爆栈」事故——全球最大的程序员问答网站 Stack Overflow，名字就是从这场事故来的。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>后进先出：撤销键、函数调用、Agent 的子任务都靠它。亲手压栈弹栈，再看一次没写终止条件的递归是怎么把栈压爆的</p></aside><!--seo:end-->  <div class="sec-label">先玩 · 撤销键的真身</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">左边是个迷你文档，用四个按钮随便折腾它。<b style="color:var(--text)">留意右边</b>：你的每一步操作都被压成一张牌，叠在「操作栈」上——<b style="color:var(--text)">后做的压在上面</b>。折腾够了，连按几下「Cmd+Z 撤销」，看看它撤的顺序。</p>
+
+  <div class="undo-wrap">
+    <div class="undo-box">
+      <div class="undo-head"><h4>📄 迷你文档</h4><p>随便操作，别心疼</p></div>
+      <div class="doc-stage" id="docStage"></div>
+      <div class="doc-toolbar">
+        <button class="btn-op" id="opType">⌨️ 打一行字</button>
+        <button class="btn-op" id="opDel">🗑 删一行</button>
+        <button class="btn-op" id="opRed">🖍 标红</button>
+        <button class="btn-op" id="opClear">🧹 清空</button>
+      </div>
+    </div>
+    <div class="undo-box">
+      <div class="undo-head"><h4>🥞 操作栈</h4><p>每步操作压一张牌，最上面 = 最近一步</p></div>
+      <div class="stack-stage" id="stackStage"><div class="stack-empty">（还没有操作）</div></div>
+      <div class="doc-toolbar">
+        <button class="btn-undo" id="opUndo">⌘Z 撤销</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="undo-bar"><span class="undo-status" id="undoStatus">试试：打两行字 → 标红 → 再撤销三次，猜猜恢复的顺序</span></div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>发现了吗？撤销永远先撤最近那步。</b>这不是产品经理的选择，是栈的天性：<b>后进先出</b>（LIFO，Last In First Out）。只从顶端拿，最先拿到的自然是最后放的。撤销要是不按这个顺序来——先撤掉十步前的操作——文档立刻乱成一锅粥。<b>凡是「按原路退回去」的事，天生就该用栈收纳</b>。
+  </div>
+
+  <div class="sec-label">程序怎么记得「回到哪」？</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked xa-peek">你让 AI「做晚饭」，它做到一半要切菜，切菜切到一半刀钝了要磨刀……每次「暂停手头的事去干别的」，程序都会把当前进度压进一个栈里。<b style="color:var(--text)">看下面的动画</b>（滚到这里会自动播一遍），留意每个任务完成后，程序是怎么<b style="color:var(--text)">自动</b>找回上一个任务的。</p>
+
+  <div class="call-box paywall-locked" id="callBox">
+    <div class="call-grid">
+      <div class="call-say" id="callSay"><span class="cs-step">准备就绪</span>点「播放」或滚动到这里，看一次完整的调用与返回</div>
+      <div class="call-stack" id="callStack"></div>
+    </div>
+    <div class="call-bar">
+      <button class="btn-ds" id="btnCall">播放 →</button>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    这个栈叫<b>函数调用栈</b>，每张牌叫一个「栈帧」，里面记着「这个任务干到哪了、干完回到哪」。程序不需要什么全局调度员——<b>弹出栈顶，自然就回到了上一层暂停的位置</b>。你学过的 Agent 也一样：主任务干到一半发现要先查资料，就把主任务压栈、先干子任务，子任务完成弹出，接着干主任务。
+  </div>
+
+  <div class="sec-label paywall-locked">爆栈现场 · Stack Overflow 是怎么发生的</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">栈的容量是有限的。下面这个函数<b style="color:var(--text)">自己调用自己</b>（这叫递归），左边是代码，右边是调用栈。先<b style="color:var(--text)">不勾</b>终止条件跑一次，看看会发生什么；再<b style="color:var(--text)">勾上</b>跑一次对比。</p>
+
+  <div class="so-box paywall-locked">
+    <div class="so-grid">
+      <div class="so-code">function 倒数(n) {
+  <span class="guard off" id="guardLine">if (n === 0) return;  <span class="cm">// 终止条件（保险丝）</span></span>
+  打印(n);
+  倒数(n - 1);  <span class="cm">// 自己调用自己</span>
+}
+倒数(5);</div>
+      <div class="so-stage" id="soStage">
+        <div class="so-boom-tag">💥 Stack Overflow<small>栈溢出，程序崩溃</small></div>
+      </div>
+    </div>
+    <div class="so-bar">
+      <button class="btn-ds" id="btnSo">运行 →</button>
+      <label class="so-toggle"><input type="checkbox" id="soGuard"> 加上终止条件</label>
+      <span class="so-status" id="soStatus">先直接运行，看看没有保险丝的递归什么下场</span>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>这和 AI 有什么关系？</b>关系大了。Agent 干活也是「主任务压栈、先干子任务」，那万一子任务又派生子任务、一层层没完没了呢？和没写终止条件的递归一模一样——所以所有正经的 Agent 框架都要设<b>最大步数 / 最大深度</b>，超过就强制停下来。<b>那根保险丝，就是给「无限递归」上的保险</b>。下次你看到 AI 写的递归代码，验收清单第一条：终止条件在哪？
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 这一课想和你分享的</h3>
+    <ul>
+      <li><b>栈 = 一摞盘子</b>：只从顶端放和拿，后进先出（LIFO）</li>
+      <li><b>撤销键的真身</b>：每步操作压一张牌，Cmd+Z 永远先弹最近那张</li>
+      <li><b>函数调用靠栈记路</b>：弹出栈顶，自动回到上一层暂停的地方</li>
+      <li><b>爆栈 = 只压不弹</b>：没有终止条件的递归把栈堆满，程序当场崩溃</li>
+      <li><b>Agent 的保险丝</b>：最大步数限制，防的就是任务栈的「无限递归」</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* ── 交互一：撤销键的真身 ──
+   每张牌记的是「怎么撤销这一步」而不是「这一步做了什么」：
+   删行的牌里存被删的整行（含标红状态）、清空的牌里存整个文档快照，
+   这样 undo 只要照牌行事，不用反推。真实编辑器的撤销栈就是这么干的。 */
+const TYPE_POOL = ['今天开会记了三点','记得买牛奶','周五之前交周报','给妈妈回个电话','健身房约了晚上八点','冰箱里还有半个西瓜'];
+let typeIdx = 0;
+let docLines = [];      // {text, red}
+let undoOps = [];       // 与 stackStage 里的牌一一对应
+
+const docStage   = document.getElementById('docStage');
+const stackStage = document.getElementById('stackStage');
+const undoStatus = document.getElementById('undoStatus');
+
+function renderDoc(){
+  docStage.innerHTML = docLines.length
+    ? docLines.map(l => `<div class="doc-line${l.red ? ' red' : ''}">${l.text}</div>`).join('')
+    : '<div class="doc-empty">（空文档，先打一行字）</div>';
+}
+
+function refreshTopTag(){
+  [...stackStage.querySelectorAll('.top-tag')].forEach(t => t.remove());
+  /* :not(.popping)——正在飞出的牌还要在 DOM 里待 250ms，不能再算栈顶 */
+  const top = stackStage.querySelector('.op-card:not(.popping)');
+  if (top) top.insertAdjacentHTML('beforeend', '<span class="top-tag">栈顶</span>');
+  if (!stackStage.querySelector('.op-card')) {
+    stackStage.innerHTML = '<div class="stack-empty">（还没有操作）</div>';
+  }
+}
+
+function pushCard(op, cls, label){
+  undoOps.push(op);
+  const empty = stackStage.querySelector('.stack-empty');
+  if (empty) empty.remove();
+  const card = document.createElement('div');
+  card.className = 'op-card ' + cls;
+  card.textContent = label;
+  stackStage.prepend(card);   // 视觉上最新的在最上面
+  refreshTopTag();
+}
+
+document.getElementById('opType').addEventListener('click', () => {
+  const text = TYPE_POOL[typeIdx % TYPE_POOL.length];
+  typeIdx++;
+  docLines.push({ text, red: false });
+  pushCard({ type: 'type' }, 't-type', '⌨️ 打字：「' + text + '」');
+  renderDoc();
+  undoStatus.innerHTML = '压入一张「打字」牌——它现在是<b>栈顶</b>';
+});
+
+document.getElementById('opDel').addEventListener('click', () => {
+  if (!docLines.length) { undoStatus.textContent = '文档是空的，先打点字再删'; return; }
+  const line = docLines.pop();
+  pushCard({ type: 'del', line }, 't-del', '🗑 删行：「' + line.text + '」');
+  renderDoc();
+  undoStatus.innerHTML = '被删的那行<b>存在牌里</b>了——所以撤销时能原样恢复';
+});
+
+document.getElementById('opRed').addEventListener('click', () => {
+  if (!docLines.length) { undoStatus.textContent = '文档是空的，没有可标红的行'; return; }
+  const last = docLines[docLines.length - 1];
+  if (last.red) { undoStatus.textContent = '最后一行已经是红的了，先打行新字'; return; }
+  last.red = true;
+  pushCard({ type: 'red', idx: docLines.length - 1 }, 't-red', '🖍 标红：「' + last.text + '」');
+  renderDoc();
+  undoStatus.innerHTML = '压入一张「标红」牌';
+});
+
+document.getElementById('opClear').addEventListener('click', () => {
+  if (!docLines.length) { undoStatus.textContent = '文档本来就是空的'; return; }
+  pushCard({ type: 'clear', lines: docLines.slice() }, 't-clear', '🧹 清空（' + docLines.length + ' 行存进牌里）');
+  docLines = [];
+  renderDoc();
+  undoStatus.innerHTML = '整个文档的快照存进牌里了——按一下撤销试试';
+});
+
+document.getElementById('opUndo').addEventListener('click', () => {
+  if (!undoOps.length) { undoStatus.textContent = '栈空了——没有可撤销的操作'; return; }
+  const op = undoOps.pop();
+  const card = stackStage.querySelector('.op-card:not(.popping)');
+  card.classList.add('popping');
+  setTimeout(() => { card.remove(); refreshTopTag(); }, 250);
+  if (op.type === 'type')  docLines.pop();
+  if (op.type === 'del')   docLines.push(op.line);
+  if (op.type === 'red')   docLines[op.idx].red = false;
+  if (op.type === 'clear') docLines = op.lines;
+  renderDoc();
+  undoStatus.innerHTML = '弹出<b>栈顶</b>那张牌，照牌还原——注意它撤的永远是<b>最近</b>那步';
+});
+
+renderDoc();
+
+/* ── 交互二：函数调用栈 ── */
+const CALL_STEPS = [
+  { act: 'push', name: '做晚饭()', cls: 'f0', say: '你喊了一声「开饭」，<b>做晚饭()</b> 开始执行——它的栈帧压入栈底' },
+  { act: 'push', name: '切菜()',   cls: 'f1', say: '做晚饭做到一半要切菜。它<b>暂停自己</b>（进度记在栈帧里），调用 <b>切菜()</b>' },
+  { act: 'push', name: '磨刀()',   cls: 'f2', say: '切菜发现刀钝了，又暂停——先调用 <b>磨刀()</b>。现在栈里叠了三层' },
+  { act: 'pop',  name: '磨刀()',   say: '刀磨好了！<b>磨刀()</b> 弹出。程序自动回到栈顶——也就是 切菜() 暂停的那一行' },
+  { act: 'pop',  name: '切菜()',   say: '菜切完了，<b>切菜()</b> 弹出，回到 做晚饭() 继续往下' },
+  { act: 'pop',  name: '做晚饭()', say: '晚饭端上桌，<b>栈空了</b>——整串任务干干净净收尾。程序全程没人指挥，全靠弹栈找路' },
+];
+
+const callStack = document.getElementById('callStack');
+const callSay   = document.getElementById('callSay');
+const btnCall   = document.getElementById('btnCall');
+let callRunning = false;
+
+async function playCall(){
+  if (callRunning) return;
+  callRunning = true;
+  btnCall.disabled = true;
+  callStack.innerHTML = '';
+  for (let i = 0; i < CALL_STEPS.length; i++) {
+    const s = CALL_STEPS[i];
+    callSay.innerHTML = '<span class="cs-step">第 ' + (i + 1) + ' 步 / ' + CALL_STEPS.length + '</span>' + s.say;
+    if (s.act === 'push') {
+      const f = document.createElement('div');
+      f.className = 'call-frame ' + s.cls;
+      f.textContent = s.name;
+      callStack.appendChild(f);   // column-reverse：后 append 的显示在上面
+    } else {
+      const top = callStack.lastElementChild;
+      if (top) {
+        top.classList.add('popping');
+        await sleep(320);
+        top.remove();
+      }
+    }
+    await sleep(1500);
+  }
+  callSay.innerHTML = '<span class="cs-step">播完了</span>再看一遍？留意「弹出即返回」——这是栈最优雅的地方';
+  btnCall.disabled = false;
+  btnCall.textContent = '再播一遍 ↻';
+  callRunning = false;
+}
+
+btnCall.addEventListener('click', playCall);
+/* lessonOnView 由页面底部的 lesson.js 提供，此刻还没加载，等 DOMContentLoaded 再绑 */
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.lessonOnView) window.lessonOnView(document.getElementById('callBox'), playCall);
+});
+
+/* ── 交互三：爆栈现场 ──
+   舞台高 250px、每帧约 26px，压到 10 帧就顶到天花板——真实的栈上限是
+   几千帧，这里缩小到 10 是为了让「溢出」在 3 秒内看得见。
+   压栈间隔逐帧递减：崩溃前的加速感比匀速更能传达「失控」。 */
+const soStage  = document.getElementById('soStage');
+const soStatus = document.getElementById('soStatus');
+const btnSo    = document.getElementById('btnSo');
+const soGuard  = document.getElementById('soGuard');
+const guardLine = document.getElementById('guardLine');
+const SO_MAX = 10;
+let soRunning = false;
+
+soGuard.addEventListener('change', () => {
+  guardLine.classList.toggle('off', !soGuard.checked);
+  soStatus.textContent = soGuard.checked
+    ? '保险丝装好了——再运行一次，看它怎么安全落地'
+    : '保险丝拆了——运行的话后果自负 😈';
+});
+
+function soReset(){
+  [...soStage.querySelectorAll('.so-frame')].forEach(f => f.remove());
+  soStage.classList.remove('boom');
+}
+
+function soPush(label, base){
+  const f = document.createElement('div');
+  f.className = 'so-frame' + (base ? ' base' : '');
+  f.textContent = label;
+  soStage.appendChild(f);
+  return f;
+}
+
+async function runSo(){
+  if (soRunning) return;
+  soRunning = true;
+  btnSo.disabled = true;
+  soReset();
+
+  if (!soGuard.checked) {
+    soStatus.innerHTML = '倒数(5) → 倒数(4) → 倒数(3)…… 0 之后没人喊停，它接着往负数冲——';
+    let n = 5, count = 0;
+    while (count < SO_MAX + 2) {
+      soPush('倒数(' + n + ')');
+      n--; count++;
+      if (count > SO_MAX) break;
+      await sleep(Math.max(70, 340 - count * 26));
+    }
+    await sleep(250);
+    soStage.classList.add('boom');
+    soStatus.innerHTML = '<b>💥 爆栈了。</b>栈帧只压不弹，堆满整个栈空间，程序当场崩溃。勾上「加上终止条件」再试一次';
+  } else {
+    soStatus.textContent = '倒数(5) 开始，每层都先检查终止条件……';
+    for (let n = 5; n >= 1; n--) {
+      soPush('倒数(' + n + ')');
+      await sleep(420);
+    }
+    soPush('倒数(0) → return!', true);
+    soStatus.innerHTML = '<span class="ok">n === 0，终止条件触发！</span>不再往下调，开始逐层返回——';
+    await sleep(900);
+    while (soStage.querySelector('.so-frame')) {
+      const top = soStage.lastElementChild;
+      if (!top || !top.classList.contains('so-frame')) break;
+      top.classList.add('popping');
+      await sleep(260);
+      top.remove();
+    }
+    soStatus.innerHTML = '<span class="ok">✓ 安全落地。</span>压 6 层、弹 6 层，栈清空，程序正常结束。一行终止条件，就是生与死的区别';
+  }
+
+  btnSo.disabled = false;
+  btnSo.textContent = '再运行 ↻';
+  soRunning = false;
+}
+
+btnSo.addEventListener('click', runSo);
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

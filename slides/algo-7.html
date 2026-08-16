@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>分治：上下文压缩的算法原理 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="动手实战篇的 Compaction 其实是分治：把长对话切段、各自摘要、再合并。亲手跑一次递归摘要，看 3600 token 的对话怎么被压到 200，也看清压缩丢掉了什么。">
+<meta name="keywords" content="分治算法,上下文压缩,Compaction原理,递归摘要,归并排序,长对话压缩,AI上下文">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="分治：上下文压缩的算法原理">
+<meta property="og:description" content="把长对话切段、各自摘要、再合并——Compaction 就是分治。亲手压一段 3600 token 的对话到 200，顺便看清它丢了什么。">
+<meta property="og:url" content="https://xueai.app/slides/algo-7.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="分治：上下文压缩的算法原理">
+<meta name="twitter:description" content="把长对话切段、各自摘要、再合并——Compaction 就是分治。亲手压一次 3600 → 200 token。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── 压缩演示 ── */
+.cmp-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.cmp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.cmp-meter{display:flex;align-items:baseline;gap:7px}
+.cmp-meter .cm-label{font-size:12px;font-weight:800;color:var(--sub)}
+.cmp-meter .cm-val{font-size:24px;font-weight:900;color:var(--al);font-variant-numeric:tabular-nums;transition:color .3s}
+.cmp-meter .cm-val.low{color:var(--success)}
+.cmp-meter .cm-unit{font-size:12px;font-weight:700;color:var(--sub)}
+.cmp-toggle{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;user-select:none}
+.cmp-toggle input{display:none}
+.cmp-toggle .tg-track{width:40px;height:22px;border-radius:99px;background:#d1d5db;position:relative;transition:background .2s;flex-shrink:0}
+.cmp-toggle .tg-track::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.cmp-toggle input:checked + .tg-track{background:var(--al)}
+.cmp-toggle input:checked + .tg-track::after{left:20px}
+.cmp-stage{padding:18px 20px;display:flex;flex-direction:column;gap:8px;min-height:300px}
+.cmp-phase-tag{align-self:center;font-size:12px;font-weight:800;color:var(--al-deep);background:var(--al-soft);border:1px dashed var(--al-line);padding:4px 16px;border-radius:99px;opacity:0;transition:opacity .3s}
+.cmp-phase-tag.show{opacity:1}
+.cmp-group{border-radius:var(--radius-sm);transition:background .4s,border-color .4s,padding .4s;display:flex;flex-direction:column;gap:8px;border:1.5px solid transparent}
+.cmp-group.grouped{padding:10px;border-color:var(--gc, var(--border));background:var(--gbg, transparent)}
+.cmp-group .grp-title{font-size:11.5px;font-weight:800;color:var(--gc);display:none;letter-spacing:.4px}
+.cmp-group.grouped .grp-title{display:block}
+.cmp-msg{display:flex;gap:8px;align-items:flex-start;overflow:hidden;max-height:120px;transition:max-height .5s ease,opacity .4s ease,margin .5s ease;position:relative}
+.cmp-msg.gone{max-height:0;opacity:0;margin:-4px 0}
+.cmp-msg.user{flex-direction:row-reverse}
+.cmp-avatar{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+.cmp-msg.user .cmp-avatar{background:#64748b}
+.cmp-msg.ai .cmp-avatar{background:var(--al)}
+.cmp-bubble{max-width:82%;padding:7px 13px;border-radius:12px;font-size:12.5px;line-height:1.65;color:var(--text)}
+.cmp-msg.user .cmp-bubble{background:rgba(100,116,139,.09);border-top-right-radius:4px}
+.cmp-msg.ai .cmp-bubble{background:var(--al-soft);border-top-left-radius:4px}
+.cmp-bubble .tk{font-size:10px;font-weight:800;color:var(--sub);opacity:.75;margin-left:6px;white-space:nowrap}
+.cmp-bubble .key-fact{background:rgba(217,119,6,.16);border-radius:4px;padding:0 3px;font-weight:700}
+.cmp-keep-badge{position:absolute;top:0;font-size:10px;font-weight:800;color:var(--success);background:rgba(22,163,74,.1);padding:1px 8px;border-radius:99px;display:none}
+.cmp-msg.user .cmp-keep-badge{left:0}
+.cmp-msg.ai .cmp-keep-badge{right:0}
+.cmp-msg.kept .cmp-keep-badge{display:block}
+.cmp-summary{border:1.5px dashed var(--gc, var(--al-line));background:#fff;border-radius:var(--radius-sm);padding:10px 14px;font-size:12.5px;line-height:1.7;color:var(--text);opacity:0;transform:scale(.92);transition:opacity .45s,transform .45s}
+.cmp-summary.show{opacity:1;transform:scale(1)}
+.cmp-summary .sm-tag{font-size:10.5px;font-weight:800;color:var(--gc, var(--al-deep));display:block;margin-bottom:2px}
+.cmp-summary .tk{font-size:10.5px;font-weight:800;color:var(--sub);margin-left:6px;white-space:nowrap}
+.cmp-final{border:2px solid var(--al);background:linear-gradient(135deg,#fdf2f8,#fce7f3);border-radius:var(--radius-sm);padding:13px 16px;font-size:13px;line-height:1.75;color:#831843;opacity:0;transform:scale(.9);transition:opacity .5s,transform .5s;display:none}
+.cmp-final.show{opacity:1;transform:scale(1)}
+.cmp-final .sm-tag{font-size:11px;font-weight:900;color:var(--al-deep);display:block;margin-bottom:3px}
+.cmp-foot{padding:14px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn-al{background:var(--al);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.cmp-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── 归并排序对照卡 ── */
+.merge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.merge-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card);text-align:center}
+.merge-card .mg-step{display:inline-block;font-size:11px;font-weight:900;color:#fff;background:var(--al);padding:2px 14px;border-radius:99px;margin-bottom:8px;letter-spacing:2px}
+.merge-card h4{font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px}
+.merge-card p{font-size:12.5px;color:var(--sub);line-height:1.75;text-align:left}
+.merge-card p b{color:var(--text)}
+
+/* ── 压缩代价对照 ── */
+.loss-box{background:var(--card);border:1.5px solid rgba(217,119,6,.35);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow-card)}
+.loss-box h4{font-size:15px;font-weight:800;color:var(--amber);margin-bottom:12px}
+.loss-row{display:grid;grid-template-columns:1fr 36px 1fr;gap:10px;align-items:center;margin-bottom:10px}
+.loss-cell{border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;line-height:1.7}
+.loss-cell.orig{background:rgba(0,0,0,.035);color:var(--text)}
+.loss-cell.orig b{background:rgba(217,119,6,.18);padding:0 3px;border-radius:4px}
+.loss-cell.after{background:var(--al-soft);color:var(--text)}
+.loss-cell.after .lost{color:var(--danger);font-weight:800;font-size:11.5px}
+.loss-arrow{text-align:center;font-size:17px;color:var(--sub)}
+.loss-note{font-size:13px;color:var(--sub);line-height:1.8;border-top:1px dashed var(--border);padding-top:12px;margin-top:4px}
+.loss-note b{color:var(--text)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .merge-grid{grid-template-columns:1fr}
+  .loss-row{grid-template-columns:1fr;gap:4px}
+  .loss-arrow{transform:rotate(90deg)}
+  .cmp-bubble{max-width:88%}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"分治：上下文压缩的算法原理","name":"分治：上下文压缩的算法原理","url":"https://xueai.app/slides/algo-7.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 递归与分治","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"动手实战篇的 Compaction 其实是分治：把长对话切段、各自摘要、再合并。亲手跑一次递归摘要，看 3600 token 的对话怎么被压到 200，也看清压缩丢掉了什么。","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">编程基础篇 · 递归与分治</div>
+    <h1>分治：上下文压缩的算法原理</h1>
+    <p class="subtitle">动手实战篇讲过：对话太长装不下时，AI 会做一次 Compaction——把旧对话压成摘要。当时说「像搬家前把杂物打包」，这一课揭开包装纸：<b>它是一个有两千年历史的算法套路，叫分治</b>。上一课的递归是「拆」，这一课补上另一半：「拆完再合」。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>动手实战篇的 Compaction 其实是分治：把长对话切段、各自摘要、再合并。亲手跑一次递归摘要，看信息怎么被层层压缩</p></aside><!--seo:end-->  <div class="sec-label">亲手压一次 · 3600 token 的装修对话</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">下面是一段你和 AI 讨论装修方案的完整对话，12 条消息约 3600 token，眼看要把上下文窗口塞爆了。点「开始压缩」，<b style="color:var(--text)">留意三幕动作</b>：先<b style="color:var(--text)">切</b>（分成三段）、再<b style="color:var(--text)">治</b>（每段各自收成一条摘要）、最后<b style="color:var(--text)">合</b>（三条摘要并成一条）——顶部的 token 计数器会告诉你压掉了多少。</p>
+
+  <div class="cmp-box">
+    <div class="cmp-head">
+      <div class="cmp-meter"><span class="cm-label">当前上下文</span><span class="cm-val" id="tokenVal">3600</span><span class="cm-unit">token</span></div>
+      <label class="cmp-toggle"><input type="checkbox" id="keepRecent"><span class="tg-track"></span>保留最近 4 条不压缩</label>
+    </div>
+    <div class="cmp-stage" id="cmpStage"></div>
+    <div class="cmp-foot">
+      <button class="btn-al" id="btnCompress">开始压缩 →</button>
+      <span class="cmp-status" id="cmpStatus">切分 → 各段摘要 → 合并，三幕连播</span>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>试试打开「保留最近 4 条」再压一次。</b>这正是真实 Agent 的做法：最近几条对话往往就是你正在办的事，最金贵，一个字都不动；只把久远的部分压成摘要。你会看到 token 数没有压到 200 那么狠——<b>保真和省空间，永远在做交换</b>。
+  </div>
+
+  <div class="sec-label">概念卡 · 归并排序同款套路</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:20px;">刚才三幕动作有个正式名字：<b style="color:var(--text)">分治</b>（Divide and Conquer）。教科书里它最出名的代言人是归并排序——把一列数切成小段、每段排好、再两两合并。<b style="color:var(--text)">归并排序排的是数，Compaction 压的是话，骨架一模一样</b>：</p>
+
+  <div class="merge-grid paywall-locked xa-peek">
+    <div class="merge-card">
+      <div class="mg-step">分</div>
+      <h4>✂️ 切成小块</h4>
+      <p>大问题直接解不动，就切成几个小块。<b>归并排序</b>：一列数对半切到只剩单个。<b>Compaction</b>：长对话按话题或轮次切成几段。</p>
+    </div>
+    <div class="merge-card">
+      <div class="mg-step">治</div>
+      <h4>🔧 每块各自解决</h4>
+      <p>小块规模小，好办。<b>归并排序</b>：小段各自排好序。<b>Compaction</b>：每段各自摘要——段够短，AI 一口就能读完、总结准。这一步还能并行干，又快一截。</p>
+    </div>
+    <div class="merge-card">
+      <div class="mg-step">合</div>
+      <h4>🧩 结果合并</h4>
+      <p>把小块的成果拼回完整答案。<b>归并排序</b>：两段有序数列合成一段。<b>Compaction</b>：几条摘要再合成一条总摘要。段还太多？<b>递归再来一轮</b>——上一课的味道回来了。</p>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>为什么不一口气让 AI 总结全文？</b>因为「总结一万字」本身就会把上下文塞爆——这不就是我们要解决的问题吗。分治的聪明处在于：<b>把「解不动的大问题」变成一堆「肯定解得动的小问题」</b>，再花点力气拼装。工程进阶篇 Coding Agent 读大代码库也是这么干的：一个文件一个文件地读、各自记要点、最后汇总。
+  </div>
+
+  <div class="sec-label paywall-locked">诚实卡 · 压缩的代价</div>
+
+  <div class="loss-box paywall-locked">
+    <h4>⚠️ 摘要是有损压缩——细节会丢</h4>
+    <div class="loss-row">
+      <div class="loss-cell orig">原文：「预算 <b>8 万以内</b>」「我特别不喜欢红色，<b>全屋别出现红色</b>」</div>
+      <div class="loss-arrow">→</div>
+      <div class="loss-cell after">压缩后：「讨论了预算和配色偏好」<span class="lost">← 具体数字和红色禁令都没了</span></div>
+    </div>
+    <div class="loss-note">压缩后 AI 还知道「聊过预算」，但<b>再问它「我预算多少」它只能猜</b>；下次它给你配个红沙发，你都没处说理。所以动手实战篇反复强调：<b>关键事实（数字、硬性要求、决定）要另外记进长期记忆或文档里</b>，不能指望摘要替你留着。摘要负责「大概聊过什么」，档案负责「铁板钉钉的事」。</div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 这一课想和你分享的</h3>
+    <ul>
+      <li><b>分治 = 切小、各治、再合</b>：解不动的大问题，变成一堆肯定解得动的小问题</li>
+      <li><b>Compaction 是分治在 AI 的真身</b>：切段 → 各段摘要 → 合并，和归并排序同一副骨架</li>
+      <li><b>最近的对话最金贵</b>：真实 Agent 只压旧的、留新的——保真和省空间永远在交换</li>
+      <li><b>压缩有损</b>：「8 万以内」「别用红色」这种关键事实要另存，别指望摘要</li>
+      <li><b>段还太多就递归再压一轮</b>：上一课的递归 + 这一课的合并 = 完整的分治</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 压缩演示 ──
+   12 条消息 × 300 token = 3600。分组三段（每段 4 条）。
+   开启「保留最近 4 条」后只压前 8 条（两段），后 4 条挂「保留原文」徽章。
+   token 计数用 rAF 缓动滚动，比瞬间跳变更有「泄气」的感觉。 */
+const MSGS = [
+  { role:'user', text:'我家 89 平的两居室想重新装修，<span class="key-fact">预算 8 万以内</span>，帮我出个整体方案。' },
+  { role:'ai',   text:'好的！8 万建议「轻硬装、重软装」：水电和墙面做扎实，家具灯具后期慢慢配，性价比最高。' },
+  { role:'user', text:'风格想要日式原木风，但别太性冷淡，要有点生活气息。' },
+  { role:'ai',   text:'那主材选浅橡木，墙面米白乳胶漆，再用棉麻布艺、藤编灯罩和绿植提温度，就不会冷。' },
+  { role:'user', text:'客厅不要电视，想装投影仪，白天也能看的那种。' },
+  { role:'ai',   text:'选亮度 2800 流明以上的机型，幕布嵌进吊顶，记得预留 HDMI 暗线和吊装点位。' },
+  { role:'user', text:'对了，我特别不喜欢红色，<span class="key-fact">全屋别出现红色</span>，一点都不要。' },
+  { role:'ai',   text:'记住了：配色控制在原木色＋米白＋灰绿三种以内，软装挑选时也整体避开红色系。' },
+  { role:'user', text:'厨房想做开放式的，但爸妈担心油烟大，怎么办？' },
+  { role:'ai',   text:'折中方案：玻璃移门半开放。平时敞开显大，爆炒时拉上挡油烟，两代人都满意。' },
+  { role:'user', text:'预算里还得留 1 万块买冰箱和洗衣机。' },
+  { role:'ai',   text:'那硬装压到 5 万：水电 1.2 万、瓦工 1 万、木工和柜子 1.8 万、油漆杂项 1 万。' },
+];
+const TOKEN_PER_MSG = 300;
+
+const GROUPS = [
+  { name:'第 1 段 · 预算与风格', color:'#db2777', bg:'rgba(219,39,119,.05)',
+    summary:'用户装修 89 平两居室，走日式原木风但要有生活气息，整体方案按轻硬装重软装定了。' },
+  { name:'第 2 段 · 客厅与配色', color:'#7c3aed', bg:'rgba(124,58,237,.05)',
+    summary:'客厅装投影不装电视（高亮机型＋吊顶幕布）；用户对配色有偏好，方案已按此调整。' },
+  { name:'第 3 段 · 厨房与家电', color:'#d97706', bg:'rgba(217,119,6,.05)',
+    summary:'厨房定了玻璃移门半开放式；家电另留预算，硬装各工种的钱已细分。' },
+];
+const FINAL_SUMMARY = '用户装修 89 平两居室，日式原木风；讨论了预算和配色偏好；客厅用投影，厨房半开放式，硬装预算已按工种细分。';
+const FINAL_SUMMARY_PARTIAL = '用户装修 89 平两居室，日式原木风，方案已定；客厅用投影，讨论了配色偏好。';
+
+const stage = document.getElementById('cmpStage');
+const tokenVal = document.getElementById('tokenVal');
+const btnCompress = document.getElementById('btnCompress');
+const cmpStatus = document.getElementById('cmpStatus');
+const keepRecent = document.getElementById('keepRecent');
+let compressing = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* token 计数缓动：600ms 内从当前值滚到目标值 */
+let tokenAnim = null;
+function setTokens(target){
+  if (tokenAnim) cancelAnimationFrame(tokenAnim);
+  const from = parseInt(tokenVal.textContent.replace(/\D/g,''), 10) || 0;
+  const t0 = performance.now();
+  function tick(now){
+    const p = Math.min(1, (now - t0) / 600);
+    const eased = 1 - Math.pow(1 - p, 3);
+    tokenVal.textContent = Math.round(from + (target - from) * eased).toLocaleString('zh-CN');
+    if (p < 1) tokenAnim = requestAnimationFrame(tick);
+    else tokenVal.classList.toggle('low', target <= 1500);
+  }
+  tokenAnim = requestAnimationFrame(tick);
+}
+
+function buildStage(){
+  stage.innerHTML = '';
+  const keep = keepRecent.checked;
+  const groupCount = keep ? 2 : 3;   // 保留模式只压前 8 条（两段）
+  const frag = document.createDocumentFragment();
+
+  const tag = document.createElement('div');
+  tag.className = 'cmp-phase-tag'; tag.id = 'phaseTag';
+  tag.textContent = '第一幕 · 切分';
+  frag.appendChild(tag);
+
+  for (let g = 0; g < 3; g++){
+    const grp = document.createElement('div');
+    grp.className = 'cmp-group';
+    grp.dataset.g = g;
+    if (g < groupCount) {
+      grp.style.setProperty('--gc', GROUPS[g].color);
+      grp.style.setProperty('--gbg', GROUPS[g].bg);
+      grp.innerHTML = `<div class="grp-title">${GROUPS[g].name}（4 条 · 约 1200 token）</div>`;
+    }
+    for (let i = g*4; i < g*4+4; i++){
+      const m = MSGS[i];
+      const div = document.createElement('div');
+      div.className = `cmp-msg ${m.role}` + (keep && g === 2 ? ' kept' : '');
+      div.innerHTML = `<div class="cmp-avatar">${m.role==='user'?'你':'AI'}</div>
+        <div class="cmp-bubble">${m.text}<span class="tk">≈300 tk</span></div>
+        <span class="cmp-keep-badge">📌 保留原文</span>`;
+      grp.appendChild(div);
+    }
+    if (g < groupCount){
+      const sm = document.createElement('div');
+      sm.className = 'cmp-summary';
+      sm.style.setProperty('--gc', GROUPS[g].color);
+      sm.style.display = 'none';
+      sm.innerHTML = `<span class="sm-tag">📝 ${GROUPS[g].name} 的摘要</span>${GROUPS[g].summary}<span class="tk">1200 → 150 tk</span>`;
+      grp.appendChild(sm);
+    }
+    frag.appendChild(grp);
+  }
+
+  const fin = document.createElement('div');
+  fin.className = 'cmp-final'; fin.id = 'finalCard';
+  frag.appendChild(fin);
+  stage.appendChild(frag);
+}
+
+async function runCompress(){
+  if (compressing) return;
+  compressing = true;
+  btnCompress.disabled = true;
+  keepRecent.disabled = true;
+  btnCompress.textContent = '压缩中……';
+  buildStage();
+  setTokens(3600);
+  await sleep(500);
+
+  const keep = keepRecent.checked;
+  const groupCount = keep ? 2 : 3;
+  const phaseTag = document.getElementById('phaseTag');
+  const groups = [...stage.querySelectorAll('.cmp-group')];
+
+  /* 第一幕：切分 */
+  phaseTag.classList.add('show');
+  cmpStatus.textContent = keep
+    ? '第一幕 · 切分：前 8 条分成 2 段，最近 4 条挂「保留原文」不动'
+    : '第一幕 · 切分：12 条按话题分成 3 段，颜色是段的记号';
+  for (let g = 0; g < groupCount; g++){
+    await sleep(560);
+    groups[g].classList.add('grouped');
+  }
+  await sleep(900);
+
+  /* 第二幕：各段摘要 */
+  phaseTag.textContent = '第二幕 · 各段摘要';
+  cmpStatus.textContent = '第二幕 · 治：每段各自收拢成一条摘要，1200 → 150 token';
+  let tokens = 3600;
+  for (let g = 0; g < groupCount; g++){
+    const grp = groups[g];
+    grp.querySelectorAll('.cmp-msg').forEach(m => m.classList.add('gone'));
+    await sleep(520);
+    const sm = grp.querySelector('.cmp-summary');
+    sm.style.display = 'block';
+    await sleep(30);
+    sm.classList.add('show');
+    tokens -= 1200 - 150;
+    setTokens(tokens);
+    await sleep(620);
+  }
+  await sleep(700);
+
+  /* 第三幕：合并 */
+  phaseTag.textContent = '第三幕 · 合并';
+  cmpStatus.textContent = keep
+    ? '第三幕 · 合：2 条摘要合成 1 条总摘要，加上保留的 4 条原文'
+    : '第三幕 · 合：3 条摘要再合成 1 条总摘要';
+  const summaries = [...stage.querySelectorAll('.cmp-summary')];
+  summaries.forEach(s => { s.classList.remove('show'); });
+  await sleep(500);
+  summaries.forEach(s => { s.style.display = 'none'; });
+  groups.slice(0, groupCount).forEach(g => { g.classList.remove('grouped'); g.style.display = 'none'; });
+
+  const fin = document.getElementById('finalCard');
+  const finalTokens = keep ? 180 : 200;
+  fin.innerHTML = `<span class="sm-tag">🗜 总摘要（约 ${finalTokens} token）</span>${keep ? FINAL_SUMMARY_PARTIAL : FINAL_SUMMARY}`;
+  fin.style.display = 'block';
+  /* 保留模式：总摘要插到保留消息前面，顺序才符合「旧的在上」 */
+  if (keep) stage.insertBefore(fin, groups[2]);
+  await sleep(40);
+  fin.classList.add('show');
+  const total = keep ? finalTokens + 4 * TOKEN_PER_MSG : finalTokens;
+  setTokens(total);
+  await sleep(700);
+
+  phaseTag.classList.remove('show');
+  cmpStatus.textContent = keep
+    ? `压完了：3600 → ${total.toLocaleString('zh-CN')} token。最近 4 条原封没动，压得没那么狠，但正在办的事一字不丢`
+    : '压完了：3600 → 200 token，省出 94% 的空间——代价是什么？往下看';
+  btnCompress.disabled = false;
+  keepRecent.disabled = false;
+  btnCompress.textContent = '再压一遍 ↻';
+  compressing = false;
+}
+
+btnCompress.addEventListener('click', runCompress);
+keepRecent.addEventListener('change', () => {
+  if (compressing) return;
+  buildStage();
+  setTokens(3600);
+  cmpStatus.textContent = keepRecent.checked
+    ? '已开启保留：只压前 8 条，最近 4 条原样留着'
+    : '切分 → 各段摘要 → 合并，三幕连播';
+  btnCompress.textContent = '开始压缩 →';
+});
+
+buildStage();
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

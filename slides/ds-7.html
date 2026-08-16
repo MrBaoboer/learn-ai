@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>树：Coding Agent 眼里全是它 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="文件目录、JSON、网页 DOM、代码语法树——AI 读你的项目时看到的是一棵棵树。点开一段代码，亲眼看它变成 AST。">
+<meta name="keywords" content="树 数据结构,AST 抽象语法树,文件目录树,JSON 结构,DOM 树,Coding Agent 原理">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="树：Coding Agent 眼里全是它">
+<meta property="og:description" content="只要有「层级+包含」，就是树。看一行代码怎么长成一棵 AST，理解 Coding Agent 改代码为什么能指哪打哪。">
+<meta property="og:url" content="https://xueai.app/slides/ds-7.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="树：Coding Agent 眼里全是它">
+<meta name="twitter:description" content="只要有「层级+包含」，就是树。看一行代码怎么长成一棵 AST，理解 Coding Agent 改代码为什么能指哪打哪。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── 一物三看 ── */
+.tri-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.tri-tabs{display:flex;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.tri-tab{flex:1;padding:12px 8px;border:none;background:none;font-family:inherit;font-size:13.5px;font-weight:800;color:var(--sub);cursor:pointer;border-bottom:2.5px solid transparent;transition:color .15s,border-color .15s}
+.tri-tab:hover{color:var(--text)}
+.tri-tab.active{color:var(--ds);border-bottom-color:var(--ds)}
+.tri-stage{padding:18px 22px;min-height:300px}
+.tri-intro{font-size:12.5px;color:var(--sub);margin-bottom:12px;line-height:1.75}
+.tri-intro b{color:var(--ds-deep)}
+.tree-view{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;line-height:1.4}
+.tree-view ul{list-style:none;padding-left:24px;margin:0;position:relative}
+.tree-view > ul{padding-left:0}
+.tree-view > ul::before{display:none}
+.tree-view ul ul::before{content:'';position:absolute;left:9px;top:0;bottom:12px;border-left:1.5px solid var(--ds-line)}
+.tree-view ul ul li{position:relative}
+.tree-view ul ul li::before{content:'';position:absolute;left:-15px;top:13px;width:13px;border-top:1.5px solid var(--ds-line)}
+.tn-row{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:8px;margin:1px 0;cursor:default;transition:background .12s}
+.tn-row.has-kids{cursor:pointer}
+.tn-row.has-kids:hover{background:var(--ds-soft)}
+.tn-arrow{width:12px;font-size:9px;color:var(--ds);transition:transform .2s;display:inline-block;text-align:center;flex-shrink:0}
+.tn-node.closed > .tn-row .tn-arrow{transform:rotate(-90deg)}
+.tn-node.closed > ul{display:none}
+.tn-label{font-weight:600;color:var(--text)}
+.tn-note{font-size:11px;color:var(--sub);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+.tn-badge{font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;flex-shrink:0}
+.tn-badge.root{background:var(--ds);color:#fff}
+.tn-badge.leaf{background:rgba(22,163,74,.12);color:var(--success)}
+.tri-legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-top:1px dashed var(--border);font-size:12px;color:var(--sub)}
+.tri-legend span b{color:var(--text)}
+
+/* ── AST 生长动画 ── */
+.ast-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.ast-code{padding:18px 22px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:17px;text-align:center;letter-spacing:.5px}
+.ast-code .tk{padding:3px 5px;border-radius:6px;color:var(--text);transition:background .25s,color .25s}
+.ast-code .tk.lit{background:var(--ds);color:#fff}
+.ast-code .tk.done{background:var(--ds-soft);color:var(--ds-deep)}
+.ast-code .tk.picked{background:var(--amber);color:#fff}
+.ast-stage{padding:10px 12px 4px;display:flex;justify-content:center}
+.ast-stage svg{width:100%;max-width:560px;height:auto;display:block}
+.ast-g{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+.ast-g.on{opacity:1;transform:translateY(0)}
+.ast-edge{stroke:var(--ds-line);stroke-width:2}
+.ast-op{fill:var(--ds)}
+.ast-op-txt{fill:#fff;font-size:19px;font-weight:800;font-family:"SF Mono",Menlo,monospace}
+.ast-leaf{fill:#fff;stroke:var(--ds-line);stroke-width:1.5}
+.ast-leaf-txt{fill:var(--text);font-size:13px;font-weight:700;font-family:"SF Mono",Menlo,monospace}
+.ast-node{cursor:default}
+svg.clickable .ast-node{cursor:pointer}
+.ast-node.picked .ast-op{fill:var(--amber)}
+.ast-node.picked .ast-leaf{stroke:var(--amber);stroke-width:2.5}
+.ast-tag{fill:var(--sub);font-size:10.5px;font-weight:700}
+.ast-narr{margin:0 22px;padding:12px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.75;color:var(--sub);min-height:46px}
+.ast-narr b{color:var(--ds-deep)}
+.ast-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 22px}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.ast-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── AI 关联卡 ── */
+.link-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.link-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.link-card .lk-icon{font-size:24px;margin-bottom:8px}
+.link-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.link-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.link-card p b{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .tri-stage{padding:14px 12px}
+  .tree-view{font-size:12px}
+  .ast-code{font-size:14px;padding:14px 10px}
+  .link-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"树：Coding Agent 眼里全是它","name":"树：Coding Agent 眼里全是它","url":"https://xueai.app/slides/ds-7.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 树与图：AI 的主场","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"文件目录、JSON、网页 DOM、代码语法树——AI 读你的项目时看到的是一棵棵树。点开一段代码，亲眼看它变成 AST。","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">编程基础篇 · 树与图：AI 的主场</div>
+    <h1>树：Coding Agent 眼里全是它</h1>
+    <p class="subtitle">前面几课的收纳方式都是「一排排」的，这一课换个维度：<b>一层套一层</b>的收纳。衣柜里有格子，格子里有盒子，盒子里有袋子——这种「层级 + 包含」的收纳方式，在编程世界叫「树」。而 Coding Agent 抬眼望去，你的项目里全是树。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>文件目录、JSON、网页 DOM、代码语法树——AI 读你的项目时看到的是一棵棵树。点开一段代码，亲眼看它变成 AST</p></aside><!--seo:end-->  <div class="sec-label">一物三看 · 同一个项目，三棵树</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">假设你让 AI 帮你做一个「奶茶店小程序」。下面三个标签页，分别是这个项目的<b style="color:var(--text)">文件目录</b>、一笔<b style="color:var(--text)">订单的 JSON 数据</b>、点单页的<b style="color:var(--text)">网页 DOM</b>——三样东西看着完全不同，请你<b style="color:var(--text)">点击带箭头的节点展开收起</b>，留意一件事：<b style="color:var(--text)">它们的形状是不是一模一样？</b>都是一个根往下分叉。</p>
+
+  <div class="tri-box">
+    <div class="tri-tabs" id="triTabs"></div>
+    <div class="tri-stage">
+      <p class="tri-intro" id="triIntro"></p>
+      <div class="tree-view" id="triTree"></div>
+    </div>
+    <div class="tri-legend">
+      <span><b style="color:var(--ds)">根</b>：最顶上那个，全树只有一个</span>
+      <span><b>父 / 子</b>：上一层是父，展开出来的是子</span>
+      <span><b style="color:var(--success)">叶子</b>：再也展不开的末端节点</span>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>只要有「层级 + 包含」关系，它就是树。</b>文件夹包含文件、订单包含商品列表、页面包含卡片包含按钮——收纳逻辑完全一样。所以 Agent 学会「读树」这一门手艺，就能同时看懂你的项目结构、API 返回的数据和整个网页。顺便记三个术语：最顶上的叫<b>根</b>，有孩子的叫<b>父节点</b>，没孩子的末端叫<b>叶子</b>。就这三个，够用一辈子。
+  </div>
+
+  <div class="sec-label">重头戏 · 一行代码变成一棵树</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked xa-peek">树最厉害的一次出场，是在代码本身。下面这行算总价的代码，在你眼里是一串文字，在 Coding Agent 眼里是一棵<b style="color:var(--text)">语法树（AST）</b>。点「解析」，看它<b style="color:var(--text)">自下而上</b>长出来——留意每一步高亮的代码片段，和树上新长出的节点是怎么对应的。</p>
+
+  <div class="ast-box paywall-locked">
+    <div class="ast-code" id="astCode"><span class="tk" data-t="total">total</span><span class="tk" data-t="eq">=</span><span class="tk" data-t="price">price</span><span class="tk" data-t="mul">*</span><span class="tk" data-t="qty">qty</span><span class="tk" data-t="plus">+</span><span class="tk" data-t="fee">fee</span></div>
+    <div class="ast-stage">
+      <svg id="astSvg" viewBox="0 0 560 330" aria-label="AST 语法树动画">
+        <g class="ast-g" id="astG1">
+          <line class="ast-edge" x1="290" y1="210" x2="230" y2="285"/>
+          <line class="ast-edge" x1="290" y1="210" x2="350" y2="285"/>
+          <g class="ast-node" data-n="price"><rect class="ast-leaf" x="194" y="268" width="72" height="34" rx="10"/><text class="ast-leaf-txt" x="230" y="290" text-anchor="middle">price</text></g>
+          <g class="ast-node" data-n="qty"><rect class="ast-leaf" x="314" y="268" width="72" height="34" rx="10"/><text class="ast-leaf-txt" x="350" y="290" text-anchor="middle">qty</text></g>
+          <g class="ast-node" data-n="mul"><circle class="ast-op" cx="290" cy="210" r="22"/><text class="ast-op-txt" x="290" y="217" text-anchor="middle">*</text></g>
+          <text class="ast-tag" x="230" y="322" text-anchor="middle">叶子</text>
+          <text class="ast-tag" x="350" y="322" text-anchor="middle">叶子</text>
+        </g>
+        <g class="ast-g" id="astG2">
+          <line class="ast-edge" x1="370" y1="135" x2="290" y2="210"/>
+          <line class="ast-edge" x1="370" y1="135" x2="450" y2="210"/>
+          <g class="ast-node" data-n="fee"><rect class="ast-leaf" x="414" y="193" width="72" height="34" rx="10"/><text class="ast-leaf-txt" x="450" y="215" text-anchor="middle">fee</text></g>
+          <g class="ast-node" data-n="plus"><circle class="ast-op" cx="370" cy="135" r="22"/><text class="ast-op-txt" x="370" y="142" text-anchor="middle">+</text></g>
+        </g>
+        <g class="ast-g" id="astG3">
+          <line class="ast-edge" x1="280" y1="60" x2="180" y2="135"/>
+          <line class="ast-edge" x1="280" y1="60" x2="370" y2="135"/>
+          <g class="ast-node" data-n="total"><rect class="ast-leaf" x="144" y="118" width="72" height="34" rx="10"/><text class="ast-leaf-txt" x="180" y="140" text-anchor="middle">total</text></g>
+          <g class="ast-node" data-n="eq"><circle class="ast-op" cx="280" cy="60" r="22"/><text class="ast-op-txt" x="280" y="67" text-anchor="middle">=</text></g>
+          <text class="ast-tag" x="322" y="52">← 根</text>
+        </g>
+      </svg>
+    </div>
+    <div class="ast-narr" id="astNarr">这行代码的意思：总价 = 单价 × 数量 + 配送费。点下面的「解析」，看 Agent 是怎么读它的。</div>
+    <div class="ast-foot">
+      <button class="btn-ds" id="btnAst">解析这行代码 ▶</button>
+      <span class="ast-status" id="astStatus">动画约 5 秒，自下而上长出一棵树</span>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>这就是 Coding Agent 改代码精准的秘密。</b>你说「把乘号右边的变量改成 quantity」，Agent 不是在一堆文字里搜「乘号」两个字——它在树上先找到 <code>*</code> 节点，再取它的右孩子，<b>指哪打哪</b>。改完再把树「打印」回文字，一个空格都不会错位。重命名变量、抽取函数、批量重构，靠的全是在这棵树上做手术，而不是碰运气的文本替换。
+  </div>
+
+  <div class="sec-label paywall-locked">这和 AI 有什么关系？</div>
+
+  <div class="link-grid paywall-locked">
+    <div class="link-card">
+      <div class="lk-icon">📂</div>
+      <h4>Agent 读项目 = 从根遍历文件树</h4>
+      <p>你把项目丢给 Coding Agent，它做的第一件事就是从<b>根目录</b>出发，一层层展开子文件夹——和你刚才点开「奶茶店小程序」目录的动作一模一样。它先看树的形状了解项目骨架，再挑几片关键的「叶子」细读。</p>
+    </div>
+    <div class="link-card">
+      <div class="lk-icon">🔗</div>
+      <h4>JSON 是 API 世界的通用树</h4>
+      <p>你调用大模型 API 时发的 message list、RAG 检索回来的资料、Agent 之间传的任务，几乎全打包成 JSON——因为它是<b>一棵用文字写出来的树</b>，任何程序都能一层层拆开读。看懂树，就看懂了 AI 世界一大半的数据。</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 这一课想和你分享的</h3>
+    <ul>
+      <li><b>层级即树</b>：只要有「一层套一层」的包含关系，就是树——文件目录、JSON、DOM 全是</li>
+      <li><b>三个术语</b>：最顶上叫根，有孩子的叫父节点，末端叫叶子</li>
+      <li><b>AST 是 AI 精确改代码的地图</b>：Agent 看的不是文字，是语法树，所以能指哪打哪</li>
+      <li><b>Agent 读项目就是遍历文件树</b>：从根出发一层层展开，先看骨架再读叶子</li>
+      <li><b>JSON 是 API 世界的通用树</b>：AI 世界的数据交换，大半靠这棵「文字树」</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 一物三看 ──
+   三个 tab 共用一个递归渲染器。节点结构 {label, note, kids}，
+   根节点带「根」徽章、无孩子的带「叶」徽章，有孩子的可点击折叠。 */
+const TRI_DATA = [
+  {
+    name: '📂 文件目录',
+    intro: '这是 Agent 打开你项目时看到的东西。<b>milktea-app 是根</b>，pages 是它的孩子、也是 home 的爸爸；.js 文件都是叶子。',
+    tree: { label:'milktea-app/', note:'项目根目录', kids:[
+      { label:'pages/', note:'所有页面', kids:[
+        { label:'home/', note:'首页', kids:[
+          { label:'home.js', note:'首页逻辑' },
+          { label:'home.wxml', note:'首页界面' },
+        ]},
+        { label:'menu/', note:'点单页', kids:[
+          { label:'menu.js', note:'点单逻辑' },
+          { label:'menu.wxml', note:'点单界面' },
+        ]},
+        { label:'order/', note:'订单页', kids:[
+          { label:'order.js', note:'订单逻辑' },
+        ]},
+      ]},
+      { label:'images/', note:'图片素材', kids:[
+        { label:'logo.png', note:'店招' },
+        { label:'banner.jpg', note:'轮播图' },
+      ]},
+      { label:'app.js', note:'小程序入口' },
+    ]},
+  },
+  {
+    name: '🧾 JSON 数据',
+    intro: '这是顾客下单后，小程序发给服务器的一笔订单。<b>order 是根</b>，customer、items 是分支，具体的名字和价格都是叶子。',
+    tree: { label:'order', note:'一笔订单', kids:[
+      { label:'orderId: "MT-0810-42"', note:'订单号' },
+      { label:'customer', note:'顾客信息', kids:[
+        { label:'name: "小山"', note:'' },
+        { label:'phone: "138****0000"', note:'' },
+      ]},
+      { label:'items', note:'购物车（2 件）', kids:[
+        { label:'[0]', note:'第 1 件', kids:[
+          { label:'name: "杨枝甘露"', note:'' },
+          { label:'sugar: "三分糖"', note:'' },
+          { label:'price: 18', note:'' },
+        ]},
+        { label:'[1]', note:'第 2 件', kids:[
+          { label:'name: "珍珠奶茶"', note:'' },
+          { label:'price: 15', note:'' },
+        ]},
+      ]},
+      { label:'total: 33', note:'总价' },
+    ]},
+  },
+  {
+    name: '🌐 网页 DOM',
+    intro: '这是点单页在浏览器里的骨架。<b>&lt;html&gt; 是根</b>，每个标签包着的标签就是它的孩子——网页本身就是一棵树。',
+    tree: { label:'<html>', note:'整个页面', kids:[
+      { label:'<head>', note:'页面信息', kids:[
+        { label:'<title> 奶茶店点单', note:'' },
+      ]},
+      { label:'<body>', note:'可见内容', kids:[
+        { label:'<header>', note:'顶栏', kids:[
+          { label:'<img> 店招 logo', note:'' },
+        ]},
+        { label:'<main>', note:'商品区', kids:[
+          { label:'<div> 商品卡片', note:'杨枝甘露', kids:[
+            { label:'<img> 商品图', note:'' },
+            { label:'<button> 加入购物车', note:'' },
+          ]},
+          { label:'<div> 商品卡片', note:'珍珠奶茶', kids:[
+            { label:'<button> 加入购物车', note:'' },
+          ]},
+        ]},
+        { label:'<footer>', note:'底栏', kids:[
+          { label:'<button> 去结算', note:'' },
+        ]},
+      ]},
+    ]},
+  },
+];
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderNode(node, isRoot){
+  const hasKids = node.kids && node.kids.length > 0;
+  let html = '<li class="tn-node">';
+  html += `<span class="tn-row${hasKids ? ' has-kids' : ''}">`;
+  html += hasKids ? '<span class="tn-arrow">▾</span>' : '<span class="tn-arrow"></span>';
+  html += `<span class="tn-label">${esc(node.label)}</span>`;
+  if (node.note) html += `<span class="tn-note">${esc(node.note)}</span>`;
+  if (isRoot) html += '<span class="tn-badge root">根</span>';
+  else if (!hasKids) html += '<span class="tn-badge leaf">叶</span>';
+  html += '</span>';
+  if (hasKids) html += '<ul>' + node.kids.map(k => renderNode(k, false)).join('') + '</ul>';
+  html += '</li>';
+  return html;
+}
+
+const triTabs = document.getElementById('triTabs');
+const triTree = document.getElementById('triTree');
+const triIntro = document.getElementById('triIntro');
+
+triTabs.innerHTML = TRI_DATA.map((d, i) =>
+  `<button class="tri-tab${i === 0 ? ' active' : ''}" data-i="${i}">${d.name}</button>`).join('');
+
+function showTab(i){
+  [...triTabs.children].forEach((b, j) => b.classList.toggle('active', j === i));
+  triIntro.innerHTML = TRI_DATA[i].intro;
+  triTree.innerHTML = '<ul>' + renderNode(TRI_DATA[i].tree, true) + '</ul>';
+}
+triTabs.addEventListener('click', e => {
+  const btn = e.target.closest('.tri-tab');
+  if (btn) showTab(+btn.dataset.i);
+});
+triTree.addEventListener('click', e => {
+  const row = e.target.closest('.tn-row.has-kids');
+  if (row) row.parentElement.classList.toggle('closed');
+});
+showTab(0);
+
+/* ── AST 生长动画 ──
+   三步自下而上：先 * 收拢 price/qty，再 + 合并 fee，最后 = 封顶。
+   播完后节点可点击：高亮该节点管辖的代码片段（真·指哪打哪）。 */
+const astSvg = document.getElementById('astSvg');
+const astNarr = document.getElementById('astNarr');
+const astStatus = document.getElementById('astStatus');
+const btnAst = document.getElementById('btnAst');
+const tks = {};
+document.querySelectorAll('#astCode .tk').forEach(t => { tks[t.dataset.t] = t; });
+
+const AST_STEPS = [
+  {
+    g: 'astG1', lit: ['price','mul','qty'],
+    narr: '<b>第一步：</b>先看优先级最高的乘法。<code>price * qty</code> 被收拢成一个 <b>*</b> 节点，price 和 qty 挂在它下面当叶子——「单价 × 数量」从此是一个整体。',
+  },
+  {
+    g: 'astG2', lit: ['plus','fee'],
+    narr: '<b>第二步：</b>刚才那个整体，再和 <code>fee</code> 一起收进 <b>+</b> 节点。注意 + 的左孩子不是一个词，而是<b>整棵 * 子树</b>——树可以一层层往上抱。',
+  },
+  {
+    g: 'astG3', lit: ['total','eq'],
+    narr: '<b>第三步：</b><b>=</b> 封顶成为根：左手 total，右手整个算式。一行文字，就这样变成了一棵结构分明的树——这就是 <b>AST（抽象语法树）</b>。',
+  },
+];
+
+let astPlaying = false, astDone = false;
+function astSleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function astReset(){
+  AST_STEPS.forEach(s => document.getElementById(s.g).classList.remove('on'));
+  Object.values(tks).forEach(t => t.classList.remove('lit','done','picked'));
+  astSvg.classList.remove('clickable');
+  astSvg.querySelectorAll('.ast-node').forEach(n => n.classList.remove('picked'));
+}
+
+btnAst.addEventListener('click', async () => {
+  if (astPlaying) return;
+  astPlaying = true; astDone = false;
+  astReset();
+  btnAst.disabled = true;
+  for (const step of AST_STEPS){
+    Object.values(tks).forEach(t => { if (t.classList.contains('lit')) { t.classList.remove('lit'); t.classList.add('done'); } });
+    step.lit.forEach(k => tks[k].classList.add('lit'));
+    astNarr.innerHTML = step.narr;
+    await astSleep(450);
+    document.getElementById(step.g).classList.add('on');
+    await astSleep(1500);
+  }
+  Object.values(tks).forEach(t => { t.classList.remove('lit'); t.classList.add('done'); });
+  astNarr.innerHTML = '<b>树长好了！</b>现在试试<b>点击树上任意节点</b>——看它「管辖」的是哪段代码。这就是 Agent 定位代码的方式。';
+  astStatus.textContent = '点树上的节点，体验「指哪打哪」';
+  astSvg.classList.add('clickable');
+  btnAst.disabled = false;
+  btnAst.textContent = '重新解析 ↻';
+  astPlaying = false; astDone = true;
+});
+
+/* 每个节点管辖的代码 token（即它的整棵子树对应的片段） */
+const AST_SCOPE = {
+  price: ['price'], qty: ['qty'], fee: ['fee'], total: ['total'],
+  mul: ['price','mul','qty'],
+  plus: ['price','mul','qty','plus','fee'],
+  eq: ['total','eq','price','mul','qty','plus','fee'],
+};
+const AST_SCOPE_NARR = {
+  price: '你点了叶子 <b>price</b>，它只管自己。你说「把单价字段改名」，Agent 就换这一个节点。',
+  qty: '你点了叶子 <b>qty</b>。「把乘号右边的变量改成 quantity」——Agent 找到 * 节点的右孩子，就是它，一步到位。',
+  fee: '你点了叶子 <b>fee</b>，它是 + 节点的右孩子，改它绝不会误伤别处。',
+  total: '你点了叶子 <b>total</b>，= 节点的左孩子——赋值的目标。',
+  mul: '你点了 <b>*</b> 节点，它管辖整段 <code>price * qty</code>。想给乘法加个括号或抽成函数？对这棵子树动手术就行。',
+  plus: '你点了 <b>+</b> 节点，它管辖 <code>price * qty + fee</code> 整个算式——= 号右边的一切。',
+  eq: '你点了根节点 <b>=</b>，它管辖整行代码。从根出发，任何一段代码都能顺着树枝找到。',
+};
+
+astSvg.addEventListener('click', e => {
+  if (!astDone) return;
+  const node = e.target.closest('.ast-node');
+  if (!node) return;
+  astSvg.querySelectorAll('.ast-node').forEach(n => n.classList.remove('picked'));
+  node.classList.add('picked');
+  const key = node.dataset.n;
+  Object.entries(tks).forEach(([k, t]) => {
+    t.classList.toggle('picked', AST_SCOPE[key].includes(k));
+  });
+  astNarr.innerHTML = AST_SCOPE_NARR[key];
+});
+
+/* 滚到 AST 区域时给个视觉提示（不自动播放，留给读者自己按）。
+   lessonOnView 由页尾的 lesson.js 提供，等 DOM 就绪后再挂。 */
+document.addEventListener('DOMContentLoaded', () => {
+  lessonOnView(document.getElementById('astSvg'), () => {
+    astStatus.textContent = '👆 点「解析」看树长出来';
+  });
+});
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

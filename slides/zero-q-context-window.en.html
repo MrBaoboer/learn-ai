@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Why Does It "Forget" After a Long Chat? | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+.qa-answer {
+  background: linear-gradient(135deg, rgba(8,145,178,0.06), rgba(0,102,255,0.05));
+  border: 1.5px solid rgba(8,145,178,0.3);
+  border-radius: var(--radius); padding: 22px 26px; margin: 4px 0 8px;
+}
+.qa-answer .qa-tag { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #0891b2; margin-bottom: 8px; }
+.qa-answer p { font-size: 16.5px; font-weight: 700; color: var(--text); line-height: 1.85; }
+.qa-answer p b { color: #0891b2; }
+
+/* 工作台演示 */
+.cw-demo {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 22px 24px;
+}
+.cw-slider-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.cw-slab { font-size: 13px; font-weight: 800; color: var(--sub); flex-shrink: 0; }
+.cw-slider-row input[type=range] { flex: 1; accent-color: var(--accent); height: 28px; cursor: pointer; }
+.cw-round {
+  font-size: 14px; font-weight: 800; color: var(--accent);
+  min-width: 68px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0;
+}
+.cw-desk-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12.5px; font-weight: 800; color: var(--sub); margin-bottom: 8px;
+}
+.cw-desk-head .cw-fill { color: var(--accent); font-variant-numeric: tabular-nums; }
+.cw-desk {
+  position: relative; overflow: hidden;
+  min-height: 132px; padding: 12px;
+  background: linear-gradient(135deg, #fdf6ec, #faf1e2);
+  border: 2px solid #e7d3b3; border-radius: var(--radius-sm);
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; align-content: start;
+}
+.cw-note {
+  background: #fffdf5; border: 1px solid #eadfc4; border-radius: 8px;
+  padding: 8px 10px; font-size: 11.5px; color: var(--text); line-height: 1.55;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.cw-note.show { opacity: 1; transform: translateY(0); }
+.cw-note .cw-n { font-weight: 800; color: var(--sub); font-size: 10.5px; display: block; }
+.cw-note.cw-key { border-color: rgba(217,119,6,0.55); background: #fff7e6; }
+.cw-note.cw-key .cw-n { color: var(--amber); }
+/* 被挤出的纸条：克隆成幽灵，向左飞出台面 */
+.cw-ghost {
+  position: absolute; margin: 0; z-index: 2; pointer-events: none;
+  opacity: 1; transform: none;
+  transition: transform 0.38s cubic-bezier(0.5, 0, 0.9, 0.5), opacity 0.38s ease;
+}
+.cw-ghost.gone { transform: translateX(-90px) rotate(-8deg); opacity: 0; }
+.cw-fallen {
+  margin-top: 10px; min-height: 22px;
+  font-size: 12.5px; color: var(--sub); line-height: 1.8;
+}
+.cw-fallen-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.cw-fallen .cw-drop {
+  background: rgba(100,116,139,0.08);
+  border: 1px dashed rgba(100,116,139,0.3); border-radius: 8px;
+  padding: 4px 10px;
+  color: #94a3b8; font-size: 11.5px; text-decoration: line-through;
+  opacity: 0; transform: translateX(-10px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.cw-fallen .cw-drop.show { opacity: 1; transform: none; }
+.cw-fallen .cw-drop.cw-drop-key {
+  border-color: rgba(217,119,6,0.5); background: rgba(217,119,6,0.07);
+  color: #b45309; font-weight: 700;
+}
+.cw-chat { margin-top: 16px; border-top: 1.5px dashed var(--border); padding-top: 16px; }
+.cw-q {
+  font-size: 13.5px; font-weight: 700; color: var(--text);
+  background: rgba(100,116,139,0.07); border: 1px solid rgba(100,116,139,0.12);
+  border-radius: 10px; padding: 9px 13px; margin-bottom: 8px;
+}
+.cw-a {
+  font-size: 13.5px; line-height: 1.75; border-radius: 10px; padding: 10px 13px;
+  transition: all 0.25s;
+}
+.cw-a.good { background: rgba(22,163,74,0.05); border: 1px solid rgba(22,163,74,0.2); color: var(--text); }
+.cw-a.bad { background: rgba(220,38,38,0.05); border: 1px solid rgba(220,38,38,0.25); color: var(--text); }
+.cw-a b.ok { color: var(--success); }
+.cw-a b.no { color: var(--danger); }
+.cw-why { font-size: 12.5px; color: var(--sub); line-height: 1.75; margin-top: 8px; }
+
+/* 应对办法 */
+.cw-tip { display: flex; gap: 12px; align-items: flex-start; }
+.cw-tip .cw-ico { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+.cw-tip h4 { font-size: 14.5px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.cw-tip p { font-size: 13px; color: var(--sub); line-height: 1.85; }
+.cw-tip p b { color: var(--text); }
+
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .qa-answer p { font-size: 15px; }
+  .cw-desk { grid-template-columns: repeat(2, 1fr); }
+  .cw-slider-row { flex-wrap: wrap; }
+  .cw-round { min-width: 0; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Something you already said, and mid-chat the AI forgets? Each answer can only see the most recent content that fits on the desk. When the desk is full, the earliest words get pushed off. Drag the slider and watch the turn-1 'peanut allergy' note fall off.">
+<meta name="keywords" content="context window,AI forgets,AI memory,long conversation,LLM memory,AI amnesia,AI beginner FAQ">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/zero-q-context-window.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/zero-q-context-window.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/zero-q-context-window.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/zero-q-context-window.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/zero-q-context-window.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Why Does It &quot;Forget&quot; After a Long Chat?">
+<meta property="og:description" content="Each time the AI answers, it can only see the most recent content that fits on the desk. When the desk is full, the earliest words get pushed off. Drag the slider and watch it happen.">
+<meta property="og:url" content="https://xueai.app/slides/zero-q-context-window.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Why Does It &quot;Forget&quot; After a Long Chat?">
+<meta name="twitter:description" content="When the desk is full, the earliest words get pushed off. Drag the slider and watch the 'peanut allergy' note fall off.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Why Does It \"Forget\" After a Long Chat?","name":"Why Does It \"Forget\" After a Long Chat?","url":"https://xueai.app/slides/zero-q-context-window.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Beginner FAQ · Concept Primer","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"Something you already said, and mid-chat the AI forgets? Each answer can only see the most recent content that fits on the desk. When the desk is full, the earliest words get pushed off. Drag the slider and watch the turn-1 'peanut allergy' note fall off.","datePublished":"2026-08-09","dateModified":"2026-08-12"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why Does It \"Forget\" After a Long Chat?","acceptedAnswer":{"@type":"Answer","text":"AI doesn't have infinite memory. Each time it answers, it can only see the most recent content that fits on the desk. When the desk (the term is \"context window\") is full, the earliest words get pushed off. Once they're off, they no longer take part in this answer."}}]}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Chapter Zero · Beginner FAQ</div>
+    <h1>Why Does It "Forget" After a Long Chat?</h1>
+    <p class="subtitle">Something you clearly said in turn 1, by turn 20 it answers as if it never heard. It's not broken, and it's not blowing you off — that sentence is just <b>no longer in front of it</b>.</p>
+  </header>
+
+  <div class="qa-answer">
+    <div class="qa-tag">One-sentence answer</div>
+    <p>AI doesn't have infinite memory. Each time it answers, <b>it can only see the most recent content that fits on the "desk"</b>. When the desk (the term is "context window") is full, the earliest words get pushed off. Once they're off, <b>they no longer take part in this answer</b>.</p>
+  </div>
+
+  <div class="sec-label">An analogy first · A desk for sticky notes</div>
+
+  <p class="l-p">Imagine a desk in front of the AI. Every turn you chat, a sticky note goes on the desk, written with what was said that turn. When the AI answers you, it only looks down at the notes currently on the desk. The desk is only so big. Once it's full, every new note <b>pushes the oldest one off</b>. Notes on the floor are invisible — and it can't pick them back up.</p>
+
+  <div class="l-cols" style="margin-top:14px;">
+    <div class="l-card">
+      <h4 style="font-size:14.5px;font-weight:800;margin-bottom:5px;">Desk size = context window</h4>
+      <p style="font-size:13px;color:var(--sub);line-height:1.85;">Different models have bigger or smaller desks, but all of them have an edge. Full is full — paying more doesn't conjure a ninth slot.</p>
+    </div>
+    <div class="l-card">
+      <h4 style="font-size:14.5px;font-weight:800;margin-bottom:5px;">One sticky note = one turn</h4>
+      <p style="font-size:13px;color:var(--sub);line-height:1.85;">What you say and what it replies both take space. Long rambles and big pasted documents take more, so the desk fills faster.</p>
+    </div>
+  </div>
+
+  <div class="sec-label">Try it yourself · Fill the desk</div>
+
+  <p class="l-p">Below is a simulated conversation. In <b>turn 1</b> you told it "I'm allergic to peanuts." Drag the slider right to add turns, watch the desk fill up, and see what dinner it recommends after that key note falls off.</p>
+
+  <div class="cw-demo">
+    <div class="cw-slider-row">
+      <span class="cw-slab">Conversation turns</span>
+      <input type="range" min="1" max="30" value="1" id="cwRange" aria-label="Conversation turns">
+      <span class="cw-round" id="cwRound">Turn 1</span>
+    </div>
+    <div class="cw-desk-head">
+      <span>Desk (this demo only holds 8 notes)</span>
+      <span class="cw-fill" id="cwFill">1 / 8 placed</span>
+    </div>
+    <div class="cw-desk" id="cwDesk"></div>
+    <div class="cw-fallen" id="cwFallen"></div>
+    <div class="cw-chat">
+      <div class="cw-q">You ask now: "I want noodles for dinner — recommend a bowl?"</div>
+      <div class="cw-a" id="cwA"></div>
+      <div class="cw-why" id="cwWhy"></div>
+    </div>
+  </div>
+
+  <div class="sec-label">Now that you know the principle · What to do</div>
+
+  <div class="l-card" style="margin-bottom:12px;">
+    <div class="cw-tip">
+      <span class="cw-ico">📌</span>
+      <div>
+        <h4>Restate important info every so often</h4>
+        <p>Allergies, budget, format requirements — after a dozen turns, say them again. That's <b>putting the note back on top of the desk</b>.</p>
+      </div>
+    </div>
+  </div>
+  <div class="l-card" style="margin-bottom:12px;">
+    <div class="cw-tip">
+      <span class="cw-ico">🧾</span>
+      <div>
+        <h4>For long tasks, start a new chat with a summary</h4>
+        <p>Instead of going a hundred turns in one chat, have it summarize progress first, then paste the summary into a new chat. <b>A clean desk, more stable answers</b>.</p>
+      </div>
+    </div>
+  </div>
+  <div class="l-card">
+    <div class="cw-tip">
+      <span class="cw-ico">🔍</span>
+      <div>
+        <h4>If it forgot, don't argue with it</h4>
+        <p>It can't flip back to notes on the floor. <b>Just resend the key info</b> — far more useful than asking "did you forget?" three times.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    Want to know how desk size is measured, how windows differ across models, and why a bigger window can still "not hold on"? The Harness core chapter has <a href="learn.html#5-1.html" target="_top">a deeper lesson on the context window</a> waiting for you.
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ What this page wants to share with you</h3>
+    <ul>
+      <li><b>Forgetting is a capacity problem</b>: it's not broken — the desk is full, and the earliest words got pushed off</li>
+      <li><b>Each answer only sees what's in the window</b>: what fell off might as well never have been said</li>
+      <li><b>Restate important settings</b>: say them again after a while, put the note back on the desk</li>
+      <li><b>Restart long chats in time</b>: have it write a summary first, then open a new chat with that summary</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 工作台演示 ── */
+(function () {
+  var CAP = 8;
+  var KEY_NOTE = "I'm allergic to peanuts — help me avoid them";
+  var TOPICS = [
+    'Chatted about the weather',
+    'Asked it to recommend a movie',
+    'Asked it to edit a weekly report',
+    'Asked how to cook braised pork',
+    'Chatted about weekend plans',
+    'Asked it to translate an English sentence',
+    'Complained about working overtime',
+    'Asked it to make a shopping list',
+    'Asked how to trim a cat\'s nails',
+    'Asked it to pick three group-chat names',
+    'Chatted about a book you were reading',
+    'Asked it to explain a news term',
+  ];
+
+  var range = document.getElementById('cwRange');
+  var elRound = document.getElementById('cwRound');
+  var elFill = document.getElementById('cwFill');
+  var desk = document.getElementById('cwDesk');
+  var fallen = document.getElementById('cwFallen');
+  var elA = document.getElementById('cwA');
+  var elWhy = document.getElementById('cwWhy');
+
+  function noteText(n) {
+    if (n === 1) return KEY_NOTE;
+    return TOPICS[(n - 2) % TOPICS.length];
+  }
+
+  /* 增量渲染：纸条元素常驻，只对变化的部分做进出场动画，
+     避免拖滑块时整块闪烁重建 */
+  var deskNotes = {};    // 轮数 -> 台面上的纸条元素
+  var fallenChips = {};  // 轮数 -> 台面下的小纸条元素
+  var fallenLabel = document.createElement('div');
+  var chipsBox = document.createElement('div');
+  chipsBox.className = 'cw-fallen-chips';
+  fallen.appendChild(fallenLabel);
+  fallen.appendChild(chipsBox);
+
+  function makeNote(n) {
+    var el = document.createElement('div');
+    el.className = 'cw-note' + (n === 1 ? ' cw-key' : '');
+    el.innerHTML = '<span class="cw-n">Turn ' + n + '</span>' + noteText(n);
+    return el;
+  }
+
+  function render() {
+    var r = parseInt(range.value, 10);
+    var start = Math.max(1, r - CAP + 1);
+    var onDesk = r - start + 1;
+
+    elRound.textContent = 'Turn ' + r;
+    elFill.textContent = onDesk + ' / ' + CAP + ' placed';
+
+    // 记录现有纸条位置（FLIP 起点）
+    var deskRect = desk.getBoundingClientRect();
+    var oldRects = {};
+    Object.keys(deskNotes).forEach(function (k) {
+      oldRects[k] = deskNotes[k].getBoundingClientRect();
+    });
+
+    // 1. 移出窗口外的纸条。向前挤出的（n < start）放一个幽灵克隆向左飞出
+    Object.keys(deskNotes).map(Number).forEach(function (n) {
+      if (n >= start && n <= r) return;
+      var el = deskNotes[n];
+      if (n < start) {
+        var rc = oldRects[n];
+        var ghost = el.cloneNode(true);
+        ghost.className = 'cw-note show cw-ghost' + (n === 1 ? ' cw-key' : '');
+        ghost.style.left = (rc.left - deskRect.left) + 'px';
+        ghost.style.top = (rc.top - deskRect.top) + 'px';
+        ghost.style.width = rc.width + 'px';
+        desk.appendChild(ghost);
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { ghost.classList.add('gone'); });
+        });
+        setTimeout(function () { ghost.remove(); }, 420);
+      }
+      el.remove();
+      delete deskNotes[n];
+    });
+
+    // 2. 补上新进窗口的纸条（往回拖时按轮数插回正确位置）
+    for (var n = start; n <= r; n++) {
+      if (deskNotes[n]) continue;
+      var el = makeNote(n);
+      var ref = null;
+      var keys = Object.keys(deskNotes).map(Number).sort(function (a, b) { return a - b; });
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i] > n) { ref = deskNotes[keys[i]]; break; }
+      }
+      desk.insertBefore(el, ref);
+      deskNotes[n] = el;
+      requestAnimationFrame(function (note) {
+        return function () { note.classList.add('show'); };
+      }(el));
+    }
+
+    // 3. 留下的纸条 FLIP 平滑补位
+    Object.keys(deskNotes).forEach(function (k) {
+      var el = deskNotes[k];
+      var old = oldRects[k];
+      if (!old) return;
+      var now = el.getBoundingClientRect();
+      var dx = old.left - now.left, dy = old.top - now.top;
+      if (!dx && !dy) return;
+      el.style.transition = 'none';
+      el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      requestAnimationFrame(function () {
+        el.style.transition = '';
+        el.style.transform = '';
+      });
+    });
+
+    // 4. 台面下的「已被挤掉」纸条逐张累积
+    var dropped = start - 1;
+    fallenLabel.innerHTML = dropped === 0 ? '' :
+      '<b>' + dropped + '</b> notes have been pushed off the desk. When it answers, it can no longer see these:';
+    Object.keys(fallenChips).map(Number).forEach(function (n) {
+      if (n >= start) { fallenChips[n].remove(); delete fallenChips[n]; }
+    });
+    for (var m = 1; m <= dropped; m++) {
+      if (fallenChips[m]) continue;
+      var chip = document.createElement('span');
+      chip.className = 'cw-drop' + (m === 1 ? ' cw-drop-key' : '');
+      chip.textContent = 'Turn ' + m + ' · ' + noteText(m);
+      var refChip = null;
+      var ckeys = Object.keys(fallenChips).map(Number).sort(function (a, b) { return a - b; });
+      for (var j = 0; j < ckeys.length; j++) {
+        if (ckeys[j] > m) { refChip = fallenChips[ckeys[j]]; break; }
+      }
+      chipsBox.insertBefore(chip, refChip);
+      fallenChips[m] = chip;
+      requestAnimationFrame(function (c) {
+        return function () {
+          requestAnimationFrame(function () { c.classList.add('show'); });
+        };
+      }(chip));
+    }
+
+    var keyOnDesk = start === 1;
+    if (keyOnDesk) {
+      elA.className = 'cw-a good';
+      elA.innerHTML = '<b class="ok">AI</b>: How about a bowl of clear-broth beef noodles. You mentioned a <b class="ok">peanut allergy</b>, so I skipped every option with peanuts.';
+      elWhy.textContent = 'The turn-1 note is still on the desk, so it can see that sentence when it answers.';
+    } else {
+      elA.className = 'cw-a bad';
+      elA.innerHTML = '<b class="no">AI</b>: I recommend our <b class="no">signature peanut-sauce noodles</b>! Rich, fragrant, toss and it\'s amazing.';
+      elWhy.textContent = 'The "peanut allergy" note has already been pushed off. It didn\'t get dumber — it simply can\'t see that sentence for this answer.';
+    }
+  }
+
+  range.addEventListener('input', render);
+  render();
+})();
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

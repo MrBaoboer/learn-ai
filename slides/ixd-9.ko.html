@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>상태 기계와 경계를 프롬프트에 넣기 | 인터랙션 엔지니어링</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="ixd.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="AI는 당신이 언급한 상태만 씁니다. 안 적은 건 전부 정상 경로로 상상해요. 상태 기계 보완기가 맑은 날 프롬프트를 다섯 상태로 채우고, 엣지 케이스 룰렛이 AI가 대충 넘기기 좋아하는 여섯 가지를 뽑은 뒤, 블록 빌더로 바로 복사할 인터랙션 스펙을 조립해요.">
+<meta name="keywords" content="상태 기계,엣지 케이스,AI 프롬프트,인터랙션 스펙,빈 상태,오류 방지,About Face">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ixd-9.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ixd-9.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ixd-9.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ixd-9.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ixd-9.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="샤오산 아카데미">
+<meta property="og:title" content="상태 기계와 경계를 프롬프트에 넣기">
+<meta property="og:description" content="적지 않은 상태는 AI가 없는 셈 쳐요. 상태를 빠짐없이 적고, 엣지 케이스를 못 박고, 오류 방지를 분명히 쓰세요.">
+<meta property="og:url" content="https://xueai.app/slides/ixd-9.ko.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="상태 기계와 경계를 프롬프트에 넣기">
+<meta name="twitter:description" content="적지 않은 상태는 AI가 없는 셈 쳐요. 상태를 빠짐없이 적고, 엣지 케이스를 못 박고, 오류 방지를 분명히 쓰세요.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 深色提示词面板（体例对齐 taste-8 的规格书面板） ── */
+.x9-code{margin-top:16px;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px;font-size:12.5px;line-height:1.9;overflow-x:auto;white-space:pre-wrap;font-family:"SF Mono","Fira Code",Menlo,monospace;}
+.x9-code .c{color:#64748b;}
+.x9-code .add{color:#86efac;}
+.x9-code .warn{color:#fca5a5;}
+.x9-line{display:block;}
+.x9-line.in{animation:ixd-slide-up .25s ease-out both;}
+/* ── 状态机补全器：五个状态芯片 + 状态板 ── */
+.x9-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;}
+.x9-chip{border:1.5px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:700;padding:6px 16px;border-radius:999px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s,color .15s;}
+.x9-chip:hover{border-color:var(--ct-line);}
+.x9-chip.on{background:var(--ct);border-color:var(--ct);color:#fff;cursor:default;}
+.x9-board{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:16px;}
+.x9-cell{border:1.5px dashed var(--border);border-radius:10px;padding:10px 8px;text-align:center;transition:border-color .2s,background .2s;}
+.x9-cell .cn{font-size:11px;font-weight:800;color:var(--sub);}
+.x9-cell .cs{font-size:10px;color:#c2410c;margin-top:3px;}
+.x9-cell.def{border-style:solid;border-color:rgba(22,163,74,.4);background:var(--good-soft);animation:ixd-pop .3s cubic-bezier(.34,1.56,.64,1) both;}
+.x9-cell.def .cs{color:var(--good);font-weight:800;}
+/* ── 边界轮盘 ── */
+.x9-wheel{margin-top:16px;border:1.5px solid var(--border);border-radius:14px;background:var(--card);padding:20px;min-height:168px;}
+.x9-wheel.spin{animation:ixd-pop .3s cubic-bezier(.34,1.56,.64,1) both;}
+.x9-wheel .wt{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:800;color:var(--ct-deep);}
+.x9-wheel .wt .wn{font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);flex-shrink:0;}
+.x9-wheel .wrow{display:flex;gap:10px;margin-top:12px;font-size:13px;line-height:1.75;}
+.x9-wheel .wrow .wl{flex-shrink:0;font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:999px;height:fit-content;margin-top:2px;}
+.x9-wheel .wrow.bad .wl{background:var(--bad-soft);color:var(--bad);}
+.x9-wheel .wrow.good .wl{background:var(--good-soft);color:var(--good);}
+.x9-wheel .wrow span:last-child{color:var(--text);min-width:0;}
+.x9-spinbtn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;font-family:inherit;background:var(--ct);color:#fff;font-size:14px;font-weight:800;padding:8px 24px;border-radius:10px;transition:background .15s;margin-top:16px;}
+.x9-spinbtn:hover{background:var(--ct-deep);}
+/* ── 积木机 seg 行 ── */
+.x9-ctl{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:8px;}
+.x9-ctl>span{font-size:13px;font-weight:700;color:var(--text);min-width:96px;}
+.x9-copy{margin-left:auto;border:1px solid var(--ct-line);background:#fff;color:var(--ct);font-size:12px;font-weight:800;padding:5px 16px;border-radius:8px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s;}
+.x9-copy:hover{background:var(--ct);color:#fff;}
+.x9-copy.done{background:var(--good);border-color:var(--good);color:#fff;}
+/* ── 姿态对照表 ── */
+.x9-posture{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
+.x9-pcard{border:1.5px solid var(--border);border-radius:14px;padding:16px 20px;background:var(--card);}
+.x9-pcard .ph{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:var(--ct-deep);margin-bottom:8px;}
+.x9-pcard .ph svg{width:16px;height:16px;color:var(--ct);}
+.x9-pcard .pd{font-size:13px;color:var(--sub);line-height:1.8;}
+.x9-pcard .pd b{color:var(--text);}
+/* 判词条 */
+.x9-note{margin-top:16px;padding:16px;border-radius:10px;background:rgba(0,0,0,.03);font-size:13.5px;line-height:1.8;color:var(--text);}
+.x9-note b{color:var(--ct-deep);}
+.x9-note.warn{background:var(--bad-soft);}
+.x9-note.warn b{color:var(--bad);}
+.x9-note.ok{background:var(--good-soft);}
+.x9-note.ok b{color:var(--good);}
+@media (max-width:768px){
+  .x9-board{grid-template-columns:repeat(2,1fr);}
+  .x9-posture{grid-template-columns:1fr;}
+  .x9-ctl>span{min-width:100%;}
+}
+@media (prefers-reduced-motion:reduce){
+  .x9-line.in,.x9-cell.def,.x9-wheel.spin{animation:none;}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"상태 기계와 경계를 프롬프트에 넣기","name":"상태 기계와 경계를 프롬프트에 넣기","url":"https://xueai.app/slides/ixd-9.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 인터랙션을 AI에게 번역하기","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"AI는 당신이 언급한 상태만 씁니다. 안 적은 건 전부 정상 경로로 상상해요. 상태 기계 보완기가 맑은 날 프롬프트를 다섯 상태로 채우고, 엣지 케이스 룰렛이 AI가 대충 넘기기 좋아하는 여섯 가지를 뽑은 뒤, 블록 빌더로 바로 복사할 인터랙션 스펙을 조립해요.","datePublished":"2026-08-11","dateModified":"2026-08-12","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">인터랙션 엔지니어링 · 9 / 10</div>
+    <h1>상태 기계와 경계를 프롬프트에 넣기</h1>
+    <p class="subtitle">지난 레슨에서 「무엇을」을 목표와 장면으로 옮겼다면, 이번엔 「대충 넘기지 마」를 보완해요. 규칙은 단순해요: <b>AI는 당신이 말한 상태만 진지하게 쓰고, 안 말한 건 전부 맑은 날로 상상해요</b>. 그러니 상태를 빠짐없이 적고, 엣지 케이스를 못 박고, 오류 방지를 분명히 쓰세요. 이 셋이 합쳐지면 인터랙션 스펙이에요.</p>
+    <div class="chips"><span class="chip">상태 5종</span><span class="chip">엣지 케이스 룰렛</span><span class="chip">인터페이스 자세</span><span class="chip">스펙 블록 빌더</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>화면마다 상태를 빠짐없이 적고, 엣지 케이스를 못 박고, 오류 방지 요구를 분명히 쓰세요. 상태 기계 보완기 + 엣지 케이스 룰렛, 복사 가능한 검수 문구 템플릿까지</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">왜 AI 산출물은 늘 「맑은 날 버전」일까</div>
+    <p class="desc">「주문 목록 페이지를 만들어」라고 하면 AI가 그리는 화면은 늘 같아요: 네트워크 괜찮고, 데이터는 한 화면에 딱 맞고, 사용자는 잘못 누르지 않아요. 게으른 게 아니라, 당신이 준 설명에 맑은 날만 있어서예요. 2레슨에서 상태 3종 세트(로딩·빈·오류), 3레슨에서 오류 방지와 되돌릴 수 있음을 다뤘어요. 그 두 레슨은 알아보게 했고, 이번 레슨은 알아본 요구를 <b>프롬프트에 흑백으로 박힌 조항</b>으로 만들게 해요.</p>
+    <a class="xref" href="ixd-2.html">
+      <span class="xref-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg></span>
+      <span><span class="xref-t">교차 레슨 · 상태 3종 세트와 오류 메시지 3요소</span><span class="xref-d">로딩·빈·오류가 각각 어떻게 생겨야 합격인지, 오류 메시지를 사람 말로 쓰는 법—2레슨에서 이미 해봤어요. 여기선 그 결론을 그대로 가져와요.</span></span>
+    </a>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">직접 해보기 · 상태 기계 보완기</div>
+    <p class="desc">아래 프롬프트는 전형적인 맑은 날 버전이에요. 오른쪽 상태판 다섯 칸은 아직 물음표뿐이죠. 아래 상태 칩을 눌러 하나씩 프롬프트에 넣고, 스펙이 한 줄씩 길어지는 걸 보세요.</p>
+    <div class="toy" id="x9sm">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg></span>
+        <span class="toy-t">상태 기계 보완기</span>
+        <span class="toy-badge" id="x9smBadge">정의됨 0 / 5</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">상태 칩을 하나 누르면 프롬프트에 해당하는 스펙 한 줄이 들어가요.</div>
+        <div class="x9-code" id="x9smCode"><span class="x9-line">주문 목록 페이지를 만들고, 주문·금액·상태를 보여 주며 상단에서 상태로 필터할 수 있게 하세요.</span><span class="x9-line c" id="x9smHint">// 여기서 멈추면 아래 다섯 상태는 전부 AI 자유 연출</span></div>
+        <div class="x9-board">
+          <div class="x9-cell" id="x9c-load"><div class="cn">로딩</div><div class="cs" id="x9s-load">AI 자유 연출</div></div>
+          <div class="x9-cell" id="x9c-empty"><div class="cn">빈 목록</div><div class="cs" id="x9s-empty">AI 자유 연출</div></div>
+          <div class="x9-cell" id="x9c-error"><div class="cn">로딩 실패</div><div class="cs" id="x9s-error">AI 자유 연출</div></div>
+          <div class="x9-cell" id="x9c-slow"><div class="cn">약한 망 타임아웃</div><div class="cs" id="x9s-slow">AI 자유 연출</div></div>
+          <div class="x9-cell" id="x9c-done"><div class="cn">작업 성공</div><div class="cs" id="x9s-done">AI 자유 연출</div></div>
+        </div>
+        <div class="x9-chips">
+          <button class="x9-chip" type="button" data-k="load">로딩</button>
+          <button class="x9-chip" type="button" data-k="empty">빈 목록</button>
+          <button class="x9-chip" type="button" data-k="error">로딩 실패</button>
+          <button class="x9-chip" type="button" data-k="slow">약한 망 타임아웃</button>
+          <button class="x9-chip" type="button" data-k="done">작업 성공</button>
+        </div>
+        <div class="x9-note" id="x9smNote">「자유 연출」이 인터랙션에서 보통 의미하는 건: 흰 화면, alert, 무반응이에요.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">대결 · 같은 빈 목록, 두 운명</div>
+    <p class="desc">스펙의 「빈 상태에 안내를」한 줄은 얼마짜리일까요? 아래는 같은 주문 페이지를 신규 사용자가 보는 두 버전이에요. 왼쪽 프롬프트는 빈 상태를 안 말했고, 오른쪽은 한 줄을 더 썼어요. 신규를 붙잡을 쪽을 눌러 보세요.</p>
+    <div class="toy" id="x9duel">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></span>
+        <span class="toy-t">맑은 날 버전 vs 전천후 버전</span>
+        <span class="toy-badge">한쪽을 고르세요</span>
+      </div>
+      <div class="toy-body">
+        <div class="duel">
+          <div class="duel-side">
+            <span class="duel-tag">A · 프롬프트에 빈 상태 없음</span>
+            <div class="mockwin">
+              <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">shop.example.com/orders</span></div>
+              <div class="mock" style="padding:16px;background:#fff">
+                <div class="mock-h" style="font-size:13px">내 주문</div>
+                <div style="display:flex;gap:6px;margin-top:8px">
+                  <span class="mock-chip" style="background:#f3f4f6;color:#374151;font-size:9.5px">전체</span>
+                  <span class="mock-chip" style="background:#fff;color:#9ca3af;font-size:9.5px;border:1px solid #e5e7eb">결제 대기</span>
+                  <span class="mock-chip" style="background:#fff;color:#9ca3af;font-size:9.5px;border:1px solid #e5e7eb">완료</span>
+                </div>
+                <div style="min-height:152px;display:flex;align-items:center;justify-content:center">
+                  <span class="mock-p" style="color:#c4c7cc;font-size:11px">데이터 없음</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="duel-side">
+            <span class="duel-tag">B · 빈 상태 스펙을 한 줄 더</span>
+            <div class="mockwin">
+              <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">shop.example.com/orders</span></div>
+              <div class="mock" style="padding:16px;background:#fff">
+                <div class="mock-h" style="font-size:13px">내 주문</div>
+                <div style="min-height:176px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center">
+                  <span style="width:40px;height:40px;border-radius:12px;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
+                  <span class="mock-h" style="font-size:12px">주문이 여기에 나타나요</span>
+                  <span class="mock-p" style="font-size:10.5px;color:#9ca3af;line-height:1.6">첫 주문 후 배송·계산서가 이 페이지에서 관리돼요</span>
+                  <span class="mock-btn" style="background:#2563eb;margin-top:4px;font-size:10.5px">둘러보기</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="duel-verdict"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">엣지 케이스 룰렛: AI가 대충 넘기기 좋아하는 여섯 가지</div>
+    <p class="desc">상태를 다 적은 뒤에도 더 깊숙이 숨은 엣지 케이스가 있어요. 공통점은 데모에선 절대 안 나오고, 출시 첫 주에 전부 나타난다는 거예요. 하나를 뽑아 AI 기본값이 어떻게 대충 넘기는지, 프롬프트에 어떤 문장을 보완할지 보세요.</p>
+    <div class="toy" id="x9wheel">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+        <span class="toy-t">엣지 케이스 룰렛</span>
+        <span class="toy-badge" id="x9wBadge">뽑음 0 / 6</span>
+      </div>
+      <div class="toy-body">
+        <div class="x9-wheel" id="x9wCard">
+          <div class="wt"><span class="wn" id="x9wNum">? / 6</span><span id="x9wTitle">아래 버튼을 눌러 첫 엣지 케이스를 뽑으세요</span></div>
+          <div class="wrow bad" id="x9wBadRow" style="display:none"><span class="wl">AI 기본값</span><span id="x9wBad"></span></div>
+          <div class="wrow good" id="x9wGoodRow" style="display:none"><span class="wl">써야 할 한 문장</span><span id="x9wGood"></span></div>
+        </div>
+        <button class="x9-spinbtn" id="x9wBtn" type="button">엣지 케이스 하나 뽑기</button>
+        <div class="x9-note" id="x9wNote">여섯 가지를 다 뽑으면 엣지 케이스 자가 점검표가 생겨요.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">자세를 먼저 밝히고, 상태 밀도는 그다음</div>
+    <p class="desc">상태와 엣지 케이스를 얼마나 촘촘히 쓸지는 인터페이스 자세에 달렸어요. 《About Face 4》 9장은 제품을 몇 가지 자세로 나누는데, 가장 흔한 둘을 옮겨 드릴게요. 프롬프트에 자세를 먼저 밝히면 AI가 상태 밀도를 훨씬 잘 맞춰요.</p>
+    <div class="x9-posture">
+      <div class="x9-pcard">
+        <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>주권 자세(sovereign)</div>
+        <div class="pd">하루 종일 켜 두는 주력 도구: IDE, 관리자, 스프레드시트. 화면을 독점하고 사용자는 숙련자예요. <b>상태는 촘촘해도 돼요:</b> 스켈레톤, 인라인 검증, 일괄 진행률, 단축키 힌트—모두 스펙에 넣을 만해요.</div>
+      </div>
+      <div class="x9-pcard">
+        <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg>임시 자세(transient)</div>
+        <div class="pd">쓰고 떠나는 작은 도구: 스캔, 계산기, 휴가 신청. 올 때마다 처음처럼 느껴요. <b>상태는 적고 눈에 띄게:</b> 한 화면에 한 일, 피드백은 크고 직설적으로—빽빽한 대시보드는 넣지 마세요.</div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:16px">자세를 잘못 고른 전형적 사고: 쓰고 떠나는 휴가 페이지에 주권급 필터와 통계 차트를 붙이거나, 하루 종일 보는 모니터링 콘솔에 대자보식 단일 화면 플로우를 넣는 거예요. <b>밀도는 자세를 따르고, 자세는 사용 빈도를 따르세요</b>.</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">조립 · 인터랙션 스펙 블록 빌더</div>
+    <p class="desc">미학 편의 블록 빌더는 시각 스펙을 조립하고, 이 기기는 인터랙션 스펙을 조립해요. 다섯 조항 그룹을 자유롭게 켜고 끄면 오른쪽 미리보기가 실시간으로 바뀌고, 「언급 안 함」을 고른 그룹은 AI가 어디서 자유 연출할지 표시돼요. 조립해 복사해서 UI 생성 프롬프트 끝에 붙이세요.</p>
+    <div class="toy" id="x9b">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M4 8h4"/><path d="M4 12h4"/><path d="M4 16h4"/><path d="M16 8h4"/><path d="M16 12h4"/><path d="M16 16h4"/></svg></span>
+        <span class="toy-t">인터랙션 스펙 블록 빌더</span>
+        <button class="x9-copy" id="x9copy" type="button">복사</button>
+      </div>
+      <div class="toy-body">
+        <div class="x9-ctl"><span>상태 전체</span><div class="seg" id="x9gState"><button type="button" class="on" data-v="0">다섯 상태 전부</button><button type="button" data-v="1">언급 안 함</button></div></div>
+        <div class="x9-ctl"><span>빈 상태</span><div class="seg" id="x9gEmpty"><button type="button" class="on" data-v="0">안내 주기</button><button type="button" data-v="1">언급 안 함</button></div></div>
+        <div class="x9-ctl"><span>네트워크와 오류</span><div class="seg" id="x9gNet"><button type="button" class="on" data-v="0">재시도·데이터 유지</button><button type="button" data-v="1">언급 안 함</button></div></div>
+        <div class="x9-ctl"><span>위험 작업</span><div class="seg" id="x9gDanger"><button type="button" class="on" data-v="0">되돌리기 우선</button><button type="button" data-v="1">언급 안 함</button></div></div>
+        <div class="x9-ctl"><span>컨트롤과 카피</span><div class="seg" id="x9gCtrl"><button type="button" class="on" data-v="0">치트시트로 제약</button><button type="button" data-v="1">언급 안 함</button></div></div>
+        <div class="x9-code" id="x9bCode"></div>
+        <div class="x9-note" id="x9bNote">다섯 그룹을 모두 켜면 완전한 인터랙션 검수 첨부예요. 어느 하나라도 끄면 위험이 미리보기에 표시돼요.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">퀴즈: 오류 방지 조항은 어떻게 써야 맞을까</div>
+    <div class="toy" id="x9quiz">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+        <span class="toy-t">「프로젝트 삭제」에 오류 방지 요구를 쓴다면 어느 문장이 최선일까요</span>
+        <span class="toy-badge">객관식</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>삭제 전 확인 상자를 두 번, 두 번째는 카운트다운</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>삭제는 즉시 실행하고 되돌리기 입구를 주며, 휴지통에 30일 보관</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>삭제 버튼을 작고 옅게 만들어 3단 메뉴에 넣기</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>안 써도 돼요. AI가 삭제는 조심해야 한다는 걸 알아요</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">핵심 요점</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>AI는 당신이 말한 상태만 씁니다:</b> 로딩·빈·오류·약한 망·성공, 다섯을 이름 불러 적으세요. 안 부른 건 흰 화면과 alert의 온상이에요.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>엣지 케이스를 못 박으세요:</b> 목록이 비었을 때, 네트워크가 실패했을 때, 중복 제출했을 때, 권한이 부족할 때—모든 「때」 뒤에 분명한 요구 한 문장.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>자세를 먼저, 밀도는 그다음:</b> 주권 자세 화면은 상태가 촘촘해도 되고, 임시 자세는 적고 눈에 띄게—스크립트를 바꿔 쓰지 마세요.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>스펙을 조립해 첨부로:</b> 목표·장면(지난 레슨)이 앞, 인터랙션 스펙(이번 레슨)이 뒤—둘이 합쳐지면 AI에게 줄 완전한 요구예요.</p></div>
+    </div>
+    <p class="src-note"><b>콘텐츠 출처:</b> 샤오산 아카데미 「인터랙션 엔지니어링」 특집 오리지널. 오류·상태 원칙은 《About Face 4: 인터랙션 디자인의 정수》 15장, 인터페이스 자세는 9장에서 정리(Alan Cooper 외).</p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="taste.js?v=20260810a"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* 状态机补全器。
+   背景：「状态要列全」是句正确的废话，亲手把一段晴天提示词补成五态规格，
+   读者才知道「列全」具体是往提示词里写什么。
+   设计意图：芯片点亮（不可撤销，规格写了就是写了）、代码行滑入
+   （ixd-slide-up）、状态板格子翻绿（ixd-pop），三处动画同步发生，
+   把「一句话规格点亮一个状态」的因果演出来；judgment 文案在 5/5 时收口。 */
+var X9_SM = {
+  load: { spec: '로딩 중에는 스켈레톤을 보여 주고, 흰 화면과 1초 넘게 피드백 없는 스피너는 금지.', cell: '스켈레톤' },
+  empty: { spec: '첫 주문 없을 때 안내: 한 줄 설명 + 「주문하기」 버튼. 「데이터 없음」만 쓰지 말 것.', cell: '안내' },
+  error: { spec: '로딩 실패 시 재시도 버튼, 선택한 필터 유지, 오류 메시지는 「무엇이 틀렸는지·왜·어떻게」 세 단락으로.', cell: '재시도 가능' },
+  slow: { spec: '응답이 1초를 넘으면 진행률, 10초를 넘으면 취소 허용, 취소 후 직전 안정 상태로.', cell: '취소 가능' },
+  done: { spec: '성공은 페이지 안 toast로 피드백하고 되돌릴 수 있게. 대화상자로 끊지 말 것.', cell: '가벼운 피드백' }
+};
+var x9SmN = 0;
+document.querySelectorAll('#x9sm .x9-chip').forEach(function (chip) {
+  chip.addEventListener('click', function () {
+    if (chip.classList.contains('on')) return;
+    chip.classList.add('on');
+    var k = chip.dataset.k;
+    var code = document.getElementById('x9smCode');
+    var hint = document.getElementById('x9smHint');
+    var line = document.createElement('span');
+    line.className = 'x9-line add in';
+    line.textContent = X9_SM[k].spec;
+    code.insertBefore(line, hint);
+    document.getElementById('x9c-' + k).classList.add('def');
+    document.getElementById('x9s-' + k).textContent = X9_SM[k].cell;
+    x9SmN++;
+    document.getElementById('x9smBadge').textContent = '정의됨 ' + x9SmN + ' / 5';
+    var note = document.getElementById('x9smNote');
+    if (x9SmN === 5) {
+      hint.textContent = '// 다섯 상태 모두 주인이 있어 AI가 자유 연출할 틈이 없어요';
+      hint.className = 'x9-line add';
+      note.className = 'x9-note ok';
+      note.innerHTML = '<b>보완 완료.</b> 이 다섯 줄을 돌아보세요: 짧고, 구체적이고, 금지 항목이 있어요. 상태 기계를 프롬프트에 넣는다는 게 이거예요. 문채가 아니라 이름을 부르는 일.';
+    } else {
+      note.className = 'x9-note';
+      note.innerHTML = '<b>' + X9_SM[k].cell + '</b>에 주인이 생겼어요. 남은 ' + (5 - x9SmN) + '개 상태는 아직 AI 자유 연출을 기다려요.';
+    }
+  });
+});
+
+/* 对决：空态的两种命运。A 面连筛选器都保留着（AI 按晴天做的），
+   空到让新用户以为坏了；B 面一句规格换来说明 + 引导按钮。 */
+tasteDuel('x9duel', {
+  winner: 1,
+  verdict: 'A는 전형적인 맑은 날 산출물이에요. 필터와 목록은 만들었는데, 처음 들어온 사람이 뭘 볼지는 아무도 안 생각했어요. 「데이터 없음」네 글자는 신규에게 이 페이지는 너와 상관없다고 말하는 셈이죠. B는 프롬프트 한 줄만 더 썼어요: 여기엔 앞으로 무엇이 올지 설명하고, 첫걸음으로 바로 가는 버튼을 줘요. 신규는 「둘러보기」를 따라 메인 플로우로 들어가요. 빈 상태는 신규의 첫인상인 동시에, 프롬프트에서 가성비가 가장 높은 한 문장이에요.'
+});
+
+/* 边界轮盘。
+   背景：边界情况的清单列在表格里没人记得住，做成抽卡，
+   每抽一张读者都会先自己猜「AI 会怎么糊弄」，猜完对答案，记忆深一截。
+   设计意图：卡片换内容时重放 ixd-pop 制造「抽出新卡」的手感；
+   顺序打乱但不重复，6/6 后按钮变「再抽一轮」。 */
+var X9_EDGE = [
+  { t: '목록이 비어 있음(신규 첫 방문)', bad: '텅 비었거나, 가운데 회색 「데이터 없음」—신규는 페이지가 고장 난 줄 알아요.', good: '빈 상태에 안내: 여기엔 앞으로 무엇이 올지 + 첫걸음 버튼.' },
+  { t: '네트워크 요청 실패', bad: 'alert로 Request failed with status code 500, 아니면 아예 무반응.', good: '실패는 재시도 가능해야 하고, 입력 내용을 지키며, 오류는 사람 말로.' },
+  { t: '사용자가 제출을 더블클릭', bad: '주문이 두 건 나가고, 월말에 중복 결제를 발견해요.', good: '제출 후 버튼은 즉시 진행 중 상태로 비활성화, 결과가 올 때까지.' },
+  { t: '입력이 너무 길거나 / 특수문자 붙여넣기', bad: '글자가 카드를 뚫거나, 페이지가 바로 오류.', good: '자르기·검증 규칙을 밝히세요: 길면 말줄임, 불법 문자는 즉시 안내.' },
+  { t: '이 작업 권한이 없음', bad: '버튼은 그대로 보이고, 눌러야 「권한 없음」—함정이에요.', good: '권한 없는 작업은 흐리게 하고, 무슨 권한이 부족한지·누구에게 요청할지 밝히세요.' },
+  { t: '약한 망, 응답 8초', bad: 'UI가 8초 멈춘 듯하고, 다섯 번 연타해 요청이 다섯 개 나가요.', good: '1초 넘으면 진행 피드백, 10초 넘으면 취소 허용, 진행 중 중복 트리거 금지.' }
+];
+var x9Order = [], x9Drawn = 0;
+function x9Shuffle() {
+  x9Order = X9_EDGE.map(function (_, i) { return i; });
+  for (var i = x9Order.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = x9Order[i]; x9Order[i] = x9Order[j]; x9Order[j] = t;
+  }
+}
+x9Shuffle();
+document.getElementById('x9wBtn').addEventListener('click', function () {
+  var btn = this;
+  if (x9Drawn === 6) {
+    x9Drawn = 0;
+    x9Shuffle();
+    btn.textContent = '엣지 케이스 하나 뽑기';
+    document.getElementById('x9wNote').className = 'x9-note';
+    document.getElementById('x9wNote').textContent = '새 라운드, 순서를 섞었어요.';
+  }
+  var item = X9_EDGE[x9Order[x9Drawn]];
+  x9Drawn++;
+  var card = document.getElementById('x9wCard');
+  card.classList.remove('spin');
+  void card.offsetWidth;
+  card.classList.add('spin');
+  document.getElementById('x9wNum').textContent = x9Drawn + ' / 6';
+  document.getElementById('x9wTitle').textContent = item.t;
+  document.getElementById('x9wBadRow').style.display = 'flex';
+  document.getElementById('x9wGoodRow').style.display = 'flex';
+  document.getElementById('x9wBad').textContent = item.bad;
+  document.getElementById('x9wGood').textContent = item.good;
+  document.getElementById('x9wBadge').textContent = '뽑음 ' + x9Drawn + ' / 6';
+  if (x9Drawn === 6) {
+    btn.textContent = '한 라운드 더';
+    var note = document.getElementById('x9wNote');
+    note.className = 'x9-note ok';
+    note.innerHTML = '<b>여섯 엣지 케이스를 모두 봤어요.</b> 공통 법칙: 정답은 모두 한 문장으로 쓸 수 있는 요구예요. 요구를 쓸 때 「＿＿할 때 어떻게」를 여섯 번 만들면 AI가 대충 넘길 틈이 없어요.';
+  }
+});
+
+/* 交互规格积木机。
+   背景：前面学的条款要落成一段能贴走的文本才算兑现，
+   玩法沿用审美篇 taste-8 的积木机，读者已经熟悉。
+   设计意图：五组 seg 开关条款，关掉的组在预览里保留一行红色注释
+   点名风险（比直接消失更扎眼），预览全量重渲染保证任意组合都是确定态。 */
+var X9_BLOCKS = [
+  { seg: 'x9gState', on: '화면마다 상태를 빠짐없이: 기본·로딩·빈·오류·성공, 하나라도 빼지 마세요.', off: '// 상태를 안 부름: 흰 화면과 스피너가 자유 출몰' },
+  { seg: 'x9gEmpty', on: '빈 상태에 안내: 여기엔 앞으로 무엇이 올지 말하고, 첫걸음 버튼을 주세요.', off: '// 빈 상태 미규정: 신규는 「데이터 없음」을 봐요' },
+  { seg: 'x9gNet', on: '네트워크 실패는 재시도 가능하고 입력 유지; 1초 넘으면 진행률, 10초 넘으면 취소; 제출 중 중복 트리거 금지.', off: '// 네트워크·오류 미규정: alert와 중복 제출이 자유 출몰' },
+  { seg: 'x9gDanger', on: '위험 작업은 확인 창보다 되돌리기 우선: 즉시 실행 + 되돌리기 입구 + 휴지통 백업.', off: '// 오류 방지 미규정: AI는 기본으로 「삭제할까요?」를 띄움' },
+  { seg: 'x9gCtrl', on: '컨트롤은 규칙대로: 배타 라디오 버튼, 다중 체크박스, 즉시 반영 토글, 한 화면 넘을 때만 드롭다운; 버튼 카피는 결과를 밝히고 「확인 / 취소」 짝은 금지.', off: '// 컨트롤·카피 제약 없음: 옵션 세 개도 드롭다운에 숨을 수 있음' }
+];
+var x9On = [true, true, true, true, true];
+function x9Render() {
+  var html = '<span class="x9-line c">// 인터랙션 스펙(UI 생성 프롬프트 끝에 붙이기)</span>';
+  X9_BLOCKS.forEach(function (b, i) {
+    html += x9On[i]
+      ? '<span class="x9-line">' + (i + 1) + '. ' + b.on + '</span>'
+      : '<span class="x9-line warn">' + b.off + '</span>';
+  });
+  document.getElementById('x9bCode').innerHTML = html;
+  var offN = x9On.filter(function (v) { return !v; }).length;
+  var note = document.getElementById('x9bNote');
+  if (offN === 0) {
+    note.className = 'x9-note ok';
+    note.innerHTML = '<b>다섯 그룹 전부 켬:</b> 완전한 인터랙션 검수 첨부예요. 빨간 위험 줄이 하나도 없어요.';
+  } else {
+    note.className = 'x9-note warn';
+    note.innerHTML = '<b>' + offN + '개 그룹을 껐어요:</b> 미리보기의 빨간 주석이 AI가 자유 연출할 곳이고, 각각이 출시 후 티켓이에요.';
+  }
+}
+X9_BLOCKS.forEach(function (b, i) {
+  var seg = document.getElementById(b.seg);
+  seg.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn || btn.classList.contains('on')) return;
+    seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+    btn.classList.add('on');
+    x9On[i] = btn.dataset.v === '0';
+    x9Render();
+  });
+});
+x9Render();
+
+/* 规格复制：只复制开着的条款，全关时按钮给出提示。 */
+document.getElementById('x9copy').addEventListener('click', function () {
+  var btn = this;
+  var lines = X9_BLOCKS.filter(function (_, i) { return x9On[i]; }).map(function (b, i) { return (i + 1) + '. ' + b.on; });
+  if (!lines.length) {
+    btn.textContent = '비어 있음';
+    setTimeout(function () { btn.textContent = '복사'; }, 1500);
+    return;
+  }
+  var text = '인터랙션 스펙:\n' + lines.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () {
+      btn.textContent = '복사됨';
+      btn.classList.add('done');
+      setTimeout(function () { btn.textContent = '복사'; btn.classList.remove('done'); }, 2000);
+    });
+  }
+});
+
+/* 点选题：防错条款的写法。
+   答案 B：可逆优先。A 是狼来了，C 是把问题藏起来，D 高估了默认产出。 */
+tasteQuiz('x9quiz', {
+  answer: 1,
+  why: [
+    '확인 상자 두 번은 사용자가 「확인」을 두 번 연타하도록 훈련할 뿐이에요. 3레슨의 늑대 실험이 보여 줬죠: 가로막기가 팝업에 의존하면 세 번째부터 먹통이 돼요.',
+    '되돌리기 우선은 이 장에서 반복되는 순위예요: 끊지 않고 즉시 실행, 되돌리기 입구는 열어 두고, 휴지통이 받쳐 줘요. 사용자는 눌러도 되고, 잘못 지워도 살릴 수 있어요. 이 문장을 프롬프트에 넣으면 AI 산출물이 한 단계 올라가요.',
+    '버튼을 3단 메뉴에 숨기면 오탭도 막고 정상 사용도 막아요. 지워야 할 때 삭제를 못 찾으면 더 위험한 편법(내용을 비워 삭제한 척)을 써요.',
+    'AI는 몰라요. 기본안이 「삭제할까요?」 팝업이에요. 이번 레슨이 손으로 조항을 써서 덮어쓰라는 바로 그 행동이죠.'
+  ]
+});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.ko.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

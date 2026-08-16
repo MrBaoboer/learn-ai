@@ -29,7 +29,9 @@
 
   var DICT = {
     zh: {
-      ask: '问问 Alice', copy: '复制', copied: '已复制', popFb: '吐槽',
+      ask: '问问 Alice', copy: '复制', copied: '已复制', copyFail: '复制失败',
+      popFb: '吐槽',
+      askCourse: function (q) { return '课程里哪里讲过「' + q + '」？'; },
       title: 'Alice', subtitle: '课程助教',
       fabNudge: '有不懂的，欢迎点击这里问我～',
       tabChat: '对话', tabDiscover: '朋友圈',
@@ -42,20 +44,34 @@
       mBanned: '账号暂时不能发言',
       tabNotes: '笔记',
       popClip: '摘抄', clipSaved: '已存入笔记', clipDup: '笔记里已有这条',
+      clipToast: '已摘抄，点击右下角 Alice 头像查看',
+      clipDupToast: '这条已在笔记中，点击右下角 Alice 头像查看',
       clipFail: '没存上，再试一次？', saveAnswer: '存入笔记',
       ntLoading: '正在翻你的笔记本…',
       ntEmpty: '还没有笔记。划选课件里的内容点「摘抄」，或在 Alice 的回答下点「存入笔记」，把值得记住的都收进来。',
       ntAnswer: 'Alice 的回答', ntClip: '摘抄',
       ntDelConfirm: '删除这条笔记？',
       ntHint: '这些笔记 Alice 在以后的对话里会记得；登录 Alice 桌面版后，它们还会出现在 Wiki 的「学习」目录。',
+      ntMoreLoading: '正在翻更早的笔记…', ntFull: '笔记本满了，删几条再存',
       ntLoginTip: '登录米羊账号后，划词摘抄和 Alice 的回答都能存进笔记，她以后聊天也会记得它们。',
+      ntExportAll: '导出所有笔记', ntExporting: '打包中…',
+      ntDl: '下载这条笔记', ntExportSrc: '来源',
       newChat: '新对话', sessions: '历史对话', noSessions: '还没有历史对话',
+      closePanel: '收起面板',
       send: '发送', placeholder: '有什么不懂的，尽管问我…',
       quoteLabel: '划选内容',
-      // 划选后点「问问 Alice」预填一句通用提问，用户直接点发送就行，也能改
-      quoteAsk: '这段话是什么意思？帮我讲讲。',
+      pageRef: '已带上当前页',
+      fuHint: '接着问',
+      fuToggle: '追问建议',
+      // 划选后点「问问 Alice」：给三种问法（原来只预填第一句）
+      askSamplesHint: '想问什么？点一句，也可以自己改',
+      askSamples: ['这段话是什么意思？帮我讲讲。',
+                   '这段能举个具体例子吗？',
+                   '这段和前面讲的有什么关系？'],
       loginTip: '登录米羊账号即可提问，对话用你账户里的米粒计费，并保存在 Alice 的服务器里，换设备也不会丢。',
       loginBtn: '登录米羊账号',
+      reloginTip: '计费凭据需要刷新一次，重新登录米羊账号即可继续提问，对话记录不会丢。',
+      reloginBtn: '重新登录',
       riceLabel: function (n) { return '米粒 ' + n; },
       noRice: '米粒快用完啦，充值后就能继续和我聊。',
       banned: function (d) { return '由于多次发送恶意内容，这个账号暂时不能和 Alice 对话了，' + d + ' 后自动恢复。'; },
@@ -84,19 +100,16 @@
       scopeCtaTitle: '想聊点课程之外的？',
       scopeCtaDesc: '去 Alice 客户端找我。生活、工作、心事，都可以在那里慢慢聊。',
       scopeCtaButton: '去 Alice 客户端继续聊',
-      feedback: '我要吐槽',
-      feedbackTip: '对课件有意见？跟我吐槽',
-      fbMode: '吐槽模式',
-      fbGuide: '好呀，我在听。哪里写错了、哪句没讲明白、想看什么内容，直接说；截图可以粘贴进来，最多 5 张。想留名的话把 GitHub 或 X 主页链接一起发我——被采纳会把你挂上首页贡献者墙。',
-      fbPlaceholder: '想吐槽什么？截图直接粘进来…',
-      fbThanks: '收到，我帮你转交给作者了，每一条他都会看。因为你是登录提交的，有进展他能直接回访你；被采纳的话你的头像会出现在首页贡献者墙。还想吐槽，随时在输入框下方切回吐槽模式。',
-      fbLoginTip: '吐槽也是在给我发消息呀——先登录米羊账号，我才知道是谁在说。记在你名下的吐槽，作者有进展能直接回访你，被采纳还会把你的头像挂上首页贡献者墙。写了一半的内容我会帮你留着，登录回来接着说。',
-      fbSendErr: '没送出去……稍等一下再发一次试试？',
+      feedbackTip: '对课件有意见？直接跟我说',
+      fbPlaceholder: '哪里有问题？直接说，截图也能粘进来…',
+      fbSamplesHint: '不知道从哪说起？点一句接着写',
+      fbSamples: ['对于这一页的设计，我有这些意见：',
+                  '这一页的内容，我觉得有个地方写错了：',
+                  '对这节课，我有个建议：'],
       fbImgErr: '这张图没传上去，再试一次？',
       fbTooMany: '最多带 5 张图哦',
-      fbAttach: '贴图（也可以直接粘贴截图）',
-      modeChat: '问答',
-      modeFb: '吐槽',
+      fbAttach: '带张截图（也可以直接粘贴）',
+      imgLoginTip: '要带图给我看，得先登录米羊账号——我才知道这是谁发的。写了一半的内容我帮你留着，登录回来接着说。',
       aiNote: '以上内容均由 AI 生成，请注意甄别',
       expandSide: '展开为侧边栏', dockFloat: '收回悬浮窗',
       resizeSide: '拖动调整侧边栏宽度，双击恢复默认',
@@ -107,7 +120,9 @@
       loggedInAs: function (n) { return n; }
     },
     en: {
-      ask: 'Ask Alice', copy: 'Copy', copied: 'Copied', popFb: 'Report',
+      ask: 'Ask Alice', copy: 'Copy', copied: 'Copied', copyFail: 'Copy failed',
+      popFb: 'Report',
+      askCourse: function (q) { return 'Where does the course cover "' + q + '"?'; },
       title: 'Alice', subtitle: 'Course TA',
       fabNudge: 'Anything unclear? Tap here and ask me!',
       tabChat: 'Chat', tabDiscover: 'Moments',
@@ -120,19 +135,33 @@
       mBanned: 'Your account is temporarily muted',
       tabNotes: 'Notes',
       popClip: 'Clip', clipSaved: 'Saved to notes', clipDup: 'Already in your notes',
+      clipToast: 'Clipped. Tap Alice in the bottom-right to view it.',
+      clipDupToast: 'Already in your notes. Tap Alice in the bottom-right to view it.',
       clipFail: 'Couldn\'t save, try again?', saveAnswer: 'Save to notes',
       ntLoading: 'Opening your notebook…',
       ntEmpty: 'No notes yet. Select text in a lesson and hit “Clip”, or save one of Alice\'s answers — keep whatever is worth remembering.',
       ntAnswer: 'Alice\'s answer', ntClip: 'Clip',
       ntDelConfirm: 'Delete this note?',
       ntHint: 'Alice recalls these notes in future chats. Sign in to Alice for desktop and they also appear in your Wiki under “学习 (Study)”.',
+      ntMoreLoading: 'Loading earlier notes…', ntFull: 'Notebook is full, delete a few',
       ntLoginTip: 'Sign in with miyang to clip lesson text and Alice\'s answers into notes — she will remember them in future chats.',
+      ntExportAll: 'Export all notes', ntExporting: 'Packing…',
+      ntDl: 'Download this note', ntExportSrc: 'Source',
       newChat: 'New chat', sessions: 'History', noSessions: 'No conversations yet',
+      closePanel: 'Close panel',
       send: 'Send', placeholder: 'Ask me anything about this lesson…',
       quoteLabel: 'Selection',
-      quoteAsk: 'What does this mean? Explain it to me.',
+      pageRef: 'Current page included',
+      fuHint: 'Keep going',
+      fuToggle: 'Follow-ups',
+      askSamplesHint: 'Not sure what to ask? Tap one, or write your own',
+      askSamples: ['What does this mean? Explain it to me.',
+                   'Can you give me a concrete example of this?',
+                   'How does this connect to what came before?'],
       loginTip: 'Sign in with miyang to ask — chats are billed with your own rice and stored on Alice\'s server, following you across devices.',
       loginBtn: 'Sign in with miyang',
+      reloginTip: 'Your billing credential needs a refresh. Sign in with miyang again to keep asking — your chats stay put.',
+      reloginBtn: 'Sign in again',
       riceLabel: function (n) { return 'Rice ' + n; },
       noRice: 'You\'re running low on rice. Top up to keep chatting with me.',
       banned: function (d) { return 'This account is temporarily suspended from chatting with Alice due to repeated abusive messages. Access resumes after ' + d + '.'; },
@@ -161,20 +190,17 @@
       scopeCtaTitle: 'Want to talk beyond the course?',
       scopeCtaDesc: 'Find me in the Alice app. Life, work, or whatever is on your mind—we can talk there.',
       scopeCtaButton: 'Continue in Alice',
-      feedback: 'Send feedback',
-      feedbackTip: 'Spotted an issue? Tell me',
-      fbMode: 'Feedback',
-      fbGuide: 'I\'m listening. What\'s wrong, unclear, or missing? Just tell me — paste in screenshots too (up to 5). Include your GitHub or X profile link if you\'d like credit: adopted feedback puts your avatar on the home page.',
-      fbPlaceholder: 'What\'s bugging you? Paste screenshots right here…',
-      fbThanks: 'Got it — I\'ve passed it on to the author. He reads every one, and since you\'re signed in he can follow up with you directly. If it ships, your avatar goes on the home page contributors. More to report? Switch back to Feedback below the input anytime.',
-      fbLoginTip: 'Feedback is a message to me too — sign in with miyang so I know who\'s talking. Filed under your name, the author can follow up with you directly, and adopted feedback puts your avatar on the home page. I\'ll keep your draft safe while you sign in.',
-      fbSendErr: 'That didn\'t go through… give it another try in a moment?',
+      feedbackTip: 'Spotted an issue? Just tell me',
+      fbPlaceholder: 'What\'s wrong? Just say it — screenshots welcome…',
+      fbSamplesHint: 'Not sure how to start? Tap one and keep writing',
+      fbSamples: ['About the design of this page, here\'s what I think:',
+                  'Something on this page looks wrong to me:',
+                  'I have a suggestion for this lesson:'],
       fbImgErr: 'That image didn\'t upload — try again?',
       fbTooMany: 'Up to 5 images',
-      fbAttach: 'Attach image (or just paste a screenshot)',
-      modeChat: 'Q&A',
-      modeFb: 'Feedback',
-      aiNote: 'AI-generated content — double-check important details',
+      fbAttach: 'Attach a screenshot (or just paste one)',
+      imgLoginTip: 'To show me a screenshot, sign in with miyang first so I know who sent it. I\'ll keep your draft safe while you sign in.',
+      aiNote: 'Alice is an AI Agent and can make mistakes. Please double-check before use.',
       expandSide: 'Expand to sidebar', dockFloat: 'Back to floating window',
       resizeSide: 'Drag to resize sidebar; double-click to reset',
       resizeFloat: 'Drag to resize window; double-click to reset',
@@ -183,7 +209,9 @@
       loggedInAs: function (n) { return n; }
     },
     ko: {
-      ask: 'Alice에게 질문', copy: '복사', copied: '복사됨', popFb: '제보',
+      ask: 'Alice에게 질문', copy: '복사', copied: '복사됨', copyFail: '복사 실패',
+      popFb: '제보',
+      askCourse: function (q) { return '강의에서 "' + q + '"를 어디서 다루나요?'; },
       title: 'Alice', subtitle: '코스 조교',
       fabNudge: '궁금한 점이 있으면 여기를 눌러 물어보세요!',
       tabChat: '대화', tabDiscover: '모멘트',
@@ -194,12 +222,35 @@
       mCmtPh: '댓글을 남겨보세요…', mReplyPh: '{name}님에게 답글…',
       mLikeMore: '등 {n}명', mCmtFail: '전송 실패, 다시 시도해 주세요',
       mBanned: '계정이 일시적으로 제한되었습니다',
+      tabNotes: '노트',
+      popClip: '메모', clipSaved: '노트에 저장됨', clipDup: '이미 노트에 있어요',
+      clipToast: '메모했어요. 오른쪽 아래 Alice 프로필을 눌러 확인하세요.',
+      clipDupToast: '이미 노트에 있어요. 오른쪽 아래 Alice 프로필을 눌러 확인하세요.',
+      clipFail: '저장하지 못했어요. 다시 시도할까요?', saveAnswer: '노트에 저장',
+      ntLoading: '노트를 펼치는 중…',
+      ntEmpty: '아직 노트가 없어요. 강의 내용을 드래그해 「메모」를 누르거나, Alice의 답변 아래 「노트에 저장」을 눌러 기억할 만한 것들을 모아보세요.',
+      ntAnswer: 'Alice의 답변', ntClip: '메모',
+      ntDelConfirm: '이 노트를 삭제할까요?',
+      ntHint: '이 노트들은 Alice가 앞으로의 대화에서 기억해요. 데스크톱 Alice에 로그인하면 Wiki의 「학습」 폴더에도 나타납니다.',
+      ntMoreLoading: '이전 노트를 불러오는 중…', ntFull: '노트가 가득 찼어요, 몇 개 삭제해 주세요',
+      ntLoginTip: 'miyang 계정으로 로그인하면 드래그 메모와 Alice의 답변을 노트에 저장할 수 있어요. 그녀도 다음 대화에서 기억합니다.',
+      ntExportAll: '노트 모두 내보내기', ntExporting: '압축 중…',
+      ntDl: '이 노트 다운로드', ntExportSrc: '출처',
       newChat: '새 대화', sessions: '기록', noSessions: '아직 대화가 없습니다',
+      closePanel: '패널 닫기',
       send: '전송', placeholder: '이 강의에 대해 무엇이든 물어보세요…',
       quoteLabel: '선택한 내용',
-      quoteAsk: '이 문장이 무슨 뜻인지 설명해 주세요.',
+      pageRef: '현재 페이지 포함됨',
+      fuHint: '이어서 묻기',
+      fuToggle: '추천 질문',
+      askSamplesHint: '무엇을 물어볼지 막막하면, 한 줄 골라 보세요',
+      askSamples: ['이 문장이 무슨 뜻인지 설명해 주세요.',
+                   '이 부분의 구체적인 예를 들어 줄 수 있나요?',
+                   '이 내용은 앞에서 배운 것과 어떻게 이어지나요?'],
       loginTip: 'miyang 계정으로 로그인하면 질문할 수 있어요. 대화는 내 쌀로 결제되며 Alice 서버에 저장되어 어디서든 이어집니다.',
       loginBtn: 'miyang 계정으로 로그인',
+      reloginTip: '결제 자격 증명을 한 번 갱신해야 해요. miyang 계정으로 다시 로그인하면 계속 질문할 수 있고 대화 기록은 그대로 남습니다.',
+      reloginBtn: '다시 로그인',
       riceLabel: function (n) { return '쌀 ' + n; },
       noRice: '쌀이 얼마 남지 않았어요. 충전하면 계속 대화할 수 있어요.',
       banned: function (d) { return '악성 메시지를 반복해서 보내 이 계정은 잠시 Alice와 대화할 수 없습니다. ' + d + ' 이후 자동으로 복구됩니다.'; },
@@ -228,19 +279,16 @@
       scopeCtaTitle: '강의 밖의 이야기를 나누고 싶나요?',
       scopeCtaDesc: 'Alice 앱에서 만나요. 일상, 일, 고민까지 그곳에서는 천천히 이야기할 수 있어요.',
       scopeCtaButton: 'Alice에서 계속 대화하기',
-      feedback: '피드백 보내기',
-      feedbackTip: '강의에 의견이 있나요? 저에게 말해주세요',
-      fbMode: '피드백 모드',
-      fbGuide: '네, 듣고 있어요. 틀린 곳, 이해 안 되는 곳, 보고 싶은 내용을 말씀해 주세요. 스크린샷은 붙여넣으면 돼요(최대 5장). GitHub나 X 프로필 링크를 함께 보내주시면, 반영될 때 홈페이지 기여자에 올려드립니다.',
-      fbPlaceholder: '무엇이 불편했나요? 스크린샷도 붙여넣으세요…',
-      fbThanks: '잘 받았어요. 작가에게 전달했고, 로그인 상태로 보내주셨으니 진행되면 직접 연락드릴 수 있어요. 반영되면 홈페이지 기여자에 프로필이 올라갑니다. 더 있으면 입력창 아래에서 피드백 모드로 전환해 주세요.',
-      fbLoginTip: '피드백도 저에게 보내는 메시지예요 — 누가 말하는지 알 수 있게 먼저 miyang 계정으로 로그인해 주세요. 이름으로 기록되면 작가가 직접 연락드릴 수 있고, 반영되면 홈페이지 기여자에 올라가요. 쓰던 내용은 제가 보관해 둘게요.',
-      fbSendErr: '전송이 안 됐어요… 잠시 후 다시 보내볼까요?',
+      feedbackTip: '강의에 의견이 있나요? 그냥 말해주세요',
+      fbPlaceholder: '어디가 문제인가요? 그냥 말해주세요, 스크린샷도 붙여넣기 가능…',
+      fbSamplesHint: '어떻게 시작할지 막막하면, 한 줄 골라 이어 쓰세요',
+      fbSamples: ['이 페이지의 구성에 대해 이런 의견이 있어요:',
+                  '이 페이지에서 잘못된 것 같은 부분이 있어요:',
+                  '이 강의에 제안이 하나 있어요:'],
       fbImgErr: '이미지 업로드에 실패했어요. 다시 시도해 주세요.',
       fbTooMany: '이미지는 최대 5장까지요',
-      fbAttach: '이미지 첨부 (스크린샷 붙여넣기도 가능)',
-      modeChat: '질문',
-      modeFb: '피드백',
+      fbAttach: '스크린샷 첨부 (붙여넣기도 가능)',
+      imgLoginTip: '이미지를 보여주시려면 먼저 miyang 계정으로 로그인해 주세요 — 누가 보냈는지 알 수 있어야 해요. 쓰던 내용은 제가 보관해 둘게요.',
       aiNote: 'AI가 생성한 내용입니다. 중요한 내용은 확인해 주세요',
       expandSide: '사이드바로 펼치기', dockFloat: '플로팅 창으로 되돌리기',
       resizeSide: '드래그해서 너비 조절, 더블클릭하면 기본값으로',
@@ -257,6 +305,10 @@
   // 与 miyang_alice/src/public/avatars/avatar_512.png 同源：黑微卷 + 淡金发带 + 星星项链。
   // 曾用 Image2 另生「老师脸」会漂成另一个人，不合规；UI 圆裁由 CSS border-radius 完成。
   var AVATAR_SRC = 'alice-teacher.png?v=20260808j';
+  // 本轮任务标记：与 alice-service 的 *_INTENT 对齐（后端只认这两个白名单值）
+  var COURSE_SEARCH_INTENT = 'course_search';
+  var FEEDBACK_INTENT = 'feedback';
+  var pendingIntent = '';
   var PAGE_FILE = location.pathname.split('/').pop();
   var PAGE_TITLE = (document.title || '').replace(/\s*\|\s*xueai\.app\s*$/, '');
   // 上报 IANA 时区：后端给每条消息注【消息时间】，韩文学员按首尔报时
@@ -275,29 +327,45 @@
     accountKey: '',           // 服务端下发的 uid 摘要，只用于隔离账号级 localStorage
     nickname: '',
     rice: null,               // 米粒余额（计费走学员本人的米羊账号）
-    feedbackMode: false,      // 吐槽模式：消息不进 LLM，收集后转交 /api/feedback
-    fbImages: [],             // 吐槽配图（已上传的 URL）
-    fbUploading: false,
+    // 会话还在，但本地缺一把可计费的网关 Key（它只在米羊 OAuth 回调那刻换取）。
+    // 服务端只能靠用户重登一次来补，所以这里单独记一位，别和「未登录」混在一起。
+    needRelogin: false,
+    // 吐槽不是模式（PRD 38）：用户照常说话，是不是意见由 Alice 判断并转交。
+    // 截图只是随消息带的附件，任何时候都能带；她看不见画面，但转交时会一起走。
+    attachImages: [],         // 已上传的截图 URL（下一条消息带走）
+    attachUploading: false,
     sessionId: null,          // 登录用户的云端会话 id
     messages: [],             // [{role, content, ts, toolCount?}]
     pendingQuote: '',
     streaming: false,
     sessionsOpen: false,
-    pageQuestions: null       // 本页推荐问题（null=未加载）
+    pageQuestions: null,      // 本页推荐问题（null=未加载）
+    followups: []             // 上一轮回答带回的「接着问」（PRD 39）
   };
 
   var SID_KEY = 'alice_session_id';   // localStorage：登录用户上次会话
+  var SID_ACCOUNT_KEY = 'alice_session_account'; // SID 必须和账号摘要一起校验
+  // 开合与形态都是三态：'1'/'0' 是用户表过的态，键不存在才叫「还没表态」。
+  // 关窗写 '0' 而不是删键——删了就和首访没法区分，下次进来又会被默认展开顶回去。
   var OPEN_KEY = 'alice_win_open';    // localStorage：悬浮窗开合（切页保持）
   var SIDE_KEY = 'alice_win_side';    // localStorage：侧边栏形态（切页保持）
+  var TAB_KEY = 'alice_win_tab';      // localStorage：当前页签（切页/刷新回到原处）
+  // 上次 /alice/me 确认过的账号摘要。它让账号级快照在首帧就能校验、不必等 me
+  // 回来（否则每次刷新都先转一圈 loading，缓存等于白写）。摘要是不可逆 HMAC，
+  // 不是 uid；过期后宁可重新拉一次，也不拿更旧的记忆去认人。
+  var ACCT_KEY = 'alice_account_last';
+  var ACCT_SEED_TTL = 12 * 60 * 60 * 1000;
   var SIDE_W_KEY = 'alice_side_w';   // localStorage：侧边栏宽度（px）
   var SIDE_W_MIN = 300;
-  var SIDE_W_MAX = 720;
-  var SIDE_W_DEF = 360;             // 比旧默认（约 36vw）更克制，正文先喘口气
+  // 比旧默认（约 36vw）克制，但也不能太窄：现在是首访就铺开的（PRD 24a），
+  // 用户没主动拖过，这个数就是绝大多数人看到的唯一宽度——代码块和配图得放得下。
+  var SIDE_W_DEF = 420;
   var FLOAT_W_KEY = 'alice_float_w';
   var FLOAT_H_KEY = 'alice_float_h';
   var FLOAT_W_DEF = 420;
   var FLOAT_H_DEF = 660;
   var FLOAT_W_MIN = 340;
+  var FLOAT_W_MAX = 600;            // 悬浮窗再宽就像遮罩层；更宽的阅读需求交给侧边栏
   var FLOAT_H_MIN = 420;
   var MSGS_KEY = 'alice_msgs_cache';  // localStorage：当前会话消息快照（切页秒显）
   var MOMENTS_KEY = 'alice_moments_cache'; // localStorage：朋友圈快照（跨课件/语言页秒显）
@@ -309,7 +377,58 @@
   var LOW_RICE_KEY = 'alice_low_rice'; // 上次余额不足；下次进入强制刷新余额而非吃 60 秒缓存
   var FAB_NUDGE_DAY_KEY = 'alice_fab_nudge_day'; // 头像引导气泡：每个浏览器每天至多一次
   var LOW_RICE_THRESHOLD = 20;
+  // 首访是被自动展开的，用户还没表过态。这段期间不能记「今天用过面板」，否则
+  // 他把栏叉掉之后引导气泡就没机会露面了。
+  var autoOpened = false;
   var pageUnloading = false;          // 刷新/翻页导致断流时绝不能删掉待恢复任务
+  function rememberSessionId(sid) {
+    try {
+      if (!sid || !state.accountKey) {
+        localStorage.removeItem(SID_KEY);
+        localStorage.removeItem(SID_ACCOUNT_KEY);
+        return;
+      }
+      localStorage.setItem(SID_KEY, sid);
+      localStorage.setItem(SID_ACCOUNT_KEY, state.accountKey);
+    } catch (e) {}
+  }
+  function readSessionId() {
+    try {
+      if (!state.accountKey ||
+          localStorage.getItem(SID_ACCOUNT_KEY) !== state.accountKey) return null;
+      return localStorage.getItem(SID_KEY);
+    } catch (e) { return null; }
+  }
+  // 账号摘要种子：me 每次确认后写一遍，入口处读回来给首帧的快照校验用。
+  function rememberAccountKey(key) {
+    try {
+      if (!key) { localStorage.removeItem(ACCT_KEY); return; }
+      localStorage.setItem(ACCT_KEY, JSON.stringify({ key: key, ts: Date.now() }));
+    } catch (e) {}
+  }
+  function readAccountSeed() {
+    var c = null;
+    try { c = JSON.parse(localStorage.getItem(ACCT_KEY) || 'null'); } catch (e) {}
+    if (!c || !c.key || Date.now() - (c.ts || 0) > ACCT_SEED_TTL) return '';
+    return String(c.key);
+  }
+  // 同浏览器换号的现实路径只有「点退出再登另一个」。退出那一刻把账号级痕迹全清掉，
+  // 下一位登录时首帧就无可恢复，不必赌 me 回来得够快。
+  function dropAccountScopedCaches() {
+    [MSGS_KEY, MOMENTS_KEY, NOTES_KEY, SESSIONS_KEY, SID_KEY, SID_ACCOUNT_KEY,
+      GEN_KEY, ACCT_KEY, DL_CARD_DAY_KEY].forEach(function (k) {
+        try { localStorage.removeItem(k); } catch (e) {}
+      });
+  }
+  // 顶栏账号菜单里的「退出」是 <button> + location.href（见 auth.js），只认
+  // a[href] 的话这段清理在线上一次都不会跑，两个形态都得盯着。
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    if (e.target.closest('a[href*="/auth/logout"], .xa-account-logout')) {
+      dropAccountScopedCaches();
+    }
+  }, true);
+
   function markPageUnloading() { pageUnloading = true; }
   window.addEventListener('beforeunload', markPageUnloading, true);
   window.addEventListener('pagehide', markPageUnloading, true);
@@ -318,19 +437,39 @@
   // 参照物：客户端对话页（用户深色胶囊气泡 / Alice 圆头像 + 无气泡直排正文 /
   // 蛐蛐灰字在正文上方 / 居中时间线）与首页（衬线大问候 / 大圆角输入卡 +
   // 卡内工具栏 + 圆形深色发送钮 / 推荐 chips / AI 生成声明）。
-  var style = document.createElement('style');
-  style.textContent = [
-    ':root{--al-bg:#fff;--al-soft:#f4f4f5;--al-accent:#1a1a1a;--al-border:#e4e4e7;--al-line:#d9d9de;--al-text:#1a1a1a;--al-sub:#6b6b70;--al-faint:#a8a8ad;--al-user:#3a3a3a;--al-serif:Georgia,"Songti SC","Noto Serif SC",serif;--al-sans:-apple-system,"PingFang SC","Noto Sans KR",sans-serif;--al-side-w:360px;--al-float-w:420px;--al-float-h:660px}',
-    // 划词浮层
-    '#alice-pop{position:fixed;z-index:100001;display:none;align-items:center;background:rgba(28,28,30,.94);backdrop-filter:blur(10px);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);overflow:hidden;font-family:var(--al-sans);animation:alice-pop-in .12s ease}',
+  // 划词栏可能被提升到阅读器最外层文档，所以样式单独留一份，供宿主复用。
+  var popCss = [
+    '#alice-pop{position:fixed;inset:auto;margin:0;border:0;padding:0;z-index:2147483647;display:none;align-items:center;background:rgba(28,28,30,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);overflow:hidden;font-family:var(--al-sans,-apple-system,"PingFang SC","Noto Sans KR",sans-serif);animation:alice-pop-in .12s ease}',
+    '#alice-pop:popover-open{display:flex}',
     '@keyframes alice-pop-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}',
     '#alice-pop button{background:transparent;border:none;color:#fff;font-size:13px;font-weight:600;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;white-space:nowrap}',
     '#alice-pop button:hover{background:rgba(255,255,255,.12)}',
-    '#alice-pop .al-sep{width:1px;height:16px;background:rgba(255,255,255,.18)}',
-    '#alice-pop .al-dot{width:16px;height:16px;border-radius:50%;background:var(--al-soft);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#666;flex-shrink:0;overflow:hidden}',
+    '#alice-pop .al-sep{width:1px;height:16px;background:rgba(255,255,255,.18);flex:0 0 auto}',
+    '#alice-pop .al-dot{width:16px;height:16px;border-radius:50%;background:var(--al-soft,#f4f4f5);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#666;flex-shrink:0;overflow:hidden}',
     '#alice-pop .al-dot img{width:100%;height:100%;object-fit:cover}',
+    // 触屏不跟系统选词菜单抢位置：JS 会把整条操作栏固定到 Alice 头像左上方。
+    '#alice-pop.al-pop-docked{max-width:calc(100vw - 28px)}',
+    // 摘抄成功提示同样放进宿主 Top Layer；右下小圆角指向 Alice 头像。
+    '#alice-clip-toast{position:fixed;inset:auto;margin:0;border:1px solid rgba(255,255,255,.12);padding:10px 14px;z-index:2147483647;display:none;align-items:center;gap:8px;max-width:min(320px,calc(100vw - 28px));border-radius:16px 16px 6px 16px;background:rgba(20,20,20,.9);color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.22);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-family:var(--al-sans,-apple-system,"PingFang SC","Noto Sans KR",sans-serif);font-size:13px;font-weight:600;line-height:1.5;text-align:left;cursor:pointer;animation:alice-toast-in .18s cubic-bezier(.3,.9,.4,1)}',
+    '#alice-clip-toast:popover-open{display:flex}',
+    '#alice-clip-toast:hover{background:rgba(20,20,20,.96)}',
+    '#alice-clip-toast .al-toast-ok{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;flex:0 0 auto;border-radius:50%;background:#fff;color:#1c1c1e;font-size:12px;font-weight:900}',
+    '@keyframes alice-toast-in{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}',
+    '@media(max-width:640px){#alice-pop button{padding:10px 11px;font-size:12px}#alice-pop .al-dot{display:none}}'
+  ].join('\n');
+  var style = document.createElement('style');
+  style.textContent = [
+    // 颜色 token 挂在 :root：#alice-panel / #alice-float 是早年的容器 id，早就不
+    // 存在了，挂在它们身上等于没挂——面板其实一直靠各处写死的 #fff 撑着，所以
+    // 外壳切深色时 Alice 只能一路白到底。
+    ':root{--al-bg:#fff;--al-soft:#f4f4f5;--al-soft-2:#e7e7ea;--al-sep:#f4f4f5;--al-accent:#1a1a1a;--al-on-accent:#fff;--al-border:#e4e4e7;--al-line:#d9d9de;--al-text:#1a1a1a;--al-sub:#6b6b70;--al-faint:#a8a8ad;--al-hint:#c2c2c7;--al-user:#3a3a3a;--al-user-text:#fff;--al-elev:0 24px 64px rgba(0,0,0,.18);--al-serif:Georgia,"Songti SC","Noto Serif SC",serif;--al-sans:-apple-system,"PingFang SC","Noto Sans KR",sans-serif;--al-side-w:420px;--al-float-w:420px;--al-float-h:660px}',
+    // 深色沿用课件那套墨绿夜色（lesson.css 的 --card/--text/--accent 同一族），
+    // 外壳切主题会把 data-theme 带进 iframe，Alice 跟着一起换。
+    'html[data-theme="dark"]{--al-bg:#151b18;--al-soft:#1e2622;--al-soft-2:#28322d;--al-sep:rgba(255,255,255,.08);--al-accent:#5cb595;--al-on-accent:#0e1512;--al-border:rgba(255,255,255,.10);--al-line:rgba(255,255,255,.17);--al-text:#e9ece9;--al-sub:#a3ada8;--al-faint:#78827d;--al-hint:#5e6863;--al-user:#232b27;--al-user-text:#e9ece9;--al-elev:0 24px 64px rgba(0,0,0,.55)}',
+    // 划词浮层
+    popCss,
     // 常驻头像按钮（右下角，Image2 垫图生成的 Alice 老师形象）
-    '#alice-fab{position:fixed;right:22px;bottom:26px;width:58px;height:58px;border-radius:50%;z-index:99999;background:#fff;border:1px solid var(--al-border);box-shadow:0 8px 28px rgba(0,0,0,.16);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:transform .18s,box-shadow .18s;overflow:hidden}',
+    '#alice-fab{position:fixed;right:22px;bottom:26px;width:58px;height:58px;border-radius:50%;z-index:99999;background:var(--al-bg);border:1px solid var(--al-border);box-shadow:0 8px 28px rgba(0,0,0,.16);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:transform .18s,box-shadow .18s;overflow:hidden}',
     '#alice-fab:hover{transform:translateY(-3px) scale(1.04);box-shadow:0 14px 36px rgba(0,0,0,.22)}',
     '#alice-fab img{width:100%;height:100%;object-fit:cover;object-position:top}',
     '#alice-fab .al-fab-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--al-serif);font-size:24px;font-weight:700;color:#fff;background:#3a3a3c}',
@@ -347,7 +486,7 @@
     '@keyframes al-fab-nudge-in{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}',
     '@media(max-width:640px){#alice-fab{right:14px;bottom:18px;width:52px;height:52px}#alice-fab-nudge{right:54px;bottom:74px;max-width:min(220px,calc(100vw - 74px))}}',
     // 悬浮窗
-    '#alice-win{position:fixed;right:20px;bottom:20px;width:var(--al-float-w);max-width:calc(100vw - 24px);height:var(--al-float-h);max-height:calc(100vh - 40px);z-index:100000;background:var(--al-bg);border:1px solid var(--al-border);border-radius:18px;box-shadow:0 24px 64px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden;font-family:var(--al-sans)}',
+    '#alice-win{position:fixed;right:20px;bottom:20px;width:var(--al-float-w);max-width:calc(100vw - 24px);height:var(--al-float-h);max-height:calc(100vh - 40px);z-index:100000;background:var(--al-bg);border:1px solid var(--al-border);border-radius:18px;box-shadow:var(--al-elev);display:none;flex-direction:column;overflow:hidden;font-family:var(--al-sans)}',
     '#alice-win.open{display:flex;animation:al-win-in .22s cubic-bezier(.3,.9,.4,1)}',
     '@keyframes al-win-in{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}',
     // 悬浮窗左边调宽、上边调高；左上角一次调两边。热区透明，只在悬停时
@@ -371,7 +510,10 @@
     // 切页恢复出来的窗口不播入场动画，也不播正文让位的过渡：翻一页飞一次
     // 就成了「每页都在重启 Alice」，而它本该看起来一直待在那儿没动过
     '#alice-win.open.restored{animation:none}',
-    'html.alice-boot body{transition:none}',
+    // !important 是必须的：下面 `html.alice-side body` 和这条同权重、又排在后面，
+    // 不加就永远是它赢，首帧的让位会被当成一次 .22s 的过渡播出来——脚本是
+    // async 注入的，必然晚于首屏绘制，于是每翻一页正文都从右边滑进来一次。
+    'html.alice-boot body{transition:none!important}',
     // 侧边栏形态：贴右满高，正文由 html.alice-side 让位（见下），不遮挡阅读
     // 阴影与左边线克制一点——三栏同屏时大阴影最容易把界面「吵」起来
     '#alice-win.side{right:0;bottom:0;top:0;width:var(--al-side-w);height:100vh;max-height:100vh;border-radius:0;border:none;border-left:1px solid var(--al-border);box-shadow:none}',
@@ -397,7 +539,10 @@
     'html.alice-side #slide-nav-trigger{right:var(--al-side-w)}',
     // 贴右上角的语言切换器同理：用 margin-right 往左推，不必知道它原本的 right
     'html.alice-side #lang-switcher{margin-right:var(--al-side-w)}',
-    '@media(max-width:640px){#alice-win,#alice-win.side{right:0;bottom:0;top:auto;width:100vw;height:100vh;max-height:100vh;border-radius:0;border:none;box-shadow:none}',
+    // 手机上不保留「浮窗」外观：打开后直接占满浏览器可视区。100vh 给旧浏览器兜底，
+    // 100dvh 跟随地址栏/键盘后的真实可视高度，避免输入框落到屏幕外。
+    '@media(max-width:640px){#alice-win,#alice-win.side{inset:0;width:100vw;max-width:none;height:100vh;height:100dvh;max-height:none;border-radius:0;border:none;box-shadow:none}',
+      '#alice-win.open{animation:none}',
       '#alice-win .al-float-rz{display:none}',
       '#alice-win.side .al-side-rz{display:none}',
       'html.alice-side{padding-top:0;padding-bottom:0}',
@@ -407,8 +552,8 @@
       'html.alice-side #lang-switcher{margin-right:0}',
       '#al-btn-side{display:none}}',   // 窄屏本来就全屏，没有侧边栏可言
     // 头部
-    '.al-head{display:flex;align-items:center;gap:10px;padding:12px 14px 10px;border-bottom:1px solid var(--al-soft);background:#fff;flex-shrink:0}',
-    '.al-avatar{width:36px;height:36px;border-radius:50%;background:var(--al-soft);display:flex;align-items:center;justify-content:center;color:#666;font-weight:700;font-size:15px;font-family:var(--al-serif);flex-shrink:0;overflow:hidden}',
+    '.al-head{display:flex;align-items:center;gap:10px;padding:12px 14px 10px;border-bottom:1px solid var(--al-sep);background:var(--al-bg);flex-shrink:0}',
+    '.al-avatar{width:36px;height:36px;border-radius:50%;background:var(--al-soft);display:flex;align-items:center;justify-content:center;color:var(--al-sub);font-weight:700;font-size:15px;font-family:var(--al-serif);flex-shrink:0;overflow:hidden}',
     '.al-avatar img{width:100%;height:100%;object-fit:cover;object-position:top}',
     '.al-head-info{flex:1;min-width:0}',
     '.al-head-name{font-size:15px;font-weight:700;color:var(--al-text);line-height:1.2;font-family:var(--al-serif);letter-spacing:.3px}',
@@ -420,10 +565,31 @@
     '.al-rice-link:hover{color:var(--al-text);border-bottom-color:currentColor}',
     '.al-iconbtn{background:transparent;border:none;cursor:pointer;color:var(--al-sub);padding:5px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;text-decoration:none}',
     '.al-iconbtn:hover{background:var(--al-soft);color:var(--al-text)}',
-    // 吐槽已并入输入卡「问答/吐槽」切换；头部再放一枚只会和右边四个按钮抢宽度
-    '#al-btn-fb{display:none}',
+    // 头部这三颗（历史/侧栏/关闭）在白底上是透明底 + 浅灰线条，用户实锤「不太明显」：
+    // 看着像装饰而不是能点的钮。补一层常驻浅底把点击区画出来，图标也加深加大一档。
+    '.al-head>.al-iconbtn{background:var(--al-soft);color:var(--al-sub);padding:6px}',
+    '.al-head>.al-iconbtn:hover{background:var(--al-soft-2);color:var(--al-text)}',
+    '.al-head>.al-iconbtn svg{width:18px;height:18px;stroke-width:1.7}',
+    // 自绘提示气泡：系统 title 要悬停一两秒才弹，"不明显"的另一半就出在这
+    '.al-iconbtn[data-tip]{position:relative}',
+    '.al-iconbtn[data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 7px);',
+      'left:50%;transform:translateX(-50%);background:#1f1f23;color:#fff;font-size:11px;',
+      'line-height:1.25;padding:4px 8px;border-radius:6px;white-space:nowrap;opacity:0;',
+      'pointer-events:none;transition:opacity .12s;z-index:40}',
+    '.al-iconbtn[data-tip]:hover::after{opacity:1}',
+    // 最右那颗贴着面板边框，气泡居中会溢出窗外
+    '.al-head>.al-iconbtn[data-tip]:last-child::after{left:auto;right:0;transform:none}',
+    '@media (hover:none){.al-iconbtn[data-tip]::after{display:none}}',
+    // 带文字的头部钮（目前只有「新对话」）：描边胶囊，比纯图标重、又不抢主色
+    '.al-headbtn{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;',
+      'background:var(--al-bg);border:1px solid var(--al-border);border-radius:999px;',
+      'padding:5px 10px 5px 8px;font-size:12px;font-weight:600;color:var(--al-sub);',
+      'line-height:1;cursor:pointer;font-family:inherit;white-space:nowrap;',
+      'transition:background .15s,color .15s,border-color .15s}',
+    '.al-headbtn:hover{background:var(--al-soft);color:var(--al-text);border-color:var(--al-line)}',
+    '.al-headbtn svg{flex-shrink:0}',
     // Tabs
-    '.al-tabs{display:flex;align-items:center;gap:2px;padding:6px 14px 0;background:#fff;flex-shrink:0;border-bottom:1px solid var(--al-soft)}',
+    '.al-tabs{display:flex;align-items:center;gap:2px;padding:6px 14px 0;background:var(--al-bg);flex-shrink:0;border-bottom:1px solid var(--al-sep)}',
     '.al-tab{flex:none;background:transparent;border:none;font-size:12.5px;font-weight:700;color:var(--al-faint);padding:5px 11px 9px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit}',
     '.al-tab.active{color:var(--al-text);border-bottom-color:var(--al-accent)}',
     '.al-download-cta{margin-left:auto;margin-bottom:6px;display:inline-flex;align-items:center;gap:4px;',
@@ -434,21 +600,25 @@
       'transition:transform .15s,box-shadow .15s,filter .15s}',
     '.al-download-cta:hover{color:#fff;filter:saturate(1.12);transform:translateY(-1px);box-shadow:0 6px 16px rgba(16,185,129,.3)}',
     '.al-download-cta svg{width:13px;height:13px;flex-shrink:0}',
+    // 「导出所有笔记」借邀请钮的胶囊形，但它是功能钮不是广告位：中性灰、无阴影
+    '.al-download-cta.export{border:1px solid var(--al-border);background:var(--al-bg);color:var(--al-sub);box-shadow:none;cursor:pointer;font-family:inherit}',
+    '.al-download-cta.export:hover{color:var(--al-text);border-color:var(--al-line);filter:none;transform:none;box-shadow:none}',
+    '.al-download-cta.export:disabled{opacity:.55;cursor:default}',
     // 消息区
-    '.al-body{flex:1;overflow-y:auto;padding:16px 16px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch;background:#fff}',
+    '.al-body{flex:1;overflow-y:auto;padding:16px 16px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch;background:var(--al-bg)}',
     '.al-time{align-self:center;font-size:11px;color:var(--al-faint);padding:4px 0}',
     // 用户消息：圆角照客户端 MessageBubble——整体 24px，右上角只有 6px（那个
     // 角是气泡的「尖」，收得比其它角紧）；单行短消息整体 18px，padding 也小一号
-    '.al-msg-user{align-self:flex-end;max-width:min(36rem,82%);background:var(--al-user);color:#fff;font-size:14px;line-height:1.8;letter-spacing:.015em;padding:12px 16px;border-radius:24px 6px 24px 24px;white-space:pre-wrap;word-break:break-word}',
+    '.al-msg-user{align-self:flex-end;max-width:min(36rem,82%);background:var(--al-user);color:var(--al-user-text);font-size:14px;line-height:1.8;letter-spacing:.015em;padding:12px 16px;border-radius:24px 6px 24px 24px;white-space:pre-wrap;word-break:break-word}',
     '.al-msg-user.short{padding:10px 14px;border-radius:18px 6px 18px 18px}',
     // Alice 消息：客户端同款 28px 圆角方头像 + 无气泡直排正文
     '.al-msg-alice{align-self:flex-start;display:flex;gap:12px;max-width:96%}',
-    '.al-msg-alice .al-mini{width:28px;height:28px;border-radius:8px;flex-shrink:0;overflow:hidden;background:var(--al-soft);display:flex;align-items:center;justify-content:center;color:#666;font-family:var(--al-serif);font-size:13px;font-weight:700;margin-top:2px}',
+    '.al-msg-alice .al-mini{width:28px;height:28px;border-radius:8px;flex-shrink:0;overflow:hidden;background:var(--al-soft);display:flex;align-items:center;justify-content:center;color:var(--al-sub);font-family:var(--al-serif);font-size:13px;font-weight:700;margin-top:2px}',
     '.al-msg-alice .al-mini img{width:100%;height:100%;object-fit:cover;object-position:top}',
     '.al-msg-alice .al-mini.ghost{visibility:hidden}',
     '.al-msg-alice .al-mtext{flex:1;min-width:0;font-size:14px;line-height:1.8;letter-spacing:.015em;color:var(--al-text);word-break:break-word;padding-top:4px}',
     '.al-mtext p{margin:0 0 10px}.al-mtext p:last-child{margin:0}',
-    '.al-mtext code{background:var(--al-soft);color:#3a3a3c;padding:1px 5px;border-radius:4px;font-size:13px;font-family:"SF Mono",Menlo,monospace}',
+    '.al-mtext code{background:var(--al-soft);color:var(--al-text);padding:1px 5px;border-radius:4px;font-size:13px;font-family:"SF Mono",Menlo,monospace}',
     '.al-mtext pre{background:#1f1f21;color:#eee;padding:10px 12px;border-radius:10px;overflow-x:auto;font-size:12px;line-height:1.6;margin:8px 0}',
     '.al-mtext pre code{background:transparent;color:inherit;padding:0}',
     '.al-mtext ul,.al-mtext ol{margin:6px 0;padding-left:20px}',
@@ -459,7 +629,25 @@
     '.al-mtext li.al-task input{margin:0 6px 0 0;vertical-align:baseline;accent-color:var(--al-accent)}',
     '.al-mtext mark{background:rgba(201,150,46,.22);color:inherit;padding:0 2px;border-radius:3px}',
     '.al-mtext sup,.al-mtext sub{font-size:.75em}',
-    '.al-mtext a{color:var(--al-text);text-decoration:underline;text-underline-offset:2px}',
+    // Markdown 链接（PRD 24o）：不吃浏览器默认紫色下划线。普通外链保持行内阅读感，
+    // 课件互链则是轻量课程胶囊；回答类笔记复用同一套 renderMd，所以两处一并覆盖。
+    '#alice-win a.al-md-link{color:#4c586d;text-decoration:none;font-weight:550;',
+      'border-bottom:1px dotted #9ca6b7;border-radius:4px;padding:0 2px;',
+      'box-decoration-break:clone;-webkit-box-decoration-break:clone;',
+      'transition:color .15s,background-color .15s,border-color .15s}',
+    '#alice-win a.al-md-link:visited{color:#4c586d}',
+    '#alice-win a.al-md-link:hover{color:#263247;background:#f2f4f7;border-bottom-color:#69758a}',
+    '#alice-win a.al-md-link:focus-visible{outline:2px solid rgba(70,91,126,.35);outline-offset:2px}',
+    '#alice-win .al-md-link-ico{display:inline-block;width:12px;height:12px;margin-left:3px;',
+      'vertical-align:-1.5px;flex-shrink:0;stroke-width:1.8}',
+    '#alice-win a.al-course-link{display:inline-flex;align-items:center;gap:4px;max-width:100%;',
+      'margin:0 2px;padding:1px 7px 1px 6px;vertical-align:baseline;line-height:1.5;',
+      'color:#43516a;background:#f4f6f9;border:1px solid #dfe4eb;border-radius:7px;',
+      'font-weight:650;text-decoration:none;box-shadow:0 1px 1px rgba(25,35,50,.025)}',
+    '#alice-win a.al-course-link:visited{color:#43516a}',
+    '#alice-win a.al-course-link:hover{color:#263247;background:#edf1f6;border-color:#cbd3df;',
+      'box-shadow:0 2px 6px rgba(25,35,50,.07)}',
+    '#alice-win a.al-course-link .al-md-link-ico{order:-1;margin:0;width:12px;height:12px}',
     '.al-mtext b,.al-mtext strong{font-weight:700}',
     '.al-mtext em{font-style:italic}',
     '.al-mtext del{opacity:.55}',
@@ -503,7 +691,7 @@
     '.al-cp{border:none;background:transparent;font-family:inherit;font-size:11px;color:var(--al-faint);padding:3px 6px;border-radius:6px;cursor:pointer;user-select:none;-webkit-user-select:none;transition:color .15s,opacity .15s}',
     '.al-cp:hover{color:var(--al-text);background:rgba(0,0,0,.04)}',
     '.al-cp.done{color:#0f766e}',
-    '.al-tb-cp{position:absolute;top:3px;right:3px;background:rgba(255,255,255,.92);border:1px solid var(--al-border);opacity:0}',
+    '.al-tb-cp{position:absolute;top:3px;right:3px;background:var(--al-bg);border:1px solid var(--al-border);opacity:0}',
     '.al-tablewrap:hover .al-tb-cp,.al-tb-cp.done{opacity:1}',
     // 表格：客户端 TableBlock 同款细边框 + 表头浅底，窄面板里横向滚动而不是压扁
     '.al-tablewrap{position:relative;overflow-x:auto;margin:10px 0;-webkit-overflow-scrolling:touch}',
@@ -532,20 +720,20 @@
     // 三点等待
     '.al-thinking{align-items:flex-start}',
     '.al-thinking .al-dots{display:flex;align-items:center;gap:6px;height:28px;margin-top:2px}',
-    '.al-thinking i{width:6px;height:6px;border-radius:50%;background:#c9c9ce;animation:al-bounce 1.2s infinite}',
+    '.al-thinking i{width:6px;height:6px;border-radius:50%;background:var(--al-faint);animation:al-bounce 1.2s infinite}',
     '.al-thinking i:nth-child(2){animation-delay:.15s}.al-thinking i:nth-child(3){animation-delay:.3s}',
     '@keyframes al-bounce{0%,60%,100%{transform:none;opacity:.35}30%{transform:translateY(-4px);opacity:1}}',
     // 空态：衬线大问候居中 + 推荐 chips（对照截图首页）
     '.al-empty{margin:auto 0;padding:28px 14px;display:flex;flex-direction:column;align-items:stretch}',
     '.al-greet{font-family:var(--al-serif);font-size:24px;font-weight:700;line-height:1.5;color:var(--al-text);text-align:center;margin:0 0 22px;letter-spacing:.5px}',
     '.al-qs{display:flex;flex-direction:column;gap:8px}',
-    '.al-q{background:#fff;border:1px solid var(--al-border);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.6;color:var(--al-sub);cursor:pointer;text-align:left;font-family:inherit;transition:border-color .15s,color .15s}',
-    '.al-q:hover{border-color:#b8b8bd;color:var(--al-text)}',
+    '.al-q{background:var(--al-bg);border:1px solid var(--al-border);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.6;color:var(--al-sub);cursor:pointer;text-align:left;font-family:inherit;transition:border-color .15s,color .15s,background .15s}',
+    '.al-q:hover{border-color:color-mix(in srgb,var(--al-accent) 42%,var(--al-border));color:var(--al-text);background:color-mix(in srgb,var(--al-accent) 6%,var(--al-bg))}',
     '.al-fb-link{align-self:center;display:inline-flex;align-items:center;margin-top:16px;',
       'background:var(--al-soft);border:1px solid var(--al-border);border-radius:999px;cursor:pointer;',
       'font-family:inherit;font-size:11px;line-height:1;color:var(--al-faint);text-align:center;',
       'padding:6px 10px;transition:color .15s,border-color .15s,background .15s}',
-    '.al-fb-link:hover{color:var(--al-text);border-color:#c8c8cc;background:#fff}',
+    '.al-fb-link:hover{color:var(--al-text);border-color:var(--al-line);background:var(--al-bg)}',
     // 提示条
     '.al-note{margin:0 14px 8px;padding:10px 12px;border-radius:12px;background:var(--al-soft);border:none;font-size:12px;line-height:1.7;color:var(--al-sub);flex-shrink:0}',
     '.al-note a{color:var(--al-text);font-weight:700;text-decoration:underline;text-underline-offset:2px}',
@@ -558,38 +746,48 @@
     // 输入区：大圆角输入卡 + 卡内工具栏 + 圆形深色发送钮（对照截图）
     // 生成声明放输入卡上方，输入卡本身就是 composer 最后一项；卡底只留安全边距，
     // 不再被一行声明垫高，看起来像悬在半空。
-    '.al-composer{background:#fff;padding:0 12px calc(10px + env(safe-area-inset-bottom));flex-shrink:0}',
-    '.al-inputcard{border:1px solid var(--al-line);border-radius:22px;background:#fff;padding:11px 12px 8px 16px;transition:border-color .15s}',
-    '.al-inputcard:focus-within{border-color:#a8a8ad}',
-    '.al-input{width:100%;border:none;padding:0;font-size:14.5px;line-height:1.6;font-family:inherit;resize:none;max-height:120px;outline:none;background:transparent;color:var(--al-text);display:block}',
-    '.al-input::placeholder{color:#b8b8bd}',
+    '.al-composer{background:var(--al-bg);padding:0 12px calc(10px + env(safe-area-inset-bottom));flex-shrink:0}',
+    '.al-inputcard{border:1px solid var(--al-line);border-radius:22px;background:var(--al-bg);padding:11px 12px 8px 16px;transition:border-color .15s}',
+    '.al-inputcard:focus-within{border-color:color-mix(in srgb,var(--al-accent) 55%,var(--al-line))}',
+    '.al-page-ref{display:flex;align-items:center;gap:6px;min-width:0;margin:-2px 0 8px;padding:5px 8px;border-radius:9px;background:var(--al-soft);font-size:10.5px;line-height:1.4;color:var(--al-faint)}',
+    '.al-page-ref svg{width:12px;height:12px;flex-shrink:0;color:var(--al-sub)}',
+    '.al-page-ref-label{flex-shrink:0;color:var(--al-sub);font-weight:650}',
+    '.al-page-ref-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '#alice-win .al-input{width:100%;border:none;padding:0;font-size:14.5px;line-height:1.6;font-family:inherit;resize:none;max-height:120px;outline:none;background:transparent;color:var(--al-text);display:block}',
+    '#alice-win .al-input::placeholder{color:var(--al-faint)}',
     '.al-toolbar{display:flex;align-items:center;gap:4px;margin-top:7px}',
     '.al-tbtn{background:transparent;border:none;color:var(--al-sub);width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;transition:background .15s,color .15s}',
     '.al-tbtn:hover{background:var(--al-soft);color:var(--al-text)}',
-    '.al-mode{background:transparent;border:none;color:var(--al-sub);font-size:12.5px;font-weight:600;padding:5px 9px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:inherit;transition:background .15s,color .15s}',
-    '.al-mode:hover{background:var(--al-soft)}',
-    '.al-mode.fb{background:var(--al-accent);color:#fff}',
-    '.al-tb-spacer{flex:1}',
-    '.al-send{background:var(--al-accent);color:#fff;border:none;border-radius:50%;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}',
+    '.al-send{background:var(--al-accent);color:var(--al-on-accent);border:none;border-radius:50%;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}',
     '.al-send:hover{opacity:.85}',
     '.al-send:disabled{opacity:.3;cursor:not-allowed}',
-    '.al-ai-note{font-size:10.5px;color:#c2c2c7;text-align:center;margin:0 0 7px}',
-    // 模式菜单（问答 / 吐槽）：位置由 anchorPopover 现算，尖角朝下指着「问答」钮
-    '.al-mode-menu{position:absolute;box-sizing:border-box;background:#fff;border:1px solid var(--al-border);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.14);padding:5px;z-index:12;animation:al-pop-up .16s cubic-bezier(.3,.9,.4,1)}',
-    '.al-mode-menu::before,.al-mode-menu::after{content:"";position:absolute;left:var(--al-caret,50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;margin-left:-7px}',
-    '.al-mode-menu::before{bottom:-7px;border-top:7px solid var(--al-border)}',
-    '.al-mode-menu::after{bottom:-6px;border-top:7px solid #fff}',
-    '@keyframes al-pop-up{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}',
-    '.al-mode-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;font-size:13px;color:var(--al-text);cursor:pointer;font-family:inherit;border:none;background:transparent;width:100%;text-align:left}',
-    '.al-mode-item:hover{background:var(--al-soft)}',
-    '.al-mode-item.cur{font-weight:700}',
-    // 引用 chip / 吐槽配图
+    // 声明兼任工具栏的弹性间隔（原 .al-tb-spacer）。英文那句照 Manus 的写法写全了
+    // （「Alice is an AI Agent and can make mistakes…」），窄面板一行放不下，所以允许
+    // 折到两行：两行 10.5px 仍矮于 34px 的发送钮，工具栏不会因此变高。真放不下才截，
+    // title 兜底全文。
+    '.al-ai-note{flex:1;min-width:0;margin:0;padding:0 6px;font-size:10.5px;line-height:1.35;',
+      'color:var(--al-hint);text-align:center;overflow:hidden;display:-webkit-box;',
+      '-webkit-line-clamp:2;-webkit-box-orient:vertical}',
+    // 引用 chip / 随手带的截图
     '.al-chip{display:flex;align-items:flex-start;gap:8px;background:var(--al-soft);border:none;border-radius:12px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--al-sub)}',
-    '.al-chip .al-chip-label{display:inline-flex;align-items:center;gap:4px;color:var(--al-text);font-weight:700;flex-shrink:0;line-height:1.5}',
+    '.al-chip .al-chip-icon{display:flex;flex-shrink:0;padding-top:3px;color:var(--al-faint)}',
     '.al-chip .al-chip-text{flex:1;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.5}',
     '.al-chip button{background:transparent;border:none;color:var(--al-faint);cursor:pointer;padding:1px 2px 0;flex-shrink:0;font-family:inherit;display:flex}',
     '.al-chip button svg{width:14px;height:14px}',
     '.al-chip button:hover{color:var(--al-text)}',
+    // 样本句：划词提问给三种问法，「有意见」给三个开头。点了都是填进输入框、
+    // 光标停句尾，发不发由用户决定
+    '.al-samples{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin-bottom:8px}',
+    '.al-samples-hint{font-size:10.5px;color:var(--al-faint);line-height:1.5}',
+    '.al-sample{background:var(--al-soft);border:1px solid transparent;border-radius:999px;',
+      'padding:5px 11px;font-family:inherit;font-size:12px;line-height:1.5;color:var(--al-sub);',
+      'cursor:pointer;text-align:left;max-width:100%;transition:color .15s,border-color .15s,background .15s}',
+    '.al-sample:hover{color:var(--al-text);border-color:var(--al-border);background:var(--al-bg)}',
+    // 追问那套多一枚小箭头：和「照这个写」的样本区分开——它是「接着问」
+    '.al-samples.al-fu .al-sample,.al-msg-fu .al-sample{display:inline-flex;align-items:center;gap:5px}',
+    '.al-samples.al-fu .al-sample svg,.al-msg-fu .al-sample svg{flex-shrink:0;color:var(--al-faint)}',
+    // 已经点进输入框的那句淡下去：他想多点几下，得看得出哪几句已经拿走了
+    '.al-sample.used{color:var(--al-faint);background:transparent;border-color:var(--al-soft)}',
     '.al-fb-imgs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}',
     '.al-fb-thumb{position:relative;width:44px;height:44px;border-radius:10px;overflow:hidden;border:1px solid var(--al-border);flex-shrink:0}',
     '.al-fb-thumb img{width:100%;height:100%;object-fit:cover;display:block}',
@@ -600,18 +798,18 @@
     '.al-msg-imgs img{width:96px;height:96px;object-fit:cover;border-radius:12px;border:1px solid var(--al-border)}',
     // 会话列表：从「历史」钮长出来的气泡卡（尖角对准钮心，宽度按内容收，不通栏）。
     // 尖角要露在卡外面，所以滚动交给内层 .al-sess-list，外层不能 overflow:hidden。
-    '.al-sessions{position:absolute;z-index:10;box-sizing:border-box;background:#fff;border:1px solid var(--al-border);border-radius:14px;box-shadow:0 14px 44px rgba(0,0,0,.16);animation:al-pop .16s cubic-bezier(.3,.9,.4,1)}',
+    '.al-sessions{position:absolute;z-index:10;box-sizing:border-box;background:var(--al-bg);border:1px solid var(--al-border);border-radius:14px;box-shadow:0 14px 44px rgba(0,0,0,.16);animation:al-pop .16s cubic-bezier(.3,.9,.4,1)}',
     '.al-sessions::before,.al-sessions::after{content:"";position:absolute;left:var(--al-caret,80%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;margin-left:-7px}',
     '.al-sessions::before{top:-7px;border-bottom:7px solid var(--al-border)}',
-    '.al-sessions::after{top:-6px;border-bottom:7px solid #fff}',
+    '.al-sessions::after{top:-6px;border-bottom:7px solid var(--al-bg)}',
     '@keyframes al-pop{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}',
     '.al-sess-list{max-height:min(50vh,340px);overflow-y:auto;padding:6px;border-radius:inherit;-webkit-overflow-scrolling:touch}',
     '.al-sess-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--al-text)}',
     '.al-sess-item:hover{background:var(--al-soft)}',
-    '.al-sess-item.cur{background:#ececee}',
+    '.al-sess-item.cur{background:var(--al-soft-2)}',
     '.al-sess-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}',
     '.al-sess-meta{font-size:11px;color:var(--al-faint);flex-shrink:0}',
-    '.al-sess-del{background:transparent;border:none;color:#c9c9ce;cursor:pointer;padding:2px;flex-shrink:0;font-family:inherit;display:flex;border-radius:6px}',
+    '.al-sess-del{background:transparent;border:none;color:var(--al-faint);cursor:pointer;padding:2px;flex-shrink:0;font-family:inherit;display:flex;border-radius:6px}',
     '.al-sess-del svg{width:12px;height:12px}',
     '.al-sess-del:hover{color:#c0524f;background:rgba(192,82,79,.1)}',
     // 每行都挂一个叉太吵；能悬停的设备上等鼠标过去再露（触屏没有悬停，照常显示）
@@ -619,25 +817,30 @@
       '.al-sess-item:hover .al-sess-del,.al-sess-del:focus-visible{opacity:1}}',
     '.al-sess-empty{padding:18px;text-align:center;font-size:12px;color:var(--al-faint)}',
     // 发现 tab
-    '.al-discover{flex:1;overflow-y:auto;padding:16px 14px;background:#fff}',
+    '.al-discover{flex:1;overflow-y:auto;padding:16px 14px;background:var(--al-bg)}',
     '.al-disc-intro{font-size:13px;line-height:1.9;color:var(--al-sub);background:var(--al-soft);border:none;border-radius:14px;padding:14px 16px;margin-bottom:12px}',
-    '.al-disc-card{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--al-border);border-radius:14px;padding:14px 16px;margin-bottom:10px;text-decoration:none;transition:border-color .15s,box-shadow .15s}',
-    '.al-disc-card:hover{border-color:#b8b8bd;box-shadow:0 4px 16px rgba(0,0,0,.06)}',
+    '.al-disc-card{display:flex;align-items:center;gap:12px;background:var(--al-bg);border:1px solid var(--al-border);border-radius:14px;padding:14px 16px;margin-bottom:10px;text-decoration:none;transition:border-color .15s,box-shadow .15s}',
+    '.al-disc-card:hover{border-color:var(--al-line);box-shadow:0 4px 16px rgba(0,0,0,.06)}',
     '.al-disc-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;background:var(--al-soft)}',
     '.al-disc-txt{flex:1;min-width:0}',
     '.al-disc-t{font-size:14px;font-weight:700;color:var(--al-text)}',
     '.al-disc-d{font-size:12px;color:var(--al-faint);margin-top:2px;line-height:1.5}',
-    '.al-disc-arrow{color:#c9c9ce;font-size:16px;flex-shrink:0}',
+    '.al-disc-arrow{color:var(--al-faint);font-size:16px;flex-shrink:0}',
     // 学习笔记页签：摘抄卡片列表。文本默认 5 行截断，点卡片展开
-    '.al-notes{flex:1;overflow-y:auto;padding:14px;background:#fff}',
+    '.al-notes{flex:1;overflow-y:auto;padding:14px;background:var(--al-bg)}',
     '.al-nt{border:1px solid var(--al-border);border-radius:14px;padding:12px 14px;margin-bottom:10px;cursor:default;transition:border-color .15s}',
-    '.al-nt:hover{border-color:#c9c9ce}',
+    '.al-nt:hover{border-color:var(--al-line)}',
     '.al-nt-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}',
     '.al-nt-kind{font-size:11px;font-weight:700;color:var(--al-sub);background:var(--al-soft);border-radius:6px;padding:2px 7px;flex-shrink:0}',
     '.al-nt-kind.answer{color:#7a5c1e;background:#f7efdd}',
     '.al-nt-date{font-size:11px;color:var(--al-faint);flex:1}',
-    '.al-nt-del{background:none;border:none;color:#c9c9ce;cursor:pointer;padding:2px;border-radius:6px;display:flex;flex-shrink:0}',
+    '.al-nt-del{background:none;border:none;color:var(--al-faint);cursor:pointer;padding:2px;border-radius:6px;display:flex;flex-shrink:0}',
     '.al-nt-del:hover{color:#c0392b;background:var(--al-soft)}',
+    // 单条下载钮（PRD 24m）：与删除钮同款幽灵态，悬停偏正色而非警示红
+    '.al-nt-dl{background:none;border:none;color:var(--al-faint);cursor:pointer;padding:2px;border-radius:6px;display:flex;flex-shrink:0}',
+    '.al-nt-dl:hover{color:var(--al-text);background:var(--al-soft)}',
+    '.al-nt-dl:disabled{opacity:.5;cursor:default}',
+    '.al-nt-dl svg,.al-nt-del svg{width:15px;height:15px}',
     '.al-nt-text{font-size:13px;line-height:1.75;color:var(--al-text);word-break:break-word;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}',
     '.al-nt.open .al-nt-text{display:block;-webkit-line-clamp:none}',
     // 回答类笔记走 renderMd（PRD 24l）：块级元素自带段落间距，pre-wrap 会把
@@ -648,17 +851,25 @@
     '.al-nt-text.md .al-mdimg{max-height:180px;width:auto;max-width:100%}',
     '.al-nt-src{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--al-faint);margin-top:8px}',
     '.al-nt-hint{font-size:12px;line-height:1.8;color:var(--al-faint);text-align:center;padding:10px 18px 18px}',
+    // 滚到底续拉更早笔记时的底部提示（PRD 24p）
+    '.al-nt-more{font-size:12px;color:var(--al-faint);text-align:center;padding:12px 18px}',
     // Alice 回答下的「存入笔记」：随消息组缩进，浅灰小钮，存好后变对勾态
-    '.al-msg-act{align-self:flex-start;margin:-4px 0 0 40px}',
+    '.al-msg-act{align-self:flex-start;display:flex;align-items:center;gap:2px;margin:-4px 0 0 40px}',
     '.al-nt-save{display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:var(--al-faint);font-size:11.5px;font-family:inherit;cursor:pointer;padding:3px 8px;border-radius:8px}',
     '.al-nt-save:hover{color:var(--al-sub);background:var(--al-soft)}',
     '.al-nt-save.done{color:#3d7a4f;cursor:default}',
+    // 发出去之后，那一轮的「接着问」收在「存入笔记」右边的开关里（PRD 39g）
+    '.al-msg-fu{align-self:flex-start;display:flex;flex-direction:column;',
+      'align-items:flex-start;gap:4px;margin:2px 0 2px 40px;max-width:calc(100% - 48px)}',
+    '.al-msg-fu[hidden]{display:none}',   // hidden 属性斗不过类选择器的 display
+    '.al-fu-toggle svg{transition:transform .15s}',
+    '.al-fu-toggle.open svg{transform:rotate(90deg)}',
     // 朋友圈 feed（读云端 sync_moments，与桌面版同一条时间线）
-    '.al-mdimg{max-width:100%;border-radius:12px;display:block;margin:8px 0;border:1px solid var(--al-soft);cursor:zoom-in}',
-    '.al-mo{border-bottom:1px solid var(--al-soft);padding:14px 2px}',
+    '.al-mdimg{max-width:100%;border-radius:12px;display:block;margin:8px 0;border:1px solid var(--al-sep);cursor:zoom-in}',
+    '.al-mo{border-bottom:1px solid var(--al-sep);padding:14px 2px}',
     '.al-mo:last-of-type{border-bottom:none}',
     '.al-mo-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}',
-    '.al-mo-ava{width:34px;height:34px;border-radius:10px;overflow:hidden;flex-shrink:0;background:var(--al-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#666}',
+    '.al-mo-ava{width:34px;height:34px;border-radius:10px;overflow:hidden;flex-shrink:0;background:var(--al-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--al-sub)}',
     '.al-mo-ava img{width:100%;height:100%;object-fit:cover;object-position:top}',
     '.al-mo-name{font-size:13px;font-weight:700;color:var(--al-text)}',
     '.al-mo-time{font-size:11px;color:var(--al-faint);margin-top:1px}',
@@ -674,8 +885,8 @@
     // 点赞行：心 + 点赞者头像 + 名字，与客户端一致（最多 6 个头像、3 个名字）
     '.al-mo-likes{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:9px;font-size:12px;color:var(--al-sub)}',
     '.al-mo-heart{color:#c0392b;flex-shrink:0}',
-    '.al-mo-lava{width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid #fff;background:var(--al-soft)}',
-    '.al-mo-lini{width:18px;height:18px;border-radius:50%;flex-shrink:0;background:var(--al-soft);color:#666;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center}',
+    '.al-mo-lava{width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--al-bg);background:var(--al-soft)}',
+    '.al-mo-lini{width:18px;height:18px;border-radius:50%;flex-shrink:0;background:var(--al-soft);color:var(--al-sub);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center}',
     '.al-mo-cmts{background:transparent;border-top:1px solid var(--al-border);border-radius:0;padding:8px 0 0;margin-top:8px}',
     '.al-mo-cmt{font-size:12.5px;line-height:1.7;color:var(--al-sub);cursor:pointer;border-radius:5px;padding:1px 3px;margin:0 -3px}',
     '.al-mo-cmt:hover{background:rgba(0,0,0,.035)}',
@@ -691,11 +902,63 @@
     '.al-mo-act svg{width:14px;height:14px}',
     '.al-mo-lbtn.liked{color:#c0392b}',
     '.al-mo-box{display:flex;align-items:center;gap:6px;margin-top:8px}',
-    '.al-mo-box input{flex:1;min-width:0;font-family:inherit;font-size:12.5px;color:var(--al-text);background:var(--al-soft);border:1px solid transparent;border-radius:9px;padding:7px 10px;outline:none}',
-    '.al-mo-box input:focus{border-color:var(--al-border);background:#fff}',
-    '.al-mo-box button{flex-shrink:0;font-family:inherit;font-size:12px;color:#fff;background:var(--al-user);border:none;border-radius:9px;padding:7px 12px;cursor:pointer}',
+    '#alice-win .al-mo-box input{flex:1;min-width:0;font-family:inherit;font-size:12.5px;color:var(--al-text);background:var(--al-soft);border:1px solid transparent;border-radius:9px;padding:7px 10px;outline:none}',
+    '#alice-win .al-mo-box input:focus{border-color:var(--al-border);background:var(--al-bg)}',
+    '.al-mo-box button{flex-shrink:0;font-family:inherit;font-size:12px;color:var(--al-user-text);background:var(--al-user);border:none;border-radius:9px;padding:7px 12px;cursor:pointer}',
     '.al-mo-box button:disabled{opacity:.4;cursor:default}',
     '.al-mo-end{padding:18px 8px 6px;text-align:center;font-size:11px;line-height:1.6;color:var(--al-faint)}',
+    // ── 深色补丁 ──────────────────────────────────────────────────────
+    // token 换不到的地方：语义色（提示卡/点赞红）、渐变卡、以及浅底上才成立的
+    // 蓝灰链接色。深色下这些不改就是脏一块、看不清一块。
+    'html[data-theme="dark"] #alice-fab{box-shadow:0 8px 28px rgba(0,0,0,.46)}',
+    // 侧栏形态在浅色下靠一条边线就够；深色里正文和面板都暗，补一层外阴影分层
+    'html[data-theme="dark"] #alice-win.side{box-shadow:-18px 0 46px rgba(0,0,0,.34)}',
+    'html[data-theme="dark"] .al-sessions{box-shadow:0 18px 48px rgba(0,0,0,.5)}',
+    // 自绘提示气泡反过来用浅底：深色面板上再叠一块近黑的小方块看不出是气泡
+    'html[data-theme="dark"] .al-iconbtn[data-tip]::after{background:#e9ece9;color:#141a17}',
+    'html[data-theme="dark"] :is(#alice-win a.al-md-link,#alice-win a.al-md-link:visited)',
+      '{color:#9fc7c0;border-bottom-color:rgba(159,199,192,.5)}',
+    'html[data-theme="dark"] #alice-win a.al-md-link:hover',
+      '{color:#d3e8e2;background:rgba(92,181,149,.14);border-bottom-color:#d3e8e2}',
+    'html[data-theme="dark"] :is(#alice-win a.al-course-link,#alice-win a.al-course-link:visited)',
+      '{color:#bcd8d0;background:rgba(92,181,149,.10);border-color:rgba(92,181,149,.26);box-shadow:none}',
+    'html[data-theme="dark"] #alice-win a.al-course-link:hover',
+      '{color:#e4f1ec;background:rgba(92,181,149,.18);border-color:rgba(92,181,149,.42);box-shadow:none}',
+    'html[data-theme="dark"] .al-mtext pre{background:#0d1210;border:1px solid var(--al-border);color:#dfe4e0}',
+    'html[data-theme="dark"] .al-mtext mark{background:rgba(217,164,95,.26)}',
+    // 深色下用户气泡和面板底色只差一档，补一条发丝边把「这是我说的」框出来
+    'html[data-theme="dark"] .al-msg-user{border:1px solid rgba(255,255,255,.06)}',
+    'html[data-theme="dark"] .al-whisper{color:#98a09a}',
+    'html[data-theme="dark"] .al-client-card{border-color:var(--al-border);',
+      'background:linear-gradient(145deg,#1d2521 0%,#161d19 100%);box-shadow:0 8px 24px rgba(0,0,0,.36)}',
+    'html[data-theme="dark"] .al-client-card-ava{background:var(--al-soft);border-color:var(--al-border)}',
+    'html[data-theme="dark"] .al-client-card-btn{background:var(--al-accent);color:var(--al-on-accent)!important}',
+    'html[data-theme="dark"] .al-client-card-btn:hover{background:#6cc4a4}',
+    'html[data-theme="dark"] :is(.al-cal-note,.al-cal-info){background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16)}',
+    'html[data-theme="dark"] :is(.al-cal-note,.al-cal-info) .al-cal-h{color:var(--al-sub)}',
+    'html[data-theme="dark"] :is(.al-cal-tip,.al-cal-success){background:rgba(92,181,149,.12);border-color:rgba(92,181,149,.32)}',
+    'html[data-theme="dark"] :is(.al-cal-tip,.al-cal-success) .al-cal-h{color:#7cc9ab}',
+    'html[data-theme="dark"] .al-cal-warning{background:rgba(217,164,95,.14);border-color:rgba(217,164,95,.34)}',
+    'html[data-theme="dark"] .al-cal-warning .al-cal-h{color:#d9a45f}',
+    'html[data-theme="dark"] .al-cal-danger{background:rgba(233,141,123,.13);border-color:rgba(233,141,123,.32)}',
+    'html[data-theme="dark"] .al-cal-danger .al-cal-h{color:#e98d7b}',
+    'html[data-theme="dark"] .al-cp:hover{background:rgba(255,255,255,.07)}',
+    'html[data-theme="dark"] :is(.al-cp.done,.al-nt-save.done){color:var(--al-accent)}',
+    'html[data-theme="dark"] .al-nt-kind.answer{color:#d9a45f;background:rgba(217,164,95,.14)}',
+    'html[data-theme="dark"] :is(.al-nt-del:hover,.al-mo-heart,.al-mo-lbtn.liked){color:#e98d7b}',
+    'html[data-theme="dark"] .al-sess-del:hover{color:#e98d7b;background:rgba(233,141,123,.14)}',
+    'html[data-theme="dark"] .al-mo-cmt:hover{background:rgba(255,255,255,.06)}',
+    // 深色里那颗荧光绿胶囊会变成整个面板最亮的东西，抢在正文前头。收掉投影、
+    // 换成同色系的淡底描边：还是看得见的入口，但不再是屏幕上第一眼。
+    'html[data-theme="dark"] .al-download-cta{box-shadow:none;color:#8fd3b8;',
+      'background:linear-gradient(135deg,rgba(92,181,149,.24),rgba(92,181,149,.14));',
+      'border:1px solid rgba(92,181,149,.34)}',
+    'html[data-theme="dark"] .al-download-cta:hover{color:#b7e6d2;filter:none;',
+      'background:linear-gradient(135deg,rgba(92,181,149,.34),rgba(92,181,149,.2))}',
+    'html[data-theme="dark"] .al-download-cta.export{background:var(--al-bg);color:var(--al-sub);border-color:var(--al-border)}',
+    // 充值那颗是真按钮（点了就走支付），留实心
+    'html[data-theme="dark"] .al-recharge-cta{background:var(--al-accent);',
+      'color:var(--al-on-accent)!important;box-shadow:none}',
     // 大图灯箱会 Portal 到 learn.html 顶层 document；样式由 ensureLightboxStyle
     // 注入顶层，不能写在当前课件 iframe 的 style 里。
   ].join('\n');
@@ -721,8 +984,12 @@
   function mdInline(s) {
     var holds = [];
     function hold(html) { holds.push(html); return '\u0001' + (holds.length - 1) + '\u0001'; }
-    function link(href, label) {
-      return hold('<a href="' + href + '" target="_blank" rel="noopener">' + label + '</a>');
+    function link(href, label, kind) {
+      var course = kind === 'course';
+      var cls = course ? 'al-md-link al-course-link' : 'al-md-link al-external-link';
+      var icon = svg(course ? 'book' : 'externalLink', 'al-md-link-ico');
+      return hold('<a class="' + cls + '" href="' + href +
+        '" target="_blank" rel="noopener">' + icon + '<span>' + label + '</span></a>');
     }
     return s
       .replace(/`([^`\n]+)`/g, function (_, code) { return hold('<code>' + code + '</code>'); })
@@ -733,18 +1000,19 @@
             '" loading="lazy">');
         })
       .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,
-        function (_, label, href) { return link(href, label); })
+        function (_, label, href) { return link(href, label, 'external'); })
       // 课件互链：模型按目录写 [《标题》](learn.html#文件名)（或裸文件名），
       // 统一落到阅读器外壳并新标签打开；对方页面会自己恢复当前对话
       .replace(/\[([^\]]+)\]\(((?:learn\.html#)?[\w][\w.-]*\.html)\)/g,
         function (_, label, target) {
-          return link('learn.html#' + target.replace(/^learn\.html#/, ''), label);
+          return link('learn.html#' + target.replace(/^learn\.html#/, ''), label, 'course');
         })
       // GFM autolink literals：显式链接已经扣走，剩下的裸地址才在这里成链。
       // 结尾的中英文标点不吃进 URL，否则「见 https://x.com。」会连句号一起跳
       .replace(/(^|[\s(（【「])((?:https?:\/\/|www\.)[^\s<>()（）【】「」，。、；：！？"']+)/g,
         function (_, pre, url) {
-          return pre + link(url.indexOf('www.') === 0 ? 'https://' + url : url, url);
+          return pre + link(url.indexOf('www.') === 0 ? 'https://' + url : url,
+            url, 'external');
         })
       .replace(/==([^=\n]+)==/g, '<mark>$1</mark>')
       // 客户端 fixCjkBold 会把 `** 文字 **` 收成 `**文字**`，这里直接吃掉内侧空格
@@ -941,8 +1209,11 @@
   var ICON_PATHS = {
     close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',   // x
     plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+    plusSm: '<path d="M5 12h14"/><path d="M12 5v14"/>',   // 同 plus，只是尺寸更小（带文字的胶囊里用）
+    filePlus: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/>',   // file-plus：带张截图给她看
     history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
     download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+    externalLink: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',   // external-link
     search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
     doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>',   // file-text：引用来源，同客户端 NoteRefChip
     book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',   // book-open
@@ -959,7 +1230,7 @@
     panelSide: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>',   // panel-right
     panelFloat: '<path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/><rect width="10" height="7" x="12" y="13" rx="2"/>'   // picture-in-picture-2
   };
-  var ICON_SIZE = { doc: 12, book: 13, search: 13, comment: 18, heartOutline: 18, chevron: 11, arrowUp: 16, bookmark: 13 };
+  var ICON_SIZE = { doc: 12, book: 13, search: 13, comment: 18, heartOutline: 18, chevron: 11, chevronRight: 12, arrowUp: 16, bookmark: 13, plusSm: 13, filePlus: 16 };
 
   // cls 可选：挂到根 <svg> 上（点赞行那颗心要上色，不能靠外层包一层）
   function svg(name, cls) {
@@ -998,8 +1269,68 @@
   }
 
   // ── DOM：划词浮层 ────────────────────────────────────────────────────
-  var pop = document.createElement('div');
+  // 课件通常跑在 learn.html 的 iframe 里。浮层留在 iframe 时，即便 z-index 再大，
+  // 也压不过浏览器插件注入到最外层页面的遮罩；同源时直接把它挂到 top document。
+  var popHostDoc = document;
+  try {
+    if (window.top !== window && window.top.location.origin === location.origin &&
+        window.top.document.body) popHostDoc = window.top.document;
+  } catch (e) {}
+  if (popHostDoc !== document && !popHostDoc.getElementById('alice-pop-style')) {
+    var popStyle = popHostDoc.createElement('style');
+    popStyle.id = 'alice-pop-style';
+    popStyle.textContent = popCss;
+    popHostDoc.head.appendChild(popStyle);
+  }
+  // ── 复制到剪贴板 ──────────────────────────────────────────────────────
+  // 必须用「按钮所在文档」的 clipboard，不能用当前脚本 realm 的那个：课件跑在
+  // learn.html 的 iframe 里，划词浮层被 portal 到 top document，点击的焦点与用户
+  // 激活都落在宿主窗口；此时从 iframe realm 调 writeText 会被浏览器直接拒绝
+  // （NotAllowedError: Document is not focused），实测复现见 CHANGELOG 2026-08-11。
+  // 失败必须往外抛：以前成功失败都走同一个回调，按钮照样显示「已复制」，
+  // 用户粘贴时才发现是空的。
+  function copyToClipboard(text, doc) {
+    doc = doc || document;
+    var win = doc.defaultView || window;
+    var nav = win.navigator || navigator;
+    if (nav.clipboard && nav.clipboard.writeText) {
+      try {
+        return Promise.resolve(nav.clipboard.writeText(text))
+          .catch(function () { return legacyCopy(text, doc); });
+      } catch (e) {}
+    }
+    return legacyCopy(text, doc);
+  }
+
+  // 兜底（http 环境、老浏览器、clipboard 被策略禁掉）：往目标文档塞临时 textarea
+  // 自造选区。不能指望 execCommand 抓用户划的那段——点按钮时选区已经没了。
+  function legacyCopy(text, doc) {
+    var ta = doc.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0';
+    doc.body.appendChild(ta);
+    var ok = false;
+    try {
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      ok = doc.execCommand('copy');
+    } catch (e) { ok = false; }
+    ta.remove();
+    return ok ? Promise.resolve() : Promise.reject(new Error('copy failed'));
+  }
+
+  // iframe 翻页会创建一份新的 ask-alice.js；先清掉上一页留在宿主里的失活节点。
+  var stalePop = popHostDoc.getElementById('alice-pop');
+  if (stalePop) stalePop.remove();
+  var staleToast = popHostDoc.getElementById('alice-clip-toast');
+  if (staleToast) staleToast.remove();
+
+  var pop = popHostDoc.createElement('div');
   pop.id = 'alice-pop';
+  // Popover API 会把元素送进浏览器 Top Layer，高于页面和普通插件的所有 z-index。
+  // 老浏览器不认识该 API 时，仍退回 fixed + 最大 z-index。
+  if (typeof pop.showPopover === 'function') pop.setAttribute('popover', 'manual');
   pop.innerHTML =
     '<button id="alice-pop-ask">' + avatarHtml('al-dot') + esc(T.ask) + '</button>' +
     '<div class="al-sep"></div>' +
@@ -1008,11 +1339,118 @@
     '<button id="alice-pop-fb">' + esc(T.popFb) + '</button>' +
     '<div class="al-sep"></div>' +
     '<button id="alice-pop-copy">' + esc(T.copy) + '</button>';
-  document.body.appendChild(pop);
+  popHostDoc.body.appendChild(pop);
+
+  var clipToast = popHostDoc.createElement('button');
+  clipToast.id = 'alice-clip-toast';
+  clipToast.type = 'button';
+  clipToast.setAttribute('aria-live', 'polite');
+  clipToast.setAttribute('aria-label', T.clipToast);
+  if (typeof clipToast.showPopover === 'function') {
+    clipToast.setAttribute('popover', 'manual');
+  }
+  clipToast.innerHTML = '<span class="al-toast-ok">✓</span><span></span>';
+  popHostDoc.body.appendChild(clipToast);
 
   var lastSelText = '';
+  var popTimer = 0;
+  var clipToastTimer = 0;
+  var clippedNotePending = false;
 
-  function hidePop() { pop.style.display = 'none'; }
+  function showPop() {
+    if (typeof pop.showPopover === 'function') {
+      try {
+        if (!pop.matches(':popover-open')) pop.showPopover();
+        return;
+      } catch (e) {}
+    }
+    pop.style.display = 'flex';
+  }
+
+  function hidePop() {
+    clearTimeout(popTimer);
+    if (typeof pop.hidePopover === 'function') {
+      try {
+        if (pop.matches(':popover-open')) pop.hidePopover();
+        pop.style.removeProperty('display');
+        return;
+      } catch (e) {}
+    }
+    pop.style.display = 'none';
+  }
+
+  function touchSelectionMode() {
+    return window.innerWidth <= 640 ||
+      !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches);
+  }
+
+  // 当前课件视口在最外层页面中的位置。划词栏被 portal 到 top document 后，
+  // getSelection() 的 rect 仍是课件 iframe 内坐标，需要逐层换算。
+  function lessonViewportInHost() {
+    var left = 0, top = 0, w = window;
+    try {
+      while (w !== w.top) {
+        var frame = w.frameElement;
+        if (!frame) break;
+        var r = frame.getBoundingClientRect();
+        left += r.left;
+        top += r.top;
+        w = w.parent;
+      }
+    } catch (e) { left = 0; top = 0; }
+    return {
+      left: left, top: top,
+      width: window.innerWidth, height: window.innerHeight
+    };
+  }
+
+  function hideClipToast() {
+    clearTimeout(clipToastTimer);
+    if (typeof clipToast.hidePopover === 'function') {
+      try {
+        if (clipToast.matches(':popover-open')) clipToast.hidePopover();
+        clipToast.style.removeProperty('display');
+        return;
+      } catch (e) {}
+    }
+    clipToast.style.display = 'none';
+  }
+
+  function showClipToast(duplicate) {
+    clearTimeout(clipToastTimer);
+    var message = duplicate ? T.clipDupToast : T.clipToast;
+    clipToast.querySelector('span:last-child').textContent = message;
+    clipToast.setAttribute('aria-label', message);
+    if (typeof clipToast.showPopover === 'function') {
+      try {
+        if (!clipToast.matches(':popover-open')) clipToast.showPopover();
+      } catch (e) { clipToast.style.display = 'flex'; }
+    } else {
+      clipToast.style.display = 'flex';
+    }
+
+    // 与当前课件里的 Alice 头像对齐；在阅读器 iframe 中也要换算成宿主坐标。
+    var vp = lessonViewportInHost();
+    var tw = clipToast.offsetWidth, th = clipToast.offsetHeight;
+    var rightGap = window.innerWidth <= 640 ? 54 : 68;
+    var bottomGap = window.innerWidth <= 640 ? 74 : 88;
+    var hostWin = popHostDoc.defaultView || window;
+    var x = vp.left + vp.width - rightGap - tw;
+    var y = vp.top + vp.height - bottomGap - th;
+    x = Math.max(8, Math.min(x, hostWin.innerWidth - tw - 8));
+    y = Math.max(8, Math.min(y, hostWin.innerHeight - th - 8));
+    clipToast.style.left = x + 'px';
+    clipToast.style.top = y + 'px';
+    clipToastTimer = setTimeout(hideClipToast, 4500);
+  }
+
+  function openClippedNote() {
+    clippedNotePending = false;
+    hideClipToast();
+    openWin();
+    showTab('notes');
+  }
+  clipToast.addEventListener('click', openClippedNote);
 
   function maybeShowPop() {
     if (!state.enabled) { hidePop(); return; }
@@ -1026,65 +1464,106 @@
     lastSelText = text.slice(0, 2000);
     var rect = sel.getRangeAt(0).getBoundingClientRect();
     if (!rect || (rect.width === 0 && rect.height === 0)) { hidePop(); return; }
-    pop.style.display = 'flex';
+    var docked = touchSelectionMode();
+    pop.classList.toggle('al-pop-docked', docked);
+    showPop();
     var pw = pop.offsetWidth, ph = pop.offsetHeight;
-    // 侧边栏展开时可用宽度只到栏的左边缘，否则靠右的选区会把浮层顶到栏底下
-    var avail = window.innerWidth;
-    if (state.open && state.side) avail -= win.getBoundingClientRect().width;
-    var x = rect.left + rect.width / 2 - pw / 2;
-    x = Math.max(8, Math.min(x, avail - pw - 8));
-    var y = rect.top - ph - 8;
-    if (y < 8) y = rect.bottom + 8;
+    var vp = lessonViewportInHost();
+    var x, y;
+    if (docked) {
+      // 系统选词菜单通常贴着选区；操作栏固定在 Alice 头像左上角，二者不再争位。
+      // 尺寸与头像的桌面/手机 CSS 对齐，右下尾角水平搭住头像 12px、垂直留 4px。
+      var rightGap = window.innerWidth <= 640 ? 54 : 68;
+      var bottomGap = window.innerWidth <= 640 ? 74 : 88;
+      x = vp.left + vp.width - rightGap - pw;
+      y = vp.top + vp.height - bottomGap - ph;
+    } else {
+      // 桌面仍贴着选区；侧栏展开时，不能把操作栏塞到侧栏底下。
+      var avail = window.innerWidth;
+      if (state.open && state.side) avail -= win.getBoundingClientRect().width;
+      x = vp.left + rect.left + rect.width / 2 - pw / 2;
+      x = Math.max(vp.left + 8, Math.min(x, vp.left + avail - pw - 8));
+      y = vp.top + rect.top - ph - 8;
+      if (y < vp.top + 8) y = vp.top + rect.bottom + 8;
+    }
+    var hostWin = popHostDoc.defaultView || window;
+    x = Math.max(8, Math.min(x, hostWin.innerWidth - pw - 8));
+    y = Math.max(8, Math.min(y, hostWin.innerHeight - ph - 8));
     pop.style.left = x + 'px';
     pop.style.top = y + 'px';
+    hideFabNudge();
+  }
+
+  function queueShowPop(delay) {
+    clearTimeout(popTimer);
+    popTimer = setTimeout(maybeShowPop, delay);
   }
 
   document.addEventListener('mouseup', function (e) {
     if (pop.contains(e.target)) return;
-    setTimeout(maybeShowPop, 10);
+    queueShowPop(10);
   });
   document.addEventListener('touchend', function () {
-    setTimeout(maybeShowPop, 150);
+    queueShowPop(220);
   }, { passive: true });
-  document.addEventListener('mousedown', function (e) {
+  // iOS/Android 长按的选区有时在 touchend 之后才落定；selectionchange 再兜一次。
+  document.addEventListener('selectionchange', function () {
+    if (touchSelectionMode()) queueShowPop(220);
+  });
+  function outsidePopDown(e) {
     if (!pop.contains(e.target)) hidePop();
-  });
+  }
+  document.addEventListener('mousedown', outsidePopDown);
+  if (popHostDoc !== document) popHostDoc.addEventListener('mousedown', outsidePopDown);
   document.addEventListener('scroll', hidePop, { passive: true, capture: true });
-  document.addEventListener('keydown', function (e) {
+  if (popHostDoc !== document) {
+    popHostDoc.addEventListener('scroll', hidePop, { passive: true, capture: true });
+  }
+  function popKeydown(e) {
     if (e.key === 'Escape') { hidePop(); if (state.open) closeWin(); }
-  });
+  }
+  document.addEventListener('keydown', popKeydown);
+  if (popHostDoc !== document) popHostDoc.addEventListener('keydown', popKeydown);
+  // adopted 节点不会随 iframe 文档自动销毁；翻页时主动解绑宿主监听并移除节点。
+  window.addEventListener('pagehide', function () {
+    clearTimeout(popTimer);
+    clearTimeout(clipToastTimer);
+    if (popHostDoc === document) return;
+    popHostDoc.removeEventListener('mousedown', outsidePopDown);
+    popHostDoc.removeEventListener('scroll', hidePop, true);
+    popHostDoc.removeEventListener('keydown', popKeydown);
+    if (pop.isConnected) pop.remove();
+    if (clipToast.isConnected) clipToast.remove();
+  }, { once: true });
 
   pop.querySelector('#alice-pop-copy').addEventListener('click', function () {
     var btn = this;
-    function done() {
+    copyToClipboard(lastSelText, popHostDoc).then(function () {
       btn.textContent = T.copied;
       setTimeout(function () { btn.textContent = T.copy; hidePop(); }, 700);
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(lastSelText).then(done, done);
-    } else {
-      try { document.execCommand('copy'); } catch (err) {}
-      done();
-    }
+    }, function () {
+      // 真没复制上就说没成，别让用户以为拿到了
+      btn.textContent = T.copyFail;
+      setTimeout(function () { btn.textContent = T.copy; }, 1500);
+    });
   });
 
   pop.querySelector('#alice-pop-ask').addEventListener('click', function () {
     state.pendingQuote = lastSelText;
     hidePop();
     try { window.getSelection().removeAllRanges(); } catch (e) {}
-    if (state.feedbackMode) exitFeedbackMode();
+    pendingIntent = '';   // 上一轮没发出去的「有意见」提示不该跟着这次提问走
+    syncPlaceholder();
     openWin();
     showTab('chat');   // 停在「朋友圈」页时点问问，得先把人带回对话页
+    // 引用在，输入框空着 → renderChip 里的 renderSamples 会给出三种问法。
+    // 原来这里硬预填一句「这段话是什么意思」并整句选中，等于替他选了问法；
+    // 现在那句降级成样本之一，另两句给「举例子」「和前面的关系」留了门。
     renderChip();
-    // 划选带引用时预填一句通用提问：用户直接点发送就能问，也可以改字
-    if (inputEl && !inputEl.value.trim()) {
-      inputEl.value = T.quoteAsk;
-      autoGrow();
-      inputEl.focus();
-      inputEl.select();   // 整句选中，想换问法时打字即覆盖
-    } else if (inputEl) {
-      inputEl.focus();
-    }
+    stashDraft();   // 引用本身就是草稿的一部分，跳登录再回来别丢
+    if (inputEl) inputEl.focus();
+    // 引用条 + 样本句会把输入区撑高，正文底部会被顶出去
+    bodyEl.scrollTop = bodyEl.scrollHeight;
   });
 
   // 划词摘抄：原地完成，不打断阅读。按钮短暂变「已存入笔记」再收起浮层。
@@ -1102,19 +1581,19 @@
     if (btn.disabled) return;
     btn.disabled = true;
     saveNote('selection', text, function (dup) {
-      btn.textContent = dup ? T.clipDup : T.clipSaved;
-      setTimeout(function () {
-        btn.textContent = T.popClip;
-        btn.disabled = false;
-        hidePop();
-      }, 900);
+      btn.textContent = T.popClip;
+      btn.disabled = false;
+      clippedNotePending = true;
+      hidePop();
+      showClipToast(dup);
       try { window.getSelection().removeAllRanges(); } catch (e) {}
-    }, function () {
-      btn.textContent = T.clipFail;
+    }, function (code) {
+      var full = code === 'note_limit';
+      btn.textContent = full ? T.ntFull : T.clipFail;
       setTimeout(function () {
         btn.textContent = T.popClip;
         btn.disabled = false;
-      }, 1500);
+      }, full ? 3000 : 1500);      // 「满了」这句要读得完，给久一点
     });
   });
 
@@ -1122,7 +1601,7 @@
     var sel = lastSelText;
     hidePop();
     try { window.getSelection().removeAllRanges(); } catch (e) {}
-    enterFeedbackMode(sel);
+    openFeedback(sel);
   });
 
   // ── DOM：常驻头像按钮 ────────────────────────────────────────────────
@@ -1133,7 +1612,11 @@
   fab.innerHTML = '<img src="' + AVATAR_SRC + '" alt="Alice" ' +
     'onerror="this.outerHTML=\'<div class=&quot;al-fab-fallback&quot;>A</div>\'">';
   document.body.appendChild(fab);
-  fab.addEventListener('click', function () { if (state.enabled) openWin(); });
+  fab.addEventListener('click', function () {
+    if (!state.enabled) return;
+    if (clippedNotePending) openClippedNote();
+    else openWin();
+  });
 
   var fabNudge = document.createElement('button');
   fabNudge.id = 'alice-fab-nudge';
@@ -1159,7 +1642,7 @@
   function maybeShowFabNudge() {
     if (!state.enabled || state.open || fab.classList.contains('hidden')) {
       hideFabNudge();
-      if (state.open) consumeFabNudgeToday();
+      if (state.open && !autoOpened) consumeFabNudgeToday();
       return;
     }
     var seen = '';
@@ -1181,8 +1664,8 @@
   });
   // 页面跨过午夜但没有刷新，也要按新的一天重新判定。
   setInterval(function () {
-    if (state.open) consumeFabNudgeToday();
-    else maybeShowFabNudge();
+    if (state.open && !autoOpened) consumeFabNudgeToday();
+    else if (!state.open) maybeShowFabNudge();
   }, 60 * 1000);
 
   // ── DOM：悬浮窗 ──────────────────────────────────────────────────────
@@ -1199,11 +1682,18 @@
         '<div class="al-head-name">' + esc(T.title) + '</div>' +
         '<div class="al-head-sub" id="al-sub">' + esc(T.subtitle) + '</div>' +
       '</div>' +
-      '<button class="al-iconbtn" id="al-btn-new" title="' + esc(T.newChat) + '">' + svg('plus') + '</button>' +
-      '<button class="al-iconbtn" id="al-btn-hist" title="' + esc(T.sessions) + '" style="display:none">' + svg('history') + '</button>' +
-      '<button class="al-iconbtn" id="al-btn-fb" title="' + esc(T.feedback) + '">' + svg('feedback') + '</button>' +
-      '<button class="al-iconbtn" id="al-btn-side" title="' + esc(T.expandSide) + '">' + svg('panelSide') + '</button>' +
-      '<button class="al-iconbtn" id="al-btn-close">' + svg('close') + '</button>' +
+      // 「新对话」是这排里唯一会改变对话去向的动作，光一个加号看不出来（用户实锤：
+      // 找不到怎么开新的一轮），所以带上文字，其余仍是纯图标
+      '<button class="al-headbtn" id="al-btn-new" title="' + esc(T.newChat) + '">' +
+        svg('plusSm') + '<span>' + esc(T.newChat) + '</span></button>' +
+      // 三颗纯图标：光靠系统 title 等于没有提示（要悬停一两秒才弹，触屏永远不弹），
+      // 所以文案挂在 data-tip 上由 CSS 即时画出来，aria-label 留给读屏（PRD 39j）
+      '<button class="al-iconbtn" id="al-btn-hist" data-tip="' + esc(T.sessions) +
+        '" aria-label="' + esc(T.sessions) + '" style="display:none">' + svg('history') + '</button>' +
+      '<button class="al-iconbtn" id="al-btn-side" data-tip="' + esc(T.expandSide) +
+        '" aria-label="' + esc(T.expandSide) + '">' + svg('panelSide') + '</button>' +
+      '<button class="al-iconbtn" id="al-btn-close" data-tip="' + esc(T.closePanel) +
+        '" aria-label="' + esc(T.closePanel) + '">' + svg('close') + '</button>' +
     '</div>' +
     '<div class="al-tabs">' +
       '<button class="al-tab active" data-tab="chat">' + esc(T.tabChat) + '</button>' +
@@ -1212,6 +1702,9 @@
       '<a class="al-download-cta" id="al-btn-dl" style="display:none" href="' + ALICE_SITE + '/download" target="_blank" ' +
         'rel="noopener" title="' + esc(T.downloadFull) + '">' +
         svg('download') + '<span>' + esc(T.downloadFull) + '</span></a>' +
+      // 笔记页签专属：导出所有笔记（PRD 24m）。与下载邀请钮互斥，同一落位。
+      '<button type="button" class="al-download-cta export" id="al-btn-export" style="display:none">' +
+        svg('download') + '<span>' + esc(T.ntExportAll) + '</span></button>' +
     '</div>' +
     '<div class="al-body" id="al-body"></div>' +
     '<div class="al-discover" id="al-discover" style="display:none">' +
@@ -1229,19 +1722,24 @@
     '</div>' +
     '<div class="al-notes" id="al-notes" style="display:none"></div>' +
     '<div class="al-note" id="al-note" style="display:none"></div>' +
-    // 生成声明在卡上方；输入卡是最后一项，才能真正贴近面板底部。
-    // 卡内仍是多行输入在上、工具栏在下（+ / 模式切换），右侧圆形上箭头。
+    // 输入卡是最后一项，才能真正贴近面板底部。
+    // 卡内：多行输入在上、工具栏在下（带图 + 生成声明 + 发送）。
     '<div class="al-composer" id="al-composer">' +
       '<div id="al-chip-wrap"></div>' +
-      '<div class="al-ai-note">' + esc(T.aiNote) + '</div>' +
+      // 样本句紧贴输入卡上沿：它是「照这个写」的示范，得挨着要写字的地方
+      '<div id="al-samples-wrap"></div>' +
       '<div class="al-inputcard">' +
+        '<div class="al-page-ref" title="' + esc(PAGE_TITLE) + '">' +
+          svg('doc') + '<span class="al-page-ref-label">' + esc(T.pageRef) + '</span>' +
+          '<span class="al-page-ref-title">《' + esc(PAGE_TITLE) + '》</span>' +
+        '</div>' +
         '<textarea class="al-input" rows="1" placeholder="' + esc(T.placeholder) + '"></textarea>' +
         '<div class="al-toolbar">' +
-          '<button class="al-tbtn" id="al-attach" title="' + esc(T.fbAttach) + '">' + svg('plus') + '</button>' +
-          '<button class="al-mode" id="al-mode" type="button">' +
-            '<span id="al-mode-label">' + esc(T.modeChat) + '</span>' + svg('chevron') +
-          '</button>' +
-          '<div class="al-tb-spacer"></div>' +
+          '<button class="al-tbtn" id="al-attach" title="' + esc(T.fbAttach) + '">' + svg('filePlus') + '</button>' +
+          // 生成声明骑在工具栏这行：原来它单独占一行浮在卡上方，引用条、样本句一来
+          // 就被挤到中间飘着，像段没主的说明。这行「带图 → 发送」之间反正空着，
+          // 声明放这儿就永远贴在最底下，不再被上面长出来的东西推着走。
+          '<div class="al-ai-note" title="' + esc(T.aiNote) + '">' + esc(T.aiNote) + '</div>' +
           '<button class="al-send" title="' + esc(T.send) + '">' + svg('arrowUp') + '</button>' +
         '</div>' +
       '</div>' +
@@ -1254,6 +1752,7 @@
   var inputEl = win.querySelector('.al-input');
   var sendBtn = win.querySelector('.al-send');
   var chipWrap = win.querySelector('#al-chip-wrap');
+  var samplesWrap = win.querySelector('#al-samples-wrap');
   var discoverEl = win.querySelector('#al-discover');
   var notesEl = win.querySelector('#al-notes');
   var composerEl = win.querySelector('#al-composer');
@@ -1286,15 +1785,18 @@
       }).join('\n');
     }
     if (!text) return true;
-    (navigator.clipboard ? navigator.clipboard.writeText(text)
-      : Promise.reject()).then(function () {
-        btn.textContent = T.copied;
-        btn.classList.add('done');
-        setTimeout(function () {
-          btn.textContent = T.copy;
-          btn.classList.remove('done');
-        }, 1500);
-      }, function () {});
+    // 面板在课件文档里，焦点本就在这一侧，doc 传 document 即可
+    copyToClipboard(text, document).then(function () {
+      btn.textContent = T.copied;
+      btn.classList.add('done');
+      setTimeout(function () {
+        btn.textContent = T.copy;
+        btn.classList.remove('done');
+      }, 1500);
+    }, function () {
+      btn.textContent = T.copyFail;
+      setTimeout(function () { btn.textContent = T.copy; }, 1500);
+    });
     return true;
   }
   bodyEl.addEventListener('click', richContentClick);
@@ -1446,12 +1948,31 @@
       '<div class="al-disc-arrow">›</div></a>';
   }
 
+  // 渲染签名：数据没变就不重建 DOM（PRD 24n）。切页签来回走时 <img> 节点得以
+  // 留在原地，浏览器缓存直接命中，不再闪一下重新下图。
+  var momentsSig = null;
+  function momentsSignature() {
+    return JSON.stringify([
+      state.meOk, state.loggedIn, momentsHasMore, momentsVisibleLimit,
+      downloadCardVisible, momentReply,
+      momentsCache.map(function (m) {
+        return [m.id, m.likes, (m.liked_by || []).length,
+          (m.comments || []).length, (m.images || []).length].join(':');
+      })
+    ]);
+  }
+
   function renderMoments(list) {
     if (list) momentsCache = list;
+    var sig = momentsSignature();
+    if (sig === momentsSig && discoverEl.firstChild) return;
+    momentsSig = sig;
     if (!momentsCache.length) {
-      discoverEl.innerHTML =
-        '<div class="al-disc-intro">' + esc(T.mEmpty) + '</div>' +
-        downloadBenefitCard() + discoverFallbackHtml;
+      // me 还没答复时不给空态：刷新回到朋友圈页不该先闪一句「还没有动态」
+      discoverEl.innerHTML = state.meOk
+        ? ('<div class="al-disc-intro">' + esc(T.mEmpty) + '</div>' +
+           downloadBenefitCard() + discoverFallbackHtml)
+        : ('<div class="al-disc-intro">' + esc(T.mLoading) + '</div>');
       return;
     }
     discoverEl.innerHTML = momentsCache.map(momentCard).join('') +
@@ -1465,8 +1986,10 @@
   }
 
   function stashMoments() {
+    if (!state.accountKey) return;
     try {
       localStorage.setItem(MOMENTS_KEY, JSON.stringify({
+        account: state.accountKey,
         ts: momentsFetchedAt || Date.now(),
         has_more: momentsHasMore,
         limit: momentsVisibleLimit,
@@ -1478,7 +2001,8 @@
   function restoreMoments() {
     var c = null;
     try { c = JSON.parse(localStorage.getItem(MOMENTS_KEY) || 'null'); } catch (e) {}
-    if (!c || !Array.isArray(c.moments) || !c.moments.length) return false;
+    if (!c || c.account !== state.accountKey ||
+        !Array.isArray(c.moments) || !c.moments.length) return false;
     if (Date.now() - (c.ts || 0) > MOMENTS_MAX_TTL) return false;
     momentsFetchedAt = c.ts || 0;
     momentsHasMore = c.has_more === true;
@@ -1488,19 +2012,25 @@
   }
 
   function loadMoments(force) {
-    if (!state.loggedIn) { momentsCache = []; renderMoments([]); return; }
     if (!momentsFetchedAt) restoreMoments();
+    if (!state.loggedIn) {
+      if (state.meOk) { momentsCache = []; renderMoments([]); return; }
+      renderMoments();
+      return;
+    }
     // 切课件、切语言页时先复用同一账号的本地时间线；五分钟内没有必要重新拉。
     if (!force && momentsFetchedAt &&
         Date.now() - momentsFetchedAt < MOMENTS_FRESH_TTL) return;
     if (!momentsCache.length) {
       discoverEl.innerHTML = '<div class="al-disc-intro">' + esc(T.mLoading) + '</div>';
     }
+    var requestAccount = state.accountKey;
     fetch('/alice/moments?lang=' + encodeURIComponent(LANG), {
       credentials: 'same-origin'
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        if (requestAccount !== state.accountKey) return;
         if (!d || !d.ok) throw new Error('bad moments response');
         // 服务降级时不能拿一个空数组覆盖仍可阅读的本地快照。
         if (d.degraded && !(d.moments || []).length && momentsCache.length) return;
@@ -1511,6 +2041,7 @@
         stashMoments();
       })
       .catch(function () {
+        if (requestAccount !== state.accountKey) return;
         if (momentsCache.length) renderMoments();
         else renderMoments([]);
       });
@@ -1522,14 +2053,26 @@
   var notesCache = [];
   var notesFetchedAt = 0;
   var NOTES_FRESH_TTL = 5 * 60 * 1000;
+  // Alice 侧会改动笔记本的工具（与 alice-service.py 的工具名对齐）
+  var NOTE_WRITE_TOOLS = ['save_note', 'edit_note', 'delete_note'];
   var NOTES_MAX_TTL = 24 * 60 * 60 * 1000;
+  // 笔记条数不设上限（PRD 24p），列表按游标一页页往回翻。首屏与每页都是 NOTES_PAGE
+  // 条，快照也只留这么多：留多了，恢复快照后第一次刷新会让列表先多后少；而且单条正文
+  // 可达 8000 字，攒多了会把 localStorage 配额挤爆。
+  var NOTES_PAGE = 50;
+  var notesHasMore = false;
+  var notesCursor = null;         // 服务端给的续翻游标 {before_at, before_id}
+  var notesLoadingMore = false;
+  var notesFromSnapshot = false;  // 列表来自本地快照时游标不可信，滚到底要先重翻第一页
 
   function stashNotes() {
+    if (!state.accountKey) return;
     try {
       localStorage.setItem(NOTES_KEY, JSON.stringify({
         ts: notesFetchedAt || Date.now(),
         account: state.accountKey,
-        notes: notesCache.slice(0, 100)
+        has_more: notesHasMore || notesCache.length > NOTES_PAGE,
+        notes: notesCache.slice(0, NOTES_PAGE)
       }));
     } catch (e) {}
   }
@@ -1540,43 +2083,69 @@
     if (!c || !Array.isArray(c.notes) || !state.accountKey ||
         c.account !== state.accountKey) return false;
     if (Date.now() - (c.ts || 0) > NOTES_MAX_TTL) return false;
-    notesFetchedAt = c.ts || 0;
+    // 脏快照（Alice 刚动过笔记本）只拿来先亮着看，不恢复新鲜度——
+    // 否则 loadNotes 的 TTL 检查会拿旧 ts 判定「还新鲜」，跳过重拉
+    notesFetchedAt = c.stale ? 0 : (c.ts || 0);
+    // 快照里没有游标（存的是首屏那几条，不知道再往前是什么），所以标记来源，
+    // 滚到底时先按服务端重翻第一页，免得快照与分页拼出重复卡片
+    notesFromSnapshot = true;
+    notesHasMore = c.has_more === true;
+    notesCursor = null;
     renderNotes(c.notes);
     return true;
   }
 
-  function renderNotes(list) {
-    if (Array.isArray(list)) notesCache = list;
-    if (!state.loggedIn) {
-      notesEl.innerHTML = '<div class="al-disc-intro">' + esc(T.ntLoginTip) +
-        ' <a href="' + loginUrl() + '">' + esc(T.loginBtn) + '</a></div>';
-      return;
-    }
-    if (!notesCache.length) {
-      notesEl.innerHTML = '<div class="al-disc-intro">' + esc(T.ntEmpty) + '</div>';
-      return;
-    }
-    var html = notesCache.map(function (n) {
-      var isAnswer = n.kind === 'answer';
-      return '<div class="al-nt" data-nid="' + esc(String(n.id || '')) + '">' +
-        '<div class="al-nt-head">' +
-          '<span class="al-nt-kind' + (isAnswer ? ' answer' : '') + '">' +
-            esc(isAnswer ? T.ntAnswer : T.ntClip) + '</span>' +
-          '<span class="al-nt-date">' +
-            esc(n.created_at ? fmtTime(n.created_at) : '') + '</span>' +
-          '<button class="al-nt-del" title="' + esc(T.del) + '">' + svg('trash') + '</button>' +
-        '</div>' +
-        '<div class="al-nt-text' + (isAnswer ? ' md' : '') + '"></div>' +
-        (n.page_title
-          ? '<div class="al-nt-src">' + svg('doc') + '<span></span></div>' : '') +
-      '</div>';
-    }).join('');
-    notesEl.innerHTML = html + '<div class="al-nt-hint">' + esc(T.ntHint) + '</div>';
-    // 两档渲染（PRD 24l）：Alice 的回答是 Markdown，走对话同一套 renderMd
-    // （renderMd 先转义再变换，与聊天气泡同等安全）；划词摘抄是用户从页面划的
-    // 任意文本，保持 textContent 纯文本，不解析不执行。
-    notesEl.querySelectorAll('.al-nt').forEach(function (card, i) {
-      var n = notesCache[i];
+  // Alice 自己动了笔记本（save/edit/delete 工具）后调：内存与 localStorage
+  // 快照要一起标脏。只清内存的 notesFetchedAt 是不够的——loadNotes 开头会
+  // restoreNotes()，把快照里的旧 ts 写回来；旧 ts 若还在 5 分钟 TTL 内，
+  // 失效就被原样撤销，她真存成功了、页签里却要干等 TTL 过期才看得到。
+  function invalidateNotesCache() {
+    notesFetchedAt = 0;
+    try {
+      var c = JSON.parse(localStorage.getItem(NOTES_KEY) || 'null');
+      if (c) {
+        c.stale = true;
+        localStorage.setItem(NOTES_KEY, JSON.stringify(c));
+      }
+    } catch (e) {}
+  }
+
+  // 同朋友圈：签名没变就不重建（PRD 24n），配图与卡片展开状态都留得住
+  var notesSig = null;
+  function notesSignature() {
+    return JSON.stringify([
+      state.meOk, state.loggedIn, notesHasMore,
+      notesCache.map(function (n) {
+        return [n.id, n.updated_at || n.created_at, (n.content || '').length]
+          .join(':');
+      })
+    ]);
+  }
+
+  function noteCardHtml(n) {
+    var isAnswer = n.kind === 'answer';
+    return '<div class="al-nt" data-nid="' + esc(String(n.id || '')) + '">' +
+      '<div class="al-nt-head">' +
+        '<span class="al-nt-kind' + (isAnswer ? ' answer' : '') + '">' +
+          esc(isAnswer ? T.ntAnswer : T.ntClip) + '</span>' +
+        '<span class="al-nt-date">' +
+          esc(n.created_at ? fmtTime(n.created_at) : '') + '</span>' +
+        '<button class="al-nt-dl" title="' + esc(T.ntDl) + '">' + svg('download') + '</button>' +
+        '<button class="al-nt-del" title="' + esc(T.del) + '">' + svg('trash') + '</button>' +
+      '</div>' +
+      '<div class="al-nt-text' + (isAnswer ? ' md' : '') + '"></div>' +
+      (n.page_title
+        ? '<div class="al-nt-src">' + svg('doc') + '<span></span></div>' : '') +
+    '</div>';
+  }
+
+  // 两档渲染（PRD 24l）：Alice 的回答是 Markdown，走对话同一套 renderMd
+  // （renderMd 先转义再变换，与聊天气泡同等安全）；划词摘抄是用户从页面划的
+  // 任意文本，保持 textContent 纯文本，不解析不执行。
+  // cards 与 notes 必须一一对应（同序同长），续拉时只传新那一批。
+  function hydrateNoteCards(cards, notes) {
+    cards.forEach(function (card, i) {
+      var n = notes[i];
       if (!n) return;
       var textEl = card.querySelector('.al-nt-text');
       if (n.kind === 'answer') textEl.innerHTML = renderMd(n.content || '');
@@ -1586,29 +2155,446 @@
     });
   }
 
+  // 只更新列表底部那两行（续拉提示 + Wiki 落点提示），不碰上面已经渲染好的卡片
+  function renderNotesFoot() {
+    var hint = notesEl.querySelector('.al-nt-hint');
+    if (!hint) return;
+    var more = notesEl.querySelector('.al-nt-more');
+    if (notesHasMore && !more) {
+      more = document.createElement('div');
+      more.className = 'al-nt-more';
+      notesEl.insertBefore(more, hint);
+    }
+    if (!more) return;
+    if (notesHasMore) more.textContent = T.ntMoreLoading;
+    else more.parentNode.removeChild(more);
+  }
+
+  // 面板高、笔记少时容器根本滚不动，scroll 事件永远不会触发，得主动补下一页
+  function maybeAutoLoadNotes() {
+    if (!notesHasMore || notesLoadingMore || state.tab !== 'notes') return;
+    if (notesEl.scrollHeight <= notesEl.clientHeight + 40) loadMoreNotes();
+  }
+
+  function renderNotes(list) {
+    if (Array.isArray(list)) notesCache = list;
+    syncExportBtn();
+    var sig = notesSignature();
+    if (sig === notesSig && notesEl.firstChild) return;
+    notesSig = sig;
+    // 登录提示只在服务端明确答过「未登录」后给：刷新时 loggedIn 默认 false，
+    // 照它渲染会让老用户先看到一句「请先登录」再变回自己的笔记。
+    if (!state.loggedIn && state.meOk) {
+      notesEl.innerHTML = '<div class="al-disc-intro">' + esc(T.ntLoginTip) +
+        ' <a href="' + loginUrl() + '">' + esc(T.loginBtn) + '</a></div>';
+      return;
+    }
+    if (!notesCache.length) {
+      notesEl.innerHTML = '<div class="al-disc-intro">' +
+        esc(state.meOk ? T.ntEmpty : T.ntLoading) + '</div>';
+      return;
+    }
+    notesEl.innerHTML = notesCache.map(noteCardHtml).join('') +
+      (notesHasMore ? '<div class="al-nt-more">' + esc(T.ntMoreLoading) + '</div>' : '') +
+      '<div class="al-nt-hint">' + esc(T.ntHint) + '</div>';
+    hydrateNoteCards([].slice.call(notesEl.querySelectorAll('.al-nt')), notesCache);
+    maybeAutoLoadNotes();
+  }
+
+  // 续拉回来的一页：**只插新卡片，绝不重刷整块 innerHTML**。重刷会把 scrollTop
+  // 打回顶部，用户翻两页就被弹回去（PRD 24p）。
+  function appendNotes(list, meta) {
+    notesHasMore = !!(meta && meta.has_more);
+    notesCursor = (meta && meta.next_cursor) || null;
+    var seen = {};
+    notesCache.forEach(function (n) { seen[String(n.id)] = 1; });
+    var fresh = (list || []).filter(function (n) {
+      return n && n.id && !seen[String(n.id)];
+    });
+    if (!fresh.length) {
+      renderNotesFoot();
+      stashNotes();
+      return;
+    }
+    notesCache = notesCache.concat(fresh);
+    var host = document.createElement('div');
+    host.innerHTML = fresh.map(noteCardHtml).join('');
+    var cards = [].slice.call(host.querySelectorAll('.al-nt'));
+    hydrateNoteCards(cards, fresh);
+    var foot = notesEl.querySelector('.al-nt-more') ||
+      notesEl.querySelector('.al-nt-hint');
+    cards.forEach(function (card) {
+      if (foot) notesEl.insertBefore(card, foot);
+      else notesEl.appendChild(card);
+    });
+    renderNotesFoot();
+    // 节点是手插的，签名要同步推进，否则下一次 renderNotes 会整块重建、丢滚动位置
+    notesSig = notesSignature();
+    stashNotes();
+    syncExportBtn();
+    maybeAutoLoadNotes();
+  }
+
+  // 刚摘抄的一条插到列表最前面。同 appendNotes 的道理：只插一个节点、不整块重建，
+  // 否则用户已经往下翻了好几页时，会被这一下弹回顶部。
+  function prependNoteCard(note) {
+    var first = notesEl.querySelector('.al-nt');
+    if (!first) { renderNotes(); return; }   // 原先是空态或登录提示，老实重渲染
+    var host = document.createElement('div');
+    host.innerHTML = noteCardHtml(note);
+    var card = host.querySelector('.al-nt');
+    hydrateNoteCards([card], [note]);
+    notesEl.insertBefore(card, first);
+    notesSig = notesSignature();
+    syncExportBtn();
+  }
+
+  // ── 笔记导出（PRD 24m）──────────────────────────────────────────────
+  // 全程前端完成：md 文本 + 抓回来的配图打成 zip。zip 用 STORE（不压缩）手写，
+  // 笔记撑死几十 KB，为它拖一个压缩库不值得。
+  var CRC_TAB = (function () {
+    var t = [], c, k, n;
+    for (n = 0; n < 256; n++) {
+      c = n;
+      for (k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(u8) {
+    var c = 0xFFFFFFFF;
+    for (var i = 0; i < u8.length; i++) c = CRC_TAB[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  // files: [{name, bytes:Uint8Array}] → Blob。本地文件头 + 中央目录 + 结尾记录，
+  // 通用位 bit11 声明 UTF-8 文件名（中文文件名在 macOS/Windows 解压都不乱码）。
+  function buildZip(files) {
+    var enc = new TextEncoder();
+    var chunks = [], central = [], offset = 0;
+    var now = new Date();
+    var dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    var dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    files.forEach(function (f) {
+      var name = enc.encode(f.name);
+      var data = f.bytes;
+      var crc = crc32(data);
+      var head = new DataView(new ArrayBuffer(30));
+      head.setUint32(0, 0x04034b50, true);
+      head.setUint16(4, 20, true);
+      head.setUint16(6, 0x0800, true);
+      head.setUint16(8, 0, true);          // STORE
+      head.setUint16(10, dosTime, true);
+      head.setUint16(12, dosDate, true);
+      head.setUint32(14, crc, true);
+      head.setUint32(18, data.length, true);
+      head.setUint32(22, data.length, true);
+      head.setUint16(26, name.length, true);
+      head.setUint16(28, 0, true);
+      chunks.push(new Uint8Array(head.buffer), name, data);
+      var cen = new DataView(new ArrayBuffer(46));
+      cen.setUint32(0, 0x02014b50, true);
+      cen.setUint16(4, 20, true);
+      cen.setUint16(6, 20, true);
+      cen.setUint16(8, 0x0800, true);
+      cen.setUint16(10, 0, true);
+      cen.setUint16(12, dosTime, true);
+      cen.setUint16(14, dosDate, true);
+      cen.setUint32(16, crc, true);
+      cen.setUint32(20, data.length, true);
+      cen.setUint32(24, data.length, true);
+      cen.setUint16(28, name.length, true);
+      cen.setUint32(42, offset, true);
+      central.push(new Uint8Array(cen.buffer), name);
+      offset += 30 + name.length + data.length;
+    });
+    var cenSize = 0;
+    central.forEach(function (c) { cenSize += c.length; });
+    var end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, files.length, true);
+    end.setUint16(10, files.length, true);
+    end.setUint32(12, cenSize, true);
+    end.setUint32(16, offset, true);
+    return new Blob(chunks.concat(central, [new Uint8Array(end.buffer)]),
+      { type: 'application/zip' });
+  }
+
+  function downloadBlob(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+  }
+
+  // 配图既可能是 COS 绝对地址，也可能是 COS 不可达时的本机兜底 /alice/img/...
+  var NOTE_IMG_RE = /!\[[^\]]*\]\((https?:\/\/[^)\s]+|\/alice\/img\/[^)\s]+)\)/g;
+  function noteImageUrls(content) {
+    var urls = [], m;
+    NOTE_IMG_RE.lastIndex = 0;
+    while ((m = NOTE_IMG_RE.exec(content || ''))) {
+      if (urls.indexOf(m[1]) < 0) urls.push(m[1]);
+    }
+    return urls;
+  }
+
+  // 逐图抓取。COS 图床没配 CORS，浏览器直取只能拿到不透明响应、读不出字节，
+  // 所以绝对地址一律经同源口 /alice/notes/img 代取（后端白名单校验）；本机兜底图
+  // /alice/img/... 本就同源，直接抓。先剥掉 ?imageMogr2/... 缩略参数要原图，
+  // 取不到再退回带参数地址；两次都失败返回 null，正文保留原始 URL（联网仍可看），
+  // 单张图绝不卡住整包导出。
+  function fetchNoteImages(urls) {
+    return Promise.all(urls.map(function (u) {
+      var clean = u.split('?')[0];
+      function grab(url) {
+        var src = /^https?:\/\//.test(url)
+          ? '/alice/notes/img?u=' + encodeURIComponent(url) : url;
+        return fetch(src, { credentials: 'same-origin' }).then(function (r) {
+          if (!r.ok) throw new Error('http ' + r.status);
+          return r.arrayBuffer();
+        });
+      }
+      return grab(clean)
+        .catch(function () { return clean === u ? Promise.reject() : grab(u); })
+        .then(function (buf) { return { url: u, bytes: new Uint8Array(buf) }; })
+        .catch(function () { return { url: u, bytes: null }; });
+    }));
+  }
+
+  function imageFileName(url, used) {
+    var base = (url.split('?')[0].split('#')[0].split('/').pop() || 'image')
+      .replace(/[^\w.\-]/g, '_');
+    if (!/\.\w{2,5}$/.test(base)) base += '.png';
+    var name = base, i = 2;
+    while (used.indexOf(name) >= 0) {
+      name = base.replace(/(\.\w+)$/, '-' + (i++) + '$1');
+    }
+    used.push(name);
+    return name;
+  }
+
+  function noteFileName(n, used) {
+    var d = new Date((n.created_at || 0) * 1000);
+    function p(x) { return (x < 10 ? '0' : '') + x; }
+    var stamp = d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+      '-' + p(d.getHours()) + p(d.getMinutes());
+    // 首个非图片文本行做摘要；剥 Markdown 符号与文件系统非法字符
+    var line = (n.content || '').split('\n').map(function (s) { return s.trim(); })
+      .filter(function (s) { return s && !/^!\[/.test(s); })[0] || '';
+    line = line.replace(/[#>*`~_\[\]()|!]/g, '').replace(/[\\/:*?"<>|]/g, ' ')
+      .replace(/\s+/g, ' ').trim().slice(0, 24).trim();
+    var base = stamp + ' ' + (n.kind === 'answer' ? T.ntAnswer : T.ntClip) +
+      (line ? ' - ' + line : '');
+    var name = base + '.md', i = 2;
+    while (used.indexOf(name) >= 0) name = base + ' (' + (i++) + ').md';
+    used.push(name);
+    return name;
+  }
+
+  // urlMap: 原始绝对 URL → images/ 相对路径。末尾附来源行，跟卡片上的一致。
+  function noteMarkdown(n, urlMap) {
+    var body = n.content || '';
+    Object.keys(urlMap).forEach(function (u) {
+      body = body.split('](' + u + ')').join('](' + urlMap[u] + ')');
+    });
+    var src = [];
+    if (n.page_title) src.push('\u300a' + n.page_title + '\u300b');
+    if (n.created_at) src.push(new Date(n.created_at * 1000).toLocaleString());
+    return body + '\n\n---\n' + T.ntExportSrc + ': xueai.app' +
+      (src.length ? ' \u00b7 ' + src.join(' \u00b7 ') : '') + '\n';
+  }
+
+  // 把一批笔记装进 files（md 平铺根目录、配图集中 images/），返回 Promise
+  function packNotes(notes, files) {
+    var mdNames = [], imgNames = [], allUrls = [];
+    notes.forEach(function (n) {
+      noteImageUrls(n.content).forEach(function (u) {
+        if (allUrls.indexOf(u) < 0) allUrls.push(u);
+      });
+    });
+    return fetchNoteImages(allUrls).then(function (imgs) {
+      var urlMap = {};
+      imgs.forEach(function (im) {
+        if (!im.bytes) return;
+        var nm = 'images/' + imageFileName(im.url, imgNames);
+        urlMap[im.url] = nm;
+        files.push({ name: nm, bytes: im.bytes });
+      });
+      var enc = new TextEncoder();
+      var mdAt = 0;   // md 按笔记原顺序排在包头，配图统一垫底
+      notes.forEach(function (n) {
+        files.splice(mdAt++, 0, {
+          name: noteFileName(n, mdNames),
+          bytes: enc.encode(noteMarkdown(n, urlMap))
+        });
+      });
+      return Object.keys(urlMap).length;
+    });
+  }
+
+  // 单条：纯文本直接给 .md；带图打 zip；图全没抓到退化回 .md（保留原 URL）
+  function exportOneNote(n) {
+    var urls = noteImageUrls(n.content);
+    if (!urls.length) {
+      downloadBlob(new Blob([noteMarkdown(n, {})], { type: 'text/markdown' }),
+        noteFileName(n, []));
+      return Promise.resolve();
+    }
+    var files = [];
+    return packNotes([n], files).then(function (fetched) {
+      if (!fetched) {
+        downloadBlob(new Blob([noteMarkdown(n, {})], { type: 'text/markdown' }),
+          noteFileName(n, []));
+        return;
+      }
+      downloadBlob(buildZip(files),
+        noteFileName(n, []).replace(/\.md$/, '.zip'));
+    });
+  }
+
+  // 取一页笔记。cursor 为空就是第一页（最新那页）；懒加载与导出共用这一个口。
+  function fetchNotesPage(cursor) {
+    var url = '/alice/notes?limit=' + NOTES_PAGE;
+    if (cursor && cursor.before_at) {
+      url += '&before_at=' + encodeURIComponent(cursor.before_at) +
+        '&before_id=' + encodeURIComponent(cursor.before_id || '');
+    }
+    return fetch(url, { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) throw new Error('bad notes response');
+        return d;
+      });
+  }
+
+  // 把还没翻到的页全部拉完，返回这个账号的全部笔记（新→旧、按 id 去重）。
+  // 导出必须走它：列表是分页懒加载的，直接打包 notesCache 只会得到用户当时滚到过
+  // 的那几页，用户以为资产整体带走了，其实是缺的（PRD 24m / 24p）。
+  function drainAllNotes() {
+    var acc = [];
+    var seen = {};
+    function take(list) {
+      (list || []).forEach(function (n) {
+        if (!n || !n.id || seen[String(n.id)]) return;
+        seen[String(n.id)] = 1;
+        acc.push(n);
+      });
+    }
+    // 快照恢复出来的列表没有可信游标，索性从第一页重新翻一遍：多一次请求换稳定
+    var trusted = !notesFromSnapshot;
+    if (trusted) take(notesCache);
+    if (trusted && !notesHasMore) return Promise.resolve(acc);
+    function step(cursor) {
+      return fetchNotesPage(cursor).then(function (d) {
+        if (d.degraded) throw new Error('notes storage degraded');
+        take(d.notes);
+        return (d.has_more && d.next_cursor) ? step(d.next_cursor) : acc;
+      });
+    }
+    return step(trusted ? notesCursor : null);
+  }
+
+  function exportAllNotes() {
+    return drainAllNotes().then(function (all) {
+      var files = [];
+      return packNotes(all, files).then(function () {
+        var d = new Date();
+        function p(x) { return (x < 10 ? '0' : '') + x; }
+        downloadBlob(buildZip(files), 'xueai-notes-' + d.getFullYear() +
+          p(d.getMonth() + 1) + p(d.getDate()) + '.zip');
+      });
+    });
+  }
+
+  function syncExportBtn() {
+    var b = win.querySelector('#al-btn-export');
+    if (!b) return;
+    // 有快照可导就先给钮：登录态在 me 回来前是 false，照它判断会让刷新后的
+    // 笔记页先缺一枚钮再冒出来。真的登出了 notesCache 会被清空，钮跟着消失。
+    var owned = state.loggedIn || !state.meOk;
+    b.style.display =
+      (state.tab === 'notes' && owned && notesCache.length) ? '' : 'none';
+  }
+
   function loadNotes(force) {
-    if (!state.loggedIn) { notesCache = []; renderNotes([]); return; }
+    // 先亮快照再谈登录态：入口处 me 还没回来，这时清空或转 loading 都是自找的
     if (!notesFetchedAt) restoreNotes();
+    // 只有服务端确认未登录才清空（PRD 24n）
+    if (!state.loggedIn) {
+      if (state.meOk) {
+        notesCache = [];
+        notesHasMore = false;
+        notesCursor = null;
+        notesFromSnapshot = false;
+        renderNotes([]);
+        return;
+      }
+      renderNotes();
+      return;
+    }
     if (!force && notesFetchedAt &&
         Date.now() - notesFetchedAt < NOTES_FRESH_TTL) { renderNotes(); return; }
     if (!notesCache.length) {
       notesEl.innerHTML = '<div class="al-disc-intro">' + esc(T.ntLoading) + '</div>';
     }
-    fetch('/alice/notes', { credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
+    var requestAccount = state.accountKey;
+    fetchNotesPage(null)
       .then(function (d) {
-        if (!d || !d.ok) throw new Error('bad notes response');
+        if (requestAccount !== state.accountKey) return;
         // 服务降级时不能拿空数组覆盖仍可阅读的本地快照
         if (d.degraded && !(d.notes || []).length && notesCache.length) return;
         notesFetchedAt = Date.now();
+        notesHasMore = d.has_more === true;
+        notesCursor = d.next_cursor || null;
+        notesFromSnapshot = false;   // 这一页是服务端给的，游标从此可信
+        notesLoadingMore = false;
         renderNotes(d.notes || []);
         stashNotes();
       })
-      .catch(function () { renderNotes(notesCache.length ? undefined : []); });
+      .catch(function (err) {
+        console.log('[alice] notes first page failed', err);
+        if (requestAccount === state.accountKey) {
+          renderNotes(notesCache.length ? undefined : []);
+        }
+      });
+  }
+
+  // 续拉更早的一页笔记（PRD 24p）。滚到底自动调，也在容器滚不动时被主动调。
+  function loadMoreNotes() {
+    if (notesLoadingMore || !notesHasMore || !state.loggedIn) return;
+    // 快照恢复出来的列表没有可信游标：先按服务端重翻第一页，免得拼出重复卡片
+    if (notesFromSnapshot || !notesCursor) { loadNotes(true); return; }
+    notesLoadingMore = true;
+    var cursor = notesCursor;
+    var requestAccount = state.accountKey;
+    fetchNotesPage(cursor)
+      .then(function (d) {
+        if (requestAccount !== state.accountKey) return;
+        notesLoadingMore = false;
+        if (d.degraded) {
+          // 这会儿读不到，就别把「还有更多」一直挂着骗人，等下次进页签重拉
+          notesHasMore = false;
+          renderNotesFoot();
+          return;
+        }
+        appendNotes(d.notes || [], d);
+      })
+      .catch(function (err) {
+        console.log('[alice] notes next page failed', cursor, err);
+        if (requestAccount !== state.accountKey) return;
+        notesLoadingMore = false;
+        // 收掉续拉提示，避免在滚动里反复重试同一个失败请求；
+        // 下次切进笔记页签、TTL 过期后会整体重拉纠正
+        notesHasMore = false;
+        renderNotesFoot();
+      });
   }
 
   // 摘抄 / 存回答共用：写权威库成功后乐观进本地快照，笔记页签立即可见
   function saveNote(kind, content, onDone, onFail) {
+    var requestAccount = state.accountKey;
     fetch('/alice/notes', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
@@ -1618,21 +2604,39 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d || !d.ok) throw new Error((d && d.error) || 'save failed');
+        if (requestAccount !== state.accountKey) return;
+        if (!d || !d.ok) {
+          // 带上服务端的 error 码：满额（note_limit）与真故障要给不同的话，
+          // 都说成「没存上，再试一次？」会让用户一直重试一件不会成功的事
+          var e = new Error((d && d.error) || 'save failed');
+          e.code = (d && d.error) || '';
+          throw e;
+        }
         if (!d.duplicate) {
-          notesCache.unshift({
+          var fresh = {
             id: d.id, kind: kind, content: content,
             page_file: PAGE_FILE, page_title: PAGE_TITLE,
             created_at: Math.floor(Date.now() / 1000)
-          });
+          };
+          notesCache.unshift(fresh);
           notesFetchedAt = notesFetchedAt || Date.now();
           stashNotes();
-          if (state.tab === 'notes') renderNotes();
+          if (state.tab === 'notes') prependNoteCard(fresh);
         }
         onDone(d.duplicate === true);
       })
-      .catch(function () { if (onFail) onFail(); });
+      .catch(function (err) {
+        console.log('[alice] save note failed', err);
+        if (onFail) onFail(String((err && err.code) || ''));
+      });
   }
+
+  // 滚到距底 300px 就续拉下一页（PRD 24p）：提前量留够，手不用停在底部等
+  notesEl.addEventListener('scroll', function () {
+    if (notesEl.scrollHeight - notesEl.scrollTop - notesEl.clientHeight < 300) {
+      loadMoreNotes();
+    }
+  });
 
   // 删除：确认后乐观移除，服务端失败再重拉纠正
   notesEl.addEventListener('click', function (e) {
@@ -1640,6 +2644,19 @@
     // 点链接走默认跳转——这三种都不该把卡片折叠状态一起切了
     if (richContentClick(e)) return;
     if (e.target.closest && e.target.closest('a')) return;
+    var dl = e.target.closest('.al-nt-dl');
+    if (dl) {
+      var dlCard = dl.closest('.al-nt');
+      var note = notesCache.filter(function (n) {
+        return String(n.id) === dlCard.dataset.nid;
+      })[0];
+      if (!note || dl.disabled) return;
+      dl.disabled = true;   // 抓图要点时间，忙碌态防连点
+      exportOneNote(note).then(
+        function () { dl.disabled = false; },
+        function () { dl.disabled = false; });
+      return;
+    }
     var del = e.target.closest('.al-nt-del');
     if (del) {
       var card = del.closest('.al-nt');
@@ -1657,6 +2674,20 @@
     }
     var cardEl = e.target.closest('.al-nt');
     if (cardEl) cardEl.classList.toggle('open');
+  });
+
+  // 导出所有笔记（PRD 24m）：抓图打包期间按钮呈忙碌态防连点
+  win.querySelector('#al-btn-export').addEventListener('click', function () {
+    var btn = this;
+    if (btn.disabled || !notesCache.length) return;
+    btn.disabled = true;
+    var label = btn.querySelector('span');
+    label.textContent = T.ntExporting;
+    exportAllNotes().then(done, done);
+    function done() {
+      btn.disabled = false;
+      label.textContent = T.ntExportAll;
+    }
   });
 
   // 点图、点赞、评论回复：一处委托，重渲染后不用重新绑事件
@@ -1714,6 +2745,7 @@
     if (!text || btn.disabled) return;
     var mid = card.dataset.mid;
     var replyTo = momentReply && momentReply.mid === mid ? momentReply.cid : '';
+    var requestAccount = state.accountKey;
     btn.disabled = true;
     fetch('/alice/moments/' + encodeURIComponent(mid) + '/comment', {
       method: 'POST',
@@ -1723,6 +2755,7 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        if (requestAccount !== state.accountKey) return;
         if (!d || !d.ok) throw new Error(d && d.error);
         momentsCache.forEach(function (m) {
           if (m.id === mid) m.comments = d.comments || m.comments;
@@ -1733,6 +2766,7 @@
         renderMoments();
       })
       .catch(function (err) {
+        if (requestAccount !== state.accountKey) return;
         btn.disabled = false;
         toast(String(err && err.message) === 'banned' ? T.mBanned : T.mCmtFail);
       });
@@ -1741,6 +2775,7 @@
   function sendMomentLike(card, btn) {
     if (!card || !btn || btn.disabled) return;
     var mid = card.dataset.mid;
+    var requestAccount = state.accountKey;
     btn.disabled = true;
     fetch('/alice/moments/' + encodeURIComponent(mid) + '/like', {
       method: 'POST',
@@ -1748,6 +2783,7 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        if (requestAccount !== state.accountKey) return;
         if (!d || !d.ok) throw new Error(d && d.error);
         momentsCache.forEach(function (m) {
           if (m.id !== mid) return;
@@ -1759,6 +2795,7 @@
         renderMoments();
       })
       .catch(function () {
+        if (requestAccount !== state.accountKey) return;
         btn.disabled = false;
         toast(T.netErr);
       });
@@ -1882,7 +2919,9 @@
   var floatW = FLOAT_W_DEF;
   var floatH = FLOAT_H_DEF;
   function clampFloatW(w) {
-    return Math.max(FLOAT_W_MIN, Math.min(Math.round(w), window.innerWidth - 24));
+    return Math.max(FLOAT_W_MIN, Math.min(
+      Math.round(w), FLOAT_W_MAX, window.innerWidth - 24
+    ));
   }
   function clampFloatH(h) {
     return Math.max(FLOAT_H_MIN, Math.min(Math.round(h), window.innerHeight - 40));
@@ -1950,9 +2989,9 @@
   });
   window.addEventListener('resize', paintFloatSize);
 
-  // 侧栏宽度：必须给正文留可读宽度（约 480px），否则三栏同屏正文会被挤没
+  // 侧栏最多占半屏：比悬浮窗更能摊开长回答，但始终给课件留另一半。
   function sideMaxW() {
-    return Math.max(SIDE_W_MIN, Math.min(SIDE_W_MAX, window.innerWidth - 480));
+    return Math.max(SIDE_W_MIN, Math.floor(window.innerWidth / 2));
   }
   function clampSideW(w) {
     return Math.min(sideMaxW(), Math.max(SIDE_W_MIN, Math.round(w)));
@@ -1961,30 +3000,68 @@
   var sideW = SIDE_W_DEF;      // 当前侧栏宽度（px），供告知外壳用
   var sideDragging = false;
 
-  // 阅读器（learn.html）里课件跑在 iframe 中，Alice 的 fixed 只能覆盖 iframe 那一段。
-  // 要让她真的顶天立地，外壳会把 iframe 撑满整个内容区、把面包屑条与翻页条浮到
-  // 课件上方只占她左边（见 learn*.html 的 alice-side-on）。这里把当前占宽报过去。
+  // 阅读器（learn.html）里课件跑在 iframe 中，Alice 的 fixed 默认只能覆盖 iframe。
+  // 桌面侧栏把当前占宽报给外壳；手机打开时额外报 mobile=true，让外壳把整个 iframe
+  // 提升为真正的全屏层，盖住顶部导航和底部翻页条，而不是只在课件区域里「假全屏」。
   function notifyHost() {
     if (window.self === window.top) return;
     var on = state.enabled && state.open && state.side && window.innerWidth > 640;
+    var mobile = state.enabled && state.open && window.innerWidth <= 640;
     try {
       parent.postMessage({
         type: 'xueai-alice-side',
         w: on ? sideW : 0,
+        mobile: mobile,
         live: sideDragging      // 拖拽中让外壳关掉过渡，否则跟手会发飘
       }, location.origin);
     } catch (e) {}
   }
+  window.addEventListener('resize', notifyHost);
 
   // 外壳的回信：那两条横条各有多高。Alice 撑满之后它们浮在课件上，
   // 正文照这个数让出上下内边距，开头结尾才不会被压掉一截。
   window.addEventListener('message', function (e) {
     if (e.origin !== location.origin) return;
     var d = e.data;
-    if (!d || d.type !== 'xueai-reader-inset') return;
-    var st = document.documentElement.style;
-    st.setProperty('--al-inset-top', (parseInt(d.top, 10) || 0) + 'px');
-    st.setProperty('--al-inset-bottom', (parseInt(d.bottom, 10) || 0) + 'px');
+    if (!d) return;
+    if (d.type === 'xueai-reader-inset') {
+      var st = document.documentElement.style;
+      st.setProperty('--al-inset-top', (parseInt(d.top, 10) || 0) + 'px');
+      st.setProperty('--al-inset-bottom', (parseInt(d.bottom, 10) || 0) + 'px');
+      return;
+    }
+    // 外壳目录搜索框的「让 Alice 搜一搜」（PRD 36）
+    if (d.type === 'xueai-alice-search') askCourseSearch(d.q);
+    // 外壳比 iframe 后就绪时会来问一声，补喊一次在不在
+    else if (d.type === 'xueai-alice-hello') notifyAliceReady();
+  });
+
+  // 告诉外壳 Alice 在不在：灰度关掉或没登录时，搜索框就不该摆一个点了没反应的按钮。
+  // 外壳可能比 iframe 先或后就绪，所以两边都主动喊一次（外壳收到 ready 才渲染入口，
+  // 外壳的 hello 也会让这边补喊一次）。
+  function notifyAliceReady() {
+    if (window.self === window.top) return;
+    try {
+      parent.postMessage({ type: 'xueai-alice-ready', enabled: !!state.enabled },
+                         location.origin);
+    } catch (e) {}
+  }
+
+  // 回答里的课件链接：在阅读器里就原地换页（PRD 36），别一次搜索开一堆新标签。
+  // 独立打开课件页时没有外壳可换，保持 target=_blank 的原行为。
+  document.addEventListener('click', function (e) {
+    if (window.self === window.top) return;
+    var a = e.target.closest && e.target.closest('a.al-course-link');
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    var file = String(a.getAttribute('href') || '').split('#')[1] || '';
+    if (!file) return;
+    e.preventDefault();
+    try {
+      parent.postMessage({ type: 'xueai-alice-goto', file: decodeURIComponent(file) },
+                         location.origin);
+    } catch (err) {
+      window.open(a.href, '_blank', 'noopener');   // 换页没喊通，别把用户卡住
+    }
   });
 
   function applySideW(w) {
@@ -2006,16 +3083,16 @@
     win.classList.toggle('side', state.side);
     document.documentElement.classList.toggle('alice-side', state.side && state.open);
     sideBtn.innerHTML = svg(state.side ? 'panelFloat' : 'panelSide');
-    sideBtn.title = state.side ? T.dockFloat : T.expandSide;
+    var tip = state.side ? T.dockFloat : T.expandSide;
+    sideBtn.setAttribute('data-tip', tip);
+    sideBtn.setAttribute('aria-label', tip);
     notifyHost();
   }
 
   sideBtn.addEventListener('click', function () {
     state.side = !state.side;
-    try {
-      if (state.side) localStorage.setItem(SIDE_KEY, '1');
-      else localStorage.removeItem(SIDE_KEY);
-    } catch (e) {}
+    // 折回悬浮窗同样是表态，记 '0'：删键会被当成「还没表过态」，下次进来又铺开
+    try { localStorage.setItem(SIDE_KEY, state.side ? '1' : '0'); } catch (e) {}
     applySide();
     closeSessionsMenu();
   });
@@ -2066,34 +3143,55 @@
     });
   })();
 
+  // 首访默认铺开为右侧栏：Alice 得先在场，学员才想得起来可以问她；藏在一个
+  // 小头像后面，绝大多数人整门课都不会点开一次。
+  // 只在「一次都没表过态」时生效——用户叉掉过就再也不自动展开（关窗写 '0'）。
+  // 手机上面板是整屏覆盖，自动展开等于把课件挡没了，所以只给桌面端。
+  function wantsAutoOpen() {
+    var pref = null;
+    try { pref = localStorage.getItem(OPEN_KEY); } catch (e) { return false; }
+    return pref === null && window.innerWidth > 640;
+  }
+
   // restore=true：切页后按上一页的状态原样恢复（无动画），不是用户主动打开
-  function openWin(restore) {
+  // auto=true：首访默认展开，用户还没表过态——既不记账气泡，也不落盘开合偏好
+  function openWin(restore, auto) {
     if (!state.enabled) return;
+    autoOpened = !!auto;
     // 手动点头像、划词「问问 Alice」和跨页恢复都算今天已经使用过面板。
-    consumeFabNudgeToday();
+    if (!auto) consumeFabNudgeToday();
     if (!state.open) {
       state.open = true;
       win.classList.toggle('restored', !!restore);
       win.classList.add('open');
       fab.classList.add('hidden');
       applySide();
-      try { localStorage.setItem(OPEN_KEY, '1'); } catch (e) {}
+      // 自动展开不写偏好：写了就等于替用户表态，此后每页都要走「恢复」分支，
+      // 他真去叉掉时反而弹不出引导气泡。
+      if (!auto) { try { localStorage.setItem(OPEN_KEY, '1'); } catch (e) {} }
       if (!state.messages.length) renderMessages();
       autoGrow();   // 关窗期间存的草稿（吐槽/预填提问）现在才量得到高度
     }
   }
   function closeWin() {
-    // 面板若跨过午夜仍开着，第二天关掉时也不能突然补弹引导气泡。
-    consumeFabNudgeToday();
+    var wasAuto = autoOpened;
+    autoOpened = false;
     state.open = false;
     win.classList.remove('open', 'restored');
     // 未授权时 fab 也保持隐藏；授权时才露出来
     if (state.enabled) fab.classList.remove('hidden');
     else fab.classList.add('hidden');
     document.documentElement.classList.remove('alice-side');   // 关窗即还正文宽度
-    try { localStorage.removeItem(OPEN_KEY); } catch (e) {}
+    // 叉掉是明确表态，记 '0' 而不是删键：删了就和「首访、还没表过态」没法区分，
+    // 下一页又会被默认展开顶回来。
+    try { localStorage.setItem(OPEN_KEY, '0'); } catch (e) {}
     closeSessionsMenu();
     notifyHost();
+    // 默认展开的那一栏被叉掉，才轮到头像旁边的引导气泡出场——告诉他人还在这儿。
+    // 手动开过的当天已经记过账，maybeShowFabNudge 自己会拦住，不会重复弹；
+    // 面板跨过午夜仍开着的情况同理（openWin 那次已把日期写成当天）。
+    if (wasAuto) maybeShowFabNudge();
+    else consumeFabNudgeToday();
   }
   win.querySelector('#al-btn-close').addEventListener('click', closeWin);
 
@@ -2105,13 +3203,17 @@
       if (state.enabled) localStorage.setItem(EN_KEY, '1');
       else localStorage.removeItem(EN_KEY);
     } catch (e) {}
+    notifyAliceReady();          // 外壳的「让 Alice 搜一搜」入口跟着显隐
     if (!state.enabled) {
       hidePop();
       hideFabNudge();
       if (state.open) {
         state.open = false;
+        autoOpened = false;
         win.classList.remove('open', 'restored');
         document.documentElement.classList.remove('alice-side');
+        // 灰度把她收走不是用户表态，所以删键而不是记 '0'：将来重新放权时，
+        // 他该像第一次见到 Alice 那样被默认铺开一次。
         try { localStorage.removeItem(OPEN_KEY); } catch (e) {}
       }
       fab.classList.add('hidden');
@@ -2123,6 +3225,11 @@
       var reopen = false;
       try { reopen = localStorage.getItem(OPEN_KEY) === '1'; } catch (e) {}
       if (reopen) { openWin(true); return; }
+      // 首次拿到白名单资格的那一刻也算「进来」，同样按默认铺开。这条走的是
+      // 网络回来之后的分支，只有第一次会命中——此后 EN_KEY 有缓存，首帧就决策完了。
+      // 形态不在这儿定：初始化那段已按 SIDE_KEY 摆好 state.side，改了反而会
+      // 盖掉「自动铺开后又自己折回悬浮窗」的选择。
+      if (wantsAutoOpen()) { openWin(true, true); return; }
     }
     if (!state.open) {
       fab.classList.remove('hidden');
@@ -2218,133 +3325,99 @@
     floaters.forEach(function (f) { if (f.isOpen()) f.close(); });
   });
 
-  // 模式在输入卡工具栏体现（对照 Alice 客户端的「探讨」模型选择器位）：
-  // 问答=默认灰字，吐槽=深色胶囊。切模式即 enter/exitFeedbackMode。
-  var modeBtn = win.querySelector('#al-mode');
-  var modeLabel = win.querySelector('#al-mode-label');
+  // ── 吐槽不是一个模式了（PRD 38）────────────────────────────────────
+  // 输入卡上原本有个「问答 / 吐槽」切换，选错就走错管道：吐槽态的消息压根不进
+  // LLM，直接 POST /api/feedback。用户实锤——「用户也不用管这是对话还是吐槽了，
+  // 不然的话，用户也很懵逼」。凭什么让他先替我们分类？他自己也未必分得清。
+  // 现在只剩一条管道：所有话都发给 Alice，是不是意见由她判断，要转交就调
+  // submit_feedback（人设里写了怎么判断、怎么问、怎么谢）。截图降级为普通附件。
 
-  function updateComposerMode() {
-    inputEl.placeholder = state.feedbackMode ? T.fbPlaceholder : T.placeholder;
-    modeLabel.textContent = state.feedbackMode ? T.modeFb : T.modeChat;
-    modeBtn.classList.toggle('fb', state.feedbackMode);
+  // 意图提示（一次性）：从划词「吐槽」、空态「对课件有意见？」进来时带上，
+  // 只作用于紧接着那一条消息，发完即清。它是提示不是命令——用户临时改问别的，
+  // Alice 照常按内容判断，不会硬把问句当意见转交。
+  function syncPlaceholder() {
+    inputEl.placeholder = pendingIntent === FEEDBACK_INTENT
+      ? T.fbPlaceholder : T.placeholder;
   }
 
-  var modeMenu = null;
-  function closeModeMenu() {
-    if (modeMenu) { modeMenu.remove(); modeMenu = null; }
-  }
-  floaters.push({
-    btn: modeBtn,
-    el: function () { return modeMenu; },
-    isOpen: function () { return !!modeMenu; },
-    close: closeModeMenu
-  });
-  modeBtn.addEventListener('click', function (e) {
-    e.stopPropagation();
-    if (modeMenu) { closeModeMenu(); return; }
-    modeMenu = document.createElement('div');
-    modeMenu.className = 'al-mode-menu';
-    modeMenu.innerHTML =
-      '<button type="button" class="al-mode-item' + (state.feedbackMode ? '' : ' cur') + '" data-mode="chat">' + esc(T.modeChat) + '</button>' +
-      '<button type="button" class="al-mode-item' + (state.feedbackMode ? ' cur' : '') + '" data-mode="fb">' + esc(T.modeFb) + '</button>';
-    win.appendChild(modeMenu);
-    anchorPopover(modeMenu, modeBtn, 160, true);
-    modeMenu.querySelectorAll('.al-mode-item').forEach(function (b) {
-      b.addEventListener('click', function () {
-        closeModeMenu();
-        var fb = b.getAttribute('data-mode') === 'fb';
-        if (fb && !state.feedbackMode) enterFeedbackMode('');
-        else if (!fb && state.feedbackMode) exitFeedbackMode();
-        inputEl.focus();
-      });
-    });
-  });
-
-  // silent=true：恢复草稿时不强行弹窗、不抢焦点（上次没开着窗就保持关着）
-  function enterFeedbackMode(quote, silent) {
-    if (!silent) openWin();
-    if (!silent) showTab('chat');
+  // 从「有意见」入口进来：带上引用、切到对话页、把话筒递给用户，其余交给 Alice
+  function openFeedback(quote) {
+    openWin();
+    showTab('chat');
     if (quote) state.pendingQuote = quote.slice(0, 2000);
-    if (!state.feedbackMode) {
-      state.feedbackMode = true;
-      state.fbImages = [];
-      pushLocalMsg('assistant', T.fbGuide);
-    }
+    pendingIntent = FEEDBACK_INTENT;
     renderChip();
-    updateComposerMode();
-    // 未登录不等到发送时才拦：进来就说清「你在给我发消息，所以要登录」，
-    // 且草稿会一直暂存，登录跳转回来自动恢复，用户不会因为登录丢内容。
-    if (!state.loggedIn) renderFbLoginNote();
-    stashFbDraft();
-    if (!silent) inputEl.focus();
+    syncPlaceholder();
+    // 未登录不等到发送时才拦：提意见也是给她发消息，身份得先立住
+    if (!state.loggedIn) renderNote();
+    stashDraft();
+    inputEl.focus();
+    // 样本句会把输入区撑高、顶掉正文底部；把刚点的那颗「有意见」钮拉回视野里
+    bodyEl.scrollTop = bodyEl.scrollHeight;
   }
 
-  function exitFeedbackMode() {
-    state.feedbackMode = false;
-    state.fbImages = [];
-    state.fbUploading = false;
-    clearFbDraft();
-    renderChip();
-    updateComposerMode();
-    renderNote();   // 把吐槽登录提示换回普通提示（或清掉）
-  }
-
-  // ── 吐槽草稿：跨登录跳转/翻页存续 ───────────────────────────────────
+  // ── 输入草稿：跨登录跳转/翻页存续 ───────────────────────────────────
   // 登录要跳去米羊 OAuth 再跳回来，页面会整个重载；不存草稿的话，引导登录
-  // 就等于让用户把刚写的槽点重打一遍——没人会照做。
-  var FBDRAFT_KEY = 'xueai_alice_fbdraft';
-  function stashFbDraft() {
-    if (!state.feedbackMode) return;
+  // 就等于让用户把刚写的话重打一遍——没人会照做。原来只有吐槽态才存，现在
+  // 吐槽没有单独形态了，草稿改成对输入框一视同仁（文字 + 引用 + 截图 + 意图）。
+  var DRAFT_KEY = 'xueai_alice_fbdraft';
+  function stashDraft() {
+    var hasContent = (inputEl.value || '').trim() || state.attachImages.length ||
+      state.pendingQuote || pendingIntent === FEEDBACK_INTENT;
+    if (!hasContent) { clearDraft(); return; }
     try {
-      localStorage.setItem(FBDRAFT_KEY, JSON.stringify({
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        account: state.accountKey || 'anonymous',
         quote: state.pendingQuote || '',
         text: inputEl.value || '',
-        images: state.fbImages.slice(),
+        images: state.attachImages.slice(),
+        intent: pendingIntent || '',
         ts: Date.now()
       }));
     } catch (e) {}
   }
-  function clearFbDraft() {
-    try { localStorage.removeItem(FBDRAFT_KEY); } catch (e) {}
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
   }
-  function restoreFbDraft() {
+  function restoreDraft() {
     var d = null;
-    try { d = JSON.parse(localStorage.getItem(FBDRAFT_KEY) || 'null'); } catch (e) {}
-    if (!d || Date.now() - (d.ts || 0) > 15 * 60 * 1000) {
-      if (d) clearFbDraft();
+    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) {}
+    var draftAccount = state.accountKey || 'anonymous';
+    if (!d || (d.account !== draftAccount && d.account !== 'anonymous') ||
+        Date.now() - (d.ts || 0) > 15 * 60 * 1000) {
+      if (d) clearDraft();
       return;
     }
-    enterFeedbackMode(d.quote || '', !state.open);
-    state.fbImages = (d.images || []).slice(0, FB_MAX_IMAGES);
+    if (d.quote) state.pendingQuote = String(d.quote).slice(0, 2000);
+    state.attachImages = (d.images || []).slice(0, FB_MAX_IMAGES);
+    if (d.intent === FEEDBACK_INTENT) pendingIntent = FEEDBACK_INTENT;
     if (d.text) { inputEl.value = d.text; autoGrow(); }
     renderChip();
+    syncPlaceholder();
   }
 
-  win.querySelector('#al-btn-fb').addEventListener('click', function () {
-    enterFeedbackMode('');
-  });
-
-  function renderFbLoginNote() {
-    noteEl.innerHTML = esc(T.fbLoginTip) +
+  function renderImgLoginNote() {
+    noteEl.innerHTML = esc(T.imgLoginTip) +
       ' <a href="' + loginUrl() + '">' + esc(T.loginBtn) + '</a>';
     noteEl.dataset.show = '1';
     if (state.tab === 'chat') noteEl.style.display = '';
   }
 
-  // 配图：文件选择与粘贴共用；逐张串行上传（并发对限流不友好，失败也难定位）
-  function addFbFiles(list) {
-    if (!state.feedbackMode || state.fbUploading) return;
-    if (!state.loggedIn) { renderFbLoginNote(); return; }
+  // 截图：文件选择与粘贴共用；逐张串行上传（并发对限流不友好，失败也难定位）。
+  // 落在 /api/feedback/image（要登录、有限流），她转交意见时原样带走这些 URL。
+  function addAttachFiles(list) {
+    if (state.attachUploading) return;
+    if (!state.loggedIn) { renderImgLoginNote(); return; }
     var files = Array.prototype.slice.call(list || [])
       .filter(function (f) { return f && MIME_EXT[f.type]; });
     if (!files.length) return;
-    var room = FB_MAX_IMAGES - state.fbImages.length;
+    var room = FB_MAX_IMAGES - state.attachImages.length;
     if (files.length > room) {
       pushLocalMsg('assistant', T.fbTooMany);
       files = files.slice(0, room);
     }
     if (!files.length) return;
-    state.fbUploading = true;
+    state.attachUploading = true;
     renderChip();
     files.reduce(function (chain, f) {
       return chain.then(function () {
@@ -2356,34 +3429,33 @@
           if (r.status === 401) { state.loggedIn = false; throw { code: 'login' }; }
           return r.json();
         }).then(function (d) {
-          if (d && d.ok && d.url) state.fbImages.push(d.url);
+          if (d && d.ok && d.url) state.attachImages.push(d.url);
           else pushLocalMsg('assistant', T.fbImgErr);
         });
       });
     }, Promise.resolve()).catch(function (err) {
-      if (err && err.code === 'login') renderFbLoginNote();
+      if (err && err.code === 'login') renderImgLoginNote();
       else pushLocalMsg('assistant', T.fbImgErr);
     }).then(function () {
-      state.fbUploading = false;
+      state.attachUploading = false;
       renderChip();
-      stashFbDraft();
+      stashDraft();
     });
   }
 
-  // + 常驻（对照客户端输入卡）：配图只用于吐槽，问答态点 + 先切到吐槽模式
+  // 带图钮常驻（对照客户端输入卡）：不再切什么模式，选完就挂在输入框上方
   attachBtn.addEventListener('click', function () {
-    if (!state.feedbackMode) enterFeedbackMode('');
+    if (!state.loggedIn) { renderImgLoginNote(); return; }
     fileEl.click();
   });
   fileEl.addEventListener('change', function () {
     var files = fileEl.files;
     fileEl.value = '';   // 允许连选同一张图
-    addFbFiles(files);
+    addAttachFiles(files);
   });
-  // 粘贴监听挂整个悬浮窗：吐槽时焦点未必在输入框（刚点过消息区/缩略图），
-  // 挂在输入区容器上会漏掉这些粘贴。只认图片文件；粘文本不拦。
+  // 粘贴监听挂整个悬浮窗：焦点未必在输入框（刚点过消息区/缩略图），挂在输入区
+  // 容器上会漏掉这些粘贴。只认图片文件；粘文本不拦。
   win.addEventListener('paste', function (e) {
-    if (!state.feedbackMode) return;
     var items = (e.clipboardData || {}).items;
     if (!items) return;
     var files = [];
@@ -2395,89 +3467,20 @@
     }
     if (!files.length) return;
     e.preventDefault();
-    addFbFiles(files);
+    addAttachFiles(files);
   });
 
-  // GitHub / X 主页：从正文里认出来就抽成 social_url 并记住，下次提交默认带上
+  // GitHub / X 主页：从用户说过的话里认出来就记住，之后每轮随 context 上报。
+  // 人设里让她「只问一次」是对的，但换了会话她无从得知问过没有——记在本地，
+  // 后端在她漏填 social_url 时兜上，用户才真的只被问一次。
   var SOCIAL_KEY = 'xueai_fb_social';
-  function extractSocial(text) {
-    var m = /https?:\/\/(?:www\.)?(?:github\.com|x\.com|twitter\.com)\/[^\s)】」]+/.exec(text);
+  function rememberSocial(text) {
+    var m = /https?:\/\/(?:www\.)?(?:github\.com|x\.com|twitter\.com)\/[^\s)】」]+/.exec(text || '');
     if (m) {
       try { localStorage.setItem(SOCIAL_KEY, m[0]); } catch (e) {}
       return m[0];
     }
     try { return localStorage.getItem(SOCIAL_KEY) || ''; } catch (e) { return ''; }
-  }
-
-  function sendFeedback(text) {
-    if (!state.loggedIn) { renderFbLoginNote(); return; }
-    var quote = state.pendingQuote;
-    var images = state.fbImages.slice();
-    state.pendingQuote = '';
-    state.fbImages = [];
-    inputEl.value = '';
-    autoGrow();
-    renderChip();
-
-    pushLocalMsg('user',
-      quote ? '【划选内容】\n' + quote + '\n\n【我的问题】\n' + text : text,
-      { images: images });
-
-    var thinkingEl = appendThinking();
-    state.streaming = true;
-    sendBtn.disabled = true;
-
-    function rollback() {
-      state.messages.pop();
-      state.pendingQuote = quote;
-      state.fbImages = images;
-      inputEl.value = text;
-      autoGrow();
-      renderChip();
-      renderMessages();
-      stashFbDraft();
-    }
-    function unlock() {
-      thinkingEl.remove();
-      state.streaming = false;
-      sendBtn.disabled = false;
-    }
-
-    fetch('/api/feedback', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: quote ? '【划词吐槽】\n' + quote + '\n\n' + text : text,
-        images: images,
-        social_url: extractSocial(text),
-        page_path: location.pathname,
-        page_title: PAGE_TITLE,
-        lang: LANG,
-        website: ''
-      })
-    }).then(function (r) {
-      if (r.status === 401) throw { code: 'login' };
-      return r.json();
-    }).then(function (d) {
-      unlock();
-      if (d && d.ok) {
-        pushLocalMsg('assistant', T.fbThanks);
-        exitFeedbackMode();
-      } else {
-        rollback();
-        pushLocalMsg('assistant', (d && d.error) || T.fbSendErr);
-      }
-    }).catch(function (err) {
-      unlock();
-      rollback();
-      if (err && err.code === 'login') {
-        state.loggedIn = false;
-        renderFbLoginNote();
-      } else {
-        pushLocalMsg('assistant', T.fbSendErr);
-      }
-    });
   }
 
   // Tabs
@@ -2486,20 +3489,29 @@
     // 朋友圈里已有一张解释具体好处的卡片时，tabs 右侧不再放重复下载按钮。
     var explainedInFeed = state.tab === 'discover' &&
       downloadCardVisible && state.loggedIn && state.hasAliceClient === false;
+    // 笔记页签一律让位给「导出所有笔记」（PRD 24m），哪怕用户符合邀请条件
     win.querySelector('#al-btn-dl').style.display =
-      (eligible && !explainedInFeed) ? '' : 'none';
+      (eligible && !explainedInFeed && state.tab !== 'notes') ? '' : 'none';
+    syncExportBtn();
   }
 
   function showTab(name) {
     var btn = win.querySelector('.al-tab[data-tab="' + name + '"]');
     if (!btn) return;
     if (name === 'discover') {
-      var today = new Date().toISOString().slice(0, 10);
-      var cardStamp = (state.accountKey || 'legacy') + ':' + today;
+      var now = new Date();
+      var today = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0');
       try {
+        var cardDays = JSON.parse(localStorage.getItem(DL_CARD_DAY_KEY) || '{}');
+        if (!cardDays || typeof cardDays !== 'object') cardDays = {};
         downloadCardVisible = state.loggedIn && state.hasAliceClient === false &&
-          localStorage.getItem(DL_CARD_DAY_KEY) !== cardStamp;
-        if (downloadCardVisible) localStorage.setItem(DL_CARD_DAY_KEY, cardStamp);
+          cardDays[state.accountKey] !== today;
+        if (downloadCardVisible) {
+          cardDays[state.accountKey] = today;
+          localStorage.setItem(DL_CARD_DAY_KEY, JSON.stringify(cardDays));
+        }
       } catch (e) {
         downloadCardVisible = state.loggedIn && state.hasAliceClient === false;
       }
@@ -2507,6 +3519,8 @@
       downloadCardVisible = false;
     }
     state.tab = name;
+    // 页签跟开合、侧栏一样属于形态，刷新/翻页后要回到原处（PRD 24n）
+    try { localStorage.setItem(TAB_KEY, name); } catch (e) {}
     syncDownloadCta();
     win.querySelectorAll('.al-tab').forEach(function (b) {
       b.classList.toggle('active', b === btn);
@@ -2558,13 +3572,36 @@
         state.hasAliceClient = d.has_alice_client === true ? true
           : (d.has_alice_client === false ? false : null);
         var nextAccountKey = d.account_key || '';
+        // 入口处按种子先认了一个账号；这里是权威答复，不同就立刻丢干净
+        // （含登出：摘要变空也算换人）。
         if (state.accountKey && nextAccountKey !== state.accountKey) {
-          // 同浏览器切换账号后，内存中的前一账号笔记也必须立刻丢弃。
+          // 同浏览器切换账号后，所有账号级内存必须立刻丢弃，不能等新请求覆盖。
+          state.messages = [];
+          state.sessionId = null;
+          momentsCache = [];
+          momentsFetchedAt = 0;
           notesCache = [];
           notesFetchedAt = 0;
+          notesHasMore = false;      // 翻页状态属于上一个账号，一起丢掉
+          notesCursor = null;
+          notesLoadingMore = false;
+          notesFromSnapshot = false;
+          sessionsCache = [];
+          sessionsFetchedAt = 0;
+          sessionsRequest = null;
+          clearGenPending();
+          closeSessionsMenu();
+          try {
+            localStorage.removeItem(MSGS_KEY);
+            localStorage.removeItem(MOMENTS_KEY);
+            localStorage.removeItem(NOTES_KEY);
+            localStorage.removeItem(SESSIONS_KEY);
+          } catch (e) {}
         }
         state.accountKey = nextAccountKey;
+        rememberAccountKey(nextAccountKey);
         state.nickname = d.nickname || '';
+        state.needRelogin = d.relogin === true;
         state.rice = (typeof d.rice === 'number') ? d.rice : null;
         if (state.rice !== null) {
           rememberLowRice(state.rice <= LOW_RICE_THRESHOLD);
@@ -2578,7 +3615,9 @@
         // 匿名或服务端确认从未登录客户端才展示；状态未知也先隐藏，杜绝老用户
         // 每次刷新先看到绿色下载广告、随后又消失的闪烁。
         syncDownloadCta();
+        // meOk 变了，空态与登录提示的判断跟着变，当前页签得复渲一次
         if (state.tab === 'discover') renderMoments();
+        else if (state.tab === 'notes') renderNotes();
         if (state.loggedIn) {
           var sub = esc(T.subtitle);
           if (state.nickname) sub += ' · ' + esc(T.loggedInAs(state.nickname));
@@ -2599,6 +3638,9 @@
     var html = '';
     if (!state.loggedIn) {
       html = esc(T.loginTip) + ' <a href="' + loginUrl() + '">' + esc(T.loginBtn) + '</a>';
+    } else if (state.needRelogin) {
+      html = esc(T.reloginTip) + ' <a href="' + loginUrl() + '">' +
+        esc(T.reloginBtn) + '</a>';
     }
     noteEl.innerHTML = html;
     noteEl.dataset.show = html ? '1' : '0';
@@ -2676,12 +3718,13 @@
         btn.classList.add('done');
         btn.disabled = false;
         btn.querySelector('span').textContent = dup ? T.clipDup : T.clipSaved;
-      }, function () {
+      }, function (code) {
+        var full = code === 'note_limit';
         btn.disabled = false;
-        btn.querySelector('span').textContent = T.clipFail;
+        btn.querySelector('span').textContent = full ? T.ntFull : T.clipFail;
         setTimeout(function () {
           btn.querySelector('span').textContent = T.saveAnswer;
-        }, 1500);
+        }, full ? 3000 : 1500);      // 「满了」这句要读得完，给久一点
       });
     });
     act.appendChild(btn);
@@ -2742,7 +3785,16 @@
         '<div class="al-mtext">' + renderMd(m.content) + '</div>';
       frag.appendChild(row);
       // 本地即时消息（问候语、吐槽引导）不值得进笔记，服务器消息才带存钮
-      if (!m.local && m.content) frag.appendChild(noteSaveAction(m.content));
+      if (!m.local && m.content) {
+        var act = noteSaveAction(m.content);
+        frag.appendChild(act);
+        // 那一轮的追问收在「存入笔记」右边的开关里。最后一条不挂：它此刻正摆在
+        // 输入卡上方那一格，两处同时出现就是同一套建议贴两遍。
+        if (m.followups && m.followups.length &&
+            state.messages[state.messages.length - 1] !== m) {
+          frag.appendChild(attachFollowups(act, m.followups));
+        }
+      }
     }
     return frag;
   }
@@ -2757,7 +3809,7 @@
         '<button type="button" class="al-fb-link" id="al-fb-link">' + esc(T.feedbackTip) + ' &rarr;</button>';
       bodyEl.appendChild(empty);
       empty.querySelector('#al-fb-link').addEventListener('click', function () {
-        enterFeedbackMode('');
+        openFeedback('');
       });
       loadQuestions().then(function (qs) {
         var wrap = bodyEl.querySelector('#al-qs');
@@ -2799,40 +3851,199 @@
     return el;
   }
 
-  function renderChip() {
-    // 吐槽/问答的模式状态不再用 chip，改在输入卡工具栏体现（al-mode 按钮）
-    var html = '';
+  // 输入卡上方那一格：三套内容抢同一个位置，同时只显示一套（用户：「和划词样本
+  // 互斥，因为追问就没有样本了啊」）。优先级 = 他刚做的动作赢：
+  //   吐槽意图 → 只写到冒号的开头，接着写的是他自己的意见；
+  //   有引用（划词点「问问 Alice」）→ 三种完整问法（原来这里硬预填第一句，等于替他选了）；
+  //   都没有但上一轮回答带回了追问 → 「接着问」那三句（PRD 39）。
+  // 三样都没有就空着：正文中间那四道推荐题已经在干这件事。
+  // 输入框一有字，前两套（写到冒号的「开头」，只能选一句）就收起来；追问不收——
+  // 用户要的是「点击之后别消失，可以追加到后面，因为想多点几下」。
+  function sampleSet() {
+    var typed = !!(inputEl.value || '').trim();
+    if (pendingIntent === FEEDBACK_INTENT) {
+      return typed ? null : { hint: T.fbSamplesHint, items: T.fbSamples };
+    }
     if (state.pendingQuote) {
+      return typed ? null : { hint: T.askSamplesHint, items: T.askSamples };
+    }
+    if (state.followups && state.followups.length) {
+      return { hint: T.fuHint, items: state.followups, kind: 'fu' };
+    }
+    return null;
+  }
+
+  // 追问点一下是「拿走这句」：追加到输入框末尾（多点几句就拼成一串），不覆盖他
+  // 自己写的字，也不重复追加同一句。返回是否真的加了。
+  function appendToInput(text) {
+    var cur = inputEl.value || '';
+    if (!text || cur.indexOf(text) >= 0) return false;
+    inputEl.value = cur && !/\s$/.test(cur) ? cur + '\n' + text : cur + text;
+    autoGrow();
+    inputEl.focus();
+    try {
+      inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+    } catch (e) {}
+    stashDraft();
+    return true;
+  }
+
+  function followupBtn(text) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'al-sample' +
+      ((inputEl.value || '').indexOf(text) >= 0 ? ' used' : '');
+    b.innerHTML = svg('chevronRight');
+    b.appendChild(document.createTextNode(text));
+    b.addEventListener('click', function () {
+      appendToInput(text);
+      syncFollowupUsed();   // 上下两处的同款一起变淡
+      renderSamples();
+    });
+    return b;
+  }
+
+  // 发出去之后那几句默认收起，「存入笔记」右边给一个同款的「追问建议」开关
+  // （用户：「发送之后，能不能收起来，就叫追问建议。然后用户点击可以展开。
+  // 和存入笔记一样，放在右边」）。展开态不记忆：翻页回来重新收起，那时他的
+  // 注意力在新的页上，不该顶着一排旧建议。
+  function attachFollowups(actEl, list) {
+    var row = followupRow(list);
+    row.hidden = true;
+    var btn = document.createElement('button');
+    btn.className = 'al-nt-save al-fu-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.innerHTML = svg('chevronRight') + '<span>' + esc(T.fuToggle) + '</span>';
+    btn.addEventListener('click', function () {
+      row.hidden = !row.hidden;
+      btn.classList.toggle('open', !row.hidden);
+      btn.setAttribute('aria-expanded', row.hidden ? 'false' : 'true');
+    });
+    actEl.appendChild(btn);
+    return row;
+  }
+
+  // 「已拿走」= 此刻输入框里有这句。他把字删掉，胶囊就该恢复成可点的样子。
+  function syncFollowupUsed() {
+    var v = inputEl.value || '';
+    bodyEl.querySelectorAll('.al-msg-fu .al-sample').forEach(function (b) {
+      b.classList.toggle('used', v.indexOf(b.textContent.trim()) >= 0);
+    });
+  }
+
+  // 发出去之后那一轮的追问：跟着回答留在消息流里，随时还能点（用户：「发送之后
+  // 再附带到这次对话之后，用户随时可以点击复制文本」）
+  function followupRow(list) {
+    var row = document.createElement('div');
+    row.className = 'al-msg-fu';
+    (list || []).forEach(function (s) { row.appendChild(followupBtn(s)); });
+    return row;
+  }
+
+  // 最后一条回答带的追问 = 此刻该摆在输入卡上方那一格的几句（更早几轮的已经
+  // 挪进消息流、跟在各自那条回答下面了）
+  function tailFollowups() {
+    var last = state.messages[state.messages.length - 1];
+    return (last && last.role === 'assistant' && Array.isArray(last.followups))
+      ? last.followups.slice(0, 3) : [];
+  }
+
+  // 输入卡上方那一格只服务「最新那一轮」：又发了一句、开了新会话、切了会话就收走
+  function setFollowups(list) {
+    state.followups = (Array.isArray(list) ? list : []).filter(function (s) {
+      return typeof s === 'string' && s.trim();
+    }).slice(0, 3);
+    renderSamples();
+  }
+
+  // 这一格每次击键都可能要变（追问的「已拿走」标记跟着输入框内容走），所以拿
+  // 签名挡住无谓重绘：内容和标记都没变就一个字都不动
+  var samplesSig = '';
+
+  function samplesSignature(set) {
+    if (!set) return '';
+    return (set.kind || 's') + '|' + set.items.join('~') + '|' +
+      set.items.map(function (s) {
+        return (inputEl.value || '').indexOf(s) >= 0 ? '1' : '0';
+      }).join('');
+  }
+
+  function renderSamples() {
+    var set = sampleSet();
+    var sig = samplesSignature(set);
+    if (sig === samplesSig) return;
+    samplesSig = sig;
+    if (!set) { samplesWrap.innerHTML = ''; return; }
+    var wrap = document.createElement('div');
+    wrap.className = 'al-samples' + (set.kind === 'fu' ? ' al-fu' : '');
+    var hint = document.createElement('span');
+    hint.className = 'al-samples-hint';
+    hint.textContent = set.hint;
+    wrap.appendChild(hint);
+    set.items.forEach(function (s) {
+      if (set.kind === 'fu') { wrap.appendChild(followupBtn(s)); return; }
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'al-sample';
+      b.textContent = s;
+      b.addEventListener('click', function () {
+        inputEl.value = s;
+        autoGrow();
+        inputEl.focus();
+        // 光标停在句尾：样本是起点不是终点，别整句选中让人一打字就覆盖掉
+        try {
+          inputEl.setSelectionRange(s.length, s.length);
+        } catch (e) {}
+        stashDraft();
+        renderSamples();   // 输入框有字了，样本收起来
+      });
+      wrap.appendChild(b);
+    });
+    samplesWrap.innerHTML = '';
+    samplesWrap.appendChild(wrap);
+  }
+
+  function renderChip() {
+    var html = '';
+    renderSamples();
+    if (state.pendingQuote) {
+      // 只留那枚文档图标当标记：「划选内容」四个字加粗顶在前面，把引用挤成两行
+      // 还抢了眼——引用的内容自己会说明它是引用（用户：「很丑」）。
       html += '<div class="al-chip">' +
-        '<span class="al-chip-label">' + svg('doc') + esc(T.quoteLabel) + '</span>' +
+        '<span class="al-chip-icon" title="' + esc(T.quoteLabel) + '" ' +
+          'aria-label="' + esc(T.quoteLabel) + '">' + svg('doc') + '</span>' +
         '<span class="al-chip-text">' + esc(state.pendingQuote) + '</span>' +
         '<button id="al-chip-x">' + svg('close') + '</button></div>';
     }
-    if (state.feedbackMode && (state.fbImages.length || state.fbUploading)) {
+    if (state.attachImages.length || state.attachUploading) {
       html += '<div class="al-fb-imgs">';
-      state.fbImages.forEach(function (u, i) {
+      state.attachImages.forEach(function (u, i) {
         html += '<span class="al-fb-thumb"><img src="' + esc(u) + '" alt="">' +
           '<button data-i="' + i + '">' + svg('close') + '</button></span>';
       });
-      if (state.fbUploading) html += '<span class="al-fb-up">…</span>';
+      if (state.attachUploading) html += '<span class="al-fb-up">…</span>';
       html += '</div>';
     }
     chipWrap.innerHTML = html;
     var x = chipWrap.querySelector('#al-chip-x');
     if (x) x.addEventListener('click', function () {
       state.pendingQuote = '';
-      // 输入框还是那句预填通用提问、用户没改过，就一并清掉，别留着空壳
-      if (inputEl && inputEl.value === T.quoteAsk) {
+      // 输入框里还是原封不动的某句样本，就一并清掉：引用都撤了，留着那句
+      // 「这段话是什么意思」问的是谁？他自己写过的字一个都不动。
+      if (inputEl && T.askSamples.indexOf(inputEl.value) >= 0) {
         inputEl.value = '';
         autoGrow();
       }
       renderChip();
+      // 草稿里也得撤掉：不然翻页/刷新回来，restoreDraft 会把刚叉掉的引用又端上来
+      stashDraft();
     });
     chipWrap.querySelectorAll('.al-fb-thumb button').forEach(function (b) {
       b.addEventListener('click', function () {
-        state.fbImages.splice(parseInt(b.getAttribute('data-i'), 10), 1);
+        state.attachImages.splice(parseInt(b.getAttribute('data-i'), 10), 1);
         renderChip();
-        stashFbDraft();
+        stashDraft();
       });
     });
   }
@@ -2858,8 +4069,10 @@
   });
 
   function stashSessions() {
+    if (!state.accountKey) return;
     try {
       localStorage.setItem(SESSIONS_KEY, JSON.stringify({
+        account: state.accountKey,
         ts: sessionsFetchedAt || Date.now(),
         sessions: sessionsCache.slice(0, 50)
       }));
@@ -2869,7 +4082,7 @@
   function restoreSessions() {
     var c = null;
     try { c = JSON.parse(localStorage.getItem(SESSIONS_KEY) || 'null'); } catch (e) {}
-    if (!c || !Array.isArray(c.sessions)) return false;
+    if (!c || c.account !== state.accountKey || !Array.isArray(c.sessions)) return false;
     if (Date.now() - (c.ts || 0) > SESSIONS_MAX_TTL) return false;
     sessionsCache = c.sessions;
     sessionsFetchedAt = c.ts || 0;
@@ -2921,9 +4134,11 @@
       return Promise.resolve(sessionsCache);
     }
     if (sessionsRequest) return sessionsRequest;
+    var requestAccount = state.accountKey;
     sessionsRequest = fetch('/alice/sessions', { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        if (requestAccount !== state.accountKey) return sessionsCache;
         if (!d || !d.ok) throw new Error('bad sessions response');
         // Alice 存储短暂不可达时保留仍可用的本地目录，不能用降级空数组覆盖它。
         if (d.degraded && !(d.sessions || []).length && sessionsFetchedAt) return sessionsCache;
@@ -2934,6 +4149,7 @@
         return sessionsCache;
       })
       .catch(function () {
+        if (requestAccount !== state.accountKey) return sessionsCache;
         if (state.sessionsOpen) {
           if (sessionsFetchedAt) renderSessions();
           else if (sessList) sessList.innerHTML =
@@ -2971,21 +4187,38 @@
   // quiet=true：切页后的静默校正——已经用本地快照把历史画出来了，拉回来的
   // 内容一样就别重画，否则用户刚往上翻的历史会被拽回底部
   function loadSession(sid, quiet) {
+    var requestAccount = state.accountKey;
     return fetch('/alice/sessions/' + sid + '/messages', { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        if (requestAccount !== state.accountKey) return;
         if (!d.ok) return;
-        if (state.feedbackMode) exitFeedbackMode();
+        // 换了会话：上一场的「接着问」跟着走就成了张冠李戴（同一会话的静默
+        // 重拉不动它，否则刚收到的追问会被自己的对账请求扫掉）
+        if (state.sessionId !== sid) setFollowups([]);
         state.sessionId = sid;
-        try { localStorage.setItem(SID_KEY, sid); } catch (e) {}
+        rememberSessionId(sid);
+        // 追问只活在本地（库里那张表只有 content 一列，不该为它加字段）。服务端
+        // 这份历史自然没有，所以按「同一条回答」把本地记着的那几句认回来，
+        // 否则五分钟后的静默校正会把已经贴在回答下面的建议全抹掉。
+        var mine = {};
+        state.messages.forEach(function (m) {
+          if (m.role === 'assistant' && m.followups && m.followups.length) {
+            mine[m.content] = m.followups;
+          }
+        });
         var next = (d.messages || []).map(function (m) {
           var toolCount = 0;
           try { toolCount = (JSON.parse(m.tool_trace || '[]') || []).length; } catch (e) {}
-          return { role: m.role, content: m.content, ts: m.created_at, toolCount: toolCount };
+          var out = { role: m.role, content: m.content, ts: m.created_at,
+            toolCount: toolCount };
+          if (m.role === 'assistant' && mine[m.content]) out.followups = mine[m.content];
+          return out;
         });
         var unchanged = quiet && sameMessages(state.messages, next);
         state.messages = next;
         if (!unchanged) renderMessages();
+        setFollowups(tailFollowups());
         stashMessages();
       })
       .catch(function () {});
@@ -3003,10 +4236,11 @@
   function startNewChat() {
     state.sessionId = null;
     state.messages = [];
-    if (state.feedbackMode) exitFeedbackMode();
-    try { localStorage.removeItem(SID_KEY); } catch (e) {}
+    state.followups = [];
+    rememberSessionId(null);
     stashMessages();
     renderMessages();
+    renderSamples();
   }
   win.querySelector('#al-btn-new').addEventListener('click', function () {
     startNewChat();
@@ -3045,11 +4279,15 @@
   var messagesFetchedAt = 0;
 
   function stashMessages() {
+    if (!state.accountKey) return;
     try {
       var keep = state.messages.filter(function (m) { return !m.local; });
       if (!keep.length) { localStorage.removeItem(MSGS_KEY); return; }
       messagesFetchedAt = Date.now();
+      // 追问挂在 assistant 消息自己身上（`followups` 字段），跟着这份快照一起走：
+      // 本站是多页导航，翻一页 DOM 全重建，不存就等于「点开下一页那几句就没了」。
       localStorage.setItem(MSGS_KEY, JSON.stringify({
+        account: state.accountKey,
         sid: state.sessionId || '', ts: messagesFetchedAt, messages: keep.slice(-40)
       }));
     } catch (e) {}
@@ -3059,14 +4297,16 @@
     var c = null, sid = null;
     try {
       c = JSON.parse(localStorage.getItem(MSGS_KEY) || 'null');
-      sid = localStorage.getItem(SID_KEY);
+      sid = readSessionId();
     } catch (e) {}
-    if (!c || !c.messages || !c.messages.length) return false;
+    if (!c || c.account !== state.accountKey ||
+        !c.messages || !c.messages.length) return false;
     if (Date.now() - (c.ts || 0) > MSGS_TTL) return false;
     if ((c.sid || '') !== (sid || '')) return false;   // 会话已换，快照作废
     state.messages = c.messages;
     state.sessionId = sid || null;
     messagesFetchedAt = c.ts || 0;
+    state.followups = tailFollowups();
     return true;
   }
 
@@ -3080,7 +4320,7 @@
     if (e.key === SESSIONS_KEY && e.newValue) {
       var sc = null;
       try { sc = JSON.parse(e.newValue); } catch (errS) { return; }
-      if (!sc || !Array.isArray(sc.sessions)) return;
+      if (!sc || sc.account !== state.accountKey || !Array.isArray(sc.sessions)) return;
       sessionsCache = sc.sessions;
       sessionsFetchedAt = sc.ts || Date.now();
       if (state.sessionsOpen) renderSessions();
@@ -3092,14 +4332,25 @@
       if (!nc || !Array.isArray(nc.notes) ||
           !state.accountKey || nc.account !== state.accountKey) return;
       notesCache = nc.notes;
-      notesFetchedAt = nc.ts || Date.now();
-      if (state.tab === 'notes') renderNotes();
+      // 跨标签页同步过来的同样是快照（只有首屏那几条、没有游标），当快照对待：
+      // 这边滚到底时先按服务端重翻第一页，不拿它的位置去接着分页
+      notesFromSnapshot = true;
+      notesHasMore = nc.has_more === true;
+      notesCursor = null;
+      // 别的标签页标了脏（Alice 在那边动了笔记本）：这边同样不认旧新鲜度，
+      // 正看着「笔记」就顺手重拉，否则等下次打开页签时再拉
+      notesFetchedAt = nc.stale ? 0 : (nc.ts || Date.now());
+      if (state.tab === 'notes') {
+        if (nc.stale) loadNotes();
+        else renderNotes();
+      }
       return;
     }
     if (e.key === MOMENTS_KEY && e.newValue) {
       var mc = null;
       try { mc = JSON.parse(e.newValue); } catch (err0) { return; }
-      if (!mc || !Array.isArray(mc.moments) || !mc.moments.length) return;
+      if (!mc || mc.account !== state.accountKey ||
+          !Array.isArray(mc.moments) || !mc.moments.length) return;
       momentsCache = mc.moments;
       momentsFetchedAt = mc.ts || Date.now();
       momentsHasMore = mc.has_more === true;
@@ -3110,18 +4361,22 @@
     if (e.key !== MSGS_KEY || !e.newValue || state.streaming) return;
     var c = null;
     try { c = JSON.parse(e.newValue); } catch (err) { return; }
-    if (!c || !c.sid || c.sid !== (state.sessionId || '')) return;
+    if (!c || c.account !== state.accountKey ||
+        !c.sid || c.sid !== (state.sessionId || '')) return;
     if (sameMessages(state.messages, c.messages || [])) return;
     // 写入快照的另一个页签刚完成了服务端生成，这份本地数据已是最新，不再多
     // 发一次 messages 请求；跨设备的变化仍由五分钟后的静默校正兜底。
     state.messages = c.messages || [];
     messagesFetchedAt = c.ts || Date.now();
     renderMessages();
+    // 另一个页签那轮的追问跟着消息一起过来：这边显示的是同一段对话，建议也该同一套
+    setFollowups(tailFollowups());
   });
 
   function saveGenPending(genId) {
     try {
       localStorage.setItem(GEN_KEY, JSON.stringify({
+        account: state.accountKey,
         gen_id: genId, session_id: state.sessionId, ts: Date.now()
       }));
     } catch (e) {}
@@ -3141,7 +4396,11 @@
   }
   inputEl.addEventListener('input', function () {
     autoGrow();
-    stashFbDraft();   // 吐槽模式下边写边存，登录跳转回来不丢字
+    stashDraft();   // 边写边存，登录跳转回来不丢字
+    // 他自己动笔了就把样本句收起来；追问留着，但拿走过的那几句要跟着变淡/复原
+    // （renderSamples 自己按签名挡重绘，敲一下不会白白重建 DOM）
+    renderSamples();
+    syncFollowupUsed();
   });
   inputEl.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -3151,12 +4410,17 @@
   });
   sendBtn.addEventListener('click', send);
 
-  // 一次流式接收的 UI 状态机：thinking 点、工具胶囊、正文光标
+  // 一次流式接收的 UI 状态机：thinking 点、工具胶囊、正文光标。
+  // 模型可能「先说半句再调工具」（查 JD、查课程库都常这样），所以正文按段管理：
+  // 工具胶囊到来就把当前段封掉，之后的文字另起一个新气泡接在胶囊下面——
+  // 对话流保持时间顺序，绝不把后到的字灌回胶囊上方的旧气泡。
   function makeStreamUI() {
     var thinkingEl = appendThinking();
     var msgRow = null, msgText = null;
+    var firstRow = null;          // 本轮第一个气泡：收尾时工具摘要插在它前面（与历史重渲染同位）
     var toolEls = [];
-    var acc = '';
+    var acc = '';                 // 全文（入库、存笔记用）
+    var segAcc = '';              // 当前段（渲染用）——工具把回答切成多段
     var toolCount = 0;
 
     function ensureMsgEl() {
@@ -3165,29 +4429,54 @@
         msgRow = document.createElement('div');
         msgRow.className = 'al-msg-alice';
         var prev = state.messages[state.messages.length - 1];
-        var sameGroup = prev && prev.role === 'assistant';
+        // 续段（同一轮里工具之后的新气泡）不重复画头像
+        var sameGroup = !!firstRow || (prev && prev.role === 'assistant');
         msgRow.innerHTML = avatarHtml('al-mini' + (sameGroup ? ' ghost' : '')) +
           '<div class="al-mtext"></div>';
         bodyEl.appendChild(msgRow);
         msgText = msgRow.querySelector('.al-mtext');
+        if (!firstRow) firstRow = msgRow;
       }
+    }
+
+    // 封段：去光标定稿当前气泡，让之后的文字另起一个新气泡
+    function closeSegment() {
+      if (!msgRow) return;
+      msgText.innerHTML = renderMd(segAcc);
+      msgRow = null;
+      msgText = null;
+      segAcc = '';
     }
 
     return {
       handleEvent: function (obj) {
         if (obj.session_id) {
           state.sessionId = obj.session_id;
-          try { localStorage.setItem(SID_KEY, obj.session_id); } catch (e) {}
+          rememberSessionId(obj.session_id);
         }
         if (obj.gen_id) saveGenPending(obj.gen_id);
+        // 追问随回答一起来（服务端已把哨兵那段从正文里摘掉，delta 是干净的）
+        if (obj.followups) setFollowups(obj.followups);
         if (obj.tool) {
           if (thinkingEl) { thinkingEl.remove(); thinkingEl = null; }
+          // Alice 自己动了笔记本：本地快照立刻作废（内存 + localStorage 一起标脏，
+          // 见 invalidateNotesCache），否则 TTL 内打开「笔记」页签看到的还是旧的，
+          // 又变成「她说存了其实没存」。工具一 done 就后台重拉——不必等用户打开页签。
+          if (NOTE_WRITE_TOOLS.indexOf(obj.tool.name) >= 0) {
+            invalidateNotesCache();
+            if (obj.tool.status !== 'running' || state.tab === 'notes') {
+              loadNotes(true);
+            }
+          }
           if (obj.tool.status === 'running') {
+            closeSegment();
             var cap = document.createElement('div');
             cap.className = 'al-tool running';
             cap.innerHTML = '<span class="al-tool-ico">' +
               svg((obj.tool.name === 'web_read' || obj.tool.name === 'read_lesson') ? 'book'
                 : (obj.tool.name === 'image_gen' || obj.tool.name === 'alice_selfie' || obj.tool.name === 'post_moment') ? 'image'
+                : (obj.tool.name === 'save_note' || obj.tool.name === 'edit_note'
+                   || obj.tool.name === 'delete_note' || obj.tool.name === 'read_note') ? 'bookmark'
                 : 'search') + '</span>' +
               '<span class="al-tool-label">' + esc(obj.tool.label || '') + '</span>';
             bodyEl.appendChild(cap);
@@ -3202,27 +4491,30 @@
         if (obj.delta) {
           ensureMsgEl();
           acc += obj.delta;
-          msgText.innerHTML = renderMd(acc) + '<span class="al-cursor"></span>';
+          segAcc += obj.delta;
+          msgText.innerHTML = renderMd(segAcc) + '<span class="al-cursor"></span>';
           bodyEl.scrollTop = bodyEl.scrollHeight;
         }
         if (obj.error) {
           ensureMsgEl();
           acc = acc || obj.error;
+          segAcc = segAcc || obj.error;
           msgText.textContent = obj.error;
         }
       },
       finalize: function () {
         if (thinkingEl) { thinkingEl.remove(); thinkingEl = null; }
-        if (msgText) msgText.innerHTML = renderMd(acc);
-        // 工具胶囊折叠为一条摘要
+        if (msgText) msgText.innerHTML = renderMd(segAcc);
+        // 工具胶囊折叠为一条摘要，放在本轮第一个气泡上方——切页回来后
+        // 历史重渲染（renderMessage 的 toolCount 分支）就是这个位置，直播态对齐它
         if (toolEls.length) {
           toolEls.forEach(function (el) { el.remove(); });
-          if (msgRow && toolCount) {
+          if (firstRow && toolCount) {
             var sum = document.createElement('div');
             sum.className = 'al-tool';
             sum.innerHTML = '<span class="al-tool-ico">' + svg('search') + '</span>' +
               '<span class="al-tool-label">' + esc(T.toolSummary(toolCount)) + '</span>';
-            bodyEl.insertBefore(sum, msgRow);
+            bodyEl.insertBefore(sum, firstRow);
           }
         }
         bodyEl.scrollTop = bodyEl.scrollHeight;
@@ -3231,27 +4523,64 @@
     };
   }
 
+  // 「让 Alice 搜一搜」（PRD 36）：外壳目录搜索框发来的检索请求。开一个新会话、
+  // 把问题打进输入框直接发——刻意走 send() 这条正路，而不是另开接口，这样长期
+  // 记忆、学习者画像、笔记召回、计费、审核全都照常，一处都不用重复实现。
+  function askCourseSearch(q) {
+    if (!state.enabled) return;
+    var text = String(q || '').trim().slice(0, 60);
+    if (!text || state.streaming) return;   // 正在生成就不打断，用户可以自己再问
+    openWin();
+    showTab('chat');
+    startNewChat();
+    pendingIntent = COURSE_SEARCH_INTENT;
+    inputEl.value = T.askCourse(text);
+    send();
+  }
+
   function send() {
     if (state.streaming) return;
     var text = inputEl.value.trim();
     if (!text) return;
-    if (state.feedbackMode) { sendFeedback(text); return; }
     if (!state.loggedIn) {
       renderNote();   // 未登录：只引导登录，不发请求（计费要用学员本人的米粒）
       if (noteEl.dataset.show === '1' && state.tab === 'chat') noteEl.style.display = '';
       return;
     }
     var quote = state.pendingQuote;
+    var images = state.attachImages.slice();
+    var social = rememberSocial(text);
+    // 本轮任务标记（目录搜索 / 从「有意见」入口进来）与引用、截图同批清掉：
+    // renderChip 要靠 pendingIntent 决定还画不画样本句，清晚了它就赖在输入框上面
+    var intent = pendingIntent;
     state.pendingQuote = '';
+    state.attachImages = [];
+    pendingIntent = '';
+    // 上一轮的「接着问」从输入卡上方那一格挪到那条回答下面：他随时还能回去点，
+    // 但这一格要腾给这一轮的新建议（这一轮的会随回答送来）
+    var prevA = state.messages[state.messages.length - 1];
+    var carry = (state.followups || []).slice();
+    state.followups = [];
+    clearDraft();   // 这条已经发出去了，草稿别再在下次打开时冒出来
     renderChip();
     inputEl.value = '';
     autoGrow();
+    syncPlaceholder();
 
     var userContent = quote
       ? '【划选内容】\n' + quote + '\n\n【我的问题】\n' + text
       : text;
     var hadEmpty = !state.messages.length;
-    state.messages.push({ role: 'user', content: userContent, ts: Math.floor(Date.now() / 1000) });
+    if (carry.length && prevA && prevA.role === 'assistant') {
+      prevA.followups = carry;             // 随消息快照存续，翻页回来照样点得到
+      // 挂到上一条回答那行「存入笔记」右边（收起态）。流式收尾那行不走
+      // messageNodes，所以这里直接找 DOM 里最后一行动作条。
+      var acts = bodyEl.querySelectorAll('.al-msg-act');
+      var lastAct = acts[acts.length - 1];
+      if (!hadEmpty && lastAct) bodyEl.appendChild(attachFollowups(lastAct, carry));
+    }
+    state.messages.push({ role: 'user', content: userContent, images: images,
+      ts: Math.floor(Date.now() / 1000) });
     if (hadEmpty) {
       renderMessages();   // 清掉问候语空态
     } else {
@@ -3266,12 +4595,19 @@
       message: text,
       context: { file: PAGE_FILE, title: PAGE_TITLE, selection: quote, lang: LANG, tz: TZ_NAME }
     };
+    // 截图她看不见画面，但要知道「有几张」：判断这是不是在报问题时算一份证据，
+    // 转交给作者时后端把这些 URL 原样带进 submit_feedback
+    if (images.length) body.context.images = images;
+    if (social) body.context.social_url = social;
+    // 本轮任务标记只对这一条生效（发送开头已清，这里用当时的快照）
+    if (intent) body.context.intent = intent;
     if (state.sessionId) body.session_id = state.sessionId;
 
     state.streaming = true;
     sendBtn.disabled = true;
     var ui = makeStreamUI();
     var sawNoRice = false;
+    var sawRelogin = false;
 
     fetch('/alice/chat', {
       method: 'POST',
@@ -3279,7 +4615,13 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     }).then(function (resp) {
-      if (resp.status === 401) throw { code: 'login' };
+      if (resp.status === 401) {
+        // 401 有两种：会话真的没了，或会话还在、只是本地缺一把可计费的网关 Key。
+        // 后者别把界面说成「未登录」——用户确实登着，只需重登一次换新凭据。
+        return resp.json().catch(function () { return {}; }).then(function (d) {
+          throw { code: (d && d.error === 'relogin') ? 'relogin' : 'login' };
+        });
+      }
       if (resp.status === 402) throw { code: 'no_rice' };
       if (resp.status === 403) {
         return resp.json().then(function (d) {
@@ -3289,10 +4631,15 @@
       if (!resp.ok || !resp.body) throw new Error('http ' + resp.status);
       return readSSE(resp, function (obj) {
         if (obj.error_code === 'no_rice') sawNoRice = true;
+        if (obj.error_code === 'relogin') sawRelogin = true;
         ui.handleEvent(obj);
       });
     }).then(function () {
       if (sawNoRice) markLowRice();
+      if (sawRelogin) {
+        state.needRelogin = true;
+        renderNote();
+      }
       finish();
     }).catch(function (err) {
       // 刷新会主动掐断当前 fetch；后台任务仍在生成，保留 GEN_KEY 给新页面重连。
@@ -3301,6 +4648,14 @@
       if (err && err.code === 'login') {
         state.messages.pop();     // 回滚未发送成功的提问
         state.loggedIn = false;
+        renderNote();
+        renderMessages();
+        cleanup(out);
+        return;
+      }
+      if (err && err.code === 'relogin') {
+        state.messages.pop();     // 回滚未发送成功的提问
+        state.needRelogin = true;
         renderNote();
         renderMessages();
         cleanup(out);
@@ -3344,7 +4699,8 @@
       if (out && out.text) {
         state.messages.push({
           role: 'assistant', content: out.text,
-          ts: Math.floor(Date.now() / 1000), toolCount: out.toolCount || 0
+          ts: Math.floor(Date.now() / 1000), toolCount: out.toolCount || 0,
+          followups: (state.followups || []).slice()
         });
         // 流式气泡不经 messageNodes，收尾补上「存入笔记」行
         bodyEl.appendChild(noteSaveAction(out.text));
@@ -3377,7 +4733,8 @@
           if (!last || last.role !== 'assistant' || last.content !== out.text) {
             state.messages.push({
               role: 'assistant', content: out.text,
-              ts: Math.floor(Date.now() / 1000), toolCount: out.toolCount || 0
+              ts: Math.floor(Date.now() / 1000), toolCount: out.toolCount || 0,
+              followups: (state.followups || []).slice()
             });
             bodyEl.appendChild(noteSaveAction(out.text));
           }
@@ -3399,7 +4756,8 @@
   function resumePendingGen() {
     var rec = null;
     try { rec = JSON.parse(localStorage.getItem(GEN_KEY) || 'null'); } catch (e) {}
-    if (rec && rec.gen_id && Date.now() - (rec.ts || 0) <= 30 * 60 * 1000) {
+    if (rec && rec.account === state.accountKey && rec.gen_id &&
+        Date.now() - (rec.ts || 0) <= 30 * 60 * 1000) {
       attachPendingGen(rec);
       return;
     }
@@ -3442,24 +4800,38 @@
   // 历史全部**同步**恢复：不等 /alice/me、更不等会话接口。等网络的话，正文
   // 会先全宽亮再猛地收窄，窗口也会缺席一段再带动画飞回来。
   // 灰度：用上次 me 缓存的 enabled 做首帧决策；权威结论仍以本次 me 为准。
-  var bootOpen = false, bootEnabled = false;
+  var bootOpen = false, bootEnabled = false, bootTab = 'chat';
+  var bootAuto = wantsAutoOpen();   // 一次都没表过态：按默认铺开右侧栏
+  var sidePref = null;
   try {
-    state.side = localStorage.getItem(SIDE_KEY) === '1';
-    bootOpen = localStorage.getItem(OPEN_KEY) === '1';
+    sidePref = localStorage.getItem(SIDE_KEY);
+    bootOpen = bootAuto || localStorage.getItem(OPEN_KEY) === '1';
     bootEnabled = localStorage.getItem(EN_KEY) === '1';
+    bootTab = localStorage.getItem(TAB_KEY) || 'chat';
   } catch (e) {}
-  var fromCache = restoreMessages();
+  // 形态跟着走：没表过态时默认就是侧栏；表过态的一律照他上次选的来，
+  // 包括「折回悬浮窗」（记的是 '0'）。
+  state.side = sidePref === null ? bootAuto : sidePref === '1';
+  // 账号级快照要在首帧就恢复，否则每次刷新都先转一圈 loading（PRD 24n）。摘要来自
+  // 上次 me 的确认，12 小时内有效；本次 me 回来若发现换了人，上面那段会立刻清干净。
+  state.accountKey = readAccountSeed();
+  var fromCache = false;
   document.documentElement.classList.add('alice-boot');   // 首帧不播让位过渡
   applySide();
   if (bootEnabled) {
     state.enabled = true;
-    if (bootOpen) openWin(true);
+    if (bootOpen) openWin(true, bootAuto);
     else {
       fab.classList.remove('hidden');
       maybeShowFabNudge();
     }
   }
+  notifyAliceReady();   // 按种子先报一次，refreshMe 回来再由 applyEnabled 校正
+  fromCache = restoreMessages();
   renderMessages();
+  renderSamples();   // 快照里带回的「接着问」，翻页首帧就该在输入框上面
+  // 页签也是形态：上次停在笔记/朋友圈，这次刷新还得在那儿，且直接亮快照
+  if (bootTab === 'notes' || bootTab === 'discover') showTab(bootTab);
   requestAnimationFrame(function () {
     requestAnimationFrame(function () {
       document.documentElement.classList.remove('alice-boot');
@@ -3474,11 +4846,18 @@
   refreshMe(rememberedLowRice()).then(function () {
     if (!state.enabled) return;   // 不在白名单：入口已拆掉，后面的会话恢复不必跑
     var loaded = Promise.resolve();
+    // 入口处按种子亮的那份，现在拿权威账号再验一遍：换过人的话 me 已清掉快照，
+    // 这里自然拿不回来，随后照常从服务器拉。
     if (state.loggedIn) {
+      fromCache = restoreMessages();
+      if (fromCache) { renderMessages(); renderSamples(); }
+      // 停在笔记/朋友圈页时补跑一次加载：入口那次因为登录态未定只亮了快照，
+      // 没发请求；这里过了 fresh TTL 才会真去拉。
+      if (state.tab === 'notes') loadNotes();
+      else if (state.tab === 'discover') loadMoments();
       // 登录态确认后立即在后台预取目录；用户稍后点历史按钮时直接读内存/本地快照。
       loadSessions(false);
-      var sid = null;
-      try { sid = localStorage.getItem(SID_KEY); } catch (e) {}
+      var sid = readSessionId();
       // 刚完成/刚同步过的本地快照就是当前浏览器的最新副本，翻一页课件不应
       // 再拉同一段历史。超过五分钟才静默校正，以接住其他设备产生的变化。
       var cacheFresh = fromCache && messagesFetchedAt &&
@@ -3489,12 +4868,13 @@
       // 把人家的对话历史清成空态，比晚几秒校正糟糕得多。
       state.messages = [];
       state.sessionId = null;
+      setFollowups([]);
       stashMessages();
       renderMessages();
     }
     Promise.resolve(loaded).then(function () {
       if (state.loggedIn) resumePendingGen();
-      restoreFbDraft();   // 登录跳转/翻页回来，接着上次的吐槽写
+      restoreDraft();   // 登录跳转/翻页回来，接着上次没发完的那句写
     });
   });
 })();

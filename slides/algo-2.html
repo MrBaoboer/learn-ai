@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>为什么上下文越长越贵？O(n²) 的账单 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="注意力机制要让每个 Token 看所有 Token：拖动上下文长度，看计算量和账单按平方往上蹿——长对话变卡变贵的根源。上一课的 O(n²) 尺子，量一量大模型本尊。">
+<meta name="keywords" content="注意力机制,O(n²),上下文窗口,长上下文成本,KV Cache,上下文压缩,大模型原理">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-2.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="为什么上下文越长越贵？O(n²) 的账单">
+<meta property="og:description" content="每个 Token 都要回头看所有 Token，n×n 的矩阵拖给你看。上下文翻 10 倍，注意力计算翻 100 倍。">
+<meta property="og:url" content="https://xueai.app/slides/algo-2.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="为什么上下文越长越贵？O(n²) 的账单">
+<meta name="twitter:description" content="每个 Token 都要回头看所有 Token，n×n 的矩阵拖给你看。上下文翻 10 倍，注意力计算翻 100 倍。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── 注意力矩阵 ── */
+.attn-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.attn-slider-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.attn-slider-row label{font-size:13.5px;font-weight:800;color:var(--text);flex-shrink:0}
+.attn-slider-row input[type=range]{flex:1;min-width:160px;accent-color:var(--al)}
+.attn-nval{font-size:15px;font-weight:900;color:var(--al);font-variant-numeric:tabular-nums;min-width:88px}
+.attn-layout{display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:20px;align-items:center}
+.attn-matrix-wrap{max-width:400px;margin:0 auto;width:100%}
+.attn-matrix{display:grid;gap:1px;aspect-ratio:1;width:100%}
+.attn-cell{background:var(--al);border-radius:1px;opacity:.75}
+.attn-cell.diag{background:var(--al-deep);opacity:1}
+.attn-axis{font-size:11px;color:var(--sub);text-align:center;margin-top:8px;font-weight:700}
+.attn-stats{display:flex;flex-direction:column;gap:12px}
+.attn-stat{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 15px}
+.attn-stat .as-label{font-size:11.5px;font-weight:800;color:var(--sub);letter-spacing:.4px}
+.attn-stat .as-val{font-size:26px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.3;transition:transform .18s}
+.attn-stat .as-val.pop{transform:scale(1.12)}
+.attn-stat.hot{border-color:var(--al-line);background:var(--al-soft)}
+.attn-stat.hot .as-val{color:var(--al-deep)}
+.attn-stat .as-sub{font-size:11px;color:var(--sub);margin-top:2px}
+.attn-hint{margin-top:16px;padding:13px 16px;background:var(--al-soft);border:1.5px dashed var(--al-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;color:var(--sub)}
+.attn-hint b{color:var(--al-deep)}
+
+/* ── 两种上下文对比 ── */
+.ctx-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ctx-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 20px}
+.ctx-card h5{font-size:14.5px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.ctx-badge{font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:99px}
+.ctx-card.lite .ctx-badge{background:rgba(22,163,74,.1);color:var(--success)}
+.ctx-card.heavy .ctx-badge{background:rgba(220,38,38,.1);color:var(--danger)}
+.ctx-q{font-size:12.5px;color:var(--sub);margin-bottom:14px}
+.ctx-row{margin-bottom:12px}
+.ctx-row-label{font-size:11.5px;font-weight:800;color:var(--sub);margin-bottom:5px;display:flex;justify-content:space-between;align-items:baseline}
+.ctx-row-label b{font-size:14px;font-weight:900;font-variant-numeric:tabular-nums}
+.ctx-card.lite .ctx-row-label b{color:var(--success)}
+.ctx-card.heavy .ctx-row-label b{color:var(--danger)}
+.ctx-bar{height:12px;border-radius:6px;background:rgba(0,0,0,.05);overflow:hidden}
+.ctx-fill{height:100%;border-radius:6px;width:0;transition:width 1s cubic-bezier(.25,1,.5,1)}
+.ctx-card.lite .ctx-fill{background:var(--success)}
+.ctx-card.heavy .ctx-fill{background:var(--danger)}
+.ctx-disclaim{font-size:11px;color:var(--sub);text-align:right;margin-top:10px;opacity:.8}
+.ctx-verdict{margin-top:14px;padding:14px 18px;background:var(--al-soft);border:1.5px dashed var(--al-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;color:var(--sub)}
+.ctx-verdict b{color:var(--al-deep)}
+
+/* ── 知识串联卡 ── */
+.link-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.link-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 20px}
+.link-card .lk-icon{font-size:24px;margin-bottom:8px}
+.link-card h4{font-size:14.5px;font-weight:800;color:var(--text);margin-bottom:6px}
+.link-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.link-card p b{color:var(--al-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .attn-layout{grid-template-columns:1fr}
+  .attn-stats{flex-direction:row}
+  .attn-stat{flex:1}
+  .attn-stat .as-val{font-size:20px}
+  .ctx-grid{grid-template-columns:1fr}
+  .link-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"为什么上下文越长越贵？O(n²) 的账单","name":"为什么上下文越长越贵？O(n²) 的账单","url":"https://xueai.app/slides/algo-2.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 复杂度：一眼看穿代码值不值","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"注意力机制要让每个 Token 看所有 Token：拖动上下文长度，看计算量和账单按平方往上蹿——长对话变卡变贵的根源。上一课的 O(n²) 尺子，量一量大模型本尊。","datePublished":"2026-08-10","dateModified":"2026-08-17"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">编程基础篇 · 复杂度：一眼看穿代码值不值</div>
+    <h1>为什么上下文越长越贵？O(n²) 的账单</h1>
+    <p class="subtitle">上一课你拿到了 Big-O 这把尺子，还记得那条起飞的红线吗？今天带你去看大模型里最有名的一个 O(n²)——<b>注意力机制</b>。学完你会突然理解一堆老问题：为什么长对话越来越卡、为什么上下文窗口是「窗口」不是「仓库」、为什么大家拼命做上下文压缩。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>注意力机制要让每个 Token 看所有 Token：拖动上下文长度，看计算量和账单按平方往上蹿——长对话变卡变贵的根源</p></aside><!--seo:end-->  <div class="sec-label">先回忆一下 · 注意力在干嘛</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">前面的课程讲过：大模型生成每个新词元（token）时，都要「<b style="color:var(--text)">回头看</b>」前面所有的词元，给每个词分配注意力权重，才知道接下来该接什么。一个 token 看一遍所有 token——这句话用上一课的语言翻译一下：<b style="color:var(--text)">n 个 token，每个都要看 n 个，总共 n × n 次「对视」</b>。这就是一张 n×n 的表格。拖滑块画给你看。</p>
+
+  <div class="sec-label">交互一 · 注意力矩阵：n² 长什么样</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">下面每一行代表「一个 token 要看所有 token」，深色对角线是它看自己。<b style="color:var(--text)">留意右边的格子总数：滑块只是匀速往右拖，数字却越跳越猛——这就是「平方增长」的手感。</b></p>
+
+  <div class="attn-box">
+    <div class="attn-slider-row">
+      <label>上下文里的 token 数 n</label>
+      <input type="range" id="attnRange" min="4" max="48" value="8">
+      <span class="attn-nval" id="attnN">8 个</span>
+    </div>
+    <div class="attn-layout">
+      <div class="attn-matrix-wrap">
+        <div class="attn-matrix" id="attnMatrix"></div>
+        <div class="attn-axis">每行 = 一个 token 要看所有 token</div>
+      </div>
+      <div class="attn-stats">
+        <div class="attn-stat">
+          <div class="as-label">TOKEN 数 n</div>
+          <div class="as-val" id="statN">8</div>
+        </div>
+        <div class="attn-stat hot">
+          <div class="as-label">对视次数 n²</div>
+          <div class="as-val" id="statN2">64</div>
+          <div class="as-sub">= 注意力矩阵的格子总数</div>
+        </div>
+      </div>
+    </div>
+    <div class="attn-hint"><b>n 从 4 拖到 48，只翻了 12 倍；格子却从 16 涨到 2304，翻了 144 倍。</b>真实对话动辄几万 token——把这张图在脑子里放大一千倍，你就明白 GPU 在替你算什么了。</div>
+  </div>
+
+  <div class="sec-label">交互二 · 同一个问题，两种上下文</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">同样问一句「帮我总结一下重点」，一个人先把历史精简到 1 万 token，另一个人把 10 万 token 的完整记录原样塞进去。token 只差 10 倍，看看账单差多少。<b style="color:var(--text)">留意「注意力计算量」那一行：它不是 ×10，是 ×100。</b></p>
+
+  <div class="ctx-grid">
+    <div class="ctx-card lite">
+      <h5>精简派 <span class="ctx-badge">1 万 token</span></h5>
+      <div class="ctx-q">只保留和问题相关的段落再提问</div>
+      <div class="ctx-row">
+        <div class="ctx-row-label"><span>注意力计算量</span><b>1 份</b></div>
+        <div class="ctx-bar"><div class="ctx-fill" data-w="1"></div></div>
+      </div>
+      <div class="ctx-row">
+        <div class="ctx-row-label"><span>首字延迟（示意）</span><b>≈ 1 秒</b></div>
+        <div class="ctx-bar"><div class="ctx-fill" data-w="4"></div></div>
+      </div>
+      <div class="ctx-row">
+        <div class="ctx-row-label"><span>本次输入费用（示意）</span><b>≈ ¥0.1</b></div>
+        <div class="ctx-bar"><div class="ctx-fill" data-w="10"></div></div>
+      </div>
+    </div>
+    <div class="ctx-card heavy">
+      <h5>全塞派 <span class="ctx-badge">10 万 token</span></h5>
+      <div class="ctx-q">整个历史记录一股脑丢进上下文</div>
+      <div class="ctx-row">
+        <div class="ctx-row-label"><span>注意力计算量</span><b>100 份</b></div>
+        <div class="ctx-bar"><div class="ctx-fill" data-w="100"></div></div>
+      </div>
+      <div class="ctx-row">
+        <div class="ctx-row-label"><span>首字延迟（示意）</span><b>≈ 几十秒</b></div>
+        <div class="ctx-bar"><div class="ctx-fill" data-w="90"></div></div>
+      </div>
+      <div class="ctx-row">
+        <div class="ctx-row-label"><span>本次输入费用（示意）</span><b>≈ ¥1+</b></div>
+        <div class="ctx-bar"><div class="ctx-fill" data-w="100"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="ctx-disclaim">※ 延迟与费用为量级示意，非精确报价；不同模型、不同档位差异很大</div>
+
+  <div class="ctx-verdict"><b>核心结论一句话：上下文翻 10 倍，注意力计算翻 100 倍。</b>费用大体跟 token 数走（×10 起步，长上下文档位往往还要加价），而延迟和显存压力跟着计算量走——所以「多塞点总没坏处」在大模型这里不成立，塞进去的每一个 token 都要被后面所有 token 反复回头看。</div>
+
+  <div class="sec-label">知识串联 · 这解释了前面课程的三件事</div>
+
+  <div class="link-grid">
+    <div class="link-card">
+      <div class="lk-icon">🐢</div>
+      <h4>① 为什么长对话越来越卡</h4>
+      <p>聊得越久，n 越大，每生成一个新 token 要做的「回头看」就越多。卡顿不是网络问题，是 <b>n² 在后台滚雪球</b>。</p>
+    </div>
+    <div class="link-card">
+      <div class="lk-icon">🗜</div>
+      <h4>② 为什么要做上下文压缩</h4>
+      <p>Compaction 把旧对话摘要成一小段再继续聊。牺牲一点细节，换 n 大幅变小——<b>n 砍一半，计算量砍四分之三</b>，划算。</p>
+    </div>
+    <div class="link-card">
+      <div class="lk-icon">💾</div>
+      <h4>③ 为什么 KV Cache 能省钱</h4>
+      <p>前缀部分算过的注意力结果缓存下来、下轮不重算（姊妹篇 ds-6 讲过）。<b>正因为原始计算是 O(n²) 的贵</b>，缓存的折扣才这么值钱。</p>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:24px;">
+    <b>把这课带进日常。</b>下次和 AI 长聊卡了、账单高了，你知道该做什么：开新对话、让它先总结再继续、RAG 里只召回相关段落。这些技巧背后是同一条数学：让 n 小一点，n² 就小很多。
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 这一课想和你分享的</h3>
+    <ul>
+      <li><b>注意力是 O(n²)</b>：每个 token 都要回头看所有 token，n×n 张表逃不掉</li>
+      <li><b>上下文不是免费的仓库</b>：塞进去的每个 token 都会被后面所有 token 反复看</li>
+      <li><b>翻 10 倍 = 贵 100 倍</b>：计算量按平方涨，这是长对话变卡变贵的根源</li>
+      <li><b>精简上下文 = 省钱省时间</b>：压缩、摘要、KV Cache 全是在和这个 n² 搏斗</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ═══ 交互一：注意力矩阵 ═══
+   n×n 个 div 用 CSS grid 画，n 最大 48 → 2304 个节点，重画开销可接受。
+   对角线（自己看自己）用深色区分，帮读者建立「一行 = 一个 token 的视野」的直觉。 */
+const attnRange = document.getElementById('attnRange');
+const attnN = document.getElementById('attnN');
+const attnMatrix = document.getElementById('attnMatrix');
+const statN = document.getElementById('statN');
+const statN2 = document.getElementById('statN2');
+
+let popTimer = null;
+function drawMatrix(){
+  const n = +attnRange.value;
+  attnN.textContent = n + ' 个';
+  attnMatrix.style.gridTemplateColumns = `repeat(${n},1fr)`;
+  let html = '';
+  for (let i = 0; i < n; i++){
+    for (let j = 0; j < n; j++){
+      html += `<div class="attn-cell${i === j ? ' diag' : ''}"></div>`;
+    }
+  }
+  attnMatrix.innerHTML = html;
+  statN.textContent = n;
+  statN2.textContent = (n * n).toLocaleString('zh-CN');
+  /* 数字跳动：先加 pop 再摘掉，连续拖动时用节流避免闪烁 */
+  statN2.classList.add('pop');
+  clearTimeout(popTimer);
+  popTimer = setTimeout(() => statN2.classList.remove('pop'), 150);
+}
+attnRange.addEventListener('input', drawMatrix);
+drawMatrix();
+
+/* ═══ 交互二：对比条进入视口时再生长 ═══
+   lessonOnView 来自 lesson.js（在本脚本之后加载），所以等 load 事件再绑定。 */
+const ctxCards = document.querySelectorAll('.ctx-grid .ctx-fill');
+const ctxGrid = document.querySelector('.ctx-grid');
+function growBars(){
+  ctxCards.forEach(f => { f.style.width = f.dataset.w + '%'; });
+}
+window.addEventListener('load', () => {
+  if (typeof lessonOnView === 'function') lessonOnView(ctxGrid, growBars);
+  else growBars();
+});
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

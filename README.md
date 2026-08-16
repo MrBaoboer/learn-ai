@@ -84,25 +84,10 @@
 
 ***
 
-## 本地运行
+## 本地阅读
 
-直接双击 `index.html` 用浏览器打开，无需服务器。
-
-或者用任意静态服务器：
-
-```bash
-# Python
-python3 -m http.server 8000
-
-# Node.js
-npx serve .
-```
-
-***
-
-## 部署到服务器
-
-参考 [DEPLOY.md](DEPLOY.md) 文档。
+课件都是单文件 HTML，直接双击 `slides/` 下的任意页面用浏览器打开即可，无需服务器。
+想从头看，先开 `slides/home.html`（首页）或 `slides/learn.html`（课程目录）。
 
 ***
 

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>语义层：双重蒸馏 | Token 降本增效</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="别把上下文窗口当垃圾桶：注意力 O(N²) 让长提示词又贵又慢，中段迷失效应让效果更差。双重蒸馏解法：动态 Few-Shot 从 4000 Token 砍到 500，LLMLingua-2 把文档压缩 5-20 倍。">
+<meta name="keywords" content="上下文优化,中段迷失,Lost in the Middle,动态 Few-Shot,LLMLingua,Prompt 压缩,RAG 优化">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-10.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="语义层：双重蒸馏">
+<meta property="og:description" content="高密度的 Prompt 才能换来高质量的 Attention。">
+<meta property="og:url" content="https://xueai.app/slides/cost-10.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="语义层：双重蒸馏">
+<meta name="twitter:description" content="高密度的 Prompt 才能换来高质量的 Attention。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl-wrap{overflow-x:auto}
+
+/* 注意力条演示 */
+.att{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.att-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.att-row label{font-size:14px;font-weight:700;color:var(--text)}
+.att-row input[type=range]{flex:1;min-width:170px;accent-color:var(--ct)}
+.att-row .val{font-size:14px;font-weight:800;min-width:96px;text-align:right;color:var(--ct-deep);font-variant-numeric:tabular-nums}
+.att-strip{display:flex;height:44px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)}
+.att-cell{flex:1;transition:background .3s}
+.att-legend{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:6px}
+.att-note{margin-top:12px;font-size:14px;line-height:1.78;color:var(--text);background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px}
+.att-note b{color:var(--ct-deep)}
+.att-note .w{color:var(--warn);font-weight:800}
+
+/* 策略步骤 */
+.steps{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.step{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 17px;box-shadow:var(--shadow-card)}
+.step-num{width:28px;height:28px;border-radius:9px;background:var(--ct-soft);color:var(--ct-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;margin-top:2px}
+.step p{font-size:14px;color:var(--sub);line-height:1.75;margin:0}
+.step p b{color:var(--ct-deep)}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.stat{background:var(--card);border:1.5px solid var(--ct-line);border-radius:13px;padding:16px;text-align:center;box-shadow:var(--shadow-card)}
+.stat .v{font-size:22px;font-weight:800;color:var(--ct-deep)}
+.stat .k{font-size:12.5px;color:var(--sub);margin-top:4px;line-height:1.5}
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+@media (max-width:768px){.stat-grid{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"语义层：双重蒸馏","name":"语义层：双重蒸馏","url":"https://xueai.app/slides/cost-10.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 四层实战优化","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"别把上下文窗口当垃圾桶：注意力 O(N²) 让长提示词又贵又慢，中段迷失效应让效果更差。双重蒸馏解法：动态 Few-Shot 从 4000 Token 砍到 500，LLMLingua-2 把文档压缩 5-20 倍。","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 降本增效 · 10 / 13</div>
+    <h1>语义层：双重蒸馏</h1>
+    <p class="subtitle">格式的税砍完了，往深一层看内容本身。RAG 和长文档场景里最常见的工程错误：把上下文窗口当垃圾桶——Few-Shot 案例、检索文档全怼进去，让模型自己辨识。能用，但不该这样用。</p>
+    <div class="chips"><span class="chip">O(N²)</span><span class="chip">中段迷失</span><span class="chip">动态 Few-Shot</span><span class="chip">LLMLingua-2</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>中段迷失效应：塞得越多越抓不住重点。动态 Few-Shot 从 4000 砍到 500，LLMLingua-2 压缩 5-20 倍</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">垃圾桶式上下文的两宗罪</div>
+    <p class="desc"><b>第一，贵而且慢。</b>Transformer 自注意力的计算复杂度是 O(N²)：提示词长度翻倍，计算量翻四倍。提示词越长，Prefill 越久，首字延迟越高——用户还没看到第一个字，耐心已经消磨没了。</p>
+    <p class="desc" style="margin-top:10px"><b>第二，效果可能更差。</b>有效信息被废话淹没后，会产生「中段迷失」效应。就像人读长文章：开头认真看（要搞清楚讲什么），结尾也留意（快出结论了），中间那一大坨——眼睛扫过去，脑子没过去。你精心挑选的参考资料如果不幸落在中段，模型可能根本没认真看。</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">交互演示 · 注意力是怎么被稀释的</div>
+    <p class="desc">色条模拟模型对 Prompt 各位置的注意力强度（绿=强，灰=弱）。拖动长度，看中段怎么塌下去。</p>
+    <div class="att" id="att">
+      <div class="att-row">
+        <label for="attLen">Prompt 长度</label>
+        <input type="range" id="attLen" min="1" max="32" value="6" step="1">
+        <span class="val" id="attLenVal">6k Tokens</span>
+      </div>
+      <div class="att-strip" id="attStrip"></div>
+      <div class="att-legend"><span>开头</span><span>中段</span><span>结尾</span></div>
+      <div class="att-note" id="attNote"></div>
+    </div>
+    <div class="quote-card" style="margin-top:14px">
+      上下文不是越多越好。<b>关键信息要么放开头，要么放结尾</b>；中间的位置，留给「丢了也不心疼」的内容。
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">策略一 · 动态 Few-Shot，别硬编码</div>
+    <p class="desc">拿 Text-to-SQL 举例：为了覆盖各种业务场景，有人在 Prompt 里写死 20 个 SQL 案例，加起来 4,000 多 Token。每次用户提问，模型都要先「复习」一遍这 4,000 字，既烧 Token 又慢。换个思路：</p>
+    <div class="steps">
+      <div class="step"><span class="step-num">1</span><p>把 20 个案例<b>存进向量数据库</b>。</p></div>
+      <div class="step"><span class="step-num">2</span><p>用户问「上个月销售额」时，先用语义检索<b>只捞 Top-3 个财务相关的案例</b>。</p></div>
+      <div class="step"><span class="step-num">3</span><p>最终 Prompt 从 4,000 Token <b>砍到 500</b>。</p></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat"><div class="v">-87.5%</div><div class="k">Token 成本</div></div>
+      <div class="stat"><div class="v">3x+</div><div class="k">响应速度</div></div>
+      <div class="stat"><div class="v">更高</div><div class="k">SQL 准确率<br>（去掉了无关案例的干扰）</div></div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">策略二 · 长文档先压缩再喂</div>
+    <p class="desc">金融研报、会议纪要这类文档充满「正确的废话」：免责声明、重复的背景介绍、口语化垫话。直接喂给 AI，等于花大成本请博士生帮你读垃圾邮件。</p>
+    <p class="desc" style="margin-top:10px">解法是在 RAG 检索后、送去推理之前，插一层 <a href="https://llmlingua.com/" target="_blank" rel="noopener">LLMLingua-2</a> 中间件。它不是粗暴砍词：用 BERT 的双向注意力同时看到上下文前后，精准识别核心语义（实体、数据、关键动词），剔掉冗余噪音。<b>压缩 5–20 倍，原本 1 秒的预填充压完 50 毫秒搞定</b>——高并发场景吞吐量直接上一个量级。</p>
+    <div class="fig-wrap">
+      <img src="images/cost/double-distill.webp" alt="双重蒸馏：高密度的 Prompt 才能带来高质量的 Attention" loading="lazy">
+      <div class="fig-cap">动态 Few-Shot + 文档压缩，两道漏斗滤掉噪音：高密度的 Prompt 才能换来高质量的 Attention。（图：作者分享原稿）</div>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>蒸馏</th><th>对象</th><th>手段</th><th>典型收益</th></tr>
+      <tr><td><b>第一重</b></td><td>Few-Shot 案例</td><td>向量检索动态选 Top-K</td><td>4,000 → 500 Token</td></tr>
+      <tr><td><b>第二重</b></td><td>检索回来的文档</td><td>LLMLingua-2 语义压缩</td><td>压缩 5–20 倍，预填充 1s → 50ms</td></tr>
+    </table></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本节要点</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>提示词翻倍 = 计算量翻四倍：</b>O(N²) 是长上下文又贵又慢的物理根源。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>中段迷失：</b>关键信息放开头或结尾，中间留给丢了不心疼的内容。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Few-Shot 别硬编码，</b>存向量库按问题动态检索：省 87.5% 还更准。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>长文档先过 LLMLingua-2 再推理：</b>高密度 Prompt 换高质量 Attention，别让用户在等待里流失。</p></div>
+    </div>
+    <p class="src-note">
+      <b>内容来源：</b>整理自作者团队内部分享《AI Token 降本增效策略分享》实战篇「02｜语义层」。中段迷失可延伸阅读 Chroma 的<a href="https://research.trychroma.com/context-rot" target="_blank" rel="noopener">上下文腐烂（Context Rot）研究</a>；压缩基准见 <a href="https://llmlingua.com/" target="_blank" rel="noopener">LLMLingua</a>。上下文窗口原理复习<a href="5-1.html">Harness 核心 · 上下文窗口</a>。
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* ── 注意力稀释演示：U 形注意力曲线，越长中段越塌 ── */
+var CELLS = 40;
+var strip = document.getElementById('attStrip');
+for (var i = 0; i < CELLS; i++) {
+  var c = document.createElement('div');
+  c.className = 'att-cell';
+  strip.appendChild(c);
+}
+function attCalc(){
+  var len = +document.getElementById('attLen').value;
+  document.getElementById('attLenVal').textContent = len + 'k Tokens';
+  /* 中段塌陷程度随长度增强 */
+  var sag = Math.min(0.88, 0.25 + len / 32 * 0.75);
+  var cells = strip.children;
+  for (var i = 0; i < CELLS; i++) {
+    var x = i / (CELLS - 1);              /* 0..1 */
+    var u = 4 * Math.pow(x - 0.5, 2);     /* U 形：两端 1，中间 0 */
+    var attn = 1 - sag * (1 - u);         /* 注意力强度 0..1 */
+    var g = Math.round(163 * attn + 200 * (1 - attn) * 0.35);
+    var alpha = 0.15 + attn * 0.85;
+    cells[i].style.background = 'rgba(22,' + (100 + Math.round(attn * 63)) + ',74,' + alpha.toFixed(2) + ')';
+  }
+  var note = document.getElementById('attNote');
+  if (len <= 8) {
+    note.innerHTML = '短 Prompt：中段还能保持 <b>' + Math.round((1 - sag) * 100) + '%</b> 左右的注意力，信息基本都能被看到。';
+  } else if (len <= 20) {
+    note.innerHTML = '开始稀释：中段注意力只剩 <span class="w">' + Math.round((1 - sag) * 100) + '%</span>。你精心挑的参考资料如果排在中间，模型可能「眼睛扫过去，脑子没过去」。';
+  } else {
+    note.innerHTML = '<span class="w">重度稀释：中段注意力只剩 ' + Math.round((1 - sag) * 100) + '%。</span>塞得越多越抓不住重点——这就是「花大成本请博士生读垃圾邮件」。该上双重蒸馏了。';
+  }
+}
+document.getElementById('attLen').addEventListener('input', attCalc);
+attCalc();
+lessonOnView(document.getElementById('att'), function(){});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

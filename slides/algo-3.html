@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>二分查找：猜数字游戏的最优解 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="玩一局 1 到 100 猜数字，体会每猜一次范围砍一半；十亿条数据 30 次就能找到——log n 快到什么程度。二分查找的门票是先排好序。">
+<meta name="keywords" content="二分查找,binary search,O(log n),猜数字游戏,查找算法,零基础算法">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-3.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="二分查找：猜数字游戏的最优解">
+<meta property="og:description" content="乱猜要几十次，二分最多 7 次；十亿条数据也只要 30 次。砍一半的威力，亲手玩一局就懂。">
+<meta property="og:url" content="https://xueai.app/slides/algo-3.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="二分查找：猜数字游戏的最优解">
+<meta name="twitter:description" content="乱猜要几十次，二分最多 7 次；十亿条数据也只要 30 次。砍一半的威力，亲手玩一局就懂。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+.btn-al{background:var(--al);color:#fff;border:none;padding:10px 24px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-ghost{background:var(--card);color:var(--sub);border:1.5px solid var(--border);padding:9px 20px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s}
+.btn-ghost:hover{border-color:var(--al-line);color:var(--al)}
+
+/* ── 猜数字游戏 ── */
+.guess-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.guess-strip{display:grid;grid-template-columns:repeat(20,1fr);gap:4px;margin-bottom:16px}
+.g-cell{aspect-ratio:1;border-radius:5px;background:rgba(219,39,119,.1);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:var(--al-deep);cursor:pointer;transition:background .2s,opacity .3s,transform .15s;-webkit-user-select:none;user-select:none;font-variant-numeric:tabular-nums}
+.g-cell:hover{transform:scale(1.15);background:rgba(219,39,119,.25)}
+.g-cell.dead{background:rgba(0,0,0,.05);color:#c4c8cf;opacity:.5;cursor:default}
+.g-cell.dead:hover{transform:none}
+.g-cell.tried{box-shadow:0 0 0 2px var(--amber) inset}
+.g-cell.hit{background:var(--success);color:#fff;transform:scale(1.2);box-shadow:0 0 0 3px rgba(22,163,74,.35)}
+.g-cell.hit:hover{transform:scale(1.2)}
+.g-cell.probing{background:var(--al);color:#fff;transform:scale(1.2)}
+.guess-status{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.guess-msg{flex:1;min-width:200px;font-size:14px;font-weight:700;color:var(--text)}
+.guess-msg b{color:var(--al)}
+.guess-count{font-size:12.5px;font-weight:700;color:var(--sub);flex-shrink:0}
+.guess-count b{font-size:22px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;margin-right:2px}
+.guess-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.guess-verdict{margin-top:14px;padding:14px 18px;background:var(--al-soft);border:1.5px dashed var(--al-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;color:var(--sub);display:none}
+.guess-verdict.show{display:block}
+.guess-verdict b{color:var(--al-deep)}
+
+/* ── 十亿条数据 ── */
+.log-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.log-btns{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px}
+.log-btn{border:1.5px solid var(--border);background:var(--card);border-radius:999px;padding:8px 20px;font-size:13.5px;font-weight:800;color:var(--text);cursor:pointer;font-family:inherit;transition:all .15s}
+.log-btn:hover{border-color:var(--al-line)}
+.log-btn.active{background:var(--al);border-color:var(--al);color:#fff}
+.log-display{display:flex;align-items:baseline;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.log-display .ld-text{font-size:14px;color:var(--sub);font-weight:700}
+.log-display .ld-num{font-size:38px;font-weight:900;color:var(--al);font-variant-numeric:tabular-nums;line-height:1}
+.fold-track{position:relative;height:34px;background:rgba(0,0,0,.05);border-radius:8px;overflow:hidden;margin-bottom:8px}
+.fold-fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--al),#f472b6);border-radius:8px;transition:width .22s cubic-bezier(.25,1,.5,1);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;min-width:3px}
+.fold-fill span{font-size:11px;font-weight:800;color:#fff;white-space:nowrap}
+.fold-caption{font-size:12.5px;color:var(--sub);font-weight:700;min-height:20px;font-variant-numeric:tabular-nums}
+.fold-caption b{color:var(--al-deep)}
+
+/* ── 前提卡 ── */
+.premise-card{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a;border-radius:var(--radius);padding:20px 24px;margin-top:24px}
+.premise-card h4{font-size:15px;font-weight:800;color:#92400e;margin-bottom:8px}
+.premise-card p{font-size:13.5px;color:#78350f;line-height:1.85}
+.premise-card p b{color:#b45309}
+
+/* ── 日常真身 ── */
+.irl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.irl-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:16px 18px}
+.irl-card .irl-icon{font-size:24px;margin-bottom:8px}
+.irl-card h4{font-size:14px;font-weight:800;color:var(--text);margin-bottom:5px}
+.irl-card p{font-size:12.5px;color:var(--sub);line-height:1.7}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .guess-strip{grid-template-columns:repeat(10,1fr)}
+  .g-cell{font-size:10px}
+  .irl-grid{grid-template-columns:1fr}
+  .log-display .ld-num{font-size:30px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"二分查找：猜数字游戏的最优解","name":"二分查找：猜数字游戏的最优解","url":"https://xueai.app/slides/algo-3.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 查找与排序","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"玩一局 1 到 100 猜数字，体会每猜一次范围砍一半；十亿条数据 30 次就能找到——log n 快到什么程度。二分查找的门票是先排好序。","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">编程基础篇 · 查找与排序</div>
+    <h1>二分查找：猜数字游戏的最优解</h1>
+    <p class="subtitle">上一课那条最省心的绿线 O(log n)，今天揭开它的真面目。你小时候玩过「我想了个 1 到 100 的数，你猜」吗？<b>猜数字的最优策略，就是计算机科学里最经典的算法之一</b>——二分查找。先玩，再讲理。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>玩一局 1 到 100 猜数字，体会每猜一次范围砍一半；十亿条数据 30 次就能找到——log n 快到什么程度</p></aside><!--seo:end-->  <div class="sec-label">交互一 · 猜数字游戏</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">系统已经想好了一个 1 到 100 之间的数。下面的条带就是全部候选：<b style="color:var(--text)">点任意数字开猜</b>，我会告诉你大了还是小了，被排除的数字会自动变灰。先按直觉乱猜一局记下次数，再点「按二分猜」看标准答案。<b style="color:var(--text)">留意：二分每猜一次，亮着的区域正好砍掉一半。</b></p>
+
+  <div class="guess-box">
+    <div class="guess-strip" id="guessStrip"></div>
+    <div class="guess-status">
+      <span class="guess-msg" id="guessMsg">点条带上任意数字，开始猜 →</span>
+      <span class="guess-count" id="guessCount"><b>0</b>次</span>
+    </div>
+    <div class="guess-controls">
+      <button class="btn-al" id="btnBisect">按二分猜（自动演示）</button>
+      <button class="btn-ghost" id="btnNewGame">换个数字重开 ↻</button>
+    </div>
+    <div class="guess-verdict" id="guessVerdict"></div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>为什么最多 7 次？</b>100 个候选，砍一半剩 50，再砍剩 25、12、6、3、1……砍 7 次必然只剩一个。乱猜运气差要猜几十次，运气再好也不稳定；二分不靠运气，<b>它给的是「最坏情况的保证」</b>——这正是工程师最看重的东西。
+  </div>
+
+  <div class="sec-label">交互二 · 十亿条数据只要 30 次</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked xa-peek">「砍一半」的威力在数据大的时候才真正显灵。点下面的数据量，看二分最多要猜几次，再看那条「连续对折」的动画。<b style="color:var(--text)">留意：数据量翻一万倍，次数只是从 7 涨到 20 出头。</b></p>
+
+  <div class="log-box paywall-locked">
+    <div class="log-btns" id="logBtns"></div>
+    <div class="log-display">
+      <span class="ld-text">最多只需猜</span>
+      <span class="ld-num" id="logTimes">7</span>
+      <span class="ld-text">次（log₂ n 向上取整）</span>
+    </div>
+    <div class="fold-track"><div class="fold-fill" id="foldFill" style="width:100%"><span id="foldLabel">100 条</span></div></div>
+    <div class="fold-caption" id="foldCaption">粉色条 = 还没排除的候选范围。点上面的数据量按钮，看它连续对折。</div>
+  </div>
+
+  <div class="premise-card paywall-locked">
+    <h4>⚠️ 重要前提：二分的门票是「先排好序」</h4>
+    <p>猜数字游戏能玩，是因为数字天然有大小顺序——「大了」这个提示才有意义。换成一本<b>页码被打乱的字典</b>，翻到中间发现是「猫」，你完全不知道「狗」在左边还是右边，二分当场失效。<b>所以想享受 O(log n) 的查找，得先付出排序的成本</b>——排序怎么做、贵不贵，正是下一课的主角。</p>
+  </div>
+
+  <div class="sec-label paywall-locked">日常真身 · 你其实早就在用二分</div>
+
+  <div class="irl-grid paywall-locked">
+    <div class="irl-card">
+      <div class="irl-icon">📖</div>
+      <h4>翻字典 / 翻通讯录</h4>
+      <p>找「王」不会从第一页翻起：先翻到中间，比一下拼音前后，直接扔掉一半——你手上的动作就是二分。</p>
+    </div>
+    <div class="irl-card">
+      <div class="irl-icon">🔍</div>
+      <h4>git bisect 找坏提交</h4>
+      <p>1000 个提交里有一个引入了 bug？git 帮你自动跳到中间的提交测一下，好的砍前半、坏的砍后半，10 次内锁定元凶。</p>
+    </div>
+    <div class="irl-card">
+      <div class="irl-icon">🎯</div>
+      <h4>猜价格 / 调参数</h4>
+      <p>「这瓶酒多少钱？」「高了」「低了」——综艺里的猜价环节，高手全在心里做二分。调试超参数时的手动逼近也是同款。</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 这一课想和你分享的</h3>
+    <ul>
+      <li><b>砍一半的威力</b>：100 个候选 7 次，十亿个候选也只要 30 次——这就是 O(log n)</li>
+      <li><b>不靠运气，靠保证</b>：二分给的是最坏情况的上限，工程要的就是确定性</li>
+      <li><b>有序是前提</b>：乱序的字典没法翻，想用二分先付排序的钱（下一课）</li>
+      <li><b>日常真身</b>：翻字典、git bisect 找坏提交、猜价格，全是二分</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ═══ 交互一：猜数字游戏 ═══
+   状态：secret 目标数，low/high 是当前还可能的区间（由用户的反馈推出）。
+   用户点数字 = 一次猜测；「按二分猜」从当前剩余区间接着自动演示。 */
+const N_MAX = 100;
+let secret, low, high, tries, finished, autoRunning;
+
+const strip = document.getElementById('guessStrip');
+strip.innerHTML = Array.from({length:N_MAX}, (_,i) => `<div class="g-cell" data-v="${i+1}">${i+1}</div>`).join('');
+const cells = [...strip.children];
+
+const guessMsg = document.getElementById('guessMsg');
+const guessCount = document.getElementById('guessCount');
+const guessVerdict = document.getElementById('guessVerdict');
+const btnBisect = document.getElementById('btnBisect');
+const btnNewGame = document.getElementById('btnNewGame');
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function newGame(){
+  secret = 1 + Math.floor(Math.random() * N_MAX);
+  low = 1; high = N_MAX; tries = 0; finished = false; autoRunning = false;
+  cells.forEach(c => c.className = 'g-cell');
+  guessMsg.innerHTML = '点条带上任意数字，开始猜 →';
+  guessCount.innerHTML = '<b>0</b>次';
+  guessVerdict.classList.remove('show');
+  btnBisect.disabled = false;
+}
+
+function paintDead(){
+  cells.forEach(c => {
+    const v = +c.dataset.v;
+    c.classList.toggle('dead', v < low || v > high);
+  });
+}
+
+/* 处理一次猜测，返回 'hit' | 'high' | 'low' */
+function applyGuess(v){
+  tries++;
+  guessCount.innerHTML = `<b>${tries}</b>次`;
+  const cell = cells[v-1];
+  if (v === secret){
+    cell.classList.add('hit');
+    finished = true;
+    guessMsg.innerHTML = `🎉 就是 <b>${v}</b>！共猜了 <b>${tries}</b> 次`;
+    showVerdict();
+    return 'hit';
+  }
+  cell.classList.add('tried');
+  if (v > secret){
+    high = Math.min(high, v - 1);
+    guessMsg.innerHTML = `<b>${v}</b>？大了 ↓（剩余范围 ${low} ~ ${high}，共 ${high-low+1} 个）`;
+  } else {
+    low = Math.max(low, v + 1);
+    guessMsg.innerHTML = `<b>${v}</b>？小了 ↑（剩余范围 ${low} ~ ${high}，共 ${high-low+1} 个）`;
+  }
+  paintDead();
+  return v > secret ? 'high' : 'low';
+}
+
+function showVerdict(){
+  const optimal = Math.ceil(Math.log2(N_MAX));
+  let text;
+  if (tries <= optimal){
+    text = `<b>${tries} 次拿下，已经是二分级别的表现。</b>100 个候选，二分保证最多 ${optimal} 次——因为砍 7 次半必然只剩 1 个。乱猜也可能撞大运，但工程要的是「保证」，不是运气。`;
+  } else {
+    text = `<b>${tries} 次找到。</b>作为对比：二分保证最多 ${optimal} 次搞定 100 个候选。点「换个数字重开」再来一局，这次试试每回都点剩余区间的正中间，感受一下「每猜一次砍一半」。`;
+  }
+  guessVerdict.innerHTML = text;
+  guessVerdict.classList.add('show');
+}
+
+strip.addEventListener('click', e => {
+  const cell = e.target.closest('.g-cell');
+  if (!cell || finished || autoRunning) return;
+  const v = +cell.dataset.v;
+  if (v < low || v > high){
+    guessMsg.innerHTML = `${v} 已经被排除了——它不可能是答案，别浪费一次机会 😉`;
+    return;
+  }
+  applyGuess(v);
+});
+
+btnBisect.addEventListener('click', async () => {
+  if (finished || autoRunning) return;
+  autoRunning = true;
+  btnBisect.disabled = true;
+  while (!finished){
+    const mid = Math.floor((low + high) / 2);
+    const cell = cells[mid-1];
+    cell.classList.add('probing');
+    guessMsg.innerHTML = `二分出手：猜剩余区间的中点 <b>${mid}</b> ……`;
+    await sleep(650);
+    cell.classList.remove('probing');
+    applyGuess(mid);
+    await sleep(550);
+  }
+  autoRunning = false;
+});
+
+btnNewGame.addEventListener('click', () => { if (!autoRunning) newGame(); });
+newGame();
+
+/* ═══ 交互二：十亿条数据只要 30 次 ═══
+   点数据量按钮 → 显示 ceil(log2 n)，并播放「连续对折」动画：
+   宽度每 220ms 砍半，配文案报出当前剩余条数。 */
+const LOG_OPTS = [
+  { label:'100 条',    n:100 },
+  { label:'1 万条',    n:10000 },
+  { label:'100 万条',  n:1000000 },
+  { label:'10 亿条',   n:1000000000 },
+];
+const logBtns = document.getElementById('logBtns');
+const logTimes = document.getElementById('logTimes');
+const foldFill = document.getElementById('foldFill');
+const foldLabel = document.getElementById('foldLabel');
+const foldCaption = document.getElementById('foldCaption');
+
+logBtns.innerHTML = LOG_OPTS.map((o,i) => `<button class="log-btn${i===0?' active':''}" data-i="${i}">${o.label}</button>`).join('');
+
+function fmtBig(n){
+  if (n >= 100000000) return (n/100000000).toLocaleString('zh-CN') + ' 亿';
+  if (n >= 10000) return (n/10000).toLocaleString('zh-CN') + ' 万';
+  return n.toLocaleString('zh-CN');
+}
+
+let foldToken = 0;
+async function playFold(n){
+  const my = ++foldToken;
+  const steps = Math.ceil(Math.log2(n));
+  logTimes.textContent = steps;
+  let remain = n;
+  foldFill.style.transition = 'none';
+  foldFill.style.width = '100%';
+  foldLabel.textContent = fmtBig(n) + ' 条';
+  foldCaption.innerHTML = '开始对折……';
+  await sleep(60);
+  foldFill.style.transition = 'width .22s cubic-bezier(.25,1,.5,1)';
+  for (let k = 1; k <= steps; k++){
+    await sleep(k <= 8 ? 320 : 120);           // 前几折慢慢看，后面加速免得等
+    if (my !== foldToken) return;              // 中途切了别的数据量就作废
+    remain = Math.ceil(remain / 2);
+    /* 宽度按剩余比例算，但视觉上给个 0.6% 下限，免得直接消失 */
+    const pct = Math.max(remain / n * 100, 0.6);
+    foldFill.style.width = pct + '%';
+    foldLabel.textContent = remain >= 10000 ? fmtBig(remain) + ' 条' : remain.toLocaleString('zh-CN') + ' 条';
+    foldCaption.innerHTML = `第 <b>${k}</b> 次对折，剩 <b>${remain.toLocaleString('zh-CN')}</b> 条候选`;
+  }
+  if (my !== foldToken) return;
+  foldCaption.innerHTML = `✅ 对折 <b>${steps}</b> 次，${fmtBig(n)} 条数据只剩最后 1 条——这就是 log₂ 的含义。`;
+}
+
+logBtns.addEventListener('click', e => {
+  const btn = e.target.closest('.log-btn');
+  if (!btn) return;
+  [...logBtns.children].forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  playFold(LOG_OPTS[+btn.dataset.i].n);
+});
+playFold(100);
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

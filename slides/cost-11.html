@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>架构层：KV Cache 的注意事项 | Token 降本增效</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="KV Cache 是商业化降本最被低估的技术点：前缀匹配命中缓存最高省 90%。两个隐形的坑：动态切换 tools 参数会把缓存全打穿，粗暴滑动窗口让前缀永远在变。章节缓存把命中率从 10% 提到 80%。">
+<meta name="keywords" content="KV Cache,前缀缓存,上下文缓存,缓存命中,tools 参数,滑动窗口,章节缓存">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-11.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="架构层：KV Cache 的注意事项">
+<meta property="og:description" content="前缀匹配最高省 90%，但动态切换工具会把缓存全打穿。">
+<meta property="og:url" content="https://xueai.app/slides/cost-11.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="架构层：KV Cache 的注意事项">
+<meta name="twitter:description" content="前缀匹配最高省 90%，但动态切换工具会把缓存全打穿。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl td.hi{color:var(--warn);font-weight:800}
+.tbl td.gd{color:var(--ct-deep);font-weight:800}
+.tbl-wrap{overflow-x:auto}
+
+/* 前缀匹配演示 */
+.pfx{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.pfx-tabs{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:14px}
+.pfx-btn{padding:9px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;color:var(--text);transition:all .18s;min-height:40px}
+.pfx-btn.on{border-color:var(--ct);background:var(--ct-soft);color:var(--ct-deep)}
+.pfx-line{margin-bottom:10px}
+.pfx-line .lb{font-size:12px;font-weight:800;color:var(--sub);margin-bottom:4px}
+.pfx-seq{display:flex;flex-wrap:wrap;gap:4px;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px}
+.pfx-tok{padding:4px 8px;border-radius:6px;background:rgba(0,0,0,.05);color:var(--text)}
+.pfx-tok.hit{background:var(--ct-soft);color:var(--ct-deep);border:1px solid var(--ct-line)}
+.pfx-tok.miss{background:var(--warn-soft);color:var(--warn);border:1px solid rgba(220,38,38,.25)}
+.pfx-note{margin-top:12px;font-size:14px;line-height:1.78;color:var(--text);background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px}
+.pfx-note b{color:var(--ct-deep)}
+.pfx-note .w{color:var(--warn);font-weight:800}
+
+.trap-card{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px 22px;box-shadow:var(--shadow-card)}
+.trap-card h4{font-size:15.5px;font-weight:800;color:var(--warn);margin-bottom:8px}
+.trap-card p{font-size:14.5px;color:var(--sub);line-height:1.8;margin:0}
+.trap-card p b{color:var(--ct-deep)}
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"架构层：KV Cache 的注意事项","name":"架构层：KV Cache 的注意事项","url":"https://xueai.app/slides/cost-11.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 四层实战优化","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"KV Cache 是商业化降本最被低估的技术点：前缀匹配命中缓存最高省 90%。两个隐形的坑：动态切换 tools 参数会把缓存全打穿，粗暴滑动窗口让前缀永远在变。章节缓存把命中率从 10% 提到 80%。","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 降本增效 · 11 / 13</div>
+    <h1>架构层：KV Cache 的注意事项</h1>
+    <p class="subtitle">在商业化产品的降本增效中，KV Cache 是最被低估的技术点之一。命中缓存和没命中，最高差 90% 的成本——但里面有几个隐形的坑，不说你可能不知道。</p>
+    <div class="chips"><span class="chip">前缀匹配</span><span class="chip">空间换时间</span><span class="chip">tools 陷阱</span><span class="chip">章节缓存</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>前缀匹配最高省 90%；动态切换工具为什么把缓存全打穿，滑动窗口 vs 章节缓存</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">什么是 KV Cache：前缀匹配</div>
+    <p class="desc">大模型的本质是「Token 推 Token」：它不关心你问的是什么问题，只关心前文是什么。这意味着——<b>如果两次请求的前缀相同，模型其实在重复计算同样的内容</b>。KV Cache 就是把算过的中间结果存下来，下次遇到相同前缀直接复用：用廉价的存储换昂贵的实时计算，「空间换时间」。</p>
+    <p class="desc" style="margin-top:10px">举个例子：你问「2 + 4 = ?」，它算出 6。再问「3 + 4 = ?」，前缀变了，只能从头算。但如果问的是「2 + 4 + 1 = ?」——前缀「2 + 4」没变，模型直接从 6 开始算出 7。<b>只要前缀不变，缓存就能命中。</b>DeepSeek、Qwen、智谱都支持这个能力（回看第 3 节报价表：缓存价只有标准价的 1/5），这是作者挑选大模型 API 时必看的一项。</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">交互演示 · 哪些 Token 命中了缓存</div>
+    <p class="desc">上一次请求已经缓存了完整前缀。点下面三种「这一次的请求」，看命中（绿）和重算（红）的部分。</p>
+    <div class="pfx" id="pfx">
+      <div class="pfx-tabs" id="pfxTabs"></div>
+      <div class="pfx-line"><div class="lb">上次请求（已缓存）</div><div class="pfx-seq" id="pfxPrev"></div></div>
+      <div class="pfx-line"><div class="lb">这次请求</div><div class="pfx-seq" id="pfxCur"></div></div>
+      <div class="pfx-note" id="pfxNote"></div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">坑一 · 用 tools 参数，就别动态切换工具</div>
+    <div class="trap-card">
+      <h4>看起来省 Token，实际是大坑</h4>
+      <p>有些产品为了极致省钱，根据用户意图动态挂载工具：问天气挂 WeatherTool，闲聊就不挂。问题出在大模型后端的模板逻辑——以 Qwen 3 为例，<b>只要请求带了 tools 参数，服务器就会在 System Prompt 后面插入一段工具说明</b>；如果你没写 System Prompt，模板还会自动帮你加一个再插。工具状态一变（从有到无、从 A 换成 B），<b>Prompt 头部前缀就变了，之前缓存的几十万 Token 瞬间灰飞烟灭</b>。</p>
+    </div>
+    <div class="fig-wrap">
+      <img src="images/cost/cache-invalidate.webp" alt="切换 tools 参数导致 200k 缓存全部失效" loading="lazy">
+      <div class="fig-cap">切换 tools 参数的瞬间：已缓存的 200k Token 全部失效，整段重算。（图：作者分享原稿）</div>
+    </div>
+    <p class="desc" style="margin-top:12px">推荐操作：<b>System Prompt 保持不变 + 不用 tools 字段</b>；或者宁可浪费点 Token，把全量工具定义一直挂着，也要保住缓存命中。System Prompt 的稳定性，比省那点 Token 重要得多。</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">坑二 · 慎用滑动窗口，尽量采用归纳形式</div>
+    <p class="desc">多轮对话和长文本场景，很多产品用「滑动窗口」处理超长历史——只保留最近 N 轮，旧的直接丢。这是偷懒，而且会出问题。滑动窗口的本质是 FIFO 队列：<b>每滚动一次，前缀就变一次，缓存永远命不中。</b></p>
+    <p class="desc" style="margin-top:10px">作者的产品「伴写」（用前文生成后文）早期就是固定 800 字滚动窗口，又贵又容易「失忆」。后来改成<b>章节缓存</b>：AI 生成时识别到话题转换（场景切换、新章节）就插入分隔标记，系统据此判断哪些内容压缩成摘要、哪些完整保留——与其让 AI 自己有损压缩，不如让前缀尽量稳定，命中缓存。</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>指标</th><th>旧方案（滑动窗口）</th><th>新方案（章节缓存）</th></tr>
+      <tr><td>KV Cache 命中率</td><td class="hi">~10%（前缀总在变）</td><td class="gd">~80%（前缀稳定）</td></tr>
+      <tr><td>逻辑连贯性</td><td class="hi">差（经常失忆）</td><td class="gd">好（摘要 + 完整章节）</td></tr>
+      <tr><td>Token 成本</td><td class="hi">高（重复计算）</td><td class="gd">低（缓存复用）</td></tr>
+    </table></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">上下文管理的四个设计决策</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>问题</th><th>设计决策</th></tr>
+      <tr><td>哪些信息必须「恒久保留」？</td><td>放入 <b>Stable 区</b>，作为缓存前缀</td></tr>
+      <tr><td>哪些信息可以「压缩存档」？</td><td>用<b>摘要替代原文</b>，控制窗口大小</td></tr>
+      <tr><td>哪些信息需要「按需加载」？</td><td>按<b>章节 / 话题切分</b>，动态挂载</td></tr>
+      <tr><td>如何识别「可压缩边界」？</td><td>设计<b>分隔符机制</b>，让 AI 标记话题转换点</td></tr>
+    </table></div>
+    <div class="quote-card" style="margin-top:14px">
+      不要把上下文窗口当垃圾桶，也不要用简单粗暴的滑动窗口。上下文管理，本质上是在做<b>信息的分层存储与按需调度</b>——这才是在质量、成本、速度之间找平衡的正确姿势。
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本节要点</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>前缀不变，缓存命中，最高省 90%。</b>选 API 时「支不支持上下文缓存」是必看项。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>别动态切换 tools：</b>工具状态一变，模板重写 System Prompt，缓存全打穿。宁可全量挂着。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>滑动窗口是缓存杀手：</b>用「Stable 前缀 + 摘要存档 + 章节挂载」代替，命中率 10% → 80%。</p></div>
+    </div>
+    <p class="src-note">
+      <b>内容来源：</b>整理自作者团队内部分享《AI Token 降本增效策略分享》实战篇「03｜架构层」。DeepSeek 的硬盘缓存定价见<a href="https://api-docs.deepseek.com/zh-cn/news/news0802" target="_blank" rel="noopener">官方公告</a>；「Token 推 Token」的原理复习<a href="1-2-base.html">大模型原理 · Base 模型</a>。
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* ── 前缀匹配演示 ── */
+var PREV = ['System Prompt', '工具定义 A', '知识库 20k', '历史 1-5 轮', '用户问题①'];
+var CASES = [
+  {tab:'① 追加一轮对话', cur:['System Prompt','工具定义 A','知识库 20k','历史 1-5 轮','用户问题①','AI 回答①','用户问题②'], hitTo:5,
+   note:'<b>理想情况：</b>新内容只是追加在尾部，前面全部命中缓存（绿色），只有新增的两段要重算。这就是「只增不改」的架构红利。'},
+  {tab:'② 切换了工具', cur:['System Prompt','工具定义 B','知识库 20k','历史 1-5 轮','用户问题①','用户问题②'], hitTo:1,
+   note:'<span class="w">灾难现场：</span>只是把工具 A 换成 B，但它排在前缀第二位——<b>从它开始后面的一切全部失效</b>，20k 知识库和全部历史都要按非缓存价重算。'},
+  {tab:'③ 滑动窗口滚动', cur:['System Prompt','工具定义 A','知识库 20k','历史 2-6 轮','用户问题②'], hitTo:3,
+   note:'<span class="w">缓存杀手：</span>窗口一滚动，「历史 1-5 轮」变成「历史 2-6 轮」，从这里开始全部重算。<b>每一轮都这样滚，命中率永远上不去</b>——所以要用章节缓存代替。'}
+];
+var pfxCur = -1;
+function pfxSeq(el, arr, hitTo, isPrev){
+  el.innerHTML = '';
+  arr.forEach(function(t, i){
+    var s = document.createElement('span');
+    s.className = 'pfx-tok' + (isPrev ? '' : (i < hitTo ? ' hit' : ' miss'));
+    s.textContent = t;
+    el.appendChild(s);
+  });
+}
+function pfxRender(){
+  var tabs = document.getElementById('pfxTabs'); tabs.innerHTML = '';
+  CASES.forEach(function(c, i){
+    var b = document.createElement('button');
+    b.className = 'pfx-btn' + (i === pfxCur ? ' on' : ''); b.type = 'button';
+    b.textContent = c.tab; b.onclick = function(){ pfxPick(i); };
+    tabs.appendChild(b);
+  });
+}
+function pfxPick(i){
+  pfxCur = i; var c = CASES[i];
+  pfxSeq(document.getElementById('pfxPrev'), PREV, PREV.length, true);
+  pfxSeq(document.getElementById('pfxCur'), c.cur, c.hitTo, false);
+  document.getElementById('pfxNote').innerHTML = c.note;
+  pfxRender();
+}
+pfxRender();
+lessonOnView(document.getElementById('pfx'), function(){ if (pfxCur < 0) pfxPick(0); });
+</script>
+<script src="skill-data.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

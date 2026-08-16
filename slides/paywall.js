@@ -31,7 +31,7 @@
   /* 措辞与 auth.js 的登录弹窗保持一致，同一个站里两处引导不该各说各的 */
   var _T = {
     zh: {
-      artAlt:        '小山学 AI',
+      artAlt:        '小山学堂',
       gateTitle:     '登录后继续免费阅读',
       gateSub:       '本节还没有结束。登录即可解锁余下内容与全部课程，完全免费，不花一分钱。',
       b0Title:       '解锁全部课程',
@@ -48,7 +48,7 @@
       noteLink:      '登录后继续免费阅读'
     },
     en: {
-      artAlt:        'Learn AI with Xiaoshan',
+      artAlt:        'Xiaoshan Academy',
       gateTitle:     'Log in to keep reading — free',
       gateSub:       'This lesson is not over yet. Log in to unlock the rest and every other course, '
                      + 'completely free of charge.',
@@ -66,7 +66,7 @@
       noteLink:      'Log in to keep reading'
     },
     ko: {
-      artAlt:        '샤오산과 함께 배우는 AI',
+      artAlt:        '샤오산 아카데미',
       gateTitle:     '로그인하고 무료로 계속 읽기',
       gateSub:       '이 강의는 아직 끝나지 않았습니다. 로그인하면 나머지 내용과 전체 강의를 '
                      + '완전 무료로 이용할 수 있습니다.',
@@ -133,6 +133,25 @@
     + '.xa-note-link{margin-left:auto;flex:0 0 auto;color:#1f6feb;font-weight:600;'
     + 'text-decoration:none;white-space:nowrap;}'
     + '.xa-note-link:hover{text-decoration:underline;}'
+    /* 课程页现已支持深色主题，登录引导必须与正文一起切换，不能留下白色孤岛 */
+    + '[data-theme="dark"] .xa-gate{background:var(--card,#171d19);'
+    + 'border-color:var(--border,rgba(255,255,255,.1));'
+    + 'box-shadow:0 8px 28px rgba(0,0,0,.28);}'
+    + '[data-theme="dark"] .xa-gate h2{color:var(--text,#e9ece9);}'
+    + '[data-theme="dark"] .xa-gate-sub{color:var(--sub,#a3ada8);}'
+    + '[data-theme="dark"] .xa-gate-li{background:var(--accent-soft,rgba(92,181,149,.14));'
+    + 'border-color:color-mix(in srgb,var(--accent,#5cb595) 24%,transparent);}'
+    + '[data-theme="dark"] .xa-gate-ico{background:color-mix(in srgb,var(--accent,#5cb595) 20%,transparent);'
+    + 'color:var(--accent,#5cb595);}'
+    + '[data-theme="dark"] .xa-gate-t{color:var(--text,#e9ece9);}'
+    + '[data-theme="dark"] .xa-gate-d,[data-theme="dark"] .xa-gate-foot{color:var(--sub,#a3ada8);}'
+    + '[data-theme="dark"] .xa-gate-btn{background:var(--accent,#5cb595);'
+    + 'box-shadow:0 4px 14px color-mix(in srgb,var(--accent,#5cb595) 28%,transparent);}'
+    + '[data-theme="dark"] .xa-gate-btn:hover{filter:brightness(1.08);}'
+    + '[data-theme="dark"] .xa-note{background:var(--accent-soft,rgba(92,181,149,.14));'
+    + 'border-color:color-mix(in srgb,var(--accent,#5cb595) 24%,transparent);'
+    + 'color:var(--text,#e9ece9);}'
+    + '[data-theme="dark"] .xa-note svg,[data-theme="dark"] .xa-note-link{color:var(--accent,#5cb595);}'
     /* 窄屏改成配图横幅在上：竖图挤在侧边只剩一条，看不出画的是什么 */
     + '@media(max-width:680px){'
     + 'html.xa-locked .xa-gate{display:block;}'

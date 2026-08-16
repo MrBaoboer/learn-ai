@@ -121,6 +121,9 @@
       viewportW: window.innerWidth || 0,
       viewportH: window.innerHeight || 0,
       referrer: (document.referrer || '').slice(0, 512),
+      // 分享链接归因：把落地页查询串原样上报（?ref=xxx / ?utm_source=xxx），
+      // 由服务端在建会话时解析出渠道标记，中途翻页不覆盖
+      qs: (location.search || '').slice(0, 256),
       language: (navigator.language || '').slice(0, 32)
     };
   }

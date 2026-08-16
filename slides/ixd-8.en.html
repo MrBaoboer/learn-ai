@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Goal-Oriented: Describe Requirements by Goals, Not Feature Lists | Interaction Engineering</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="ixd.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="Feed AI a feature list and it returns a counter; feed it a scenario with a persona and a goal, and it returns a tool that fits. Duel two prompts, sort six goal-vs-task lines, run a greedy-persona experiment, then rewrite a feature list into a scenario by hand.">
+<meta name="keywords" content="goal-oriented design,persona,scenario,AI prompts,requirement writing,About Face">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ixd-8.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ixd-8.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ixd-8.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ixd-8.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ixd-8.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Xiaoshan Academy">
+<meta property="og:title" content="Goal-Oriented: Describe Requirements by Goals, Not Feature Lists">
+<meta property="og:description" content="Features are derived; goals are the original text of the requirement. Tell AI a scenario—don't hand it a list.">
+<meta property="og:url" content="https://xueai.app/slides/ixd-8.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Goal-Oriented: Describe Requirements by Goals, Not Feature Lists">
+<meta name="twitter:description" content="Features are derived; goals are the original text of the requirement. Tell AI a scenario—don't hand it a list.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 提示词对决：两段提示词各配一个产出 mock ──
+   v1.3 质感：A 面产出是「什么都有」的柜台式表单，密而不糙；
+   B 面产出是围着场景走的三步流，经得起单独截图。 */
+.x8-duelgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.x8-prompt{background:#0f172a;color:#cbd5e1;border-radius:10px;padding:12px 14px;font-size:11px;line-height:1.8;font-family:"SF Mono","Fira Code",Menlo,monospace;white-space:pre-wrap;margin-bottom:12px;min-height:128px;}
+.x8-prompt .pl{color:#64748b;}
+.x8-prompt .hl{color:#93c5fd;}
+/* A 面柜台式表单零件 */
+.x8-formrow{display:flex;flex-direction:column;gap:3px;margin-top:8px;}
+.x8-formrow label{font-size:9.5px;color:#6b7280;font-weight:700;}
+.x8-input{border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#9ca3af;font-size:9.5px;padding:5px 8px;}
+.x8-table{margin-top:10px;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;font-size:8.5px;color:#6b7280;}
+.x8-table .tr{display:grid;grid-template-columns:2fr 1fr 1fr;padding:4px 8px;border-bottom:1px solid #f1f3f5;}
+.x8-table .tr.th{background:#f9fafb;font-weight:800;color:#374151;}
+.x8-table .tr:last-child{border-bottom:none;}
+/* B 面三步流零件 */
+.x8-steps{display:flex;align-items:center;gap:6px;margin-bottom:12px;}
+.x8-step{flex:1;text-align:center;font-size:9.5px;font-weight:800;color:#9ca3af;padding:5px 0;border-radius:999px;background:#f3f4f6;}
+.x8-step.on{background:#2563eb;color:#fff;}
+.x8-drop{border:1.5px dashed #93c5fd;border-radius:10px;background:#eff6ff;padding:16px;text-align:center;color:#1d4ed8;font-size:11px;font-weight:700;line-height:1.7;}
+.x8-invoice{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.x8-invoice .iv-ic{width:28px;height:28px;border-radius:8px;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.x8-invoice .iv-ic svg{width:14px;height:14px;}
+.x8-invoice .iv-t{font-size:11px;font-weight:800;color:#111827;}
+.x8-invoice .iv-s{font-size:9.5px;color:#9ca3af;margin-top:1px;}
+.x8-invoice .iv-ok{margin-left:auto;font-size:9.5px;font-weight:800;color:#16a34a;flex-shrink:0;}
+/* ── 目标还是任务：六道分辨题 ── */
+.x8-cls{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+.x8-clsrow{display:flex;align-items:center;gap:10px;padding:12px 16px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);transition:border-color .2s;}
+.x8-clsrow .st{flex:1;font-size:13px;color:var(--text);line-height:1.6;min-width:0;}
+.x8-clsrow .pick{display:flex;gap:6px;flex-shrink:0;}
+.x8-clsbtn{border:1.5px solid var(--border);background:#fff;color:var(--sub);font-size:12px;font-weight:800;padding:5px 14px;border-radius:999px;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s,background .15s;}
+.x8-clsbtn:hover{border-color:var(--ct-line);color:var(--ct-deep);}
+.x8-clsrow.done .x8-clsbtn{cursor:default;pointer-events:none;opacity:.45;}
+.x8-clsrow.done .x8-clsbtn.right{opacity:1;background:var(--good);border-color:var(--good);color:#fff;}
+.x8-clsrow.done .x8-clsbtn.wrongpick{opacity:1;background:var(--bad);border-color:var(--bad);color:#fff;}
+.x8-clsrow .why{display:none;width:100%;font-size:12px;color:var(--sub);line-height:1.7;margin-top:8px;}
+.x8-clsrow.done{flex-wrap:wrap;}
+.x8-clsrow.done .why{display:block;animation:ixd-slide-up .25s ease-out both;}
+/* ── 人物模型贪多实验 ── */
+.x8-persona{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;}
+.x8-pcard{border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--card);transition:border-color .2s,box-shadow .2s;}
+.x8-pcard.lead{border-color:var(--ct);box-shadow:0 0 0 3px var(--ct-soft);}
+.x8-pcard .pn{font-size:13px;font-weight:800;color:var(--ct-deep);}
+.x8-pcard .pr{font-size:10.5px;color:var(--sub);margin-top:2px;}
+.x8-pcard .pg{font-size:12px;color:var(--text);line-height:1.65;margin-top:8px;}
+.x8-pcard .pt{display:inline-block;font-size:10px;font-weight:800;padding:2px 10px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);margin-top:8px;}
+/* 贪多后的 mock 附件面板 */
+.x8-extra{display:none;margin-top:8px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;font-size:9.5px;color:#6b7280;line-height:1.6;}
+.x8-extra.show{display:block;animation:ixd-slide-up .25s ease-out both;}
+.x8-extra b{color:#374151;font-size:10px;}
+/* ── 场景改写器 ── */
+.x8-rw{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+.x8-rwrow{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);cursor:pointer;transition:border-color .18s,transform .18s;}
+.x8-rwrow:hover{border-color:var(--ct-line);transform:translateY(-1px);}
+.x8-rwrow.flip{cursor:default;border-color:rgba(22,163,74,.35);background:var(--good-soft);transform:none;}
+.x8-rwrow .rw-ic{width:26px;height:26px;border-radius:8px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:800;transition:background .18s,color .18s;}
+.x8-rwrow.flip .rw-ic{background:var(--good);color:#fff;}
+.x8-rwrow .rw-tx{flex:1;font-size:13px;line-height:1.7;color:var(--text);min-width:0;}
+.x8-rwrow .rw-tx .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 8px;border-radius:999px;background:rgba(0,0,0,.05);color:var(--sub);margin-right:6px;vertical-align:1px;}
+.x8-rwrow.flip .rw-tx .tag{background:rgba(22,163,74,.14);color:var(--good);}
+.x8-rwrow .rw-tx.swap{animation:ixd-slide-up .25s ease-out both;}
+.x8-final{display:none;margin-top:16px;}
+.x8-final.show{display:block;animation:ixd-pop .3s cubic-bezier(.34,1.56,.64,1) both;}
+.x8-copy{margin-left:auto;border:1px solid var(--ct-line);background:#fff;color:var(--ct);font-size:12px;font-weight:800;padding:5px 16px;border-radius:8px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s;}
+.x8-copy:hover{background:var(--ct);color:#fff;}
+.x8-copy.done{background:var(--good);border-color:var(--good);color:#fff;}
+/* 判词条 */
+.x8-note{margin-top:16px;padding:16px;border-radius:10px;background:rgba(0,0,0,.03);font-size:13.5px;line-height:1.8;color:var(--text);}
+.x8-note b{color:var(--ct-deep);}
+.x8-note.warn{background:var(--bad-soft);}
+.x8-note.warn b{color:var(--bad);}
+.x8-note.ok{background:var(--good-soft);}
+.x8-note.ok b{color:var(--good);}
+.x8-addbtn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;font-family:inherit;background:var(--ct);color:#fff;font-size:14px;font-weight:800;padding:8px 24px;border-radius:10px;transition:background .15s;}
+.x8-addbtn:hover{background:var(--ct-deep);}
+.x8-addbtn.undo{background:#111827;}
+@media (max-width:768px){
+  .x8-duelgrid{grid-template-columns:1fr;}
+  .x8-persona{grid-template-columns:1fr;}
+  .x8-clsrow{flex-wrap:wrap;}
+  .x8-clsrow .st{flex-basis:100%;}
+}
+@media (prefers-reduced-motion:reduce){
+  .x8-clsrow.done .why,.x8-extra.show,.x8-rwrow .rw-tx.swap,.x8-final.show{animation:none;}
+  .x8-rwrow:hover{transform:none;}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Goal-Oriented: Describe Requirements by Goals, Not Feature Lists","name":"Goal-Oriented: Describe Requirements by Goals, Not Feature Lists","url":"https://xueai.app/slides/ixd-8.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Translating Interaction for AI","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Feed AI a feature list and it returns a counter; feed it a scenario with a persona and a goal, and it returns a tool that fits. Duel two prompts, sort six goal-vs-task lines, run a greedy-persona experiment, then rewrite a feature list into a scenario by hand.","datePublished":"2026-08-11","dateModified":"2026-08-12","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Interaction Engineering · 8 / 10</div>
+    <h1>Goal-Oriented: Describe Requirements by Goals, Not Feature Lists</h1>
+    <p class="subtitle">The first seven lessons teach you to spot good interaction; these two teach you to translate requirements for AI. The first translation principle comes from the opening methodology of <i>About Face 4</i>: <b>say who the user is and what they need to finish—let AI derive the features</b>. Hand it a list and you get a counter; tell it a scenario and you get a tool.</p>
+    <div class="chips"><span class="chip">Goal vs. task</span><span class="chip">Persona</span><span class="chip">Contextual scenario</span><span class="chip">Prompt duel</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Telling AI "Xiaomei needs to file expenses in three minutes" beats "need upload, form, buttons" by a mile. Duel two prompts, then practice rewriting a feature list into a scenario</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">How feature lists fool you</div>
+    <p class="desc">When briefing AI, most people's first move is a feature list: "need upload, need a form, need export." It looks professional, but it skips the most important info: <b>together, who are these features helping finish what?</b> AI can only execute item by item—every item lands, yet nobody's problem gets solved.</p>
+    <p class="desc" style="margin-top:16px"><i>About Face 4</i>, Chapter 1, makes this the foundation of the methodology: interaction design studies user goals first, then derives features from goals. Cooper stresses that goals and tasks are different: <b>a goal is the expected end state; a task is only a middle step toward it</b>. Goals stay stable for decades (file the expense, let the boss know you're done); tasks swap every few years (paste receipts → photo OCR). Brief by tasks and AI gives you an electronic version of the old task; brief by goals and it gets a chance to delete the task itself.</p>
+    <div class="quote-card" style="margin-top:16px">"We call this method of studying and satisfying user goals and needs directly goal-oriented design."<br><b>Alan Cooper, <i>About Face 4</i>, Chapter 1. Ask for whom and why before what.</b></div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Duel · Same requirement, two prompts</div>
+    <p class="desc">Same expense tool: left feeds AI a feature list, right feeds a persona and scenario. Below are two prompts and the UIs they return. Don't peek at the verdict—pick: which side would you use once a month?</p>
+    <div class="toy" id="x8duelToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="M9.5 6.5 21 18v3h-3L6.5 9.5"/><path d="m5 14-2 2 2 2"/><path d="m3 21 2-2"/></svg></span>
+        <span class="toy-t">Feature list vs. goal scenario</span>
+        <span class="toy-badge">Pick a side</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">Above is the prompt fed to AI; below is the UI it returned. Tap the side you'd actually use.</div>
+        <div class="duel">
+          <div class="duel-side">
+            <span class="duel-tag">Prompt A · Feature list</span>
+            <div class="x8-prompt"><span class="pl">// List features item by item</span>
+Build an expense page with:
+invoice upload, amount field,
+category dropdown, notes, approver picker,
+submit button, history table,
+filters, export to Excel.</div>
+            <div class="mockwin">
+              <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">oa.example.com/expense</span></div>
+              <div class="mock" style="padding:16px;background:#f4f5f7">
+                <div class="mock-card" style="padding:12px;border-radius:8px">
+                  <div class="mock-h" style="font-size:12px">Expense management</div>
+                  <div class="x8-formrow"><label>Invoice file</label><span class="x8-input">Choose file (none selected)</span></div>
+                  <div class="x8-formrow"><label>Amount *</label><span class="x8-input">Enter amount</span></div>
+                  <div class="x8-formrow"><label>Category *</label><span class="x8-input">Select ▾</span></div>
+                  <div class="x8-formrow"><label>Notes</label><span class="x8-input">Enter notes</span></div>
+                  <div class="x8-formrow"><label>Approver *</label><span class="x8-input">Select ▾</span></div>
+                  <div style="display:flex;gap:6px;margin-top:10px">
+                    <span class="mock-btn" style="background:#2563eb;font-size:9.5px">Submit</span>
+                    <span class="mock-btn ghost" style="font-size:9.5px">Reset</span>
+                    <span class="mock-btn ghost" style="font-size:9.5px">Export Excel</span>
+                  </div>
+                  <div class="x8-table">
+                    <div class="tr th"><span>History</span><span>Amount</span><span>Status</span></div>
+                    <div class="tr"><span>2026-07 Taxi</span><span>¥86.00</span><span>Approved</span></div>
+                    <div class="tr"><span>2026-06 Office supplies</span><span>¥219.00</span><span>Approved</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="duel-side">
+            <span class="duel-tag">Prompt B · Goal scenario</span>
+            <div class="x8-prompt"><span class="pl">// Tell the persona and scenario</span>
+User is sales rep <span class="hl">Xiaomei</span>, who stacks up
+taxi receipts at month-end. Goal: <span class="hl">file expenses
+in three minutes without breaking her flow</span>.
+Scenario: drag in receipt photos; the system auto-reads
+amount and category; she glances, confirms, taps submit,
+and sees "Submitted—expect reimbursement in 3 days."</div>
+            <div class="mockwin">
+              <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">oa.example.com/expense</span></div>
+              <div class="mock" style="padding:16px;background:#f4f5f7">
+                <div class="mock-card" style="padding:14px;border-radius:10px">
+                  <div class="x8-steps"><span class="x8-step on">1 Drop invoice</span><span class="x8-step">2 Confirm</span><span class="x8-step">3 Done</span></div>
+                  <div class="x8-drop">Drop invoice photos here<br><span style="font-size:9.5px;font-weight:400;color:#60a5fa">Batch OK; amount and category auto-detected</span></div>
+                  <div class="x8-invoice">
+                    <span class="iv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6"/></svg></span>
+                    <span><span class="iv-t">Taxi receipt · ¥86.00</span><br><span class="iv-s">Detected as "Transport"—tap to fix</span></span>
+                    <span class="iv-ok">Detected</span>
+                  </div>
+                  <span class="mock-btn" style="background:#2563eb;margin-top:12px">Confirm &amp; submit</span>
+                  <div class="mock-p" style="margin-top:8px;font-size:9.5px;color:#9ca3af">You can undo within 5 minutes after submit</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="duel-verdict"></div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:16px">One detail: Prompt B never names a control, yet the output has drag-and-drop, auto-detect, and undo—none of which were on A's list. <b>Features grow from goals; give AI enough soil and it will fruit on its own</b>.</p>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">Warm up: goal, or task?</div>
+    <p class="desc">To brief by goals, you first have to recognize them. One test, from Chapter 1: <b>a goal is the end state; a task is a step toward it</b>. Ask "what is this for?"—if you can still answer, it's a task; if you can't (it is the answer), it's a goal. Six lines—judge each.</p>
+    <div class="toy" id="x8cls">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3 3 21"/><path d="M16 21h5v-5"/></svg></span>
+        <span class="toy-t">Goal or task</span>
+        <span class="toy-badge" id="x8clsBadge">0 / 6</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">Ask "what for?" of each line, then decide.</div>
+        <div class="x8-cls" id="x8clsList"></div>
+        <div class="x8-note" id="x8clsNote">After all six, a summary lands here.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Personas: design for someone—write their name</div>
+    <p class="desc">A goal needs an owner. Chapter 3's tool is the persona: distill a real user into a concrete person with a name, a job, and a goal, and let every design trade-off answer to them. Cooper hammers one point: <b>each screen serves one primary persona</b>. Try to please everyone and the UI becomes a counter with a bit of everything—everyone who arrives has to hunt first.</p>
+    <div class="x8-persona">
+      <div class="x8-pcard lead">
+        <div class="pn">Xiaomei</div>
+        <div class="pr">Sales · expenses once a month</div>
+        <div class="pg">Goal: file expenses in three minutes—don't break my deal flow.</div>
+        <span class="pt">Primary persona</span>
+      </div>
+      <div class="x8-pcard">
+        <div class="pn">Lao Zhou</div>
+        <div class="pr">Finance · reviews dozens a day</div>
+        <div class="pg">Goal: spot problem claims at a glance; batch-approve the clean ones.</div>
+        <span class="pt" style="background:rgba(0,0,0,.05);color:var(--sub)">Secondary persona</span>
+      </div>
+      <div class="x8-pcard">
+        <div class="pn">Da Liu</div>
+        <div class="pr">Director · always on the road</div>
+        <div class="pg">Goal: multi-currency receipts—don't make me convert myself.</div>
+        <span class="pt" style="background:rgba(0,0,0,.05);color:var(--sub)">Secondary persona</span>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:16px">Secondary needs can ship—but only tucked in a corner that doesn't crowd the primary. Doubt it? The experiment below shows what "a little for everyone" costs.</p>
+    <div class="toy" id="x8greedy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        <span class="toy-t">Greedy experiment: serve one more user</span>
+        <span class="toy-badge" id="x8gBadge">Serving 1 person</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">This is Xiaomei's expense home. Each button tap stuffs in one more user's needs.</div>
+        <div class="mockwin">
+          <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">oa.example.com/expense</span></div>
+          <div class="mock" style="padding:16px;background:#f4f5f7">
+            <div class="mock-card" style="padding:14px;border-radius:10px">
+              <div class="mock-h" style="font-size:12px">Expenses</div>
+              <div class="x8-extra" id="x8g1"><b>Approval desk (for Lao Zhou):</b> 23 pending · 2 flagged · batch approve · reject-reason library</div>
+              <div class="x8-extra" id="x8g2"><b>FX center (for Da Liu):</b> USD 7.18 · EUR 7.82 · JPY 0.048 · historical FX chart</div>
+              <div class="x8-drop" style="margin-top:10px">Drop invoice photos here</div>
+              <div class="x8-extra" id="x8g3"><b>Team report (for the manager):</b> dept expenses this month ¥42,190 · YoY +18% · view details</div>
+              <span class="mock-btn" style="background:#2563eb;margin-top:10px;font-size:9.5px">Confirm &amp; submit</span>
+              <div class="x8-extra" id="x8g4"><b>Invoice archive print (for admin):</b> bind by month · generate cover · connect printer</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <button class="x8-addbtn" id="x8gBtn" type="button">Serve one more user</button>
+        </div>
+        <div class="x8-note" id="x8gNote">Right now the whole page serves Xiaomei only: drop, confirm, submit—the three-minute goal holds.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Scenarios: let the persona walk the product on paper</div>
+    <p class="desc">With persona and goal in place, Chapter 4's last tool is the <b>contextual scenario</b>: no tech, no control names—write like a story how this person reaches the goal end to end. Once written, must-have features vs. pure fantasy float up on their own. That's also the best format for AI: it can read a story, and invent the missing parts.</p>
+    <p class="desc" style="margin-top:16px">Below is a typical feature list—four lines of "must have X." Tap each to see what it looks like in scenario language.</p>
+    <div class="toy" id="x8rw">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
+        <span class="toy-t">Scenario rewriter</span>
+        <span class="toy-badge" id="x8rwBadge">0 / 4</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">Tap each line to see feature-speak become scenario-speak. After four, you get a ready-to-use prompt.</div>
+        <div class="x8-rw">
+          <div class="x8-rwrow" data-i="0">
+            <span class="rw-ic">1</span>
+            <span class="rw-tx"><span class="tag">Feature-speak</span>Need meeting-room booking with time filters</span>
+          </div>
+          <div class="x8-rwrow" data-i="1">
+            <span class="rw-ic">2</span>
+            <span class="rw-tx"><span class="tag">Feature-speak</span>Need calendar view and list view toggle</span>
+          </div>
+          <div class="x8-rwrow" data-i="2">
+            <span class="rw-ic">3</span>
+            <span class="rw-tx"><span class="tag">Feature-speak</span>Need meeting reminder push settings</span>
+          </div>
+          <div class="x8-rwrow" data-i="3">
+            <span class="rw-ic">4</span>
+            <span class="rw-tx"><span class="tag">Feature-speak</span>Need cancel booking and reschedule</span>
+          </div>
+        </div>
+        <div class="x8-final" id="x8final">
+          <div class="toy-head" style="padding:0 0 8px;border:none">
+            <span class="toy-t" style="font-size:13px">Assembled scenario prompt</span>
+            <button class="x8-copy" id="x8copy" type="button">Copy</button>
+          </div>
+          <div class="x8-prompt" id="x8finalText" style="min-height:0">User is admin specialist Azhe. Every week he books rooms for three teams. Goal: book a usable room in ten seconds, and fix mistakes instantly. Walk the scenario: he states time and headcount; the system shows only rooms available now; after booking he glances at this week's plan; before the meeting he gets one well-timed reminder; a coworker reschedules, and he edits the same record in one step—no cancel-and-rebook. You choose UI states (loading, empty, error) and controls—whatever helps Azhe hit the ten-second goal.</div>
+        </div>
+        <div class="x8-note" id="x8rwNote">Notice what every rewrite shares: the subject flips from "the system" to "a person."</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Quiz: which requirement feeds AI best?</div>
+    <div class="toy" id="x8quiz">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+        <span class="toy-t">Building an "add expense" screen for a ledger app—which brief is best?</span>
+        <span class="toy-badge">Single choice</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>Need amount keypad, category grid, date picker, notes field, save button</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>Reference mainstream ledger apps and make an add-expense screen—make it nicer</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>User is an office worker. Goal: log one expense in five seconds while queuing for coffee. They only use a few categories—two taps should finish it</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>Page in three blocks: amount on top, category in the middle, big save button at the bottom</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Key Takeaways</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Goals are destinations; tasks are steps:</b> if "what for?" still has an answer, it's a task. Brief by goals so AI gets a chance to delete surplus tasks entirely.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>One screen serves one primary persona:</b> tuck secondary needs in a corner. A UI that tries to care for everyone ends up smooth for no one.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Best format for AI is a scenario:</b> persona + goal + an end-to-end story. Let it derive controls and states; you only check whether the goal was met.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>One-line template:</b> "User is ____. Goal is ____. Walk the scenario: ____. You decide UI details—whatever helps the user hit the goal."</p></div>
+    </div>
+    <p class="src-note"><b>Source:</b> Original to Xiaoshan Academy's Interaction Engineering series; goal-oriented design, personas, and contextual scenarios adapted from <i>About Face 4: The Essentials of Interaction Design</i>, Chapters 1, 3, and 4 (Alan Cooper et al.).</p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="taste.js?v=20260810a"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* 提示词对决：判词点名两边产出的来源差异。 */
+tasteDuel('x8duelToy', {
+  winner: 1,
+  verdict: 'A shipped all nine features on the list—none missing. Xiaomei only uses four each month, and every time she has to find those four among nine. That\'s a counter. B\'s prompt never named a control—only persona, goal, and scenario—yet AI derived drag-and-drop, auto-detect, and undo, none of which were on the list, because they serve "file it in three minutes." Requirement information density isn\'t in the item count—it\'s in the goal.'
+});
+
+/* 目标还是任务：六道分辨题。
+   背景：目标导向的第一步是会认目标，判据「追问为了什么」要练手才长在身上。
+   设计意图：行内双按钮即点即判，答案与解释在点击那一刻滑出（ixd-slide-up），
+   错选标红、正确项标绿，六题全判给总结并统计正确数。 */
+var X8_CLS = [
+  { s: 'File this month\'s expenses before leaving work', a: 'goal', why: 'What for? It is the answer. Tech changes; this need stays. Goal.' },
+  { s: 'Tap "Upload invoice" and pick a local file', a: 'task', why: 'To file expenses. Photo OCR arrives and this step vanishes. Task.' },
+  { s: 'Make sure the approver knows this claim is urgent', a: 'goal', why: 'What for? No deeper answer. Urgent flags, DMs, phone calls are its tasks. Goal.' },
+  { s: 'Pick "Transport" in the category dropdown', a: 'task', why: 'To categorize the receipt. Auto-detect can do it. Task.' },
+  { s: 'Don\'t look clumsy in front of coworkers', a: 'goal', why: 'Cooper calls these experience goals: users never say them out loud, but every interaction scores them. Products that violate them get quietly abandoned.' },
+  { s: 'Export last week\'s data to Excel every Monday', a: 'task', why: 'Easy to misjudge. Ask once: export is so the boss can see the numbers. A scheduled auto-report can erase it. Task.' }
+];
+var x8ClsDone = 0, x8ClsRight = 0;
+var x8ClsList = document.getElementById('x8clsList');
+X8_CLS.forEach(function (item, i) {
+  var row = document.createElement('div');
+  row.className = 'x8-clsrow';
+  row.innerHTML = '<span class="st">' + item.s + '</span>' +
+    '<span class="pick"><button class="x8-clsbtn" type="button" data-v="goal">Goal</button>' +
+    '<button class="x8-clsbtn" type="button" data-v="task">Task</button></span>' +
+    '<span class="why"></span>';
+  row.querySelectorAll('.x8-clsbtn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (row.classList.contains('done')) return;
+      row.classList.add('done');
+      var right = btn.dataset.v === item.a;
+      if (right) { x8ClsRight++; btn.classList.add('right'); }
+      else {
+        btn.classList.add('wrongpick');
+        row.querySelector('[data-v="' + item.a + '"]').classList.add('right');
+      }
+      var why = row.querySelector('.why');
+      why.innerHTML = (right ? '<b style="color:var(--good)">You got it.</b>' : '<b style="color:var(--bad)">Flipped it.</b>') + item.why;
+      x8ClsDone++;
+      document.getElementById('x8clsBadge').textContent = x8ClsDone + ' / 6';
+      if (x8ClsDone === 6) {
+        var note = document.getElementById('x8clsNote');
+        note.className = 'x8-note ' + (x8ClsRight >= 5 ? 'ok' : '');
+        note.innerHTML = '<b>' + x8ClsRight + ' / 6.</b> One move: ask "what for?" If you can answer, it\'s a task—and tasks can be deleted by a better approach. If you can\'t, it\'s a goal—and only goals belong in the AI brief.';
+      }
+    });
+  });
+  x8ClsList.appendChild(row);
+});
+
+/* 贪多实验。
+   背景：「每个人都照顾一点」听着善良，后果要亲眼看着页面变柜台才有痛感。
+   设计意图：与加色器同款的累积状态机，四步各塞进一位次要人物的面板
+   （ixd-slide-up 滑入），判词随人数升级；满四人后按钮变「回到首要人物」，
+   一键清场制造对比。 */
+var X8_G_STEPS = [
+  { id: 'x8g1', note: '<b>Serving person 2 (Lao Zhou):</b> The approval desk lands on the home screen. Every time Xiaomei files expenses she has to dodge 23 pending claims—she isn\'t an approver.' },
+  { id: 'x8g2', note: '<b>Serving person 3 (Da Liu):</b> FX center joins in. Xiaomei\'s taxi receipts are all RMB—this panel is pure noise for her.' },
+  { id: 'x8g3', note: '<b>Serving person 4 (manager):</b> Team report lands between the drop zone and the submit button—the core path is cut in half.' },
+  { id: 'x8g4', note: '<b>Serving person 5 (admin):</b> Binding and printing climb on too. Now the page is a little useful to five people and smooth for none. Three-minute goal? Xiaomei spends a minute just finding the button.' }
+];
+var x8gStep = 0;
+document.getElementById('x8gBtn').addEventListener('click', function () {
+  var btn = this;
+  var note = document.getElementById('x8gNote');
+  var badge = document.getElementById('x8gBadge');
+  if (x8gStep < 4) {
+    document.getElementById(X8_G_STEPS[x8gStep].id).classList.add('show');
+    note.className = 'x8-note warn';
+    note.innerHTML = X8_G_STEPS[x8gStep].note;
+    x8gStep++;
+    badge.textContent = 'Serving ' + (x8gStep + 1) + ' people';
+    if (x8gStep === 4) { btn.textContent = 'Back to primary persona'; btn.classList.add('undo'); }
+  } else {
+    X8_G_STEPS.forEach(function (s) { document.getElementById(s.id).classList.remove('show'); });
+    x8gStep = 0;
+    badge.textContent = 'Serving 1 person';
+    note.className = 'x8-note ok';
+    note.innerHTML = '<b>Clear the stage—Xiaomei only.</b> Lao Zhou\'s needs aren\'t skipped; they go on their own screens: an approval desk for Lao Zhou, multi-currency in settings for Da Liu. Primary personas go home, and every screen gets smooth.';
+    btn.textContent = 'Serve one more user';
+    btn.classList.remove('undo');
+  }
+});
+
+/* 场景改写器。
+   背景：功能语到场景语的翻译是本节要带走的手艺，看十遍例子接不上手，
+   亲手翻四条就接上了。
+   设计意图：点击逐条翻转（文本换装配 ixd-slide-up，行变绿表示已翻），
+   四条齐了弹出拼好的完整提示词（ixd-pop）供复制，练完就能用。 */
+var X8_RW = [
+  'Azhe states time and headcount; the system shows only rooms available now',
+  'After booking he glances at this week\'s plan—no view hopping',
+  'Before the meeting he gets one well-timed reminder—not early, not late, not repeated',
+  'A coworker reschedules; he edits the same record in one step—no cancel-and-rebook'
+];
+var x8RwDone = 0;
+document.querySelectorAll('.x8-rwrow').forEach(function (row) {
+  row.addEventListener('click', function () {
+    if (row.classList.contains('flip')) return;
+    row.classList.add('flip');
+    var tx = row.querySelector('.rw-tx');
+    tx.innerHTML = '<span class="tag">Scenario-speak</span>' + X8_RW[+row.dataset.i];
+    tx.classList.remove('swap');
+    void tx.offsetWidth;
+    tx.classList.add('swap');
+    x8RwDone++;
+    document.getElementById('x8rwBadge').textContent = x8RwDone + ' / 4';
+    var note = document.getElementById('x8rwNote');
+    if (x8RwDone === 4) {
+      document.getElementById('x8final').classList.add('show');
+      note.className = 'x8-note ok';
+      note.innerHTML = '<b>Four done—the pattern surfaces:</b> feature-speak\'s subject is the system (must have X); scenario-speak\'s subject is a person (what they need to finish). The assembled prompt below is ready to use—persona, goal, scenario are complete; control decisions go back to AI.';
+    } else {
+      note.className = 'x8-note';
+      note.textContent = 'Subject flips from "the system" to "a person." ' + (4 - x8RwDone) + ' left.';
+    }
+  });
+});
+
+/* 提示词复制：成功给两秒「已复制」态。 */
+document.getElementById('x8copy').addEventListener('click', function (e) {
+  e.stopPropagation();
+  var btn = this;
+  var text = document.getElementById('x8finalText').textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () {
+      btn.textContent = 'Copied';
+      btn.classList.add('done');
+      setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 2000);
+    });
+  }
+});
+
+/* 点选题：哪句需求最好。
+   答案 C：人物 + 目标 + 约束俱全；A/D 是清单和布局稿，B 把决定权全弃了。 */
+tasteQuiz('x8quiz', {
+  answer: 2,
+  why: [
+    'A standard feature list. AI will give you all five controls—but nobody told it about "log it in five seconds," so you\'ll probably get a four-step form.',
+    '"Reference mainstream" lets AI copy a random app; "make it nicer" is a useless adjective—covered in the Taste part. This sentence abandons every decision.',
+    'Persona (office worker), goal (log in five seconds), scenario constraints (few categories, two taps)—all present. AI will invent pinned favorites, default-to-today, skip-notes tricks, because each one clears the path for the five-second goal.',
+    'This is a layout draft—even block positions are decided for AI—but why this split, and how fast the user needs to go, it still doesn\'t know. Wrong direction: the more concrete the execution, the harder to undo.'
+  ]
+});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.en.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

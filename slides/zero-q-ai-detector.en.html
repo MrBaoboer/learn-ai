@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>When an AI Detector Says "This Was Written by AI," Can You Trust It? | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+.qa-answer {
+  background: linear-gradient(135deg, rgba(8,145,178,0.06), rgba(0,102,255,0.05));
+  border: 1.5px solid rgba(8,145,178,0.3);
+  border-radius: var(--radius); padding: 22px 26px; margin: 4px 0 8px;
+}
+.qa-answer .qa-tag { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #0891b2; margin-bottom: 8px; }
+.qa-answer p { font-size: 16.5px; font-weight: 700; color: var(--text); line-height: 1.85; }
+.qa-answer p b { color: #0891b2; }
+
+/* 审判小游戏 */
+.jd-game {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 22px 24px;
+}
+.jd-note {
+  font-size: 12px; color: var(--sub); background: rgba(217,119,6,0.07);
+  border: 1px dashed rgba(217,119,6,0.35); border-radius: var(--radius-sm);
+  padding: 8px 12px; margin-bottom: 14px; line-height: 1.7;
+}
+.jd-progress { font-size: 12.5px; font-weight: 800; color: var(--sub); margin-bottom: 10px; letter-spacing: 0.5px; }
+.jd-text {
+  background: rgba(0,0,0,0.025); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 16px 18px;
+  font-size: 14px; color: var(--text); line-height: 1.95; min-height: 96px;
+}
+.jd-text .jd-label { font-size: 11.5px; font-weight: 800; color: var(--sub); margin-bottom: 6px; letter-spacing: 0.5px; }
+.jd-btns { display: flex; gap: 10px; margin-top: 14px; }
+.jd-btn {
+  flex: 1; border: 1.5px solid var(--border); background: var(--card);
+  border-radius: var(--radius-sm); padding: 11px 12px;
+  font-size: 14px; font-weight: 800; color: var(--text);
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.jd-btn:hover { border-color: rgba(0,102,255,0.45); background: rgba(0,102,255,0.03); }
+.jd-btn:disabled { opacity: 0.45; cursor: default; }
+.jd-reveal {
+  max-height: 0; overflow: hidden; opacity: 0;
+  transition: max-height 0.4s ease, opacity 0.35s ease;
+}
+.jd-reveal.show {
+  max-height: 520px; opacity: 1;
+  margin-top: 14px; border-top: 1.5px dashed var(--border); padding-top: 14px;
+}
+.jd-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.jd-tag { padding: 5px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 800; }
+.jd-tag.t-det-ai { background: rgba(220,38,38,0.08); color: var(--danger); }
+.jd-tag.t-det-hu { background: rgba(22,163,74,0.1); color: var(--success); }
+.jd-tag.t-truth { background: rgba(0,102,255,0.07); color: var(--accent); }
+.jd-tag.t-guess-ok { background: rgba(8,145,178,0.09); color: var(--cyan); }
+.jd-tag.t-guess-no { background: rgba(100,116,139,0.1); color: var(--sub); }
+.jd-comment { font-size: 13px; color: var(--sub); line-height: 1.8; }
+.jd-comment b { color: var(--text); }
+.jd-next {
+  margin-top: 12px; border: none; background: var(--accent); color: #fff;
+  border-radius: 999px; padding: 9px 26px; font-size: 13.5px; font-weight: 800;
+  cursor: pointer; font-family: inherit; transition: filter 0.15s;
+}
+.jd-next:hover { filter: brightness(1.08); }
+.jd-summary { display: none; }
+.jd-summary.show { display: block; }
+.jd-summary .jd-score {
+  font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 10px;
+}
+.jd-summary .jd-wrap { display: flex; flex-direction: column; gap: 8px; }
+.jd-sum-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 13px; border-radius: 10px; font-size: 13px; line-height: 1.7;
+}
+.jd-sum-row.r-bad { background: rgba(220,38,38,0.05); border: 1px solid rgba(220,38,38,0.15); }
+.jd-sum-row.r-ok { background: rgba(22,163,74,0.05); border: 1px solid rgba(22,163,74,0.15); }
+.jd-sum-row b { color: var(--text); }
+
+/* 自证三件套 */
+.pt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pt-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-card);
+}
+.pt-card .pt-icon { font-size: 26px; margin-bottom: 8px; }
+.pt-card h4 { font-size: 14.5px; font-weight: 800; color: var(--text); margin-bottom: 5px; }
+.pt-card p { font-size: 12.5px; color: var(--sub); line-height: 1.8; }
+.pt-card p b { color: var(--text); }
+
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .pt-grid { grid-template-columns: 1fr; }
+  .qa-answer p { font-size: 15px; }
+  .jd-btns { flex-direction: column; }
+  .jd-game { padding: 16px 14px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Your paper gets flagged as &quot;AI-generated,&quot; your resume gets marked red by a screening tool — can you trust an AI detector? Sadly, it's closer to mysticism: AI learned by studying good human writing, so people who write cleanly get falsely accused. Play a short judgment game, feel how unreliable the detector is, then pick up a few ways to prove you wrote it.">
+<meta name="keywords" content="can you trust AI detectors,AI writing detection,Turnitin AI detection,AIGC false positive,how AI detectors work,flagged for AI writing,AI beginner FAQ">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/zero-q-ai-detector.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/zero-q-ai-detector.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/zero-q-ai-detector.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/zero-q-ai-detector.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/zero-q-ai-detector.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="When an AI Detector Says &quot;This Was Written by AI,&quot; Can You Trust It?">
+<meta property="og:description" content="Don't trust it — it's closer to mysticism. The cleaner you write, the easier you get falsely accused. Play one judgment game and you'll see.">
+<meta property="og:url" content="https://xueai.app/slides/zero-q-ai-detector.en.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="When an AI Detector Says &quot;This Was Written by AI,&quot; Can You Trust It?">
+<meta name="twitter:description" content="Don't trust it — it's closer to mysticism. The cleaner you write, the easier you get falsely accused. Play one judgment game and you'll see.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"When an AI Detector Says \"This Was Written by AI,\" Can You Trust It?","name":"When an AI Detector Says \"This Was Written by AI,\" Can You Trust It?","url":"https://xueai.app/slides/zero-q-ai-detector.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Beginner FAQ · Debunking the Hype","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"Your paper gets flagged as \"AI-generated,\" your resume gets marked red by a screening tool — can you trust an AI detector? Sadly, it's closer to mysticism: AI learned by studying good human writing, so people who write cleanly get falsely accused. Play a short judgment game, feel how unreliable the detector is, then pick up a few ways to prove you wrote it.","datePublished":"2026-08-09","dateModified":"2026-08-12"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"When an AI Detector Says \"This Was Written by AI,\" Can You Trust It?","acceptedAnswer":{"@type":"Answer","text":"Don't trust it — it's closer to mysticism. AI learned by studying good human writing, so polished, fluent human prose often gets falsely accused; no detector today can reliably tell the two apart. The score is a shaky reference at best, and it must never be treated as evidence."}}]}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Chapter Zero · Beginner FAQ</div>
+    <h1>When an AI Detector Says "This Was Written by AI," Can You Trust It?</h1>
+    <p class="subtitle">You submitted a paper and the school detector flagged it as "AI-generated rate too high." A report you wrote carefully, and a colleague suspects a machine wrote it… How much trust does that score actually deserve? Don't rush to protest — <b>play a short game</b>, and you'll have your answer.</p>
+  </header>
+
+  <div class="qa-answer">
+    <div class="qa-tag">One-sentence answer</div>
+    <p><b>Don't trust it — it's closer to mysticism</b>. AI learned by studying good human writing, so polished, fluent human prose often gets falsely accused; <b>no detector today can reliably tell the two apart</b>. The score is a shaky reference at best, and it must never be treated as evidence.</p>
+  </div>
+
+  <div class="sec-label">The judgment game · Guess how the detector will call it</div>
+
+  <p class="l-p">Below are six passages — some written by people, some generated by AI. Your job is a little unusual: <b>guess how the detector will call each one</b>. After every passage, we'll reveal the detector's verdict, the real author, and whether it got it wrong.</p>
+
+  <div class="jd-game">
+    <div class="jd-note">Note: this game is a <b>simulated demo</b>. The detector results are preset on this page to show typical false-positive patterns. They are not the output of any real detector.</div>
+    <div id="jdPlay">
+      <div class="jd-progress" id="jdProgress"></div>
+      <div class="jd-text">
+        <div class="jd-label" id="jdLabel"></div>
+        <div id="jdContent"></div>
+      </div>
+      <div class="jd-btns">
+        <button class="jd-btn" id="jdGuessAi">I guess it'll say: AI-written</button>
+        <button class="jd-btn" id="jdGuessHu">I guess it'll say: human-written</button>
+      </div>
+      <div class="jd-reveal" id="jdReveal">
+        <div class="jd-tags">
+          <span class="jd-tag" id="jdTagDet"></span>
+          <span class="jd-tag t-truth" id="jdTagTruth"></span>
+          <span class="jd-tag" id="jdTagGuess"></span>
+        </div>
+        <div class="jd-comment" id="jdComment"></div>
+        <button class="jd-next" id="jdNext">Next passage</button>
+      </div>
+    </div>
+    <div class="jd-summary" id="jdSummary">
+      <div class="jd-score" id="jdScore"></div>
+      <div class="jd-wrap" id="jdWrap"></div>
+      <button class="jd-next" id="jdRestart" style="margin-top:14px;">Play again</button>
+    </div>
+  </div>
+
+  <div class="sec-label">Why it can't be accurate even in principle</div>
+
+  <p class="l-p">The detector's idea is to hunt for an "AI flavor": is the wording too tidy, the sentences too smooth, the structure too neat? Here's the problem: <b>AI learned to write by studying good human essays</b>. Smooth, tidy, clearly structured — that's exactly what careful writers have always been chasing. Asking a detector to find "AI features" is asking it to find "good-student features." Result: people who write carefully all get hit.</p>
+
+  <p class="l-p">The other direction is even more awkward: take AI-generated text, <b>swap a few words, add two typos, mix in some slang</b>, and the score tanks immediately. A tool that falsely accuses good people going forward, and gets fooled going backward — what is it even catching? In the end it only sees surface features. It cannot see the author.</p>
+
+  <div class="sec-label">If you've been wrongly accused · A three-piece kit to prove you wrote it</div>
+
+  <p class="l-p">The detector is unreliable, but the trouble of being wrongly accused is real. Instead of arguing after the fact, keep these three things on hand so you can produce them when it matters.</p>
+
+  <div class="pt-grid">
+    <div class="pt-card">
+      <div class="pt-icon">📝</div>
+      <h4>Drafts and revision history</h4>
+      <p>Most online docs come with <b>edit history</b>: which paragraph you wrote when, how many rounds you revised — all timestamped. A piece a real person wrote grows bit by bit. You can't fake that.</p>
+    </div>
+    <div class="pt-card">
+      <div class="pt-icon">🎬</div>
+      <h4>A screen recording of the writing</h4>
+      <p>For important drafts (a thesis, a job-application sample), <b>hit record</b> while you write. It costs a bit of disk space and buys you evidence nobody can talk away. Worth it.</p>
+    </div>
+    <div class="pt-card">
+      <div class="pt-icon">🗂️</div>
+      <h4>Keep the process materials</h4>
+      <p>Outlines, screenshots of sources, chat logs with classmates — these are <b>footprints of the writing path</b>. AI can spit out a draft in a second. It cannot fake a trail this complete.</p>
+    </div>
+  </div>
+
+  <div class="sec-label">A word for teachers and HR</div>
+
+  <p class="l-p">If you're the one making a decision with a detector report in hand, remember this: <b>the official docs of the mainstream tools all say the result is for reference only and false positives are possible</b>. If the tool itself won't swear by it, the person using the tool shouldn't let it veto a student or a candidate in one shot.</p>
+
+  <div class="l-callout">
+    If you really want to know who wrote something, the method has always been there: <b>look at the writing process, and talk for a few minutes</b>. Ask them to walk through their thinking, why a paragraph is written that way, how they'd change it from another angle. Someone who actually wrote it lights up. Someone who didn't slips in three sentences. That's more reliable than any detector score.
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ What this page wants to share with you</h3>
+    <ul>
+      <li><b>A detector score is not evidence</b>: false positives are the norm, and they hit careful writers especially hard</li>
+      <li><b>The tidier you write, the more danger you're in</b>: AI trained on human model essays, so the features of good writing overlap on both sides</li>
+      <li><b>Keep the process as you go</b>: edit history, screen recordings, drafts — proof you wrote it when it counts</li>
+      <li><b>The tools themselves label it "for reference only"</b>: don't finish the sentence for them</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 审判小游戏 ── */
+(function () {
+  var ITEMS = [
+    {
+      label: 'Passage 1 · A nostalgic essay',
+      text: '"The osmanthus at the alley mouth is blooming again. When Mother was alive, she always aired the quilts this season — sunlight mixed with osmanthus, that was my entire memory of autumn. The quilt is still that same quilt; the person airing it is me now."',
+      det: 'ai', truth: 'Human-written (a regular reader\'s essay voice)',
+      comment: '<b>The detector got it wrong.</b> Tidy prose, restrained feeling, not a single typo — these "careful writing" features are exactly what it reads as an "AI flavor."',
+      wrong: true,
+    },
+    {
+      label: 'Passage 2 · A building notice',
+      text: '"Dear residents: To further improve the building\'s water quality and ensure safe tap water, pipe maintenance for Building 2 is scheduled this Thursday from 9:00 a.m. to 5:00 p.m. Water will be shut off during this period. Please store water in advance."',
+      det: 'ai', truth: 'Human-written (standard official-notice format)',
+      comment: '<b>Wrong again.</b> Official notices prize tidy format, uniform wording, and even sentence patterns — the same features as AI-generated text. By that standard, every admin who writes notices would get accused.',
+      wrong: true,
+    },
+    {
+      label: 'Passage 3 · A sales caption',
+      text: '"okay you guys I used this ONCE and I\'m obsessed!! not even kidding, my quality of life literally took off, you\'ll know when you try it, if it sucks come yell at me!!"',
+      det: 'hu', truth: 'AI-generated (imitating a livestream sales voice)',
+      comment: '<b>This time it let the real culprit walk.</b> Slang, exclamation marks, and internet catchphrases made the detector drop its guard. That voice is everywhere online — AI can mimic it with no effort.',
+      wrong: true,
+    },
+    {
+      label: 'Passage 4 · A student apology note',
+      text: '"Teacher, I\'m sorry. I did fall asleep in class yesterday, because I gamed until 1:30 the night before. I promise I\'ll sleep before 11 from now on and pay attention in class. If I do it again, I\'ll erase the blackboard for the whole class for a week."',
+      det: 'hu', truth: 'Human-written (a student\'s own hand)',
+      comment: '<b>This time it got it right.</b> Details like "1:30" and "erase the blackboard for a week," plus that poorly hidden guilt, made it call "human-written."',
+      wrong: false,
+    },
+    {
+      label: 'Passage 5 · A product blurb',
+      text: '"This thermos is crafted from quality materials, offering both heat and cold retention, suitable for the office, travel, sports, and more. Whether you are a student, a commuter, or an outdoor enthusiast, it can meet your diverse needs."',
+      det: 'ai', truth: 'AI-generated (an unedited machine first draft)',
+      comment: '<b>It got this one right.</b> Covers every case, nods to every audience, and never lands on a concrete detail — that "offend nobody" voice is common in AI first drafts.',
+      wrong: false,
+    },
+    {
+      label: 'Passage 6 · A chat message',
+      text: '"dinner tomorrow is a different place  that skewer spot from last time  yeah that one  just come over  dont be late  last time we waited 40 min  i already reserved"',
+      det: 'hu', truth: 'Human-written (a real person typing on the fly)',
+      comment: '<b>It got this one right.</b> Typos, missing punctuation, thinking out loud — the strongest "human signal" in a detector\'s eyes. The irony: it\'s also the easiest signal to fake. Just tell the AI to misspell a few words.',
+      wrong: false,
+    },
+  ];
+
+  var idx = 0, hit = 0, answered = false;
+  var elProgress = document.getElementById('jdProgress');
+  var elLabel = document.getElementById('jdLabel');
+  var elContent = document.getElementById('jdContent');
+  var elReveal = document.getElementById('jdReveal');
+  var elTagDet = document.getElementById('jdTagDet');
+  var elTagTruth = document.getElementById('jdTagTruth');
+  var elTagGuess = document.getElementById('jdTagGuess');
+  var elComment = document.getElementById('jdComment');
+  var btnAi = document.getElementById('jdGuessAi');
+  var btnHu = document.getElementById('jdGuessHu');
+  var btnNext = document.getElementById('jdNext');
+  var elPlay = document.getElementById('jdPlay');
+  var elSummary = document.getElementById('jdSummary');
+  var elScore = document.getElementById('jdScore');
+  var elWrap = document.getElementById('jdWrap');
+  var btnRestart = document.getElementById('jdRestart');
+
+  function render() {
+    var it = ITEMS[idx];
+    answered = false;
+    elProgress.textContent = 'Passage ' + (idx + 1) + ' / ' + ITEMS.length + ' total';
+    elLabel.textContent = it.label;
+    elContent.textContent = it.text;
+    elReveal.classList.remove('show');
+    btnAi.disabled = false;
+    btnHu.disabled = false;
+    btnNext.textContent = idx === ITEMS.length - 1 ? 'See the recap' : 'Next passage';
+  }
+
+  function guess(g) {
+    if (answered) return;
+    answered = true;
+    var it = ITEMS[idx];
+    btnAi.disabled = true;
+    btnHu.disabled = true;
+    var good = g === it.det;
+    if (good) hit++;
+    elTagDet.className = 'jd-tag ' + (it.det === 'ai' ? 't-det-ai' : 't-det-hu');
+    elTagDet.textContent = 'Detector says: ' + (it.det === 'ai' ? 'AI-written' : 'human-written');
+    elTagTruth.textContent = 'Actual author: ' + it.truth;
+    elTagGuess.className = 'jd-tag ' + (good ? 't-guess-ok' : 't-guess-no');
+    elTagGuess.textContent = good ? 'You guessed the detector\'s call' : 'You missed its call';
+    elComment.innerHTML = it.comment;
+    elReveal.classList.add('show');
+  }
+
+  function summary() {
+    elPlay.style.display = 'none';
+    elSummary.classList.add('show');
+    var wrongs = ITEMS.filter(function (it) { return it.wrong; });
+    elScore.textContent = 'Here\'s the result: six passages, and this simulated detector got ' + wrongs.length + ' of them wrong. Times you guessed its call: ' + hit + ' / ' + ITEMS.length + '.';
+    elWrap.innerHTML =
+      '<div class="jd-sum-row r-bad"><span>❌</span><span><b>It wrongly accused two good human passages</b>: the nostalgic essay and the building notice, just because they were tidy and formal.</span></div>' +
+      '<div class="jd-sum-row r-bad"><span>❌</span><span><b>It waved through an AI sales blurb</b>: a few slang words and exclamation marks, and it surrendered.</span></div>' +
+      '<div class="jd-sum-row r-ok"><span>✅</span><span><b>The three it got right</b> were no feat either: it leaned on surface cues like typos and boilerplate, which anyone can fake.</span></div>' +
+      '<div class="jd-sum-row r-ok"><span>🎲</span><span>Three misses out of six — <b>about as good as a coin flip</b>. Would you let a call like that decide your grade or your job?</span></div>';
+  }
+
+  btnAi.addEventListener('click', function () { guess('ai'); });
+  btnHu.addEventListener('click', function () { guess('hu'); });
+  btnNext.addEventListener('click', function () {
+    if (idx === ITEMS.length - 1) { summary(); return; }
+    idx++;
+    render();
+  });
+  btnRestart.addEventListener('click', function () {
+    idx = 0; hit = 0;
+    elSummary.classList.remove('show');
+    elPlay.style.display = '';
+    render();
+  });
+  render();
+})();
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding 프로젝트에서 가장 전형적인 기술 부채: 같은 버튼에 CSS가 여덟 벌. 이 레슨에서는 스타일이 왜 증식하는지, token과 공용 컴포넌트로 어떻게 수렴하는지, 어떤 차이는 남겨야 하는지 다룹니다.">
+<meta name="keywords" content="CSS 수렴,중복 스타일,design token,스타일 재사용,기술 부채,Vibe Coding">
+<meta name="author" content="뤄샤오산(洛小山)">
+<title>스타일 수렴: 버튼 하나에 CSS 여덟 벌은 그만 | AI 시스템 강좌</title>
+<link rel="canonical" href="https://xueai.app/slides/vibe-3b.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/vibe-3b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/vibe-3b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/vibe-3b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/vibe-3b.html">
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e}
+.lesson-header .kicker{color:var(--vibe)}
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+/* 熵增模拟器 */
+.ent-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px}
+.ent-stage{padding:18px 20px;min-height:150px;background:repeating-conic-gradient(rgba(0,0,0,.025) 0% 25%, transparent 0% 50%) 0 0 / 22px 22px}
+.ent-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.ent-item{animation:entIn .28s ease}
+@keyframes entIn{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+.ent-item button{border:none;color:#fff;font-family:inherit;font-weight:700;cursor:default;display:block}
+.ent-cls{display:block;margin-top:5px;font-family:"SF Mono",Menlo,monospace;font-size:11.5px;color:var(--sub);text-align:center}
+.ent-empty{font-size:14px;color:var(--sub);line-height:1.7}
+.ent-log{border-top:1px solid var(--border);padding:12px 20px;background:rgba(0,0,0,.02);font-size:13.5px;color:var(--sub);line-height:1.7;min-height:44px}
+.ent-log b{color:var(--text)}
+.ent-stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)}
+.ent-stat{padding:12px 8px;text-align:center;border-right:1px solid var(--border)}
+.ent-stat:last-child{border-right:none}
+.ent-stat .n{display:block;font-size:24px;font-weight:800;color:var(--vibe);font-variant-numeric:tabular-nums;transition:color .2s}
+.ent-stat.hot .n{color:var(--danger)}
+.ent-stat .k{font-size:12px;color:var(--sub)}
+.ent-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.ent-btns button{padding:12px 22px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-size:14.5px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;min-height:44px;transition:all .15s}
+.ent-btns button.pri{background:var(--vibe);border-color:var(--vibe);color:#fff}
+.ent-btns button.pri:hover{filter:brightness(1.08)}
+.ent-btns button:disabled{opacity:.42;cursor:default}
+.ent-token{margin-top:14px;padding:14px 18px;border-radius:12px;background:#0e1c1a;color:#d9f2ec;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.75;white-space:pre;overflow-x:auto;display:none}
+.ent-token.on{display:block}
+
+/* 三个原因 */
+.why-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:12px}
+.why-grid .l-card h3{font-size:16px;margin-bottom:4px}
+.why-grid .l-card p{font-size:14px;color:var(--sub);line-height:1.7}
+.why-tag{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--vibe);background:rgba(13,148,136,.1);border-radius:6px;padding:3px 10px;margin-bottom:8px}
+
+/* 判断题 */
+.jd-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:16px 20px;margin-top:12px}
+.jd-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.jd-side{border:1.5px solid var(--border);border-radius:11px;padding:12px 14px;background:rgba(0,0,0,.015)}
+.jd-side .nm{font-family:"SF Mono",Menlo,monospace;font-size:12.5px;font-weight:700;color:var(--vibe-deep);display:block;margin-bottom:5px}
+.jd-side .vl{font-size:13.5px;color:var(--sub);line-height:1.65}
+.jd-ask{font-size:15px;font-weight:700;color:var(--text);line-height:1.6;margin-bottom:10px}
+.jd-opts{display:flex;gap:8px;flex-wrap:wrap}
+.jd-opts button{flex:1;min-width:150px;padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-size:14.5px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;min-height:44px;transition:all .15s}
+.jd-opts button:hover:not(:disabled){border-color:rgba(0,0,0,.2)}
+.jd-opts button.right{border-color:rgba(22,163,74,.5);background:rgba(22,163,74,.07);color:var(--success)}
+.jd-opts button.wrong{border-color:rgba(220,38,38,.4);background:rgba(220,38,38,.05);color:var(--danger)}
+.jd-opts button:disabled{cursor:default}
+.jd-fb{margin-top:11px;border-radius:10px;padding:12px 15px;font-size:14px;line-height:1.7;display:none}
+.jd-fb.on{display:block}
+.jd-fb.ok{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.3);color:var(--text)}
+.jd-fb.no{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.28);color:var(--text)}
+.jd-fb b.y{color:var(--success)}
+.jd-fb b.n{color:var(--danger)}
+
+/* 四步 */
+.step-list{margin-top:12px;display:flex;flex-direction:column;gap:11px}
+.step-item{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 18px}
+.step-n{flex-shrink:0;width:30px;height:30px;border-radius:9px;background:rgba(13,148,136,.1);color:var(--vibe);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.step-item h3{font-size:15.5px;margin:0 0 3px}
+.step-item p{font-size:14px;color:var(--sub);line-height:1.72;margin:0}
+
+code{color:var(--vibe-deep);background:rgba(13,148,136,.08)}
+.vibe-callout{background:rgba(13,148,136,.05);border:1.5px solid rgba(13,148,136,.25);border-radius:14px;padding:18px 22px}
+.vibe-callout b{color:var(--vibe)}
+.vibe-callout p{line-height:1.8}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub)}
+.src-note a{color:var(--vibe-deep)}
+.ctrl-hint{font-size:13px;color:var(--sub);margin-top:10px}
+.xref{margin-top:14px;font-size:14.5px;color:var(--sub);line-height:1.8}
+.xref a{color:var(--vibe-deep);font-weight:700}
+
+@media (max-width:768px){
+  .why-grid,.jd-pair{grid-template-columns:1fr}
+  .ent-stats{grid-template-columns:1fr 1fr}
+  .ent-stat:nth-child(2){border-right:none}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"스타일 수렴: 버튼 하나에 CSS 여덟 벌은 그만","name":"스타일 수렴: 버튼 하나에 CSS 여덟 벌은 그만","url":"https://xueai.app/slides/vibe-3b.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 품질 기준선","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Vibe Coding 프로젝트에서 가장 전형적인 기술 부채: 같은 버튼에 CSS가 여덟 벌. 이 레슨에서는 스타일이 왜 증식하는지, token과 공용 컴포넌트로 어떻게 수렴하는지, 어떤 차이는 남겨야 하는지 다룹니다.","datePublished":"2026-08-12","dateModified":"2026-08-12","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="스타일 수렴: 버튼 하나에 CSS 여덟 벌은 그만"><meta property="og:description" content="Vibe Coding 프로젝트에서 가장 전형적인 기술 부채: 같은 버튼에 CSS가 여덟 벌. 이 레슨에서는 스타일이 왜 증식하는지, token과 공용 컴포넌트로 어떻게 수렴하는지, 어떤 차이는 남겨야 하는지 다룹니다."><meta property="og:url" content="https://xueai.app/slides/vibe-3b.ko.html"><meta property="og:image" content="https://xueai.app/slides/og/vibe-3b.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Vibe Coding 방법론 · 품질 기준선</div>
+    <h1>스타일 수렴: 버튼 하나에 CSS 여덟 벌은 그만</h1>
+    <p class="subtitle">AI에게 기능을 열 개 연달아 시키면, 거의 똑같이 생긴 버튼 클래스가 여덟 개 쌓입니다. 재사용을 못하는 게 아니라, 대화가 새로 열릴 때마다 이미 있는 걸 모르는 거예요. 이 레슨에서는 스타일이 왜 증식하는지, 어떻게 깔끔히 걷어내는지, 어떤 차이는 남겨야 하는지 이야기합니다.</p>
+    <div class="chips"><span class="chip">재사용 우선</span><span class="chip">design token</span><span class="chip">기술 부채</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>스타일이 왜 증식하는지, token으로 어떻게 나눠 걷어내는지, 어떤 차이는 남겨야 하는지</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">인터랙티브 데모 1 · 버튼을 직접 잔뜩 쌓아 보기</div>
+    <p class="desc">아래는 실제 프로젝트의 반복을 흉내 냅니다. 「기능 하나 더」를 누를 때마다, 새 대화를 열어 AI에게 페이지를 하나 시키는 것과 같아요. 버튼을 매번 어떻게 다루는지, 아래 숫자 네 개가 어떻게 오르는지 보세요.</p>
+    <div class="ent-wrap">
+      <div class="ent-stage">
+        <div class="ent-row" id="entRow"><p class="ent-empty">프로젝트는 아직 비어 있어요. 아래 버튼을 눌러 반복을 시작하세요.</p></div>
+      </div>
+      <div class="ent-log" id="entLog">0라운드: 아직 시작 전이에요.</div>
+      <div class="ent-stats">
+        <div class="ent-stat" id="stImpl"><span class="n">0</span><span class="k">버튼 구현</span></div>
+        <div class="ent-stat" id="stColor"><span class="n">0</span><span class="k">주색상 종류</span></div>
+        <div class="ent-stat" id="stRadius"><span class="n">0</span><span class="k">모서리 반경</span></div>
+        <div class="ent-stat" id="stLine"><span class="n">0</span><span class="k">CSS 줄 수</span></div>
+      </div>
+    </div>
+    <div class="ent-btns">
+      <button type="button" class="pri" id="entNext" onclick="entNext()">기능 하나 더</button>
+      <button type="button" id="entFix" onclick="entConverge()" disabled>수렴 실행</button>
+      <button type="button" onclick="entReset()">다시</button>
+    </div>
+    <p class="ctrl-hint" id="entHint">여덟 라운드 뒤에 이 버튼 더미를 보면, 뭘 고쳐야 할지 구분이 안 돼요 — 그게 「제각각」의 손맛이에요.</p>
+    <div class="ent-token" id="entToken"></div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">AI를 탓하기 전에, 환경이 그렇게 만든 거예요</div>
+    <p class="desc">스타일을 반복해서 만드는 건 모델이 게으른 게 아니라, 구조적인 이유 세 가지가 겹친 결과예요. 이유를 알아야 어디에 게이트를 둘지 보입니다.</p>
+    <div class="why-grid">
+      <div class="l-card">
+        <span class="why-tag">안 보임</span>
+        <h3>당신 CSS가 눈앞에 없어요</h3>
+        <p>새 대화를 열면 컨텍스트에는 이번에 준 파일 몇 개만 있어요. 프로젝트에 이미 <code>.btn-primary</code>가 있다는 걸 알 길이 없으니, 요구대로 새로 씁니다.</p>
+      </div>
+      <div class="l-card">
+        <span class="why-tag">더 편함</span>
+        <h3>새로 쓰는 게 옛것을 읽는 것보다 싸요</h3>
+        <p>기존 스타일을 이해하려면 관련 파일을 다 봐야 하고, 고치면 다른 곳이 깨질까 봐 걱정해야 해요. 새 클래스 이름은 리스크 제로, 읽기 비용 제로 — 그건 AI의 최적해이지, 당신의 최적해가 아니에요.</p>
+      </div>
+      <div class="l-card">
+        <span class="why-tag">손대기 싫음</span>
+        <h3>망칠까 봐, 옆에 하나 더 둬요</h3>
+        <p>그림자가 있는 버튼이 필요하면 원래 걸 고치기보다 <code>.btn-primary-new</code>를 씁니다 — 남이 쓰는 스타일을 고치는 건 고위험이라, 안전하지만 증식하는 길을 고른 거예요.</p>
+      </div>
+    </div>
+    <div class="vibe-callout" style="margin-top:16px">
+      <p><b>세 이유 모두 같은 곳을 가리켜요: 「이미 뭐가 있는지」 목록이 없어요.</b> 이 목록을 프로젝트 규칙 파일에 넣으면 매 라운드 보이니까, 증식이 멈춥니다. <a href="vibe-8.html" style="color:var(--vibe-deep);font-weight:700">8강에서 환경 사실을 Rule에 적는 것</a>과 같은 이치예요. 이번엔 적는 자산이 스타일일 뿐이에요.</p>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">수렴 네 단계: 먼저 목록, 그다음 병합, 마지막에 게이트</div>
+    <p class="desc">이미 흐트러진 프로젝트를 한 번의 리팩터로 깨끗이 만들 수는 없어요. 아래 네 단계로 가세요. 각 단계에서 멈춰 검증할 수 있어요.</p>
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-n">1</div>
+        <div>
+          <h3>목록부터, 보기만 하고 고치지 말 것</h3>
+          <p>AI에게 프로젝트 스타일을 전부 훑게 하고, 중복 목록을 받아요: 같은 컨트롤을 구현하는 클래스가 몇 개인지, 색값과 모서리 반경이 얼마나 흩어져 있는지. 이 단계에서는 코드를 건드리지 마세요. 빚이 얼마인지 먼저 보세요.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-n">2</div>
+        <div>
+          <h3>token을 정하고, 매직 넘버를 몇 단으로 접기</h3>
+          <p>목록에서 실제로 쓰는 값만 골라 작은 변수 세트로 고정해요: 주색상, 의미 색, 모서리 반경 두세 단, 간격 네 단, 컨트롤 높이. 단은 적어야 해요. 적어야 지킬 수 있어요.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-n">3</div>
+        <div>
+          <h3>나눠 병합, 한 번에 컨트롤 하나</h3>
+          <p>버튼 먼저, 검증; 카드 다음, 검증; 그다음 입력창. 배치마다 따로 커밋하면, 문제 나도 그 배치만 롤백할 수 있어요. 수렴은 동등 치환이에요. 눈으로 보면 달라지면 안 됩니다 — 진짜 모양을 바꿀 거면, 그건 다른 일이에요.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-n">4</div>
+        <div>
+          <h3>게이트를 두어, 내일 다시 자라지 않게</h3>
+          <p>규칙 파일에 이렇게 적어요: 「새 스타일을 쓰기 전에 token과 공용 컴포넌트를 먼저 검색. 있으면 재사용하고, 없을 때만 새로 만들되 뭘 찾아봤는지 밝힐 것」. 이 게이트가 없으면 석 달 뒤에 또 걷어내야 해요.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">인터랙티브 데모 2 · 병합할 것인가, 정당한 차이인가</div>
+    <p class="desc">수렴이 과해지기 쉬운 지점은, 있어야 할 차이까지 밀어 없애는 거예요. 실제 스타일 차이 다섯 쌍입니다. 손 미끄러져 쌓인 것과, 이유가 있는 것을 직접 가려 보세요.</p>
+    <div id="jdWrap"></div>
+    <p class="ctrl-hint" id="jdScore"></p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">판정 기준 하나: 그 차이에 이름이 있나요</div>
+    <div class="vibe-callout">
+      <p><b>합칠지 말지는 한 마디만 물으면 돼요: 이 차이, 뭐라고 부르나요?</b> 이름이 나오면 남겨요 — 「보조 버튼」「위험한 동작」「터치 타깃 하한」「팝오버는 카드보다 한 단 위」. 이건 디자인 결정이고, 이유만 주석에 적으면 됩니다. 이름이 안 나오면 합쳐요 — 2px 차이나는 모서리 반경 두 개, 눈으로 안 가려지는 파랑 두 개. 그건 아무것도 아니에요. 그때 그냥 쓴 거예요.</p>
+    </div>
+    <p class="desc" style="margin-top:16px">미학 편의 일관성 레슨에도 같은 말이 있어요: 차이는 죄가 아니고, 이유가 없는 게 죄예요. 그 레슨은 디자인 쪽에서 변수표를 어떻게 정하는지 말하고, 이 레슨은 코드가 이미 흩어졌을 때 어떻게 거두는지 말해요. 둘을 같이 보세요. 하나는 기준을, 하나는 수술 방안을 줍니다.</p>
+    <p class="xref">함께 읽기: <a href="taste-6.html">미학 엔지니어링 · 일관성: 시스템감은 어디서 오나</a> (token을 어떻게 정할지) · <a href="vibe-3.html">이전 레슨 PlayGround</a> (수렴한 컴포넌트를 어디서 조율할지)</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">수렴할 때 가장 잘 빠지는 함정 세 개</div>
+    <div class="l-cols">
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">한 번에 전량 리팩터</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">AI에게 「사이트 스타일을 한 번에 맞춰 줘」라고 하면, 파일 60개를 고친 diff가 옵니다. 검토도 못 하고 배포도 못 해요. 언제나 컨트롤 단위로 나누세요.</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">겸사겸사 비주얼을 고침</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">수렴 중에 AI는 모서리 반경과 배색을 「겸사겸사 최적화」하는 일이 많아요. 그러면 페이지가 달라진 게 병합 버그인지, AI의 미적 즉흥인지 구분이 안 됩니다. 수렴은 동등 치환만 하세요.</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">token을 너무 잘게 쪼갬</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">모서리 반경 12단, 회색 9종이면 정하지 않은 것과 같아요 — 다음에 또 고르게 되고, 고르면 틀립니다. 「거의 고를 게 없을 때」라야 구속력이 생겨요.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">핵심 요점</div>
+    <div class="vibe-callout">
+      <p><b>AI는 존재한다고 알려 주지 않은 것을 재사용하지 않아요.</b> 스타일이 증식하는 뿌리는 매 라운드 기억을 잃는 것이라, 해법은 두 쪽입니다: 이미 흐트러진 것은 컨트롤 단위로 token에 담고, 앞으로는 규칙 하나로 막아요 — 쓰기 전에 먼저 검색. 페이지 위쪽 Skill이 바로 이 두 쪽의 실행판이에요. Agent에게 복사해 주면, 바로 고치는 대신 빚 목록부터 내놓습니다.</p>
+    </div>
+    <p class="src-note">함께 쓸 규칙은 저장소 <a href="https://github.com/itshen/xs_vibe_rules">itshen/xs_vibe_rules</a>의 「새 기능은 먼저 중복을 확인할 것」 한 조항을 참고하세요. 이 레슨은 그걸 기능에서 스타일까지 연장합니다.</p>
+  </section>
+
+</article>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* ── 交互一：样式熵增模拟器 ──
+   八轮迭代都取自真实项目里见过的类名，颜色和圆角的微小差异是刻意的：
+   肉眼几乎分不出，但正是这种「差一点」让人不敢动手合并。 */
+var ENT = [
+  { cls:'.btn-primary',     c:'#0d9488', r:10, pad:'11px 26px', fs:15, lines:6,
+    log:'1라운드: 홈페이지를 만들어요. AI가 첫 번째 메인 버튼을 씁니다. 아직은 다 괜찮아요.' },
+  { cls:'.submit-btn',      c:'#0f9d8f', r:8,  pad:'12px 24px', fs:15, lines:6,
+    log:'2라운드: 폼 페이지. 새 대화는 홈페이지 CSS를 못 보니, 하나를 다시 씁니다 — 색이 아주 조금 달라요.' },
+  { cls:'.btn-blue',        c:'#0ea5e9', r:12, pad:'10px 22px', fs:14, lines:7,
+    log:'3라운드: 상세 페이지. 「버튼을 조금 더 파랗게」라고 했더니, 색 이름으로 새 클래스를 만들어요.' },
+  { cls:'.primaryButton',   c:'#0d9488', r:10, pad:'14px 28px', fs:16, lines:6,
+    log:'4라운드: 설정 페이지. 스타일은 첫 번째와 거의 같고, 이름만 카멜케이스로 바뀌었어요.' },
+  { cls:'.action-btn',      c:'#14b8a6', r:6,  pad:'10px 20px', fs:14, lines:7,
+    log:'5라운드: 목록 페이지의 동작 열. 또 한 벌, 이번 모서리 반경은 6.' },
+  { cls:'.btn-primary-new', c:'#0d9488', r:10, pad:'11px 26px', fs:15, lines:8,
+    log:'6라운드: 버튼에 그림자를 달라고 해요. 첫 번째를 고치면 홈페이지가 깨질까 봐, 옆에 -new를 하나 더 둡니다.' },
+  { cls:'.form-submit',     c:'#0f766e', r:10, pad:'12px 30px', fs:15, lines:6,
+    log:'7라운드: 다른 폼. 이번엔 색이 한 단 더 어두운데, 당신도 눈치채지 못해요.' },
+  { cls:'.cta',             c:'#0d9488', r:999,pad:'13px 32px', fs:16, lines:6,
+    log:'8라운드: 랜딩 페이지에 캡슐 버튼이 필요해요. 클래스가 여덟 개, 이제 뭘 고쳐야 할지 모르겠어요.' }
+];
+
+var entStep = 0, entFixed = false;
+
+function entRender() {
+  var row = document.getElementById('entRow');
+  if (!entStep) {
+    row.innerHTML = '<p class="ent-empty">프로젝트는 아직 비어 있어요. 아래 버튼을 눌러 반복을 시작하세요.</p>';
+  } else if (entFixed) {
+    row.innerHTML =
+      '<div class="ent-item"><button style="background:var(--brand,#0d9488);border-radius:10px;padding:11px 26px;font-size:15px">기본 동작</button>' +
+      '<span class="ent-cls">Button/primary</span></div>' +
+      '<div class="ent-item"><button style="background:#fff;color:#0f766e;border:1.5px solid #0d9488;border-radius:10px;padding:11px 26px;font-size:15px">보조 동작</button>' +
+      '<span class="ent-cls">Button/secondary</span></div>' +
+      '<div class="ent-item"><button style="background:#dc2626;border-radius:10px;padding:11px 26px;font-size:15px">삭제</button>' +
+      '<span class="ent-cls">Button/danger</span></div>';
+  } else {
+    row.innerHTML = ENT.slice(0, entStep).map(function (b) {
+      return '<div class="ent-item"><button style="background:' + b.c + ';border-radius:' + b.r +
+        'px;padding:' + b.pad + ';font-size:' + b.fs + 'px">기본 동작</button>' +
+        '<span class="ent-cls">' + b.cls + '</span></div>';
+    }).join('');
+  }
+  entStats();
+}
+
+function entStats() {
+  var used = ENT.slice(0, entStep);
+  var impl, colors, radii, lines;
+  if (entFixed) {
+    impl = 1;
+    colors = 1;
+    radii = 1;
+    lines = 22;
+  } else {
+    impl = used.length;
+    colors = new Set(used.map(function (b) { return b.c; })).size;
+    radii = new Set(used.map(function (b) { return b.r; })).size;
+    lines = used.reduce(function (s, b) { return s + b.lines; }, 0);
+  }
+  var set = [['stImpl', impl, 3], ['stColor', colors, 2], ['stRadius', radii, 2], ['stLine', lines, 24]];
+  set.forEach(function (t) {
+    var el = document.getElementById(t[0]);
+    el.querySelector('.n').textContent = t[1];
+    el.classList.toggle('hot', !entFixed && t[1] > t[2]);
+  });
+}
+
+function entNext() {
+  if (entFixed) entReset();
+  if (entStep >= ENT.length) return;
+  var b = ENT[entStep];
+  entStep++;
+  document.getElementById('entLog').innerHTML = '<b>' + b.cls + '</b> — ' + b.log;
+  document.getElementById('entFix').disabled = entStep < 3;
+  if (entStep >= ENT.length) {
+    document.getElementById('entNext').disabled = true;
+    document.getElementById('entHint').textContent =
+      '클래스 여덟 개, 주색상 일곱 종, 모서리 반경 여섯 종, 중복 CSS 오십 줄쯤. 이제 「수렴 실행」을 눌러, 뭐가 남아야 하는지 보세요.';
+  }
+  entRender();
+}
+
+function entConverge() {
+  entFixed = true;
+  document.getElementById('entLog').innerHTML =
+    '<b>수렴이 끝났어요.</b> 클래스 여덟 개를 컴포넌트 하나의 의미 변형 세 가지로 합쳤고, 색과 모서리 반경은 전부 token에서 가져옵니다. 눈으로 보면 아무것도 안 바뀌었어요. 바뀐 건 「다음에 어디를 고칠까」에 답이 하나뿐이라는 점이에요.';
+  document.getElementById('entHint').textContent =
+    '남은 버튼 셋을 보세요: 기본, 보조, 위험. 차이에 이름이 있으니 남겼고, 아까 여덟 개는 이름이 없으니 합쳤어요.';
+  document.getElementById('entToken').className = 'ent-token on';
+  document.getElementById('entToken').textContent =
+    ':root {\n' +
+    '  --brand:        #0d9488;   /* 八种绿收成一种 */\n' +
+    '  --danger:       #dc2626;\n' +
+    '  --radius-ctl:   10px;      /* 控件圆角只留一档 */\n' +
+    '  --ctl-h:        44px;      /* 触摸目标下限 */\n' +
+    '  --pad-ctl:      11px 26px;\n' +
+    '}';
+  document.getElementById('entNext').disabled = true;
+  document.getElementById('entFix').disabled = true;
+  entRender();
+}
+
+function entReset() {
+  entStep = 0;
+  entFixed = false;
+  document.getElementById('entLog').textContent = '0라운드: 아직 시작 전이에요.';
+  document.getElementById('entHint').textContent =
+    '여덟 라운드 뒤에 이 버튼 더미를 보면, 뭘 고쳐야 할지 구분이 안 돼요 — 그게 「제각각」의 손맛이에요.';
+  document.getElementById('entToken').className = 'ent-token';
+  document.getElementById('entNext').disabled = false;
+  document.getElementById('entFix').disabled = true;
+  entRender();
+}
+
+/* ── 交互二：该合并还是合理差异 ── */
+var JD = [
+  {
+    a: { nm:'.btn-primary', vl:'배경 #0d9488 · 모서리 반경 10px · 안쪽 여백 11/26' },
+    b: { nm:'.submit-btn',  vl:'배경 #0f9d8f · 모서리 반경 8px · 안쪽 여백 12/24' },
+    ask: '둘 다 페이지 메인 버튼이고, 차이는 색과 모서리 반경이에요.',
+    merge: true,
+    why: '이 두 색은 눈으로 구분이 안 되고, 모서리 반경 2px 차이도 아무도 못 느껴요. 디자인 결정이 아니라, 대화 두 번이 각각 한 번씩 쓴 결과예요. 하나로 합치고, 그중 한 값을 token으로 쓰세요.'
+  },
+  {
+    a: { nm:'.btn-primary',   vl:'솔리드 채움 · 브랜드색 배경 · 흰 글자' },
+    b: { nm:'.btn-secondary', vl:'외곽선 · 흰 배경 · 브랜드색 글자' },
+    ask: '같은 팝업 안의 버튼 둘, 하나는 솔리드, 하나는 외곽선.',
+    merge: false,
+    why: '이 차이의 이름은 「주와 부」예요: 한 화면에 주인공은 하나, 보조 동작은 시각 무게에서 한 발 물러나야 해요. 할 일은 합치는 게 아니라, 둘의 색을 같은 token에서 가져오게 해서 스타일을 맞추는 거예요.'
+  },
+  {
+    a: { nm:'.btn (데스크톱)', vl:'높이 36px' },
+    b: { nm:'.btn (모바일)', vl:'높이 44px' },
+    ask: '같은 버튼인데, 화면 두 종류에서 높이가 달라요.',
+    merge: false,
+    why: '이 차이의 이름은 「터치 타깃 하한」이에요: 손가락은 36px을 정확히 못 눌러요. 다만 올바른 쓰기는 클래스 하나에 반응형 브레이크포인트를 다는 것이지, 나란한 클래스 둘이 아니에요 — 차이는 남기고, 구현은 합치세요.'
+  },
+  {
+    a: { nm:'.card',  vl:'모서리 반경 12px · 그림자 0 2px 8px' },
+    b: { nm:'.panel', vl:'모서리 반경 13px · 그림자 0 2px 8px' },
+    ask: '컨테이너 두 종류, 모서리 반경은 1px 차이고 그림자는 완전히 같아요.',
+    merge: true,
+    why: '13px은 손이 미끄러졌거나, 어느 날 「조금만 키우자」의 잔재일 거예요. 1px 차이는 디자이너도 재지 못하는데, 나중에 온 사람은 여기 뭔가 있다고 생각해 손을 못 대요. 합치세요.'
+  },
+  {
+    a: { nm:'.btn-primary', vl:'배경 #0d9488 (브랜드색)' },
+    b: { nm:'.btn-danger',  vl:'배경 #dc2626 (빨강)' },
+    ask: '확인 버튼과 삭제 버튼이 완전히 다른 색을 썼어요.',
+    merge: false,
+    why: '이 차이의 이름은 「의미 색」이에요: 빨강은 누르기 전에 한 초 망설이게 해야 해요. 반드시 남겨야 하는 차이고, 할 일은 이것도 token(--danger)에 넣는 것이지, 여기저기 #dc2626을 흩뿌리는 게 아니에요.'
+  }
+];
+var jdDone = 0;
+
+function buildJd() {
+  document.getElementById('jdWrap').innerHTML = JD.map(function (it, i) {
+    return '<div class="jd-card">' +
+      '<div class="jd-pair">' +
+        '<div class="jd-side"><span class="nm">' + it.a.nm + '</span><span class="vl">' + it.a.vl + '</span></div>' +
+        '<div class="jd-side"><span class="nm">' + it.b.nm + '</span><span class="vl">' + it.b.vl + '</span></div>' +
+      '</div>' +
+      '<div class="jd-ask">' + it.ask + '</div>' +
+      '<div class="jd-opts">' +
+        '<button type="button" onclick="jdPick(' + i + ',1,this)">합쳐야 함</button>' +
+        '<button type="button" onclick="jdPick(' + i + ',0,this)">정당한 차이, 남김</button>' +
+      '</div>' +
+      '<div class="jd-fb" id="jdFb' + i + '"></div>' +
+    '</div>';
+  }).join('');
+}
+
+function jdPick(i, saidMerge, btn) {
+  var card = btn.closest('.jd-card');
+  if (card.getAttribute('data-done')) return;
+  card.setAttribute('data-done', '1');
+  var it = JD[i];
+  var right = (!!saidMerge) === it.merge;
+  var btns = card.querySelectorAll('.jd-opts button');
+  btns.forEach(function (b, bi) {
+    b.disabled = true;
+    var isMergeBtn = bi === 0;
+    if (isMergeBtn === it.merge) b.classList.add('right');
+    else if ((isMergeBtn ? 1 : 0) === saidMerge) b.classList.add('wrong');
+  });
+  var fb = document.getElementById('jdFb' + i);
+  fb.className = 'jd-fb on ' + (right ? 'ok' : 'no');
+  fb.innerHTML = (right ? '<b class="y">맞아요.</b>' : '<b class="n">다시 생각해 보세요.</b>') + it.why;
+  jdDone++;
+  document.getElementById('jdScore').textContent = jdDone >= JD.length
+    ? '다섯 쌍을 다 판정했어요. 규칙은 단순해요: 이 차이를 뭐라고 부를 수 있으면 남기고 token에 담고, 못 부르면 손 미끄러진 거니 합치세요.'
+    : '판정 ' + jdDone + ' / ' + JD.length + ' 쌍.';
+}
+
+entRender();
+buildJd();
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.ko.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

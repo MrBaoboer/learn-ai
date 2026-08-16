@@ -5,9 +5,11 @@
        lsKey     刷题进度的 localStorage 键（每个题库必须唯一）
        examId    考试标识，随成绩上报（服务端暂不消费，先带上）
        pickPlan  模拟考试抽题数 { single, multi, judge }，在整个题库里抽
-       pickPerPart 改为按篇章均摊，每章各抽 { single, multi, judge } 道，
-                 篇章由考点组编号的百位推导（1xx 是第一篇章，依此类推）。
-                 全站综合卷用它保证七章都考到，不会整章漏掉。设了它就不看 pickPlan
+       pickPerPart 改为按卷均摊，每卷各抽 { single, multi, judge } 道，
+                 卷子由考点组编号的百位推导（1xx 是大模型原理篇，依此类推；
+                 7xx 是协作方法论篇 Vibe Coding，6xx 是 Grok Build 专题——
+                 百位与篇章序号对不上是篇章重排留下的，详见 exam-data.js 的说明）。
+                 全站综合卷用它保证七套卷都考到，不会整卷漏掉。设了它就不看 pickPlan
        drill     false 表示这份卷子不提供顺序刷题（全站综合卷用不上，
                  想逐题刷解析该去各篇章自测页）
        verdicts  判分文案 [{ min, tier, title, desc }]，按 min 降序匹配 */
@@ -119,7 +121,7 @@ function pickByGroup(type, n){
   return sample(oneFromEachGroup(window.EXAM_BANK, type), n);
 }
 /* 按篇章均摊：每章各抽固定题数，再把同题型的题跨章打乱，
-   避免出现前几题清一色第一篇章 */
+   避免出现前几题清一色大模型原理篇 */
 function pickPerPart(plan){
   var parts = {};
   window.EXAM_BANK.forEach(function(q){

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>贪心与采样：AI 选词时的两种性格 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="每步都挑最大的就是贪心解码，按概率掷骰子就是采样——Temperature 背后的算法学。同一个开头连点三次：贪心三次全同，采样三次各不相同，温度越高越野。">
+<meta name="keywords" content="贪心算法,采样,temperature参数,贪心解码,大模型解码策略,top-p,AI选词原理">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-9.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="贪心与采样：AI 选词时的两种性格">
+<meta property="og:description" content="temperature=0 就是贪心解码，温度越高越敢选冷门词。同一个开头连点三次，两种性格一目了然。">
+<meta property="og:url" content="https://xueai.app/slides/algo-9.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="贪心与采样：AI 选词时的两种性格">
+<meta name="twitter:description" content="每步挑最大 = 贪心，按概率掷骰子 = 采样。Temperature 背后的算法学，一玩就懂。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── 生成器（两台共用） ── */
+.gen-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden;margin-bottom:20px}
+.gen-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:13px 18px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.gen-head h4{font-size:15px;font-weight:800;color:var(--text)}
+.gen-badge{font-size:11px;font-weight:800;padding:3px 12px;border-radius:99px}
+.gen-badge.cold{background:rgba(2,132,199,.1);color:#0369a1}
+.gen-badge.hot{background:rgba(219,39,119,.1);color:var(--al-deep)}
+.temp-row{margin-left:auto;display:flex;align-items:center;gap:9px}
+.temp-row .tp-label{font-size:12px;font-weight:800;color:var(--sub)}
+.temp-seg{display:flex;border:1.5px solid var(--al-line);border-radius:99px;overflow:hidden}
+.temp-seg button{border:none;background:transparent;padding:5px 15px;font-size:12.5px;font-weight:800;color:var(--al);cursor:pointer;font-family:inherit;transition:background .15s,color .15s}
+.temp-seg button.active{background:var(--al);color:#fff}
+.gen-body{padding:18px 20px;min-height:120px}
+.gen-text{font-size:16.5px;line-height:1.9;color:var(--text);word-break:break-all;margin-bottom:4px}
+.gen-text .starter-part{color:var(--sub)}
+.gen-text .ai-part{font-weight:600}
+.gen-text .caret{display:inline-block;width:2px;height:1.1em;background:var(--al);vertical-align:text-bottom;margin-left:1px;animation:blink .85s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.cand-pop{margin-top:12px;padding:12px 14px;background:var(--al-soft);border:1.5px dashed var(--al-line);border-radius:var(--radius-sm);opacity:0;transform:translateY(5px);transition:opacity .25s,transform .25s}
+.cand-pop.show{opacity:1;transform:translateY(0)}
+.cand-title{font-size:11.5px;font-weight:800;color:var(--al-deep);margin-bottom:8px}
+.cand-list{display:flex;flex-direction:column;gap:6px}
+.cand-row{display:flex;align-items:center;gap:9px}
+.cand-word{min-width:104px;text-align:center;padding:2px 10px;font-size:13px;font-weight:800;border-radius:7px;background:rgba(0,0,0,.05);color:var(--sub);transition:background .13s,color .13s,transform .13s}
+.cand-row.picked .cand-word{background:var(--al);color:#fff;transform:scale(1.05)}
+.cand-track{flex:1;height:13px;background:rgba(0,0,0,.05);border-radius:5px;overflow:hidden}
+.cand-fill{height:100%;border-radius:5px;background:rgba(0,0,0,.16);width:0;transition:width .3s cubic-bezier(.25,1,.5,1)}
+.cand-row.picked .cand-fill{background:var(--al)}
+.cand-pct{width:46px;font-size:12px;font-weight:800;color:var(--sub);flex-shrink:0;font-variant-numeric:tabular-nums}
+.cand-row.picked .cand-pct{color:var(--al)}
+.gen-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 18px;border-top:1px solid var(--border)}
+.btn-al{background:var(--al);color:#fff;border:none;padding:9px 24px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.gen-status{font-size:12px;color:var(--sub);font-weight:600}
+.run-list{border-top:1px dashed var(--border);padding:12px 18px;display:flex;flex-direction:column;gap:6px}
+.run-item{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text);line-height:1.6}
+.run-item .rn{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.06);color:var(--sub);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.run-item .rt-temp{flex-shrink:0;font-size:10.5px;font-weight:800;color:var(--al);background:var(--al-soft);padding:1px 8px;border-radius:99px}
+.run-same-badge{align-self:flex-start;font-size:12px;font-weight:800;color:#0369a1;background:rgba(2,132,199,.1);padding:3px 14px;border-radius:99px;margin-top:2px}
+.run-diff-badge{align-self:flex-start;font-size:12px;font-weight:800;color:var(--al-deep);background:rgba(219,39,119,.1);padding:3px 14px;border-radius:99px;margin-top:2px}
+
+/* ── 概念卡 ── */
+.duo-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.duo-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.duo-card h4{font-size:15px;font-weight:800;margin-bottom:6px}
+.duo-card.greedy h4{color:#0369a1}
+.duo-card.sample h4{color:var(--al-deep)}
+.duo-card p{font-size:13px;color:var(--sub);line-height:1.8}
+.duo-card p b{color:var(--text)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .duo-grid{grid-template-columns:1fr}
+  .cand-word{min-width:84px;font-size:12px}
+  .temp-row{margin-left:0;width:100%}
+  .gen-text{font-size:15px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"贪心与采样：AI 选词时的两种性格","name":"贪心与采样：AI 选词时的两种性格","url":"https://xueai.app/slides/algo-9.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 搜索与决策","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"每步都挑最大的就是贪心解码，按概率掷骰子就是采样——Temperature 背后的算法学。同一个开头连点三次：贪心三次全同，采样三次各不相同，温度越高越野。","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">编程基础篇 · 搜索与决策</div>
+    <h1>贪心与采样：AI 选词时的两种性格</h1>
+    <p class="subtitle">大模型原理篇你看过 AI 逐词元续写时脑子里的候选概率条，也调过 Temperature 旋钮。当时是「体感」，这一课给它算法学的名字：<b>每步挑最大的叫贪心，按概率掷骰子叫采样</b>。同一个开头，两种性格各生成三次——差别一眼就能看穿。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>每步都挑最大的就是贪心解码，按概率掷骰子就是采样——Temperature 背后的算法学。亲手对比两种策略生成的句子</p></aside><!--seo:end-->  <div class="sec-label">同一个开头 · 两种性格</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">开头固定是「周末的计划是」。<b style="color:var(--text)">先玩上面这台</b>：贪心模式（temperature=0），每步永远选概率条最长的那根。<b style="color:var(--text)">连点三次「再生成」</b>，留意下方堆叠的结果列表——有没有哪怕一个字的不同？</p>
+
+  <div class="gen-box">
+    <div class="gen-head">
+      <h4>😤 贪心模式</h4><span class="gen-badge cold">temperature = 0</span>
+    </div>
+    <div class="gen-body">
+      <div class="gen-text" id="gText"><span class="starter-part">周末的计划是</span><span class="ai-part" id="gAi"></span><span class="caret"></span></div>
+      <div class="cand-pop" id="gPop">
+        <div class="cand-title">每一步的候选——它永远拿最长那根</div>
+        <div class="cand-list" id="gCands"></div>
+      </div>
+    </div>
+    <div class="gen-foot">
+      <button class="btn-al" id="gBtn">再生成 →</button>
+      <span class="gen-status" id="gStatus">没有骰子、没有悬念：概率最大者胜</span>
+    </div>
+    <div class="run-list" id="gRuns" style="display:none"></div>
+  </div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;"><b style="color:var(--text)">再玩下面这台</b>：采样模式，每步按概率<b style="color:var(--text)">加权掷骰子</b>。先在 0.7 档连点三次，看结果是不是各不相同；再切到 1.2 档试试——<b style="color:var(--text)">留意概率条的形状变化</b>：温度越高，条与条越接近，冷门词翻身的机会就越大。</p>
+
+  <div class="gen-box">
+    <div class="gen-head">
+      <h4>🎲 采样模式</h4><span class="gen-badge hot">按概率掷骰子</span>
+      <div class="temp-row">
+        <span class="tp-label">temperature</span>
+        <div class="temp-seg" id="tempSeg">
+          <button data-t="0.2">0.2</button>
+          <button data-t="0.7" class="active">0.7</button>
+          <button data-t="1.2">1.2</button>
+        </div>
+      </div>
+    </div>
+    <div class="gen-body">
+      <div class="gen-text" id="sText"><span class="starter-part">周末的计划是</span><span class="ai-part" id="sAi"></span><span class="caret"></span></div>
+      <div class="cand-pop" id="sPop">
+        <div class="cand-title" id="sPopTitle">经温度调整后的概率——骰子按这个掷</div>
+        <div class="cand-list" id="sCands"></div>
+      </div>
+    </div>
+    <div class="gen-foot">
+      <button class="btn-al" id="sBtn">再生成 →</button>
+      <span class="gen-status" id="sStatus">同样的候选表，掷骰子选——每次都可能走上不同岔路</span>
+    </div>
+    <div class="run-list" id="sRuns" style="display:none"></div>
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">概念卡 · 两种性格的账本</div>
+
+  <div class="duo-grid paywall-locked">
+    <div class="duo-card greedy">
+      <h4>😤 贪心：每步拿眼前最大的</h4>
+      <p><b>快、稳、可复现</b>——跑一万次都是同一句话。但它有个致命盲点：<b>每步的局部最优，加起来不一定是整体最优</b>。第一步选了最顺口的词，可能把整句话带进死路。这个坑怎么填？<b>下一课的 Beam Search 就是解药</b>——先卖个关子。</p>
+    </div>
+    <div class="duo-card sample">
+      <h4>🎲 采样：给随机留个口子</h4>
+      <p><b>用确定性换多样性</b>。按概率掷骰子，大概率的词常被选中（所以还是通顺的），小概率的词偶尔翻身（所以有惊喜）。温度就是拨给「惊喜」的额度：<b>T 越高，概率分布被压得越平，冷门词越敢冒头</b>。</p>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>面试标准答案，一句话版：</b>temperature = 0 时就是贪心解码，输出完全确定；T 越高，softmax 分布越平坦，模型越敢选低概率词，多样性和「胡来」的风险一起上升。你在大模型原理篇拨的那颗旋钮，拨的就是贪心和采样之间的位置。
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:14px;background:rgba(217,119,6,.05);border-color:rgba(217,119,6,.3);">
+    <b style="color:var(--amber)">生活里你见过贪心党：</b>自助餐里每一轮都直奔当下最贵的菜——三文鱼、牛排、帝王蟹一路夹过去，最后肚子没了，主打的现切和牛一口没吃上。<b style="color:var(--amber)">每步最优 ≠ 整体最优</b>，胃是有限的，上下文窗口也是。
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 这一课想和你分享的</h3>
+    <ul>
+      <li><b>贪心 = 每步挑概率最大的</b>：三次生成一字不差——快、可复现，但可能错过整体更优</li>
+      <li><b>采样 = 按概率掷骰子</b>：三次三个样——牺牲确定性，换来多样性</li>
+      <li><b>Temperature 是两者之间的旋钮</b>：T=0 就是贪心；T 越高分布越平、越敢选冷门词</li>
+      <li><b>怎么选看任务</b>：复现实验、写代码、抽取数据用 T=0；头脑风暴、写文案调高 T</li>
+      <li><b>贪心的坑下一课填</b>：Beam Search——先多看几步再选</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 数据 ──
+   贪心用固定步骤表（每步 3 候选，首位最大）；
+   采样用「槽位」表：精心挑过词，任意组合读起来都通顺，
+   所以骰子怎么掷都不会掷出病句——这是演示能放心随机的前提。
+   概率是凭语感标的示意值，不是真实模型输出。 */
+const GREEDY_STEPS = [
+  ['先',42,'去',31,'把',15],
+  ['睡',48,'把',26,'收拾',14],
+  ['个',71,'到',16,'懒觉',8],
+  ['懒觉',83,'好觉',10,'午觉',5],
+  ['，',76,'。',14,'再',6],
+  ['再',44,'然后',28,'下午',17],
+  ['说',39,'看',33,'安排',18],
+  ['。',85,'吧',9,'！',4],
+];
+
+const SLOTS = [
+  [['先',50],['就想',30],['打算',20]],
+  [['睡个懒觉',55],['去爬山',30],['看场电影',15]],
+  [['，然后',45],['，再',35],['，接着',20]],
+  [['去逛逛菜市场',40],['把房间收拾了',35],['窝在沙发追剧',25]],
+  [['，晚上',50],['，回家以后',30],['，累了就',20]],
+  [['吃顿火锅',45],['早点休息',35],['给爸妈打个电话',20]],
+  [['。',70],['就很满足了。',20],['！',10]],
+];
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* 候选条渲染：pop 容器 + 三行复用（重建会闪，见 zero-1 的同款处理） */
+function buildRows(listEl){
+  listEl.innerHTML = [0,1,2].map(() => `
+    <div class="cand-row">
+      <div class="cand-word"></div>
+      <div class="cand-track"><div class="cand-fill"></div></div>
+      <div class="cand-pct"></div>
+    </div>`).join('');
+  return [...listEl.children].map(row => ({
+    row,
+    word: row.querySelector('.cand-word'),
+    fill: row.querySelector('.cand-fill'),
+    pct:  row.querySelector('.cand-pct'),
+  }));
+}
+
+function renderCands(rows, cands){
+  /* cands: [[word,pct],...] 已按显示顺序排好 */
+  rows.forEach((r, k) => {
+    r.row.classList.remove('picked');
+    r.word.textContent = cands[k][0];
+    r.pct.textContent = cands[k][1].toFixed(0) + '%';
+    r.fill.style.width = Math.max(cands[k][1], 2) + '%';
+  });
+}
+
+function pushRun(listEl, n, text, tempLabel){
+  listEl.style.display = 'flex';
+  const item = document.createElement('div');
+  item.className = 'run-item';
+  item.innerHTML = `<span class="rn">${n}</span>` +
+    (tempLabel ? `<span class="rt-temp">T=${tempLabel}</span>` : '') +
+    `<span>周末的计划是${text}</span>`;
+  listEl.appendChild(item);
+}
+
+/* ══ 贪心生成器 ══ */
+const gAi = document.getElementById('gAi');
+const gBtn = document.getElementById('gBtn');
+const gStatus = document.getElementById('gStatus');
+const gPop = document.getElementById('gPop');
+const gRows = buildRows(document.getElementById('gCands'));
+const gRuns = document.getElementById('gRuns');
+let gRunning = false, gResults = [];
+
+async function runGreedy(){
+  if (gRunning) return;
+  gRunning = true;
+  gBtn.disabled = true;
+  gAi.textContent = '';
+  gPop.classList.add('show');
+  gStatus.textContent = '每一步：亮出候选 → 拿最长那根，绝不犹豫';
+  for (const step of GREEDY_STEPS){
+    renderCands(gRows, [[step[0],step[1]],[step[2],step[3]],[step[4],step[5]]]);
+    await sleep(460);
+    gRows[0].row.classList.add('picked');
+    await sleep(300);
+    gAi.textContent += step[0];
+  }
+  const text = GREEDY_STEPS.map(s => s[0]).join('');
+  gResults.push(text);
+  pushRun(gRuns, gResults.length, text, null);
+  if (gResults.length >= 3 && gResults.every(t => t === gResults[0]) && !gRuns.querySelector('.run-same-badge')){
+    const badge = document.createElement('div');
+    badge.className = 'run-same-badge';
+    badge.textContent = '🔁 三次全同——temperature=0 没有骰子，跑一万次也是这句';
+    gRuns.appendChild(badge);
+  }
+  gStatus.textContent = gResults.length < 3
+    ? `第 ${gResults.length} 次生成完毕——再点，看会不会变`
+    : '看到了吧：贪心是台复读机。往下看采样怎么打破它';
+  gBtn.disabled = false;
+  gBtn.textContent = '再生成 ↻';
+  gRunning = false;
+}
+gBtn.addEventListener('click', runGreedy);
+
+/* ══ 采样生成器 ══ */
+const sAi = document.getElementById('sAi');
+const sBtn = document.getElementById('sBtn');
+const sStatus = document.getElementById('sStatus');
+const sPop = document.getElementById('sPop');
+const sPopTitle = document.getElementById('sPopTitle');
+const sRows = buildRows(document.getElementById('sCands'));
+const sRuns = document.getElementById('sRuns');
+let sRunning = false, sResults = [];
+let temperature = 0.7;
+
+document.querySelectorAll('#tempSeg button').forEach(b => {
+  b.addEventListener('click', () => {
+    if (sRunning) return;
+    document.querySelectorAll('#tempSeg button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    temperature = +b.dataset.t;
+    sStatus.textContent = temperature >= 1.2
+      ? 'T=1.2：分布被压平了，冷门词也有像样的机会——生成一次看看'
+      : temperature <= 0.2
+        ? 'T=0.2：分布更尖了，基本只剩头号候选——接近贪心'
+        : 'T=0.7：日常聊天的常用档——通顺和多样的折中';
+  });
+});
+
+/* 温度变换：q_i ∝ p_i^(1/T)，再归一化。
+   这正是真实 softmax 里除以 T 的效果：T<1 分布变尖，T>1 变平。
+   演示里直接对标注概率做变换，学员能亲眼看到条形随温度改变形状。 */
+function applyTemp(cands, T){
+  const powed = cands.map(([w, p]) => [w, Math.pow(p, 1 / T)]);
+  const sum = powed.reduce((a, [, q]) => a + q, 0);
+  return powed.map(([w, q]) => [w, q / sum * 100]);
+}
+
+function samplePick(adjusted){
+  let roll = Math.random() * 100;
+  for (let i = 0; i < adjusted.length; i++){
+    roll -= adjusted[i][1];
+    if (roll <= 0) return i;
+  }
+  return adjusted.length - 1;
+}
+
+async function runSample(){
+  if (sRunning) return;
+  sRunning = true;
+  sBtn.disabled = true;
+  sAi.textContent = '';
+  sPop.classList.add('show');
+  sPopTitle.textContent = `T=${temperature} 调整后的概率——骰子按这个掷`;
+  let coldPicks = 0;
+  const picked = [];
+  for (const slot of SLOTS){
+    const adjusted = applyTemp(slot, temperature);
+    renderCands(sRows, adjusted);
+    await sleep(500);
+    const k = samplePick(adjusted);
+    sRows[k].row.classList.add('picked');
+    if (k === 2) coldPicks++;
+    await sleep(k > 0 ? 480 : 280);   // 掷中非首选时多停一拍，让人看清分叉
+    sAi.textContent += slot[k][0];
+    picked.push(slot[k][0]);
+  }
+  const text = picked.join('');
+  sResults.push({ text, T: temperature });
+  pushRun(sRuns, sResults.length, text, temperature);
+  if (sResults.length >= 3 && !sRuns.querySelector('.run-diff-badge')){
+    const distinct = new Set(sResults.map(r => r.text)).size;
+    const badge = document.createElement('div');
+    badge.className = 'run-diff-badge';
+    badge.textContent = distinct > 1
+      ? `🎲 ${sResults.length} 次生成了 ${distinct} 种结果——骰子的功劳`
+      : '🎲 这几次碰巧掷出了同一句——低温下常见，调高温度再试';
+    sRuns.appendChild(badge);
+  }
+  sStatus.textContent = coldPicks > 0
+    ? `这一次有 ${coldPicks} 步掷中了冷门候选——句子拐上了小路，但依然通顺`
+    : '这一次骰子都落在了大概率的词上——再掷一次未必如此';
+  sBtn.disabled = false;
+  sBtn.textContent = '再生成 ↻';
+  sRunning = false;
+}
+sBtn.addEventListener('click', runSample);
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

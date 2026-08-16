@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>我的聊天记录会被拿去训练吗？ | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+.qa-answer {
+  background: linear-gradient(135deg, rgba(8,145,178,0.06), rgba(0,102,255,0.05));
+  border: 1.5px solid rgba(8,145,178,0.3);
+  border-radius: var(--radius); padding: 22px 26px; margin: 4px 0 8px;
+}
+.qa-answer .qa-tag { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #0891b2; margin-bottom: 8px; }
+.qa-answer p { font-size: 16.5px; font-weight: 700; color: var(--text); line-height: 1.85; }
+.qa-answer p b { color: #0891b2; }
+
+/* 数据流向动画 */
+.pv-demo {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 22px 24px;
+}
+.pv-toggle-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 16px; margin-bottom: 20px; background: rgba(0,0,0,0.015);
+}
+.pv-toggle-label { font-size: 13.5px; font-weight: 800; color: var(--text); }
+.pv-toggle-label small { display: block; font-size: 11.5px; font-weight: 600; color: var(--sub); margin-top: 2px; }
+.pv-switch {
+  flex-shrink: 0; width: 52px; height: 28px; border-radius: 999px;
+  border: none; cursor: pointer; position: relative;
+  background: var(--amber); transition: background 0.25s;
+}
+.pv-switch::after {
+  content: ''; position: absolute; top: 3px; left: 27px;
+  width: 22px; height: 22px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25); transition: left 0.25s;
+}
+.pv-switch[aria-pressed="false"] { background: #c4c8cf; }
+.pv-switch[aria-pressed="false"]::after { left: 3px; }
+.pv-lane { display: flex; align-items: stretch; gap: 0; }
+.pv-node {
+  flex-shrink: 0; text-align: center; padding: 10px 12px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--card); font-size: 12px; font-weight: 700; color: var(--sub);
+  line-height: 1.5; opacity: 0.4; transition: all 0.35s;
+  cursor: pointer; font-family: inherit;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.pv-node:hover { border-color: rgba(0,102,255,0.4); }
+.pv-node.lit { opacity: 1; border-color: var(--accent); color: var(--text); box-shadow: 0 2px 10px rgba(0,102,255,0.12); }
+.pv-node.picked { border-color: var(--cyan); background: rgba(8,145,178,0.06); }
+.pv-node .pv-ico { font-size: 20px; display: block; margin-bottom: 2px; }
+.pv-arrow {
+  flex: 1; min-width: 18px; height: 3px; align-self: center;
+  background: rgba(0,0,0,0.1); border-radius: 2px; position: relative;
+  transition: background 0.35s;
+}
+.pv-arrow.lit {
+  background: repeating-linear-gradient(90deg, var(--accent) 0 8px, rgba(0,102,255,0.25) 8px 14px);
+  background-size: 14px 3px; animation: pvFlow 0.8s linear infinite;
+}
+@keyframes pvFlow { from { background-position: 0 0; } to { background-position: 14px 0; } }
+.pv-branches { margin-top: 14px; padding-left: 12%; display: flex; flex-direction: column; gap: 12px; }
+.pv-branch { display: flex; align-items: center; gap: 0; }
+.pv-branch .pv-tag {
+  flex-shrink: 0; font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+  color: var(--sub); width: 88px;
+}
+.pv-branch.off { opacity: 0.35; filter: grayscale(0.8); }
+.pv-branch.off .pv-arrow.lit { animation: none; background: rgba(0,0,0,0.1); }
+.pv-branch .pv-node.lit.warm { border-color: var(--amber); background: rgba(217,119,6,0.05); }
+.pv-branch .pv-node.lit.safe { border-color: var(--success); background: rgba(22,163,74,0.05); }
+.pv-note {
+  margin-top: 16px; border-top: 1.5px dashed var(--border); padding-top: 14px;
+  font-size: 13px; color: var(--sub); line-height: 1.85; min-height: 44px;
+}
+.pv-note b { color: var(--text); }
+.pv-status { font-size: 12.5px; font-weight: 800; margin-top: 10px; transition: color 0.25s; }
+.pv-status.on { color: var(--amber); }
+.pv-status.off { color: var(--success); }
+
+/* 速查表 */
+.pv-table-wrap { overflow-x: auto; }
+.pv-table {
+  width: 100%; border-collapse: collapse;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  font-size: 13px; box-shadow: var(--shadow-card);
+}
+.pv-table th, .pv-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); line-height: 1.7; }
+.pv-table th { background: rgba(0,0,0,0.025); font-size: 12px; font-weight: 800; color: var(--sub); white-space: nowrap; }
+.pv-table td:first-child { font-weight: 800; color: var(--text); white-space: nowrap; }
+.pv-table td { color: var(--sub); }
+.pv-table td b { color: var(--text); }
+.pv-table tr:last-child td { border-bottom: none; }
+
+/* 别发清单 */
+.nono-list { display: flex; flex-direction: column; gap: 12px; }
+.nono-item {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow-card);
+}
+.nono-item .nn-ico { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+.nono-item h4 { font-size: 14.5px; font-weight: 800; color: var(--text); margin-bottom: 3px; }
+.nono-item p { font-size: 13px; color: var(--sub); line-height: 1.85; }
+.nono-item p b { color: var(--danger); }
+
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .qa-answer p { font-size: 15px; }
+  .pv-demo { padding: 16px 14px; }
+  .pv-node { padding: 8px 7px; font-size: 10.5px; }
+  .pv-node .pv-ico { font-size: 16px; }
+  .pv-branches { padding-left: 0; }
+  .pv-branch .pv-tag { width: 64px; font-size: 10px; }
+  .pv-table th, .pv-table td { padding: 9px 10px; font-size: 12px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="我的聊天记录会被拿去训练吗？可能会，取决于产品和你的设置。不少产品默认用你的对话改进模型，但正规产品都给了关闭开关。一张数据流向图讲清你发的话去了哪、开关在哪类设置里找，以及什么内容坚决别发给 AI。">
+<meta name="keywords" content="聊天记录会被训练吗,AI隐私设置,关闭模型训练,AI数据安全,对话数据用途,AI入门问答">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/zero-q-privacy.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/zero-q-privacy.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/zero-q-privacy.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/zero-q-privacy.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/zero-q-privacy.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 产品经理培训">
+<meta property="og:title" content="我的聊天记录会被拿去训练吗？">
+<meta property="og:description" content="可能会，取决于产品和设置。一张数据流向图讲清你发的话去了哪，开关怎么找，什么坚决别发。">
+<meta property="og:url" content="https://xueai.app/slides/zero-q-privacy.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_CN">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="我的聊天记录会被拿去训练吗？">
+<meta name="twitter:description" content="可能会，取决于产品和设置。数据流向图讲清你发的话去了哪，开关怎么找。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"我的聊天记录会被拿去训练吗？","name":"我的聊天记录会被拿去训练吗？","url":"https://xueai.app/slides/zero-q-privacy.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 小白三千问 · 花钱与安全","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"我的聊天记录会被拿去训练吗？可能会，取决于产品和你的设置。不少产品默认用你的对话改进模型，但正规产品都给了关闭开关。一张数据流向图讲清你发的话去了哪、开关在哪类设置里找，以及什么内容坚决别发给 AI。","datePublished":"2026-08-09","dateModified":"2026-08-17"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"我的聊天记录会被拿去训练吗？","acceptedAnswer":{"@type":"Answer","text":"可能会，取决于产品和你的设置。不少产品默认用你的对话改进模型，但正规产品都给了关闭开关；免费版更倾向收集，企业版通常承诺不碰你的数据。"}}]}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">零基础入门 · 小白三千问</div>
+    <h1>我的聊天记录会被拿去训练吗？</h1>
+    <p class="subtitle">你和 AI 说过的话，有没有可能变成它的「教材」？这一页用一张流向图讲清<b>数据到底去了哪</b>，再告诉你开关在哪类设置里找、什么内容坚决别发。</p>
+  </header>
+
+  <div class="qa-answer">
+    <div class="qa-tag">一句话回答</div>
+    <p><b>可能会，取决于产品和你的设置</b>。不少产品默认用你的对话改进模型，但<b>正规产品都给了关闭开关</b>；免费版更倾向收集，企业版通常承诺不碰你的数据。</p>
+  </div>
+
+  <div class="sec-label">看个动画 · 你发的一句话去了哪</div>
+
+  <p class="l-p">你在输入框敲下一句话、点了发送，它就开始了一段旅程。下面这张图模拟了这段旅程，<b>试着切换那个开关</b>，看看流向怎么变；每个节点都可以点，看一句说明。</p>
+
+  <div class="pv-demo">
+    <div class="pv-toggle-row">
+      <div class="pv-toggle-label">允许用我的对话改进模型<small>多数产品的设置里都有一个类似的开关，这里是模拟版</small></div>
+      <button class="pv-switch" id="pvSwitch" aria-pressed="true" aria-label="允许用我的对话改进模型"></button>
+    </div>
+
+    <div class="pv-lane">
+      <button class="pv-node" data-node="you"><span class="pv-ico">🧑</span>你</button>
+      <div class="pv-arrow"></div>
+      <button class="pv-node" data-node="tls"><span class="pv-ico">🔒</span>加密传输</button>
+      <div class="pv-arrow"></div>
+      <button class="pv-node" data-node="server"><span class="pv-ico">🖥️</span>服务器<br>生成回答</button>
+      <div class="pv-arrow"></div>
+      <button class="pv-node" data-node="fork"><span class="pv-ico">🔀</span>分叉点</button>
+    </div>
+
+    <div class="pv-branches">
+      <div class="pv-branch" id="branchTrain">
+        <span class="pv-tag">开关开着时</span>
+        <div class="pv-arrow"></div>
+        <button class="pv-node warm" data-node="train"><span class="pv-ico">📚</span>训练语料仓库</button>
+      </div>
+      <div class="pv-branch" id="branchKeep">
+        <span class="pv-tag">两种状态都有</span>
+        <div class="pv-arrow"></div>
+        <button class="pv-node safe" data-node="keep"><span class="pv-ico">🗑️</span>保留一段时间后删除</button>
+      </div>
+    </div>
+
+    <div class="pv-status on" id="pvStatus"></div>
+    <div class="pv-note" id="pvNote">点击上面任意一个节点，这里会显示它的说明。</div>
+  </div>
+
+  <div class="sec-label">速查表 · 免费、付费、企业版的典型待遇</div>
+
+  <p class="l-p">各家条款五花八门，但按付费档位看，待遇有个大致规律。下表说的是<b>行业里的普遍做法</b>，具体到某个产品，以它自己的隐私条款为准。</p>
+
+  <div class="pv-table-wrap">
+    <table class="pv-table">
+      <thead>
+        <tr><th>档位</th><th>默认用于训练？</th><th>能不能关</th><th>数据保留承诺</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>免费版</td><td><b>多数默认开启</b>，你的对话更可能被收集</td><td>通常可以关，要自己动手找开关</td><td>承诺较弱，保留期各家说法不同</td></tr>
+        <tr><td>付费版</td><td>部分默认开启，部分默认关闭</td><td>通常可以关，开关更好找</td><td>多数写进条款，保留期更明确</td></tr>
+        <tr><td>企业版</td><td><b>通常承诺完全不用</b></td><td>默认就是关的</td><td>有合同约束，出问题可以追责</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec-label">怎么关 · 一个通用找法</div>
+
+  <p class="l-p">每家产品的叫法不同，但开关都藏在类似的地方。打开设置，找这几类字眼：<b>「数据控制」「隐私」「改进模型」「模型训练」</b>。网页版和手机 App 里都找得到，一般就是一两个开关的事。实在找不到，就在设置页的搜索框里搜「数据」两个字，八九不离十。</p>
+
+  <div class="l-callout">
+    关掉开关管的是「以后」。<b>已经练进模型的内容，删除对话也拿不回来</b>，就像话说出口收不回。所以更靠谱的防线在下一节：从一开始就别把敏感的东西发进去。
+  </div>
+
+  <div class="sec-label">什么坚决别发 · 三条红线</div>
+
+  <div class="nono-list">
+    <div class="nono-item">
+      <div class="nn-ico">🪪</div>
+      <div>
+        <h4>能直接惹祸的号码和凭证</h4>
+        <p>身份证号、银行卡号、各种密码和验证码。这类信息<b>一串数字就能造成损失</b>，任何时候都别发给 AI，问问题时用「某某」代替就行。</p>
+      </div>
+    </div>
+    <div class="nono-item">
+      <div class="nn-ico">🏢</div>
+      <div>
+        <h4>公司机密</h4>
+        <p>内部经营数据、没发布的产品方案、核心代码。用 AI 润色文档前先想一想：<b>这份东西登在明天的报纸上，你慌吗</b>。慌，就先把敏感部分删掉再发。</p>
+      </div>
+    </div>
+    <div class="nono-item">
+      <div class="nn-ico">🤝</div>
+      <div>
+        <h4>客户和他人的资料</h4>
+        <p>合同、客户名单、别人的聊天记录。这些信息<b>当事人没同意给 AI 看</b>，替别人做主发出去，出了问题责任在你。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">在公司用 AI · 多记一条规矩</div>
+
+  <p class="l-p">处理工作内容，用<b>公司审批过的企业版账号</b>。企业版贵，贵就贵在合同里白纸黑字写着「你的数据只归你」。拿个人免费号处理工作机密，等于把公司文件存进了一个连你自己都说不清条款的地方，出了事很难交代。</p>
+
+  <div class="l-callout">
+    这一页和另外两页组成本站的「安全三部曲」：<a href="learn.html#zero-q-relay.html" target="_top">API 中转站为什么不太推荐</a>讲买接口的坑，<a href="learn.html#zero-q-reverse-proxy.html" target="_top">「反代账号」「共享号」是什么</a>讲低价会员的坑，这一页讲数据本身。三页看完，AI 花钱路上的大坑基本都认得了。
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 这一页想和你分享的</h3>
+    <ul>
+      <li><b>默认多半在收集</b>：正规产品都有关闭开关，去设置里找「数据控制」「隐私」这类字眼</li>
+      <li><b>敏感信息别进对话框</b>：证件号、公司机密、客户资料，删除对话救不回已经练进模型的内容</li>
+      <li><b>免费产品你也是原料</b>：免费的代价之一，往往是你的对话更可能被拿去当训练材料</li>
+      <li><b>公司机密用企业版</b>：合同写明不碰你的数据，个人免费号别碰工作内容</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 数据流向动画 ── */
+(function () {
+  var NOTES = {
+    you:    '<b>你</b>：一切从你的输入框开始。文字、图片、上传的文件，都算「你发出的内容」。',
+    tls:    '<b>加密传输</b>：路上是加密的，像装进了密封信封，中途被人截获也看不懂。这一步主流产品都做得不错，风险主要在后面。',
+    server: '<b>服务器生成回答</b>：你的话在厂商的服务器上被处理，AI 的回答从这里发回给你。只要用的是在线 AI，这一步躲不开。',
+    fork:   '<b>分叉点</b>：回答生成之后，这段对话的去向在这里分岔：被留下当「教材」，或者存放一阵子之后删除。你设置里的那个开关，决定走哪条岔路。',
+    train:  '<b>训练语料仓库</b>：开关开着时，你的对话可能被抽样、去除个人信息后拿去当训练材料。一旦练进模型，删除对话也撤不回来。',
+    keep:   '<b>保留一段时间后删除</b>：多数产品会把对话保留一段时间（用于安全审查、故障排查等），到期删除。具体保留多久，各家条款写法不同。'
+  };
+  var demo = document.querySelector('.pv-demo');
+  var sw = document.getElementById('pvSwitch');
+  var branchTrain = document.getElementById('branchTrain');
+  var status = document.getElementById('pvStatus');
+  var note = document.getElementById('pvNote');
+  var timers = [];
+  var allowTrain = true;
+
+  function play() {
+    timers.forEach(function (t) { clearTimeout(t); });
+    timers = [];
+    demo.querySelectorAll('.pv-node, .pv-arrow').forEach(function (el) { el.classList.remove('lit'); });
+    branchTrain.classList.toggle('off', !allowTrain);
+
+    var mainItems = demo.querySelectorAll('.pv-lane .pv-node, .pv-lane .pv-arrow');
+    mainItems.forEach(function (el, i) {
+      timers.push(setTimeout(function () { el.classList.add('lit'); }, 320 * i));
+    });
+
+    var branchDelay = 320 * mainItems.length + 150;
+    demo.querySelectorAll('.pv-branch .pv-arrow, .pv-branch .pv-node').forEach(function (el) {
+      timers.push(setTimeout(function () { el.classList.add('lit'); }, branchDelay));
+    });
+
+    timers.push(setTimeout(function () {
+      if (allowTrain) {
+        status.className = 'pv-status on';
+        status.textContent = '当前状态：开关开着，对话可能流进训练语料仓库，同时按期限保留。';
+      } else {
+        status.className = 'pv-status off';
+        status.textContent = '当前状态：开关关了，流向训练仓库的支线熄灭，对话只保留一段时间后删除。';
+      }
+    }, branchDelay + 250));
+  }
+
+  sw.addEventListener('click', function () {
+    allowTrain = !allowTrain;
+    sw.setAttribute('aria-pressed', String(allowTrain));
+    play();
+  });
+
+  demo.querySelectorAll('.pv-node').forEach(function (node) {
+    node.addEventListener('click', function () {
+      demo.querySelectorAll('.pv-node').forEach(function (n) { n.classList.remove('picked'); });
+      node.classList.add('picked');
+      note.innerHTML = NOTES[node.getAttribute('data-node')];
+    });
+  });
+
+  play();
+})();
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

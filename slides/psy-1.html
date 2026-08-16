@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>工程指标及格了，用户为什么还骂慢？ | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="psy.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="AI 产品心理学第 1 课：服务器的秒表和用户的秒表走得不一样。四个可玩实验：同一个 5 秒请求用空白冻结、转圈、流式、步骤外显四种呈现并排跑，选出最难受的那个；凭体感掐 8 秒，揭晓无反馈等待被高估多少；拖 TTFT 滑块重放打字流，看首字时间怎么换体感分；三个走时怪癖逐档演示。感知性能才是用户打分的依据。">
+<meta name="keywords" content="感知性能,TTFT,首字时间,流式输出,等待体验,感知时间,AI产品心理学,AI产品经理">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/psy-1.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="工程指标及格了，用户为什么还骂慢？">
+<meta property="og:description" content="同一个 5 秒请求，四种呈现并排跑；再掐一次 8 秒、拖一次 TTFT 滑块。感知性能才是用户打分的依据。">
+<meta property="og:url" content="https://xueai.app/slides/psy-1.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="工程指标及格了，用户为什么还骂慢？">
+<meta name="twitter:description" content="同一个 5 秒请求，四种呈现并排跑，物理时长相同，体感差三倍。四个实验亲手玩。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 实验一：四方案并排跑 ── */
+.race-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.race-box{background:var(--card);border:2px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:border-color .15s,transform .15s;}
+.race-box:hover{transform:translateY(-2px);}
+.race-box.voted{border-color:var(--ct);box-shadow:0 0 0 2px var(--ct-line);}
+.race-head{padding:11px 15px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.race-head h4{font-size:13.5px;font-weight:800;color:var(--text);}
+.race-tag{font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--ct-soft);color:var(--ct-deep);white-space:nowrap;}
+.race-stage{padding:13px 15px;min-height:132px;font-size:12.5px;line-height:1.75;color:var(--sub);flex:1;}
+.race-stage .rs-answer{color:var(--text);}
+.race-stage .rs-hint{color:#9ca3af;font-size:12px;}
+.race-spinner{width:22px;height:22px;border:3px solid var(--ct-line);border-top-color:var(--ct);border-radius:50%;animation:rspin .8s linear infinite;margin:8px 0;}
+@keyframes rspin{to{transform:rotate(360deg)}}
+.race-steps{display:flex;flex-direction:column;gap:6px;}
+.race-step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub);opacity:0;transform:translateX(-6px);transition:opacity .3s,transform .3s;}
+.race-step.on{opacity:1;transform:none;}
+.race-step .st-dot{width:7px;height:7px;border-radius:50%;background:var(--ct);flex-shrink:0;}
+.race-step.doing .st-dot{animation:stpulse 1s ease infinite;}
+@keyframes stpulse{50%{transform:scale(1.7);opacity:.5}}
+.race-foot{padding:9px 15px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--sub);}
+.race-foot .rf-time{font-variant-numeric:tabular-nums;}
+.race-foot .rf-feel{color:var(--ct-deep);opacity:0;transition:opacity .3s;text-align:right;}
+.race-foot .rf-feel.show{opacity:1;}
+.race-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;}
+.btn-ct{background:var(--ct);color:#fff;border:none;padding:10px 24px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s;}
+.btn-ct:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px);}
+.btn-ct:disabled{background:#c4c8cf;cursor:not-allowed;}
+.race-status{font-size:12.5px;color:var(--sub);font-weight:600;}
+.race-verdict{margin-top:14px;padding:14px 18px;background:var(--ct-soft);border:1.5px dashed var(--ct-line);border-radius:10px;font-size:13.5px;line-height:1.8;color:var(--sub);display:none;}
+.race-verdict.show{display:block;animation:psy-slide-up .35s ease;}
+.race-verdict b{color:var(--ct-deep);}
+
+/* ── 实验二：秒表估时游戏 ── */
+.sw-wrap{display:grid;grid-template-columns:7fr 5fr;gap:16px;align-items:stretch;}
+.sw-panel{border:2px solid var(--border);border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;min-height:200px;font-size:12.5px;color:#9ca3af;user-select:none;}
+.sw-panel.run{color:#d1d5db;}
+.sw-side{display:flex;flex-direction:column;gap:12px;justify-content:center;}
+.sw-side p{font-size:13px;color:var(--sub);line-height:1.75;}
+.sw-side p b{color:var(--ct-deep);}
+.sw-result{display:none;}
+.sw-result.show{display:block;animation:psy-pop .3s ease;}
+.sw-nums{display:flex;gap:10px;margin-bottom:10px;}
+.sw-num{flex:1;background:var(--ct-soft);border:1px solid var(--ct-line);border-radius:10px;padding:10px 12px;text-align:center;}
+.sw-num i{display:block;font-style:normal;font-size:10.5px;font-weight:800;color:var(--sub);margin-bottom:3px;}
+.sw-num b{font-size:16px;color:var(--ct-deep);font-variant-numeric:tabular-nums;}
+.sw-verdict{font-size:13px;line-height:1.8;color:var(--sub);}
+.sw-verdict b{color:var(--ct-deep);}
+
+/* ── 实验三：TTFT 滑块 + 聊天重放 ── */
+.tf-wrap{display:grid;grid-template-columns:6fr 6fr;gap:16px;align-items:start;}
+.tf-chat{border:2px solid var(--border);border-radius:12px;display:flex;flex-direction:column;gap:10px;min-height:216px;}
+.tf-msg{max-width:88%;padding:9px 13px;border-radius:12px;font-size:12px;line-height:1.7;}
+.tf-msg.user{align-self:flex-end;background:var(--ct);color:#fff;border-bottom-right-radius:4px;}
+.tf-msg.ai{align-self:flex-start;background:#f3f4f6;color:#374151;border-bottom-left-radius:4px;min-height:38px;min-width:130px;}
+.tf-wait::after{content:'▍';animation:tfblink .8s step-end infinite;color:#9ca3af;}
+@keyframes tfblink{50%{opacity:0}}
+.tf-ctrl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;}
+.tf-kv{margin-top:12px;font-size:13px;line-height:1.8;color:var(--sub);}
+.tf-kv b{color:var(--ct-deep);}
+.tf-note{margin-top:12px;font-size:12.5px;color:var(--sub);line-height:1.75;background:rgba(0,0,0,.03);border-radius:9px;padding:10px 14px;}
+.tf-note b{color:var(--ct-deep);}
+
+/* ── 实验四：三个走时怪癖 ── */
+.qk-pane{display:none;margin-top:16px;}
+.qk-pane.on{display:block;}
+.qk-cap{font-size:13px;color:var(--sub);line-height:1.8;margin-top:14px;}
+.qk-cap b{color:var(--ct-deep);}
+.tl-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;margin-top:12px;}
+.tl-label{font-size:12px;font-weight:800;color:var(--sub);}
+.tl-track{height:14px;border-radius:8px;background:rgba(0,0,0,.06);overflow:hidden;}
+.tl-fill{height:100%;width:0;border-radius:8px;background:var(--ct);}
+.tl-fill.dim{background:#94a3b8;}
+.tl-mark{grid-column:2;font-size:11.5px;font-weight:700;color:var(--ct-deep);opacity:0;transition:opacity .3s;}
+.tl-mark.show{opacity:1;}
+.fb-stage{grid-column:2;font-size:11.5px;font-weight:700;color:var(--ct-deep);min-height:17px;}
+.qk-ask{display:none;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;font-size:13px;font-weight:700;color:var(--text);}
+.qk-ask.show{display:flex;animation:psy-slide-up .3s ease;}
+.qk-ask button{padding:7px 15px;border-radius:999px;border:1.5px solid var(--border);background:transparent;font-size:12.5px;font-weight:800;color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s;}
+.qk-ask button:hover:not(:disabled){border-color:var(--ct);color:var(--ct-deep);}
+.qk-ask button:disabled{cursor:default;opacity:.5;}
+.qk-verdict{display:none;margin-top:12px;padding:12px 16px;border-radius:10px;background:var(--ct-soft);border:1px solid var(--ct-line);font-size:13px;line-height:1.8;color:var(--sub);}
+.qk-verdict.show{display:block;animation:psy-pop .3s ease;}
+.qk-verdict b{color:var(--ct-deep);}
+.q3-quote{margin-top:14px;padding:13px 17px;border-radius:10px;background:rgba(0,0,0,.035);font-size:13px;color:var(--text);line-height:1.75;font-style:italic;}
+
+/* ── 全章地图翻卡 ── */
+.map-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.map-card{position:relative;aspect-ratio:1.06;cursor:pointer;perspective:600px;}
+.map-inner{position:absolute;inset:0;transition:transform .5s;transform-style:preserve-3d;}
+.map-card.flip .map-inner{transform:rotateY(180deg);}
+.map-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:12px;border:1.5px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;text-align:center;}
+.map-front{background:var(--card);box-shadow:var(--shadow-card);}
+.map-front .mp-icon{font-size:22px;}
+.map-front .mp-name{font-size:12.5px;font-weight:800;color:var(--text);line-height:1.4;}
+.map-front .mp-hint{font-size:10px;font-weight:700;color:var(--ct);}
+.map-back{background:var(--ct-soft);border-color:var(--ct-line);transform:rotateY(180deg);}
+.map-back .mp-ai{font-size:11px;font-weight:800;color:var(--ct-deep);line-height:1.55;}
+.map-back .mp-tag{font-size:10px;font-weight:800;color:var(--sub);letter-spacing:.5px;}
+
+@media (max-width:768px){
+  .race-grid{grid-template-columns:1fr;}
+  .sw-wrap{grid-template-columns:1fr;}
+  .tf-wrap{grid-template-columns:1fr;}
+  .map-grid{grid-template-columns:repeat(2,1fr);}
+  .tl-row{grid-template-columns:76px 1fr;}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"工程指标及格了，用户为什么还骂慢？","name":"工程指标及格了，用户为什么还骂慢？","url":"https://xueai.app/slides/psy-1.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 感知性能","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"AI 产品心理学第 1 课：服务器的秒表和用户的秒表走得不一样。四个可玩实验：同一个 5 秒请求用空白冻结、转圈、流式、步骤外显四种呈现并排跑，选出最难受的那个；凭体感掐 8 秒，揭晓无反馈等待被高估多少；拖 TTFT 滑块重放打字流，看首字时间怎么换体感分；三个走时怪癖逐档演示。感知性能才是用户打分的依据。","datePublished":"2026-08-11","dateModified":"2026-08-17"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">专题篇章 · AI 产品心理学</div>
+    <h1>工程指标及格了，用户为什么还骂慢？</h1>
+    <p class="subtitle">前面的章节教你把延迟压下来、把成本抠下来、把幻觉率降下来。这一章换一块秒表：<b>用户脑子里那块</b>。它和服务器的秒表走时不同，打分、续费、卸载都跟着它走。第一课先跑个实验，再把这块表的走时怪癖逐个拆开。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>同一个 5 秒请求，空白冻结、转圈、流式、步骤外显四种呈现并排跑，亲身体验物理时长相同、体感差三倍；再认识用户秒表的三个走时怪癖</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">实验一 · 同一个 5 秒，四种活法</div>
+    <p class="desc">下面四个面板背后是<b>同一次请求</b>：同一个问题，同样 5 秒出完整答案。区别只有一个：这 5 秒里给用户看什么。点按钮让四个同时开跑，留意自己的体感。</p>
+    <div class="toy" id="raceToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+        <span class="toy-t">四方案并排跑</span>
+        <span class="toy-badge" id="raceBadge">先开跑</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">跑完之后，点你觉得最难受的那个面板。</div>
+        <div class="race-grid" id="raceGrid">
+          <div class="race-box" data-mode="freeze">
+            <div class="race-head"><h4>方案 A · 空白冻结</h4><span class="race-tag">什么都不给</span></div>
+            <div class="race-stage" id="stFreeze"><span class="rs-hint">点下方按钮开始</span></div>
+            <div class="race-foot"><span class="rf-time" id="tFreeze">0.0s</span><span class="rf-feel" id="fFreeze"></span></div>
+          </div>
+          <div class="race-box" data-mode="spinner">
+            <div class="race-head"><h4>方案 B · 转圈等待</h4><span class="race-tag">告诉你它活着</span></div>
+            <div class="race-stage" id="stSpinner"><span class="rs-hint">点下方按钮开始</span></div>
+            <div class="race-foot"><span class="rf-time" id="tSpinner">0.0s</span><span class="rf-feel" id="fSpinner"></span></div>
+          </div>
+          <div class="race-box" data-mode="stream">
+            <div class="race-head"><h4>方案 C · 流式输出</h4><span class="race-tag">先给一部分</span></div>
+            <div class="race-stage" id="stStream"><span class="rs-hint">点下方按钮开始</span></div>
+            <div class="race-foot"><span class="rf-time" id="tStream">0.0s</span><span class="rf-feel" id="fStream"></span></div>
+          </div>
+          <div class="race-box" data-mode="steps">
+            <div class="race-head"><h4>方案 D · 步骤外显</h4><span class="race-tag">让你看它在干嘛</span></div>
+            <div class="race-stage" id="stSteps"><span class="rs-hint">点下方按钮开始</span></div>
+            <div class="race-foot"><span class="rf-time" id="tSteps">0.0s</span><span class="rf-feel" id="fSteps"></span></div>
+          </div>
+        </div>
+        <div class="race-controls">
+          <button class="btn-ct" id="btnRace">四个同时开跑</button>
+          <span class="race-status" id="raceStatus">物理时长一模一样：都是 5 秒</span>
+        </div>
+        <div class="race-verdict" id="raceVerdict"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">实验二 · 先校一校你的体内秒表</div>
+    <p class="desc">刚才多数人最难受的是空白面板。空白除了难受，还有个隐藏代价：<b>它会放大你对时长的估计</b>。感知时间研究把「一边等一边关注时间」的计时叫前瞻计时：注意力越多押在时间本身上，主观时长越膨胀，紧张情绪再把它拉长一截。Zakay 与 Block 的注意闸门模型是这条规律最常被引用的解释。结论先放这，你自己测一遍更有说服力。</p>
+    <div class="toy" id="swToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="2" x2="14" y2="2"/><circle cx="12" cy="14" r="8"/><path d="M12 14l3-3"/></svg></span>
+        <span class="toy-t">凭体感掐 8 秒</span>
+        <span class="toy-badge" id="swBadge">未开始</span>
+      </div>
+      <div class="toy-body">
+        <div class="sw-wrap">
+          <div class="sw-panel" id="swPanel">（准备好了就点右边的「开始」）</div>
+          <div class="sw-side">
+            <p>点「开始」后，左边面板会进入一段<b>没有进度、没有转圈、没有文案</b>的等待。凭体感，觉得过了 8 秒就按停。尽量别在心里数拍子，那是作弊。</p>
+            <button class="btn-ct" id="swBtn">开始</button>
+            <div class="sw-result" id="swResult">
+              <div class="sw-nums">
+                <div class="sw-num"><i>你以为的</i><b>8.0s</b></div>
+                <div class="sw-num"><i>实际走过</i><b id="swActual">0.0s</b></div>
+                <div class="sw-num"><i>偏差</i><b id="swDelta">0%</b></div>
+              </div>
+              <div class="sw-verdict" id="swVerdict"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:14px;">这就是空白冻结在数据后台看不见的那笔账：服务器记 5 秒，用户记 6 秒半。<b>无反馈等待的高估误差，实验里两三成很常见</b>。你产品的「体感延迟」比监控面板上的 P99 更糟，且差距由界面决定。</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">实验三 · 首字时间是根多长的杠杆</div>
+    <p class="desc">秒表既然开在用户心里，工程预算就要花在他计时的区间。下面这台聊天机器人的<b>总时长锁死 5 秒</b>，你只能动一个参数：首字时间 TTFT（从发送到看见第一个字）。拖滑块，点「重放」，右边按所选 TTFT 重演一次打字流，体感分跟着变。</p>
+    <div class="toy" id="tfToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg></span>
+        <span class="toy-t">TTFT 滑块 · 总时长不变</span>
+        <span class="toy-badge" id="tfBadge">拖一拖再重放</span>
+      </div>
+      <div class="toy-body">
+        <div class="tf-wrap">
+          <div>
+            <div class="sl-row">
+              <label>首字时间</label>
+              <input type="range" id="tfSlider" min="0.2" max="5" step="0.1" value="2.4">
+              <span class="sl-val" id="tfVal">2.4s</span>
+            </div>
+            <div class="tf-ctrl">
+              <button class="btn-ct" id="tfBtn">重放</button>
+              <span class="race-status" id="tfStatus">总时长固定 5.0s，只动首字</span>
+            </div>
+            <div class="psy-meter">
+              <span class="pm-label">体感分</span>
+              <div class="pm-track"><div class="pm-fill" id="tfFill" style="width:64%"></div></div>
+              <span class="pm-num" id="tfNum">64</span>
+            </div>
+            <div class="tf-kv" id="tfKv"></div>
+          </div>
+          <div class="tf-chat mock">
+            <div class="tf-msg user">帮我把这段会议纪要缩成三条待办</div>
+            <div class="tf-msg ai"><span id="tfAi">点「重放」看这一档 TTFT 的体感</span></div>
+          </div>
+        </div>
+        <div class="tf-note"><b>为什么工程上先压 TTFT：</b>把首字从 5 秒压到 0.5 秒，总时长一秒没省，体感分翻了两三倍；反过来 TTFT 不动、总时长从 5 秒压到 4 秒，这根表几乎不动。接流式、先出提纲、分段返回，性价比都排在升级机器前面。</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">实验四 · 用户秒表的三个走时怪癖</div>
+    <p class="desc">把前面的体感整理成三条可复用的规律。每一档都有个 mini 演示，<b>三档都切一遍</b>。</p>
+    <div class="toy" id="qkToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+        <span class="toy-t">三个走时怪癖</span>
+        <span class="toy-badge" id="qkBadge">1 / 3 档</span>
+      </div>
+      <div class="toy-body">
+        <div class="seg" id="qkSeg">
+          <button class="on" data-k="0">① 开表点在首字</button>
+          <button data-k="1">② 有反馈走得快</button>
+          <button data-k="2">③ 差结果记得长</button>
+        </div>
+
+        <div class="qk-pane on" data-k="0">
+          <button class="btn-ct" id="q1Play" style="margin-top:14px;">播放两条时间线</button>
+          <div class="tl-row"><span class="tl-label">用户的秒表</span><div class="tl-track"><div class="tl-fill" id="q1UserFill"></div></div><span class="tl-mark" id="q1UserMark">0.6s · 看见第一个字，秒表停</span></div>
+          <div class="tl-row"><span class="tl-label">服务器的秒表</span><div class="tl-track"><div class="tl-fill dim" id="q1SrvFill"></div></div><span class="tl-mark" id="q1SrvMark">5.0s · 完整答案落地</span></div>
+          <p class="qk-cap">用户的开表点在按下发送，收表点在看见第一个字。首字之后他的注意力交给了阅读，边读边到的内容几乎没被记进等待的账本。工程团队盯总时长的 P99，用户只记首字，<b>两块表对不上，差评就从缝里钻出来</b>。实验三里 TTFT 那根杠杆的长度，就是这条怪癖给的。</p>
+        </div>
+
+        <div class="qk-pane" data-k="1">
+          <button class="btn-ct" id="q2Play" style="margin-top:14px;">两根同速进度条，开跑</button>
+          <div class="tl-row"><span class="tl-label">裸奔</span><div class="tl-track"><div class="tl-fill dim" id="q2AFill"></div></div></div>
+          <div class="tl-row"><span class="tl-label">带播报</span><div class="tl-track"><div class="tl-fill" id="q2BFill"></div></div><span class="fb-stage" id="q2Stage"></span></div>
+          <div class="qk-ask" id="q2Ask"><span>同样 6 秒，哪根更煎熬？</span><button data-v="a">裸奔那根</button><button data-v="b">带播报那根</button></div>
+          <div class="qk-verdict" id="q2Verdict"></div>
+        </div>
+
+        <div class="qk-pane" data-k="2">
+          <p class="qk-cap" style="margin-top:14px;">同一次等待：5 秒后答案落地。切换两种结局，看回忆里的时长怎么变。</p>
+          <div class="seg" id="q3Seg" style="margin-top:10px;">
+            <button class="on" data-k="0">结果好 · 答案到位</button>
+            <button data-k="1">结果坏 · 答非所问</button>
+          </div>
+          <div class="q3-quote" id="q3Quote">「等了一小会儿就出来了，答案挺到位，这工具行。」</div>
+          <div class="psy-meter">
+            <span class="pm-label">回忆里的时长</span>
+            <div class="pm-track"><div class="pm-fill" id="q3Fill" style="width:42%"></div></div>
+            <span class="pm-num" id="q3Num">约 4 秒</span>
+          </div>
+          <p class="qk-cap">物理上都是那一次 5 秒。<b>追记式的时间靠事后重建，情绪越糟，重建出来的等待越长</b>。所以延迟和幻觉在差评里常常挤进同一句话：又慢又蠢。答案质量的问题会连坐到速度头上；反过来，好答案也能替你把慢遮掉一截。第 4 课峰终定律会把这条用在结尾设计上。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">立论 · 用户拿感知那块表给你打分</div>
+    <p class="desc">AI 产品有三个天生毛病：<b>慢</b>（推理要时间）、<b>会错</b>（幻觉压不净）、<b>不透明</b>（用户看不见它在干嘛）。工程手段短期内只能缓解这三样，但用户的评价由感知产生，感知可以设计。你在前面章节学的流式输出、模型路由、语义缓存、Agent 进度汇报，每一个都还有一重心理学开关的身份，这一章教你什么时候为了心理效果去拨它。</p>
+    <div class="quote-card"><b>感知性能 ≠ 真实性能。</b>服务器的 5 秒是物理事实，用户的 5 秒是心理事件；打分、续费、卸载，都发生在后一个 5 秒里。</div>
+    <div class="toy" id="vqToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+        <span class="toy-t">出门考 · 预算只够动一刀</span>
+        <span class="toy-badge">选一个</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">你的 AI 助手被用户骂慢，实测总时长 5 秒、首字 4.2 秒。手上的排期只够做一件事，先动哪刀？</div>
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>升级推理集群，把总时长从 5 秒压到 4 秒</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>接入流式输出，首字压到 0.5 秒，总时长不变</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>换一个更精致的加载动画，转圈升级成粒子特效</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>弹一个提示框，向用户解释模型正在深度思考</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">全章地图 · 十六课怎么接着讲</div>
+    <p class="desc">慢、会错、不透明，每个毛病后面都排着几课；再往后是关系和钱。<b>点卡片翻面</b>，看每一课要解决用户的哪句抱怨。</p>
+    <div class="toy" id="mapToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15"/><path d="M15 6v15"/></svg></span>
+        <span class="toy-t">十六课一张图</span>
+        <span class="toy-badge" id="mapBadge">0 / 16 已翻</span>
+      </div>
+      <div class="toy-body">
+        <div class="map-grid" id="mapGrid"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="src-note">
+    <b>出处与延伸：</b>感知时间的注意闸门模型见 Zakay 与 Block 的系列研究（1990 年代起），无反馈与高唤起状态下的时长高估在前瞻计时实验里反复复现；等待体验的经典整理见 David Maister《The Psychology of Waiting Lines》（1985），「被占住的时间感觉更短、没解释的等待感觉更长」出自这里；界面响应的 0.1 / 1 / 10 秒三档见 Nielsen《Usability Engineering》（1993）；进度指示器让用户偏好与耐心上升的实验见 Myers（1985）。情绪改写时间记忆的机制与第 4 课峰终定律（Kahneman 等）同根。
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 这一课想和你分享的</h3>
+    <ul>
+      <li><b>盯两块秒表</b>：服务器计物理时长，用户从发送计到首字，考核指标里给 TTFT 单开一行</li>
+      <li><b>别让界面空白</b>：无反馈等待会被放大两三成，超过 1 秒就给反馈，超过 3 秒就给进展</li>
+      <li><b>预算先压首字</b>：接流式、先出提纲、分段返回，排期都在升级机器前面</li>
+      <li><b>错误当场兜住</b>：时间记忆跟着情绪走，答非所问会把慢一起写进差评</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 实验一：四方案并排跑 ──
+   四个面板共用一条 5 秒时间线，差异只在呈现层：冻结无输出、转圈、
+   流式（TTFT 0.6s 后逐字出）、步骤外显（四步逐条亮再流式收尾）。
+   跑完让用户投最难受的一票，按票给判词，再揭示物理时长相同。 */
+const ANSWER = '根据 2025 年 Q4 数据，退款申请集中在物流破损（41%）和尺码不符（27%）两类。建议优先上线破损件「拍照即赔」通道，预计可把人工审核量压缩三成，客服响应中位数从 4 小时降到 20 分钟。';
+const RACE_MS = 5000;
+const $ = id => document.getElementById(id);
+const stages = { freeze: $('stFreeze'), spinner: $('stSpinner'), stream: $('stStream'), steps: $('stSteps') };
+const clocks = { freeze: $('tFreeze'), spinner: $('tSpinner'), stream: $('tStream'), steps: $('tSteps') };
+const feels  = { freeze: $('fFreeze'), spinner: $('fSpinner'), stream: $('fStream'), steps: $('fSteps') };
+const FEEL_TEXT = { freeze: '体感最长，多数人以为超过 8 秒', spinner: '知道没死机，但还在干等', stream: '0.6 秒后开始读，等待感很弱', steps: '等待被翻译成了进展' };
+const VOTE_OPEN = {
+  freeze: '<b>和多数人的选择一致。</b>空白冻结连「它死了没」都不肯回答，大脑拿不到线索，只能按最坏情况焦虑。',
+  spinner: '<b>选转圈的也不少。</b>它回答了「还活着」，却没回答「还要多久」，干等的每一秒照样计进秒表。',
+  stream: '<b>你和多数人选得不一样。</b>流式的难受多半来自吊胃口：首字出得快，后面断断续续，期待被反复拉扯。',
+  steps: '<b>你和多数人选得不一样。</b>步骤外显偶尔翻车在演过头：步骤文案和实际动作对不上时，观感反而变差，第 3 课会拆这个度。',
+};
+const btnRace = $('btnRace');
+const raceStatus = $('raceStatus');
+const raceVerdict = $('raceVerdict');
+const raceBadge = $('raceBadge');
+let racing = false, raceDone = false, voted = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function runClocks(){
+  const t0 = performance.now();
+  const timer = setInterval(() => {
+    const s = Math.min(RACE_MS, performance.now() - t0) / 1000;
+    Object.values(clocks).forEach(c => c.textContent = s.toFixed(1) + 's');
+    if (s >= RACE_MS / 1000) clearInterval(timer);
+  }, 100);
+}
+
+async function runFreeze(){
+  stages.freeze.innerHTML = '<span class="rs-hint">（页面毫无动静）</span>';
+  await sleep(RACE_MS);
+  stages.freeze.innerHTML = '<span class="rs-answer">' + ANSWER + '</span>';
+}
+
+async function runSpinner(){
+  stages.spinner.innerHTML = '<div class="race-spinner"></div><span class="rs-hint">正在生成…</span>';
+  await sleep(RACE_MS);
+  stages.spinner.innerHTML = '<span class="rs-answer">' + ANSWER + '</span>';
+}
+
+async function runStream(){
+  stages.stream.innerHTML = '<span class="rs-hint">正在连接…</span>';
+  await sleep(600);
+  stages.stream.innerHTML = '<span class="rs-answer"></span>';
+  const el = stages.stream.querySelector('.rs-answer');
+  const step = (RACE_MS - 600) / ANSWER.length;
+  for (let i = 0; i < ANSWER.length; i++){
+    el.textContent += ANSWER[i];
+    await sleep(step);
+  }
+}
+
+async function runSteps(){
+  const STEPS = [
+    { label: '理解问题：退款流程优化', at: 300 },
+    { label: '检索知识库：命中 12 条工单记录', at: 1100 },
+    { label: '对比 3 个候选方案', at: 2200 },
+    { label: '生成回答', at: 3200 },
+  ];
+  stages.steps.innerHTML = '<div class="race-steps">' + STEPS.map(s =>
+    '<div class="race-step"><span class="st-dot"></span>' + s.label + '</div>').join('') + '</div>';
+  const rows = [...stages.steps.querySelectorAll('.race-step')];
+  STEPS.forEach((s, i) => setTimeout(() => {
+    rows.forEach(r => r.classList.remove('doing'));
+    rows[i].classList.add('on', 'doing');
+  }, s.at));
+  await sleep(3600);
+  stages.steps.innerHTML = '<span class="rs-answer"></span>';
+  const el = stages.steps.querySelector('.rs-answer');
+  const step = (RACE_MS - 3600) / ANSWER.length;
+  for (let i = 0; i < ANSWER.length; i++){
+    el.textContent += ANSWER[i];
+    await sleep(step);
+  }
+}
+
+btnRace.addEventListener('click', async () => {
+  if (racing) return;
+  racing = true; raceDone = false; voted = false;
+  raceVerdict.classList.remove('show');
+  Object.values(feels).forEach(f => { f.textContent = ''; f.classList.remove('show'); });
+  document.querySelectorAll('.race-box').forEach(b => b.classList.remove('voted'));
+  btnRace.disabled = true;
+  btnRace.textContent = '5 秒，跑着…';
+  raceBadge.textContent = '跑着…';
+  raceStatus.textContent = '留意体感：哪个面板的 5 秒最漫长？';
+  runClocks();
+  await Promise.all([runFreeze(), runSpinner(), runStream(), runSteps()]);
+  raceDone = true; racing = false;
+  btnRace.disabled = false;
+  btnRace.textContent = '再跑一遍';
+  raceBadge.textContent = '投一票';
+  raceStatus.textContent = '跑完了。点一下你觉得最难受的那个面板 ↑';
+});
+
+document.querySelectorAll('.race-box').forEach(box => {
+  box.addEventListener('click', () => {
+    if (!raceDone || voted) return;
+    voted = true;
+    box.classList.add('voted');
+    Object.keys(feels).forEach(k => { feels[k].textContent = FEEL_TEXT[k]; feels[k].classList.add('show'); });
+    raceVerdict.innerHTML = VOTE_OPEN[box.dataset.mode] + '不过四个面板在服务器侧一模一样，都是 5 秒出完整答案，差别只在这 5 秒给用户看什么。方案 C 把「等 5 秒」改写成「等 0.6 秒，然后边读边到」，方案 D 把「等待」翻译成「进展」。<b>感知性能是产品性能的一部分，也是用户唯一摸得到的那部分。</b>';
+    raceVerdict.classList.add('show');
+    raceBadge.textContent = '✓ 已揭晓';
+    raceBadge.classList.add('solved');
+    raceStatus.textContent = '物理时长相同：都是 5 秒';
+  });
+});
+
+/* ── 实验二：秒表估时游戏 ──
+   无反馈等待下凭体感掐 8 秒。计时过程不给一丝提示，
+   揭晓时算高估/低估比例，按方向给判词。 */
+const swBtn = $('swBtn'), swPanel = $('swPanel'), swBadge = $('swBadge');
+const swResult = $('swResult'), swVerdict = $('swVerdict');
+let swState = 'idle', swT0 = 0;
+
+swBtn.addEventListener('click', () => {
+  if (swState === 'idle' || swState === 'done'){
+    swState = 'run';
+    swT0 = performance.now();
+    swResult.classList.remove('show');
+    swPanel.classList.add('run');
+    swPanel.textContent = '（界面毫无动静）';
+    swBtn.textContent = '到 8 秒了？按停';
+    swBadge.textContent = '计时中…';
+    swBadge.classList.remove('solved');
+    return;
+  }
+  const e = (performance.now() - swT0) / 1000;
+  if (e < 2){
+    swPanel.textContent = '（这一下像是手滑，重新来）';
+    swState = 'idle';
+    swBtn.textContent = '开始';
+    swBadge.textContent = '未开始';
+    return;
+  }
+  swState = 'done';
+  swPanel.classList.remove('run');
+  swPanel.textContent = '（等待结束）';
+  swBtn.textContent = '再测一次';
+  const over = Math.round((8 / e - 1) * 100);
+  $('swActual').textContent = e.toFixed(1) + 's';
+  $('swDelta').textContent = over > 0 ? '高估 ' + over + '%' : over < 0 ? '低估 ' + (-over) + '%' : '正中';
+  let v;
+  if (over >= 10){
+    v = '你在 <b>' + e.toFixed(1) + ' 秒</b>就觉得 8 秒到了，这段无反馈等待在你体内被放大了约 <b>' + over + '%</b>。看走眼了，正常：注意力被时间本身占满时，多数人都会高估，实验里两三成的误差很常见。';
+  } else if (over <= -10){
+    v = '你等到 <b>' + e.toFixed(1) + ' 秒</b>才按停，把时长记短了，是少数派。猜个原因：多半在心里数了拍子，注意力被数数占住，主观时间反而缩水，这恰好从反方向验证了注意闸门的说法。';
+  } else {
+    v = '实际 <b>' + e.toFixed(1) + ' 秒</b>，误差不到一成，体内秒表相当稳，比多数被试都准。带着这份手感去看用户数据：他们没你稳，空白面板前的 5 秒，常被记成 6 秒半。';
+  }
+  swVerdict.innerHTML = v;
+  swResult.classList.add('show');
+  swBadge.textContent = '✓ 已揭晓';
+  swBadge.classList.add('solved');
+});
+
+/* ── 实验三：TTFT 滑块 + 聊天重放 ──
+   总时长锁 5 秒，滑块只动首字时间；体感分随滑块即时变化，
+   重放按所选 TTFT 真实演一遍等待与打字流。 */
+const TF_ANSWER = '给你三条待办：① 周三前把预算表发给财务复核；② 客服话术由小杨改到第二版，周五评审；③ 下周一上午约供应商确认交期。要我顺手生成日历提醒吗？';
+const tfSlider = $('tfSlider'), tfAi = $('tfAi'), tfBtn = $('tfBtn'), tfBadge = $('tfBadge');
+let tfPlaying = false, tfRun = 0;
+
+function tfScore(t){ return Math.round(97 - (t - 0.2) * 15); }
+
+function tfPaint(){
+  const t = +tfSlider.value;
+  const sc = tfScore(t);
+  $('tfVal').textContent = t.toFixed(1) + 's';
+  const fill = $('tfFill');
+  fill.style.width = sc + '%';
+  fill.className = 'pm-fill ' + (sc < 40 ? 'hot' : sc < 70 ? 'warm' : '');
+  $('tfNum').textContent = sc;
+  let kv;
+  if (t <= 0.8){
+    kv = '首字 ' + t.toFixed(1) + ' 秒：<b>秒表刚起步就停了</b>。剩下 ' + (5 - t).toFixed(1) + ' 秒用户在阅读里度过，几乎没被记进等待的账。';
+  } else if (t <= 2.5){
+    kv = '首字 ' + t.toFixed(1) + ' 秒：能忍，但秒表实打实走了 ' + t.toFixed(1) + ' 秒。<b>往 1 秒以内压，每压 0.5 秒都有明显回报</b>。';
+  } else {
+    kv = '首字 ' + t.toFixed(1) + ' 秒：前 ' + t.toFixed(1) + ' 秒和空白冻结没有区别，<b>流式的好处被挤到了尾巴上</b>。';
+  }
+  $('tfKv').innerHTML = kv;
+}
+tfSlider.addEventListener('input', tfPaint);
+tfPaint();
+
+tfBtn.addEventListener('click', async () => {
+  if (tfPlaying) return;
+  tfPlaying = true;
+  const my = ++tfRun;
+  const t = +tfSlider.value;
+  tfBtn.disabled = true;
+  tfBtn.textContent = '重放中…';
+  $('tfStatus').textContent = '本次重放：首字 ' + t.toFixed(1) + 's · 总长 5.0s';
+  tfAi.textContent = '';
+  tfAi.classList.add('tf-wait');
+  await sleep(t * 1000);
+  if (my !== tfRun) return;
+  tfAi.classList.remove('tf-wait');
+  const delay = Math.max(0, (5 - t) * 1000 / TF_ANSWER.length);
+  if (delay === 0){
+    tfAi.textContent = TF_ANSWER;
+  } else {
+    for (let i = 0; i < TF_ANSWER.length; i++){
+      tfAi.textContent += TF_ANSWER[i];
+      await sleep(delay);
+      if (my !== tfRun) return;
+    }
+  }
+  tfPlaying = false;
+  tfBtn.disabled = false;
+  tfBtn.textContent = '重放';
+  tfBadge.textContent = '✓ 玩过了';
+  tfBadge.classList.add('solved');
+});
+
+/* ── 实验四：三个走时怪癖 ── */
+const qkSeg = $('qkSeg'), qkBadge = $('qkBadge');
+const qkSeen = new Set([0]);
+qkSeg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const k = +b.dataset.k;
+  [...qkSeg.children].forEach(x => x.classList.toggle('on', +x.dataset.k === k));
+  document.querySelectorAll('.qk-pane').forEach(p => p.classList.toggle('on', +p.dataset.k === k));
+  qkSeen.add(k);
+  if (qkSeen.size === 3){
+    qkBadge.textContent = '✓ 三档看完';
+    qkBadge.classList.add('solved');
+  } else {
+    qkBadge.textContent = qkSeen.size + ' / 3 档';
+  }
+});
+
+/* 怪癖①：两条时间线，一条 0.6s 停表，一条 5s 走完 */
+const q1Play = $('q1Play');
+q1Play.addEventListener('click', () => {
+  const uf = $('q1UserFill'), sf = $('q1SrvFill');
+  const um = $('q1UserMark'), sm = $('q1SrvMark');
+  q1Play.disabled = true;
+  [uf, sf].forEach(el => { el.style.transition = 'none'; el.style.width = '0'; });
+  [um, sm].forEach(el => el.classList.remove('show'));
+  void uf.offsetWidth;
+  uf.style.transition = 'width .6s linear';
+  uf.style.width = '12%';
+  sf.style.transition = 'width 5s linear';
+  sf.style.width = '100%';
+  setTimeout(() => um.classList.add('show'), 650);
+  setTimeout(() => {
+    sm.classList.add('show');
+    q1Play.disabled = false;
+    q1Play.textContent = '再放一遍';
+  }, 5050);
+});
+
+/* 怪癖②：两根同速进度条，一根裸奔一根带播报，跑完投票 */
+const q2Play = $('q2Play'), q2Ask = $('q2Ask'), q2Verdict = $('q2Verdict'), q2Stage = $('q2Stage');
+const Q2_STAGES = ['正在理解问题', '检索知识库：命中 12 条', '对比 3 个候选方案', '组织语言，马上好'];
+const Q2_V = {
+  a: '<b>和多数人的体感一致。</b>两根速度相同，裸奔那根少的只有信息：等到几成了、卡在哪一步、还要多久，一概不知，大脑只能自己脑补。Maister 在《排队心理学》里把这条排在第一：被占住的时间感觉更短，没解释的等待感觉更长。第 2 课拆等待的三条定律，第 3 课讲把努力演出来的劳动错觉。',
+  b: '<b>少数派，也说得通。</b>有人会盯着播报文案挑毛病，注意力反而被拉回等待本身。大样本里结论仍然稳定：带反馈的等待普遍被记得更短，Maister 的《排队心理学》把它排在第一条。第 2 课拆等待的三条定律，第 3 课讲劳动错觉。',
+};
+q2Play.addEventListener('click', () => {
+  const af = $('q2AFill'), bf = $('q2BFill');
+  q2Play.disabled = true;
+  q2Ask.classList.remove('show');
+  q2Verdict.classList.remove('show');
+  [...q2Ask.querySelectorAll('button')].forEach(b => b.disabled = false);
+  [af, bf].forEach(el => { el.style.transition = 'none'; el.style.width = '0'; });
+  q2Stage.textContent = '';
+  void af.offsetWidth;
+  [af, bf].forEach(el => { el.style.transition = 'width 6s linear'; el.style.width = '100%'; });
+  Q2_STAGES.forEach((s, i) => setTimeout(() => { q2Stage.textContent = s; }, i * 1500 + 100));
+  setTimeout(() => {
+    q2Stage.textContent = '完成';
+    q2Ask.classList.add('show');
+    q2Play.disabled = false;
+    q2Play.textContent = '再跑一遍';
+  }, 6100);
+});
+q2Ask.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  [...q2Ask.querySelectorAll('button')].forEach(x => x.disabled = true);
+  q2Verdict.innerHTML = Q2_V[b.dataset.v];
+  q2Verdict.classList.add('show');
+});
+
+/* 怪癖③：同一次 5 秒等待，结局好坏改写时间记忆 */
+const Q3 = [
+  { quote: '「等了一小会儿就出来了，答案挺到位，这工具行。」', w: 42, n: '约 4 秒', hot: false },
+  { quote: '「卡了半天才蹦出来，还答非所问，退钱。」', w: 88, n: '约 9 秒', hot: true },
+];
+const q3Seg = $('q3Seg');
+q3Seg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const k = +b.dataset.k;
+  [...q3Seg.children].forEach(x => x.classList.toggle('on', +x.dataset.k === k));
+  const d = Q3[k];
+  $('q3Quote').textContent = d.quote;
+  const fill = $('q3Fill');
+  fill.style.width = d.w + '%';
+  fill.className = 'pm-fill' + (d.hot ? ' hot' : '');
+  $('q3Num').textContent = d.n;
+});
+
+/* ── 出门考：tasteQuiz 在 taste.js 加载后初始化 ── */
+document.addEventListener('DOMContentLoaded', () => {
+  tasteQuiz('vqToy', {
+    answer: 1,
+    why: [
+      '钱花在了用户不计时的区间：首字还卡在 4.2 秒，等待感原样躺着，省下的那一秒落在他边读边等的阶段。',
+      '用户的秒表 0.5 秒就停，剩下 4.5 秒他在阅读里度过。机器成本没涨，体感直接换档，这正是实验三量出来的杠杆。',
+      '更精致的转圈还是转圈：回答了「它活着」，没回答「还要多久」，4.2 秒的空窗一秒没少。',
+      '解释是好方向，但提示框会打断阅读，把注意力又押回时间本身。过程怎么演才加分，第 3 课劳动错觉专门拆。',
+    ],
+  });
+});
+
+/* ── 全章地图翻卡 ── */
+const MAP = [
+  { icon: '⏱', name: '感知性能', ai: '两块秒表走时不同，感知可以设计', tag: '第 1 课 · 你在这' },
+  { icon: '⏳', name: '等待心理学', ai: '等待多难受由呈现决定，三档呈现决策', tag: '第 2 课' },
+  { icon: '🔍', name: '劳动错觉', ai: '让 AI 把努力演出来，慢一点反而更可信', tag: '第 3 课' },
+  { icon: '🎢', name: '峰终定律', ai: '体验只被记住峰值和结尾，预算该砸在哪很清楚', tag: '第 4 课' },
+  { icon: '⚖️', name: '信任校准', ai: '盲信会出事故，不信等于白买，把信任调到半信半疑', tag: '第 5 课' },
+  { icon: '🤖', name: '算法厌恶', ai: '同样的错，AI 犯比人犯更招恨', tag: '第 6 课' },
+  { icon: '🛡', name: '防御心理', ai: '用户不敢传数据、不敢点确认，控制感来救', tag: '第 7 课' },
+  { icon: '📖', name: '心智模型', ai: '用户拿错说明书，把 AI 当搜索引擎用', tag: '第 8 课' },
+  { icon: '🎭', name: '拟人化与道歉', ai: '装人装到哪一档，出错之后怎么道歉', tag: '第 9 课' },
+  { icon: '🌉', name: '蜜月悬崖', ai: '新鲜感掉下去之后，靠什么留住人', tag: '第 10 课' },
+  { icon: '🏷', name: 'AI 标签折扣', ai: '同样的内容，标上 AI 就掉价', tag: '第 11 课' },
+  { icon: '🧠', name: '认知卸载', ai: '用户越用越省脑子，产品该接住还是该拦', tag: '第 12 课' },
+  { icon: '💞', name: '情感依恋', ai: '用户和 AI 处出感情之后，边界怎么画', tag: '第 13 课' },
+  { icon: '💳', name: '付费心理', ai: '用得挺爽，就是不想掏钱，卡在哪一环', tag: '第 14 课' },
+  { icon: '🧾', name: '定价', ai: '订阅、按量还是买断，价格也是心理设计', tag: '第 15 课' },
+  { icon: '📮', name: '反馈心理', ai: '用户为什么不点踩，坏消息怎么才能听见', tag: '第 16 课' },
+];
+const mapGrid = $('mapGrid');
+const mapBadge = $('mapBadge');
+const mapFlipped = new Set();
+mapGrid.innerHTML = MAP.map(m => `
+  <div class="map-card">
+    <div class="map-inner">
+      <div class="map-face map-front">
+        <div class="mp-icon">${m.icon}</div>
+        <div class="mp-name">${m.name}</div>
+        <div class="mp-hint">点开看</div>
+      </div>
+      <div class="map-face map-back">
+        <div class="mp-ai">${m.ai}</div>
+        <div class="mp-tag">${m.tag}</div>
+      </div>
+    </div>
+  </div>`).join('');
+[...mapGrid.children].forEach((card, i) => {
+  card.addEventListener('click', () => {
+    card.classList.toggle('flip');
+    mapFlipped.add(i);
+    if (mapFlipped.size === 16){
+      mapBadge.textContent = '✓ 十六张翻完';
+      mapBadge.classList.add('solved');
+    } else {
+      mapBadge.textContent = mapFlipped.size + ' / 16 已翻';
+    }
+  });
+});
+</script>
+<script src="taste.js?v=20260810a"></script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

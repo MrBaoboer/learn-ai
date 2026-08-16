@@ -8,9 +8,9 @@
  */
 window.COURSE = {
   meta: {
-    title: 'AI Products: From Beginner to Expert',
+    title: 'AI from Fundamentals to Mastery',
     subtitle: 'From LLM Fundamentals to AI Agent Harness',
-    brand: 'Miyang Tech (米羊科技) · AI Course',
+    brand: 'Xiaoshan Academy',
     author: 'Luo Xiaoshan (洛小山)',
     authorUrl: 'https://luoxiaoshan.cn/',
     github: 'https://github.com/itshen/learn-ai',
@@ -66,6 +66,68 @@ window.COURSE = {
           lessons: [
             { file: 'zero-4.html', title: 'Treat It Like a Colleague Who Doesn\'t Know You', desc: 'Three-level prompt comparison + a prompt building-block assembler: context, request, constraints — it answers exactly as much as you tell it', tag: 'Interactive' },
             { file: 'zero-5.html', title: 'The Magic Opener: "Ask Me a Few Questions First"', desc: 'Can\'t articulate what you need? Let it interview you. A click-through dialogue demo where answer quality visibly doubles', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-zero-faq-usage',
+          title: 'Using It Well',
+          desc: 'One question per page: use it better, pick the right tools',
+          lessons: [
+            { file: 'zero-q-prompt.html', title: 'How Do You Actually Write a Good Prompt?', desc: 'One universal skeleton (context + request + constraints) + a puzzle assembler: snap different prompts together and watch answer quality change live', tag: 'Interactive' },
+            { file: 'zero-q-prompt-engineering.html', title: "What's the Point of Prompt Engineering?", desc: "Your one chat vs a product team's one million calls: drag the slider and watch a chunk of filler blow up into a real bill", tag: 'Interactive' },
+            { file: 'zero-q-model-agent-app.html', title: 'Models, Agents, Apps — How Do They Relate?', desc: "Engine, full car, ride-share — a three-layer analogy + a matching game: hear the news and know which layer they're talking about", tag: 'Interactive' },
+            { file: 'zero-q-agent.html', title: 'What Makes Agents So Powerful?', desc: 'Same expense-report job, chat AI and an Agent work it completely differently — hit play and watch the Agent finish the work step by step', tag: 'Interactive' },
+            { file: 'zero-q-skill.html', title: "What Is This \"Skill\" Everyone's Talking About?", desc: 'A cheat sheet of experience written for AI. Play the comparison: the butler without it runs 4 extra trips; with it, done in one', tag: 'Interactive' },
+            { file: 'zero-q-vibe-coding.html', title: 'What Is Vibe Coding? Can You Build Software Without Writing Code?', desc: 'Pick an everyday need and watch the full loop: one-sentence brief → AI generates → two revision rounds → it works; three months of study vs ten minutes of describing', tag: 'Interactive' },
+            { file: 'zero-q-china-models.html', title: 'What Chinese AI Models Are Out There? How to Choose?', desc: 'Qwen (Tongyi), Kimi, DeepSeek, Doubao, GLM… click your scenario and find your match. Data from the global blind-test leaderboard', tag: 'Interactive' },
+            { file: 'zero-q-companies.html', title: 'Which Other AI Companies Matter?', desc: 'OpenAI, Anthropic, Google, Meta, xAI… a matching game pairs each company with its flagship, then a friendly field guide', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-zero-faq-basics',
+          title: 'Concept Primer',
+          desc: 'One question per page: a zero-background take on the words in the news',
+          lessons: [
+            { file: 'zero-q-token.html', title: 'What Is a Token? Why Does AI Charge by It?', desc: 'Interactive tokenizer: tap a sentence, watch it slice into tokens, and the bill jumps live; Chinese vs English cost is obvious', tag: 'Interactive' },
+            { file: 'zero-q-context-window.html', title: 'Why Does It "Forget" After a Long Chat?', desc: "AI's desk is only so big: drag the turn count, watch the earliest notes fall off when the desk fills — that's the moment it starts answering the wrong question", tag: 'Interactive' },
+            { file: 'zero-q-reasoning.html', title: 'What Are "Reasoning Models" and "Deep Thinking"?', desc: 'Same puzzle, two modes: instant vs deep thinking; watch the time and cost gap, then a four-question quiz to feel when thinking is worth turning on', tag: 'Interactive' },
+            { file: 'zero-q-parameters.html', title: 'Does More Parameters Mean Smarter?', desc: 'What does "100 billion parameters" even mean? Drag the scale slider to build intuition, then see where small models win: speed, cost, specialist jobs', tag: 'Interactive' },
+            { file: 'zero-q-multimodal.html', title: "Why Can't Some AIs See Pictures?", desc: '"Can talk" and "can see" are two different skills. Send the same cat photo to two models, see the gap, then unpack how the "eyes" work', tag: 'Interactive' },
+            { file: 'zero-q-finetune-vs-rag.html', title: 'What Is Fine-Tuning? How Is It Different from "Feeding It Docs"?', desc: 'Back to class vs an open-book exam: two ways to make AI know your stuff, side by side, then match four real scenarios', tag: 'Interactive' },
+            { file: 'zero-q-knowledge-base.html', title: 'What Is This "Knowledge Base" Every Company Is Building?', desc: 'Three-step animation: chunk files into the store → retrieve on ask → stuff into context then answer; same question with and without a knowledge base', tag: 'Interactive' },
+            { file: 'zero-q-acronyms.html', title: 'GPT, LLM, AIGC… How Do You Tell These Acronyms Apart?', desc: 'A matching game pairs each acronym with its plain-language meaning; finish it and you get a who-contains-whom map', tag: 'Interactive' },
+            { file: 'zero-q-nvidia-gpu.html', title: 'Why Is NVIDIA Worth So Much?', desc: 'The gold-rush shovel seller: one PhD grinding problems one by one vs ten thousand kids starting at once — see why GPUs are the hot commodity', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-zero-faq-myth',
+          title: 'Debunking the Hype',
+          desc: 'One question per page: puncture the hype and common myths',
+          lessons: [
+            { file: 'zero-q-train-or-prompt.html', title: '"I Trained a Model" — What Did They Actually Train?', desc: 'A four-rung ladder: rewrite the prompt, hang a knowledge base, fine-tune, pretrain from scratch — each rung tagged with real cost; hear five boasts and place the speaker', tag: 'Interactive' },
+            { file: 'zero-q-jargon-translator.html', title: 'AI Jargon Translator', desc: 'In-house, wrapper, digital employee, empower… tap a launch-event line for the plain-language version, plus a gold-content rating and three follow-ups that get the real story on the spot', tag: 'Interactive' },
+            { file: 'zero-q-opensource-free.html', title: "Does an “Open-Source Model” Mean It's Free?", desc: 'Weights, data, method — a three-piece check of what mainstream models actually open; full-size vs distilled, and what you run locally is usually the small one', tag: 'Interactive' },
+            { file: 'zero-q-benchmark.html', title: 'Why Does the "#1 on the Leaderboard" Model Feel Worse in Real Use?', desc: 'A reversal demo of leaderboard score vs real usefulness + three reasons: gaming the board, overfitting the question bank, scenario mismatch; and which boards you can actually trust', tag: 'Interactive' },
+            { file: 'zero-q-ai-learning.html', title: 'The More We Chat, the Better It Knows Me — Is It Learning?', desc: "You think the model is growing; it's a little notebook stuffed back into the chat — split-screen animation + a new-chat \"memory wipe\" demo", tag: 'Interactive' },
+            { file: 'zero-q-ai-detector.html', title: 'When an AI Detector Says "This Was Written by AI," Can You Trust It?', desc: "Guess how the detector will call six passages, and feel the classic false-positive moments yourself; why it can't work in principle, and what to do if you're wrongly accused", tag: 'Interactive' },
+            { file: 'zero-q-prompt-course.html', title: 'Are "Secret Prompt Playbooks" Worth Buying?', desc: "Tear through the paid-course talking points one by one: what this site already teaches free, what's just common sense, what's pure packaging. The skeleton is free — the work is using it", tag: 'Interactive' },
+            { file: 'zero-q-randomness.html', title: 'Why Is the Answer Different Every Time?', desc: "Ask the same question three times and get three answers, plus a \"next word\" probability-dice animation; it's design, not a bug — and when you need stable output", tag: 'Interactive' },
+            { file: 'zero-q-ai-customer-service.html', title: 'Why Is AI Customer Service So Dumb?', desc: 'Send the same complaint to a chat AI and a support bot — the gap is obvious; three reasons: a cheap small model, guardrails locked tight, old tech wearing an AI sticker', tag: 'Interactive' },
+            { file: 'zero-q-siri-vs-chatgpt.html', title: 'Are Siri and ChatGPT the Same Thing?', desc: "Path animation of the same sentence through two generations of assistant: command matching apologizes when it doesn't understand; generative AI can pick up any phrasing", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-zero-faq-money',
+          title: 'Spending & Safety',
+          desc: 'One question per page: cost, accounts, and privacy',
+          lessons: [
+            { file: 'zero-q-free-vs-paid.html', title: 'Is Free AI Enough? When Is Paying Worth It?', desc: 'Free-tier X-ray: model tier, quota, context, peak-hour queues — light up all four; three kinds of people find their match, each with one-line advice', tag: 'Interactive' },
+            { file: 'zero-q-api-vs-membership.html', title: 'What Is an API? How Is It Different from a Membership?', desc: 'Monthly buffet vs pay-as-you-go by the gram: drag the usage slider to see what each way costs, and find your crossover', tag: 'Interactive' },
+            { file: 'zero-q-image-cost.html', title: 'Why Does One Image Cost Dozens of Times More?', desc: 'A chat costs a fraction of a cent; one image costs a few cents. Cost-bar animation + three reasons: way more pixels, painted dozens of times, GPU monopolized', tag: 'Interactive' },
+            { file: 'zero-q-video-cost.html', title: 'Why Is AI Video Billed by the Second?', desc: 'Drag the slider: 10 seconds of video = 240 coherent frames + physics that hold + audio in sync. A save-money order comes with it', tag: 'Interactive' },
+            { file: 'zero-q-relay.html', title: 'What Is an API Relay Reseller?', desc: 'Behind that 70%-off price: every word you send passes an unverifiable middleman. A route animation lays out three structural risks', tag: 'Interactive' },
+            { file: 'zero-q-reverse-proxy.html', title: 'What Are "Carpool" and "Shared" Accounts?', desc: "A ¥9.9 Plus carpool = 30 people sharing a studio. Animation: histories in the open, one ban takes everyone down, the key sits in someone else's hands", tag: 'Interactive' },
+            { file: 'zero-q-privacy.html', title: 'Will My Chat History Be Used for Training?', desc: 'After you hit send, which steps a sentence passes and which one may enter the training data; how to flip the training switch off, and how the free tier differs from enterprise', tag: 'Interactive' },
           ],
         },
         {
@@ -132,11 +194,19 @@ window.COURSE = {
           ],
         },
         {
+          id: 't-build1',
+          title: 'What You Can Do Now',
+          desc: 'After this chapter, what you can start doing today',
+          lessons: [
+            { file: 'build-1.html', title: 'Lock That One Job Down', desc: 'Four-step demo of tightening a requirement; three tasks: write a four-line spec, try it on five real inputs, draw a human–AI boundary', tag: 'Hands-on' },
+          ],
+        },
+        {
           id: 't-interview1',
           title: 'They Will Quiz You',
           desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
           lessons: [
-            { file: 'interview-1.html', title: 'LLM Fundamentals · 7 Tough Questions', desc: 'Each with intent, framework, and bonus points: probability prediction / message list / hallucination explanation / RAG vs retraining / Temperature / context window', tag: 'Quiz' },
+            { file: 'interview-1.html', title: 'LLM Fundamentals · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: probability prediction / message list / hallucination explanation / RAG vs retraining / Temperature / context window', tag: 'Quiz' },
           ],
         },
       ],
@@ -254,11 +324,19 @@ window.COURSE = {
           ],
         },
         {
+          id: 't-build2',
+          title: 'What You Can Do Now',
+          desc: 'After this chapter, what you can start doing today',
+          lessons: [
+            { file: 'build-2.html', title: 'Make Five Runs in a Row All Usable', desc: 'Same-input five-run demo; three tasks: write the first prompt, classify the instability, add examples and a ban list then rerun and compare', tag: 'Hands-on' },
+          ],
+        },
+        {
           id: 't-interview2',
           title: 'They Will Quiz You',
           desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
           lessons: [
-            { file: 'interview-2.html', title: 'AI Harness · 7 Tough Questions', desc: 'Each with intent, framework, and bonus points: context overflow / Prompt engineering / injection defense / tool calling / cost accounting / KV Cache / output formats', tag: 'Quiz' },
+            { file: 'interview-2.html', title: 'AI Harness · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: context overflow / Prompt engineering / injection defense / tool calling / cost accounting / KV Cache / output formats', tag: 'Quiz' },
           ],
         },
       ],
@@ -376,11 +454,19 @@ window.COURSE = {
           ],
         },
         {
+          id: 't-build3',
+          title: 'What You Can Do Now',
+          desc: 'After this chapter, what you can start doing today',
+          lessons: [
+            { file: 'build-3.html', title: 'Wire Up the First Real Tool', desc: 'A four-step demo of the tool-calling loop; three tasks: pick a tool, write a three-line description, run the loop and deliberately break it once', tag: 'Hands-on' },
+          ],
+        },
+        {
           id: 't-interview3',
           title: 'They Will Quiz You',
           desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
           lessons: [
-            { file: 'interview-3.html', title: 'Practice · From Demo to Product · 7 Tough Questions', desc: 'Each with intent, framework, and bonus points: demo-to-launch gap / Agent deadlock / context compression / memory design / multi-Agent / MCP / cost accounting', tag: 'Quiz' },
+            { file: 'interview-3.html', title: 'Practice · From Demo to Product · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: demo-to-launch gap / Agent deadlock / context compression / memory design / multi-Agent / MCP / cost accounting', tag: 'Quiz' },
           ],
         },
       ],
@@ -454,11 +540,19 @@ window.COURSE = {
           ],
         },
         {
+          id: 't-build4',
+          title: 'What You Can Do Now',
+          desc: 'After this chapter, what you can start doing today',
+          lessons: [
+            { file: 'build-4.html', title: 'Build Your First Eval Set', desc: 'Before/after score demo; three tasks: collect ten real cases, write pass criteria and run a baseline, let the numbers talk', tag: 'Hands-on' },
+          ],
+        },
+        {
           id: 't-interview4',
           title: 'They Will Quiz You',
           desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
           lessons: [
-            { file: 'interview-4.html', title: 'AI Engineering Design Patterns · 7 Tough Questions', desc: 'Each with intent, framework, and bonus points: context engineering / long tasks / grep vs RAG / ACI tool design / eval infrastructure / LLM-as-Judge / sandbox isolation', tag: 'Quiz' },
+            { file: 'interview-4.html', title: 'AI Engineering Design Patterns · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: context engineering / long tasks / grep vs RAG / ACI tool design / eval infrastructure / LLM-as-Judge / sandbox isolation', tag: 'Quiz' },
           ],
         },
       ],
@@ -506,11 +600,19 @@ window.COURSE = {
           ],
         },
         {
+          id: 't-build5',
+          title: 'What You Can Do Now',
+          desc: 'After this chapter, what you can start doing today',
+          lessons: [
+            { file: 'build-5.html', title: 'Three Endurance Rules', desc: 'A context-usage curve and compression-threshold demo; three tasks: find the forgetting turn, write three rules, run a write-to-disk-then-read-back loop', tag: 'Hands-on' },
+          ],
+        },
+        {
           id: 't-interview5',
           title: 'They Will Quiz You',
           desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
           lessons: [
-            { file: 'interview-5.html', title: 'Harness & Self-Improvement · 6 Tough Questions', desc: 'Each with intent, framework, and bonus points: Harness essence / design patterns / context auto-evolution / reward hacking / RSI progress and risks', tag: 'Quiz' },
+            { file: 'interview-5.html', title: 'Harness & Self-Improvement · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: Harness essence / design patterns / context auto-evolution / reward hacking / RSI progress and risks', tag: 'Quiz' },
           ],
         },
       ],
@@ -607,7 +709,7 @@ window.COURSE = {
           title: 'They Will Quiz You',
           desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
           lessons: [
-            { file: 'interview-6.html', title: 'Dissecting Grok Build · 6 Tough Questions', desc: 'Each with intent, framework, and bonus points: runtime loop / Compaction / tool permissions / memory retrieval / sandbox security / MCP integration', tag: 'Quiz' },
+            { file: 'interview-6.html', title: 'Dissecting Grok Build · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: runtime loop / Compaction / tool permissions / memory retrieval / sandbox security / MCP integration', tag: 'Quiz' },
           ],
         },
       ],
@@ -641,6 +743,7 @@ window.COURSE = {
           title: 'Quality Baselines',
           desc: 'Hard requirements for comments, debugging, and complete implementation',
           lessons: [
+            { file: 'vibe-3b.html', title: "Style Convergence: Don't Ship Eight CSS Kits for One Button", desc: 'Why styles proliferate, how to fold them into design tokens in batches, and which differences should stay', tag: 'Interactive' },
             { file: 'vibe-4.html', title: 'Three Comment Elements & Code Protection', desc: 'Background, design intent, key constraints — all three required; no silent deletion of code or dependencies', tag: 'Interactive' },
             { file: 'vibe-5.html', title: 'Debug Iron Rule: Log First, Fix Later', desc: 'No speculative fixes allowed; answer three questions before fixing; declare impact scope after fixing', tag: 'Interactive' },
             { file: 'vibe-6.html', title: 'No Installment Delivery Accepted', desc: 'Why AI loves to deliver "the simple version first," and why you must break this pattern', tag: 'Interactive' },
@@ -680,11 +783,129 @@ window.COURSE = {
           ],
         },
         {
+          id: 't-build6',
+          title: 'What You Can Do Now',
+          desc: 'After this chapter, what you can start doing today',
+          lessons: [
+            { file: 'build-6.html', title: 'Distill Your Own Collaboration Spec', desc: 'A four-step flow comparison; three tasks: write your first Rule, walk a real requirement through the flow, export the Build Log and shape it into spec v1', tag: 'Hands-on' },
+          ],
+        },
+        {
           id: 't-interview7',
           title: 'They Will Quiz You',
           desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
           lessons: [
-            { file: 'interview-7.html', title: 'Vibe Coding Methodology · 6 Tough Questions', desc: 'Each with intent, framework, and bonus points: why make rules / quality ownership / code merge gate / reject installments / decision persistence / safety gates', tag: 'Quiz' },
+            { file: 'interview-7.html', title: 'Vibe Coding Methodology · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: why make rules / quality ownership / code merge gate / reject installments / decision persistence / safety gates', tag: 'Quiz' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-taste',
+      num: 'Special Topic',
+      title: 'Taste Engineering: Getting AI to Make Things with Taste',
+      desc: "Once the collaboration workflow holds, taste is the first thing that stops you. After AI knocks down the barrier to execution, anyone can make something usable in ten minutes — \"usable\" itself starts to devalue, and taste becomes the new dividing line. This chapter trains two skills: recognizing beauty, four handles (hierarchy, whitespace, restraint, consistency), each with an A/B spot-the-difference; and translating taste for AI — a taste vocabulary, prompts for generating UI and images, reference images and a reference library. Innate \"creating beauty\" can't be taught; \"seeing what's off\" and \"saying what you want\" can, if you practice.",
+      color: '#db2777',
+      topics: [
+        {
+          id: 't-taste-why',
+          title: 'Taste Is the New Bottleneck',
+          desc: 'Once execution is leveled, judgment starts getting expensive',
+          lessons: [
+            { file: 'taste-1.html', title: 'Execution Is Free. Judgment Just Got Expensive', desc: 'Once anyone can make something usable in ten minutes, "usable" starts to devalue. Vote on three interfaces by gut feel first — come back after this chapter and vote again. See if your eye changed', tag: 'Intro' },
+            { file: 'taste-2.html', title: 'Where the AI Look Comes From', desc: 'Purple gradient, frosted glass, rounded cards: AI defaults to the average of its training data, and average is mediocre. Tap the AI-look tells on a typical AI-generated page; collect them all to unlock why', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-taste-eye',
+          title: 'Four Handles for Recognizing Beauty',
+          desc: 'Hierarchy, whitespace, restraint, consistency — each with a spot-the-difference',
+          lessons: [
+            { file: 'taste-3.html', title: 'Hierarchy: One Hero per Screen', desc: 'Emphasize everything and you emphasize nothing. How type size, weight, and color allocate attention — and A/B spot-the-difference to catch screens that steal the scene', tag: 'Interactive' },
+            { file: 'taste-4.html', title: 'Whitespace & Alignment: Most Ugliness Is Spacing', desc: "When you can't name what's ugly, spacing is usually why. Drag the slider to feel breathing room, then learn the 8pt grid — a lazy genius of a tool", tag: 'Interactive' },
+            { file: 'taste-5.html', title: 'Restraint: Budget Your Colors and Type', desc: 'One primary, two weights, one radius set. Dump colors onto a UI until it looks like a year-end party flyer, then one-click subtract and feel the premium feel snap back', tag: 'Interactive' },
+            { file: 'taste-6.html', title: 'Consistency: Where System Feel Comes From', desc: "Good-looking sites sit on a set of design variables. Open this site's real CSS: why control height, radius, and color stay one tier sitewide — change once, everywhere updates", tag: 'Case Study' },
+          ],
+        },
+        {
+          id: 't-taste-speak',
+          title: 'Translate Taste for AI',
+          desc: 'Your taste vocabulary decides how good AI output gets',
+          lessons: [
+            { file: 'taste-7.html', title: 'A Hundred Concrete Ways to Say "Looks Good"', desc: "Information density, visual noise, breathing room, contrast hierarchy… tap a taste word for its definition and do/don't cases. Name it, and you can direct the AI", tag: 'Interactive' },
+            { file: 'taste-8.html', title: 'Generating UI: From Adjectives to a Spec', desc: "“Make a nice page” vs “reference Linear's information density, one primary color only” — a whole tier apart. Compare three prompt levels and watch the gap", tag: 'Hands-on' },
+            { file: 'taste-9.html', title: 'Generating Images: The Language of Composition, Light and Shadow, Color', desc: 'The aesthetic trio for image prompts: composition, light and shadow, color. Build intuition on three compare sets, then pick the right one from four candidates', tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-taste-library',
+          title: 'Build Your Own Reference Library',
+          desc: 'Learn to look, then get AI to ship from your references',
+          lessons: [
+            { file: 'taste-10.html', title: 'What It Means to Really Look at Design', desc: 'Bookmarking a hundred sites is useless. Tear them down in order: hierarchy, then spacing, then colors. Use this flow to dissect a good design live', tag: 'Method' },
+            { file: 'taste-11.html', title: 'Feeding References to AI', desc: 'Describing style by mouth alone is inefficient. When to use reference images, style descriptions, or design variables — plus templates — so AI ships from your reference library', tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-taste-final',
+          title: 'Series Finale',
+          desc: 'Before you sign off, run through the list',
+          lessons: [
+            { file: 'taste-final.html', title: 'Acceptance Checklist: Run Through This Before You Sign Off', desc: 'For AI-delivered UI and images, walk the list item by item: hierarchy, spacing, restraint, consistency, detail. Interactive checklist you can tick, plus further reading', tag: 'Finale' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-ixd',
+      num: 'Special Topic',
+      title: 'Interaction Engineering: Getting AI to Make Usable Things',
+      desc: "Looks you can judge at a glance; usability you only know by using it — so interaction bugs hide deeper than taste bugs. AI's default interaction ships at the \"it runs\" level: blank empty states, errors that pop an alert, Delete with no confirm, five-step wizards that skip no step. This chapter continues from Taste Engineering: first learn to spot (the three states, error prevention and reversibility, flow restraint, conventions), then tighten interface details (which control to pick, how the copy should read), and finally translate interaction requirements for AI (goal-oriented requirements; put the state machine and boundaries in the prompt). Source material is drawn from the classic interaction-design textbook About Face 4.",
+      color: '#2563eb',
+      topics: [
+        {
+          id: 't-ixd-why',
+          title: 'Usability Is Also the Bottleneck',
+          desc: '"It runs" and "usable" are a whole chapter apart',
+          lessons: [
+            { file: 'ixd-1.html', title: 'It Runs. Now What?', desc: "Flip the \"considerate software\" trait list and you get AI's default interaction flaw list. Click five inconsiderate spots in an app that runs fine, and see what you've been quietly putting up with", tag: 'Intro' },
+          ],
+        },
+        {
+          id: 't-ixd-spot',
+          title: 'Four Handles for Spotting Good Interaction',
+          desc: 'States, error prevention, flow, conventions',
+          lessons: [
+            { file: 'ixd-2.html', title: 'The Three States: Loading, Empty, Error', desc: 'The three abnormal moments in a UI are exactly where experience splits. Empty states should teach the next step; loading should report progress; errors should speak plain language and offer a way out. Pick winners in three A/B duels yourself', tag: 'Interactive' },
+            { file: 'ixd-3.html', title: "Error Prevention & Reversibility: So Users Aren't Afraid to Click", desc: 'Stop errors before they happen rather than report them after; undo makes exploration safe; confirm dialogs are the weakest error prevention. Redesign three dangerous buttons yourself', tag: 'Interactive' },
+            { file: 'ixd-4.html', title: 'Flow Restraint: Every Extra Step Drops Another Batch', desc: "Actions that don't directly serve the goal are excise. Trim a five-step signup to two, step by step, and watch who stays in the funnel", tag: 'Interactive' },
+            { file: 'ixd-5.html', title: "Conventions: Don't Let AI Invent New Interactions", desc: "Users operate software through conventions — learn once, use everywhere. Spot which control is faking innovation, and which thing that looks like a button isn't one", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-ixd-detail',
+          title: 'Interface Details',
+          desc: 'Which control to pick, how the copy should read',
+          lessons: [
+            { file: 'ixd-6.html', title: 'Did You Pick the Right Control: Radio, Checkbox, Toggle & Dropdown', desc: 'Mutually exclusive pick-one uses a radio button; multi-select uses checkboxes; instant effect uses a toggle; dropdown only when options overflow one screen. Six match-up scenes plus a cheat sheet you paste into prompts', tag: 'Interactive' },
+            { file: 'ixd-7.html', title: 'The UI Speaks: How Users Read Your Copy', desc: "\"Delete these 3\" is more honest than \"OK.\" Button verbs must name the consequence; labels use the user's words; don't serve database field names to users. Rewrite five lazy buttons by hand", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-ixd-translate',
+          title: 'Translating Interaction for AI',
+          desc: 'Goal-oriented plus a state machine — then AI knows what you want',
+          lessons: [
+            { file: 'ixd-8.html', title: 'Goal-Oriented: Describe Requirements by Goals, Not Feature Lists', desc: 'Telling AI "Xiaomei needs to file expenses in three minutes" beats "need upload, form, buttons" by a mile. Duel two prompts, then practice rewriting a feature list into a scenario', tag: 'Hands-on' },
+            { file: 'ixd-9.html', title: 'Put the State Machine and Boundaries in the Prompt', desc: 'For every screen, list every state, nail the edge cases, and write error-prevention requirements. State-machine completer + edge-case wheel, with a copy-ready acceptance phrasing template', tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-ixd-final',
+          title: 'Series Finale',
+          desc: 'The second list before launch',
+          lessons: [
+            { file: 'ixd-final.html', title: 'Interaction Acceptance Checklist: The Second List Before Launch', desc: 'Are the states complete? Are dangerous actions reversible? Can the flow still be cut? Did you pick the right controls? Is the copy in plain language? A checkable interactive list — paired with the Taste and Psychology lists as one set', tag: 'Finale' },
           ],
         },
       ],
@@ -778,6 +999,50 @@ window.COURSE = {
           desc: 'Cross-chapter comprehensive exam',
           lessons: [
             { file: 'exam-all.html', title: 'Comprehensive Exam · 35 from 7 Chapters', desc: '5 questions evenly drawn per chapter from 350 total — targeting cross-chapter confusions: compression vs memory / Workflow vs Agent selection / Harness vs prompt engineering', tag: 'Interactive' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-seo',
+      num: 'Bonus',
+      title: 'Get Found: SEO & GEO',
+      desc: "Your product is built and the rights are locked down \u2014 the next question is whether anyone can find it. This chapter covers two things: the SEO minimum viable checklist (crawlable, readable, indexable), and GEO, the new battleground (getting ChatGPT, Perplexity, Kimi, and Doubao to cite you when they answer a question). The whole chapter uses one of Xiaoshan Academy's own real overhauls as the case study \u2014 no black hat, no ranking promises, just checklists you can verify yourself. The first two lessons are open without login; the rest require signing in.",
+      color: '#4338ca',
+      bonus: true,
+      topics: [
+        {
+          id: 't-seo-why',
+          title: 'First, Get Clear on Being Found',
+          desc: 'Shipping it is not the same as anyone showing up',
+          lessons: [
+            { file: 'seo-1.html', title: "You Built It. Why Isn't Anyone Coming?", desc: 'Three traffic doors, each with its own temperament: search engines where users look, AI engines where users ask, and social where other people speak for you. Play through the indexing funnel first and find the layer your product is stuck on', tag: 'Intro' },
+          ],
+        },
+        {
+          id: 't-seo-field',
+          title: 'Two Battlegrounds',
+          desc: 'Search engines hand out links; AI engines hand out answers',
+          lessons: [
+            { file: 'seo-2.html', title: 'The SEO Minimum Viable Checklist: Crawlable, Readable, Indexable', desc: 'Only the parts that pay off the moment you do them: one topic per page, a title written the way a person talks, body text that does not depend on JS to render, plus sitemap and webmaster-tool submission. Flip the crawl simulator between two states to see what the crawler actually receives', tag: 'Hands-on' },
+            { file: 'seo-3.html', title: 'GEO: Get AI Engines to Cite You', desc: 'Users no longer only search \u2014 they ask. Self-contained paragraphs, FAQ structured data, llms.txt, and freshness signals: four levers, each with a toy you can play with on the spot, plus a roster of the AI crawlers worth knowing', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-seo-case',
+          title: 'Dissecting a Real Case',
+          desc: "Using this site's own overhaul log as the dissection table",
+          lessons: [
+            { file: 'seo-4.html', title: 'Dissecting This Site: Google Indexes 693 Pages, Bing Only 50', desc: "Xiaoshan Academy's real August 2026 audit, replayed: the sitemap dropped every English and Korean page, the Q&A pages threw away their FAQ citations, and the logs discarded every crawler. For each gap \u2014 how it surfaced, what changed, and what to check it against", tag: 'Case Study' },
+          ],
+        },
+        {
+          id: 't-seo-final',
+          title: 'Priorities and Wrap-up',
+          desc: 'A solo builder has no SEO team, only the ability to put things in order',
+          lessons: [
+            { file: 'seo-5.html', title: 'Solo Priorities: Write Questions People Actually Search', desc: 'Write the question a user would really type before piling on features, and trade real experience for credibility. The do-not list lives here too: buying backlinks, keyword stuffing, and mass-generated AI filler pages \u2014 which of them will get you killed', tag: 'Hands-on' },
+            { file: 'seo-final.html', title: 'Getting-Found Launch Checklist: One Last Pass Before You Ship', desc: 'Twelve items you can tick off: one topic per page, body text visible server-side, sitemap, one-sentence answer block, FAQ structured data, llms.txt. Plus four ways to measure whether any of it actually worked', tag: 'Finale' },
           ],
         },
       ],

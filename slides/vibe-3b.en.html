@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="The most typical tech debt in a Vibe Coding project: eight CSS kits for the same button. This lesson covers why styles proliferate, how to fold them into tokens and shared components, and which differences should stay.">
+<meta name="keywords" content="CSS convergence,reinventing styles,design token,style reuse,tech debt,Vibe Coding">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<title>Style Convergence: Don't Ship Eight CSS Kits for One Button | AI Systems Course</title>
+<link rel="canonical" href="https://xueai.app/slides/vibe-3b.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/vibe-3b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/vibe-3b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/vibe-3b.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/vibe-3b.html">
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e}
+.lesson-header .kicker{color:var(--vibe)}
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+/* 熵增模拟器 */
+.ent-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px}
+.ent-stage{padding:18px 20px;min-height:150px;background:repeating-conic-gradient(rgba(0,0,0,.025) 0% 25%, transparent 0% 50%) 0 0 / 22px 22px}
+.ent-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.ent-item{animation:entIn .28s ease}
+@keyframes entIn{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+.ent-item button{border:none;color:#fff;font-family:inherit;font-weight:700;cursor:default;display:block}
+.ent-cls{display:block;margin-top:5px;font-family:"SF Mono",Menlo,monospace;font-size:11.5px;color:var(--sub);text-align:center}
+.ent-empty{font-size:14px;color:var(--sub);line-height:1.7}
+.ent-log{border-top:1px solid var(--border);padding:12px 20px;background:rgba(0,0,0,.02);font-size:13.5px;color:var(--sub);line-height:1.7;min-height:44px}
+.ent-log b{color:var(--text)}
+.ent-stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)}
+.ent-stat{padding:12px 8px;text-align:center;border-right:1px solid var(--border)}
+.ent-stat:last-child{border-right:none}
+.ent-stat .n{display:block;font-size:24px;font-weight:800;color:var(--vibe);font-variant-numeric:tabular-nums;transition:color .2s}
+.ent-stat.hot .n{color:var(--danger)}
+.ent-stat .k{font-size:12px;color:var(--sub)}
+.ent-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.ent-btns button{padding:12px 22px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-size:14.5px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;min-height:44px;transition:all .15s}
+.ent-btns button.pri{background:var(--vibe);border-color:var(--vibe);color:#fff}
+.ent-btns button.pri:hover{filter:brightness(1.08)}
+.ent-btns button:disabled{opacity:.42;cursor:default}
+.ent-token{margin-top:14px;padding:14px 18px;border-radius:12px;background:#0e1c1a;color:#d9f2ec;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.75;white-space:pre;overflow-x:auto;display:none}
+.ent-token.on{display:block}
+
+/* 三个原因 */
+.why-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:12px}
+.why-grid .l-card h3{font-size:16px;margin-bottom:4px}
+.why-grid .l-card p{font-size:14px;color:var(--sub);line-height:1.7}
+.why-tag{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--vibe);background:rgba(13,148,136,.1);border-radius:6px;padding:3px 10px;margin-bottom:8px}
+
+/* 判断题 */
+.jd-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:16px 20px;margin-top:12px}
+.jd-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.jd-side{border:1.5px solid var(--border);border-radius:11px;padding:12px 14px;background:rgba(0,0,0,.015)}
+.jd-side .nm{font-family:"SF Mono",Menlo,monospace;font-size:12.5px;font-weight:700;color:var(--vibe-deep);display:block;margin-bottom:5px}
+.jd-side .vl{font-size:13.5px;color:var(--sub);line-height:1.65}
+.jd-ask{font-size:15px;font-weight:700;color:var(--text);line-height:1.6;margin-bottom:10px}
+.jd-opts{display:flex;gap:8px;flex-wrap:wrap}
+.jd-opts button{flex:1;min-width:150px;padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-size:14.5px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;min-height:44px;transition:all .15s}
+.jd-opts button:hover:not(:disabled){border-color:rgba(0,0,0,.2)}
+.jd-opts button.right{border-color:rgba(22,163,74,.5);background:rgba(22,163,74,.07);color:var(--success)}
+.jd-opts button.wrong{border-color:rgba(220,38,38,.4);background:rgba(220,38,38,.05);color:var(--danger)}
+.jd-opts button:disabled{cursor:default}
+.jd-fb{margin-top:11px;border-radius:10px;padding:12px 15px;font-size:14px;line-height:1.7;display:none}
+.jd-fb.on{display:block}
+.jd-fb.ok{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.3);color:var(--text)}
+.jd-fb.no{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.28);color:var(--text)}
+.jd-fb b.y{color:var(--success)}
+.jd-fb b.n{color:var(--danger)}
+
+/* 四步 */
+.step-list{margin-top:12px;display:flex;flex-direction:column;gap:11px}
+.step-item{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 18px}
+.step-n{flex-shrink:0;width:30px;height:30px;border-radius:9px;background:rgba(13,148,136,.1);color:var(--vibe);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.step-item h3{font-size:15.5px;margin:0 0 3px}
+.step-item p{font-size:14px;color:var(--sub);line-height:1.72;margin:0}
+
+code{color:var(--vibe-deep);background:rgba(13,148,136,.08)}
+.vibe-callout{background:rgba(13,148,136,.05);border:1.5px solid rgba(13,148,136,.25);border-radius:14px;padding:18px 22px}
+.vibe-callout b{color:var(--vibe)}
+.vibe-callout p{line-height:1.8}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub)}
+.src-note a{color:var(--vibe-deep)}
+.ctrl-hint{font-size:13px;color:var(--sub);margin-top:10px}
+.xref{margin-top:14px;font-size:14.5px;color:var(--sub);line-height:1.8}
+.xref a{color:var(--vibe-deep);font-weight:700}
+
+@media (max-width:768px){
+  .why-grid,.jd-pair{grid-template-columns:1fr}
+  .ent-stats{grid-template-columns:1fr 1fr}
+  .ent-stat:nth-child(2){border-right:none}
+}
+</style>
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Style Convergence: Don't Ship Eight CSS Kits for One Button","name":"Style Convergence: Don't Ship Eight CSS Kits for One Button","url":"https://xueai.app/slides/vibe-3b.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Quality Baselines","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"The most typical tech debt in a Vibe Coding project: eight CSS kits for the same button. This lesson covers why styles proliferate, how to fold them into tokens and shared components, and which differences should stay.","datePublished":"2026-08-12","dateModified":"2026-08-12","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Style Convergence: Don't Ship Eight CSS Kits for One Button"><meta property="og:description" content="The most typical tech debt in a Vibe Coding project: eight CSS kits for the same button. This lesson covers why styles proliferate, how to fold them into tokens and shared components, and which differences should stay."><meta property="og:url" content="https://xueai.app/slides/vibe-3b.en.html"><meta property="og:image" content="https://xueai.app/slides/og/vibe-3b.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Vibe Coding Methodology · Quality Baseline</div>
+    <h1>Style Convergence: Don't Ship Eight CSS Kits for One Button</h1>
+    <p class="subtitle">Ask AI to ship ten features in a row, and you'll pile up eight button classes that look almost the same. It's not that it won't reuse — each new conversation has no idea what you already have. This lesson covers why styles proliferate, how to clean them up, and which differences should stay.</p>
+    <div class="chips"><span class="chip">Reuse first</span><span class="chip">design token</span><span class="chip">Tech debt</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Why styles proliferate, how to fold them into tokens in batches, and which differences should stay</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">Interactive Demo 1 · Pile Up a Heap of Buttons Yourself</div>
+    <p class="desc">This simulates a real project's iteration. Each click of "Add another feature" is you opening a new conversation and asking AI to build a page. Watch how it handles the button each time, and how the four numbers below climb.</p>
+    <div class="ent-wrap">
+      <div class="ent-stage">
+        <div class="ent-row" id="entRow"><p class="ent-empty">The project is still empty. Click the button below to start iterating.</p></div>
+      </div>
+      <div class="ent-log" id="entLog">Round 0: Not started yet.</div>
+      <div class="ent-stats">
+        <div class="ent-stat" id="stImpl"><span class="n">0</span><span class="k">Button impls</span></div>
+        <div class="ent-stat" id="stColor"><span class="n">0</span><span class="k">Primary colors</span></div>
+        <div class="ent-stat" id="stRadius"><span class="n">0</span><span class="k">Corner radii</span></div>
+        <div class="ent-stat" id="stLine"><span class="n">0</span><span class="k">Lines of CSS</span></div>
+      </div>
+    </div>
+    <div class="ent-btns">
+      <button type="button" class="pri" id="entNext" onclick="entNext()">Add another feature</button>
+      <button type="button" id="entFix" onclick="entConverge()" disabled>Run convergence</button>
+      <button type="button" onclick="entReset()">Reset</button>
+    </div>
+    <p class="ctrl-hint" id="entHint">After eight rounds, look at this pile of buttons — you can't tell which one to edit. That's the feel of "loose parts."</p>
+    <div class="ent-token" id="entToken"></div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Don't rush to blame AI — the environment forced its hand</div>
+    <p class="desc">Reinventing styles isn't the model being lazy. It's three structural reasons stacked together. See the reasons, and you'll know where to put the gate.</p>
+    <div class="why-grid">
+      <div class="l-card">
+        <span class="why-tag">Can't see</span>
+        <h3>Your CSS isn't in front of it</h3>
+        <p>A new conversation only has the few files you just handed it. It has no way to know the project already has <code>.btn-primary</code>, so it writes a fresh one for the request.</p>
+      </div>
+      <div class="l-card">
+        <span class="why-tag">Cheaper</span>
+        <h3>Writing new is cheaper than reading the old</h3>
+        <p>Understanding an existing style means reading every related file, plus worrying that a change will break something else. A new class name is zero risk and zero reading cost — that's its optimal solution, not yours.</p>
+      </div>
+      <div class="l-card">
+        <span class="why-tag">Won't touch</span>
+        <h3>Afraid of breaking things, so it adds a parallel copy</h3>
+        <p>When it needs a button with a shadow, it would rather write <code>.btn-primary-new</code> than change the original — editing a style others already use is high-risk, so it picks the safe path that proliferates.</p>
+      </div>
+    </div>
+    <div class="vibe-callout" style="margin-top:16px">
+      <p><b>All three reasons point to the same thing: it's missing a list of "what we already have."</b> Write that list into the project rules file so it can see it every round, and the proliferation stops. Same idea as <a href="vibe-8.html" style="color:var(--vibe-deep);font-weight:700">Lesson 8 encoding environment facts in a Rule</a> — this time the asset is styles.</p>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">Four steps to converge: inventory first, then merge, then gate</div>
+    <p class="desc">Don't expect one big refactor to clean up a messy project. Follow these four steps — you can stop and verify after each one.</p>
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-n">1</div>
+        <div>
+          <h3>Inventory — look, don't touch</h3>
+          <p>Have AI scan the project's styles and produce a duplication list: which classes implement the same control, how many color and radius values are scattered around. No code changes in this step — first see how much debt you owe.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-n">2</div>
+        <div>
+          <h3>Set tokens — fold magic numbers into a few tiers</h3>
+          <p>From the inventory, pick the values actually in use and lock them into a small set of variables: primary color, semantic colors, two or three radius tiers, four spacing tiers, control height. Few tiers — few is what you can defend.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-n">3</div>
+        <div>
+          <h3>Merge in batches, one control at a time</h3>
+          <p>Buttons first, then verify; cards next, then verify; then inputs. Commit each batch separately so you can roll back one batch if something breaks. Convergence is an equivalent replacement — visually nothing should change. If you actually need a new look, that's a different task.</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-n">4</div>
+        <div>
+          <h3>Set a gate so it doesn't grow back tomorrow</h3>
+          <p>Write this into the rules file: "Before writing a new style, search tokens and shared components first. Reuse if you find one; only create a new one if you don't, and say what you searched." Without this gate, you'll be cleaning up again in three months.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Interactive Demo 2 · Merge it, or keep a justified difference</div>
+    <p class="desc">The easiest place for convergence to go too far is flattening differences that should exist. Five real style pairs — you decide which were piled up by accident, and which have a reason.</p>
+    <div id="jdWrap"></div>
+    <p class="ctrl-hint" id="jdScore"></p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">One test: does the difference have a name</div>
+    <div class="vibe-callout">
+      <p><b>To decide whether to merge, ask one question: what is this difference called?</b> If you can name it, keep it — "secondary button," "destructive action," "touch-target minimum," "overlay one tier above the card." Those are design decisions; write the reason in a comment. If you can't name it, merge it — two radii 2px apart, two blues the eye can't tell apart. They aren't called anything. They were written on the fly.</p>
+    </div>
+    <p class="desc" style="margin-top:16px">The consistency lesson in the Taste series says the same thing: difference isn't a crime — having no reason is. That lesson covers how to set the variable table from the design side; this one covers how to pull things back once the code has scattered. Read them as a pair: one gives you the standard, the other gives you the surgical plan.</p>
+    <p class="xref">Further reading: <a href="taste-6.html">Taste Engineering · Consistency: Where System Feel Comes From</a> (how to set tokens) · <a href="vibe-3.html">Previous lesson: PlayGround</a> (where to tune components after you converge)</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Three traps you'll hit while converging</div>
+    <div class="l-cols">
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">Big-bang full rewrite</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">Tell AI to "unify the site's styles" and you'll get a 60-file diff you can't review and don't dare ship. Always batch by control.</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">"While we're here" visual tweaks</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">During convergence it often "optimizes" the radius and palette while it's at it. Then you can't tell whether the page looks different because of a merge bug or its aesthetic improvisation. Convergence is equivalent replacement only.</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">Tokens too fine-grained</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">Twelve radius tiers and nine grays is the same as having none — next time it still has to pick, and it will pick wrong. Tiers only constrain when there's almost nothing to choose from.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Key Takeaway</div>
+    <div class="vibe-callout">
+      <p><b>AI will not reuse what you never told it exists.</b> Styles proliferate because it forgets every round, so the fix has two halves: fold the mess into tokens by control, and block the future with one rule — search before you write. The Skill at the top of this page is the executable version of both halves. Copy it to your Agent; it will hand you a debt inventory first, instead of starting to edit.</p>
+    </div>
+    <p class="src-note">The companion rule is "check for duplicates before adding a feature" in the <a href="https://github.com/itshen/xs_vibe_rules">itshen/xs_vibe_rules</a> repo. This lesson extends that from features to styles.</p>
+  </section>
+
+</article>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* ── 交互一：样式熵增模拟器 ──
+   八轮迭代都取自真实项目里见过的类名，颜色和圆角的微小差异是刻意的：
+   肉眼几乎分不出，但正是这种「差一点」让人不敢动手合并。 */
+var ENT = [
+  { cls:'.btn-primary',     c:'#0d9488', r:10, pad:'11px 26px', fs:15, lines:6,
+    log:'Round 1: Building the homepage. AI writes the first primary button. Everything\'s fine.' },
+  { cls:'.submit-btn',      c:'#0f9d8f', r:8,  pad:'12px 24px', fs:15, lines:6,
+    log:'Round 2: Building the form page. The new conversation can\'t see the homepage CSS, so it rewrites one — the color is off by a hair.' },
+  { cls:'.btn-blue',        c:'#0ea5e9', r:12, pad:'10px 22px', fs:14, lines:7,
+    log:'Round 3: Building the detail page. You said "make the button a bit bluer," and it named a new class after the color.' },
+  { cls:'.primaryButton',   c:'#0d9488', r:10, pad:'14px 28px', fs:16, lines:6,
+    log:'Round 4: Building the settings page. The style is almost identical to #1 — only the naming switched to camelCase.' },
+  { cls:'.action-btn',      c:'#14b8a6', r:6,  pad:'10px 20px', fs:14, lines:7,
+    log:'Round 5: Building the list-page action column. Another set; radius is 6 this time.' },
+  { cls:'.btn-primary-new', c:'#0d9488', r:10, pad:'11px 26px', fs:15, lines:8,
+    log:'Round 6: You want a shadow on the button. It doesn\'t dare change #1 (might affect the homepage), so it adds a parallel -new.' },
+  { cls:'.form-submit',     c:'#0f766e', r:10, pad:'12px 30px', fs:15, lines:6,
+    log:'Round 7: Another form. The color is one shade darker this time; you didn\'t notice either.' },
+  { cls:'.cta',             c:'#0d9488', r:999,pad:'13px 32px', fs:16, lines:6,
+    log:'Round 8: The landing page wants a pill button. Eight classes now, and you no longer know which one to edit.' }
+];
+
+var entStep = 0, entFixed = false;
+
+function entRender() {
+  var row = document.getElementById('entRow');
+  if (!entStep) {
+    row.innerHTML = '<p class="ent-empty">The project is still empty. Click the button below to start iterating.</p>';
+  } else if (entFixed) {
+    row.innerHTML =
+      '<div class="ent-item"><button style="background:var(--brand,#0d9488);border-radius:10px;padding:11px 26px;font-size:15px">Primary Action</button>' +
+      '<span class="ent-cls">Button/primary</span></div>' +
+      '<div class="ent-item"><button style="background:#fff;color:#0f766e;border:1.5px solid #0d9488;border-radius:10px;padding:11px 26px;font-size:15px">Secondary Action</button>' +
+      '<span class="ent-cls">Button/secondary</span></div>' +
+      '<div class="ent-item"><button style="background:#dc2626;border-radius:10px;padding:11px 26px;font-size:15px">Delete</button>' +
+      '<span class="ent-cls">Button/danger</span></div>';
+  } else {
+    row.innerHTML = ENT.slice(0, entStep).map(function (b) {
+      return '<div class="ent-item"><button style="background:' + b.c + ';border-radius:' + b.r +
+        'px;padding:' + b.pad + ';font-size:' + b.fs + 'px">Primary Action</button>' +
+        '<span class="ent-cls">' + b.cls + '</span></div>';
+    }).join('');
+  }
+  entStats();
+}
+
+function entStats() {
+  var used = ENT.slice(0, entStep);
+  var impl, colors, radii, lines;
+  if (entFixed) {
+    impl = 1;
+    colors = 1;
+    radii = 1;
+    lines = 22;
+  } else {
+    impl = used.length;
+    colors = new Set(used.map(function (b) { return b.c; })).size;
+    radii = new Set(used.map(function (b) { return b.r; })).size;
+    lines = used.reduce(function (s, b) { return s + b.lines; }, 0);
+  }
+  var set = [['stImpl', impl, 3], ['stColor', colors, 2], ['stRadius', radii, 2], ['stLine', lines, 24]];
+  set.forEach(function (t) {
+    var el = document.getElementById(t[0]);
+    el.querySelector('.n').textContent = t[1];
+    el.classList.toggle('hot', !entFixed && t[1] > t[2]);
+  });
+}
+
+function entNext() {
+  if (entFixed) entReset();
+  if (entStep >= ENT.length) return;
+  var b = ENT[entStep];
+  entStep++;
+  document.getElementById('entLog').innerHTML = '<b>' + b.cls + '</b> — ' + b.log;
+  document.getElementById('entFix').disabled = entStep < 3;
+  if (entStep >= ENT.length) {
+    document.getElementById('entNext').disabled = true;
+    document.getElementById('entHint').textContent =
+      'Eight classes, seven primary colors, six radii, fifty-odd lines of duplicate CSS. Now click "Run convergence" and see what should remain.';
+  }
+  entRender();
+}
+
+function entConverge() {
+  entFixed = true;
+  document.getElementById('entLog').innerHTML =
+    '<b>Convergence done.</b> Eight classes folded into three semantic variants of one component; color and radius all come from tokens. Visually nothing changed. What changed is that "where do I edit next time" now has a single answer.';
+  document.getElementById('entHint').textContent =
+    'Notice the three buttons left: primary, secondary, danger. Their differences have names, so they stay. The eight from earlier had no names, so they got merged.';
+  document.getElementById('entToken').className = 'ent-token on';
+  document.getElementById('entToken').textContent =
+    ':root {\n' +
+    '  --brand:        #0d9488;   /* 八种绿收成一种 */\n' +
+    '  --danger:       #dc2626;\n' +
+    '  --radius-ctl:   10px;      /* 控件圆角只留一档 */\n' +
+    '  --ctl-h:        44px;      /* 触摸目标下限 */\n' +
+    '  --pad-ctl:      11px 26px;\n' +
+    '}';
+  document.getElementById('entNext').disabled = true;
+  document.getElementById('entFix').disabled = true;
+  entRender();
+}
+
+function entReset() {
+  entStep = 0;
+  entFixed = false;
+  document.getElementById('entLog').textContent = 'Round 0: Not started yet.';
+  document.getElementById('entHint').textContent =
+    'After eight rounds, look at this pile of buttons — you can\'t tell which one to edit. That\'s the feel of "loose parts."';
+  document.getElementById('entToken').className = 'ent-token';
+  document.getElementById('entNext').disabled = false;
+  document.getElementById('entFix').disabled = true;
+  entRender();
+}
+
+/* ── 交互二：该合并还是合理差异 ── */
+var JD = [
+  {
+    a: { nm:'.btn-primary', vl:'Background #0d9488 · radius 10px · padding 11/26' },
+    b: { nm:'.submit-btn',  vl:'Background #0f9d8f · radius 8px · padding 12/24' },
+    ask: 'Both are the page\'s primary button; they differ in color and radius.',
+    merge: true,
+    why: 'These two colors are indistinguishable to the eye, and a 2px radius gap is invisible. They aren\'t a design decision — they\'re the product of two conversations each writing once. Merge them; pick one value as the token.'
+  },
+  {
+    a: { nm:'.btn-primary',   vl:'Solid fill · brand background · white text' },
+    b: { nm:'.btn-secondary', vl:'Outline · white background · brand text' },
+    ask: 'Two buttons in the same dialog: one solid, one outline.',
+    merge: false,
+    why: 'This difference is called "primary vs. secondary": one screen, one lead. The secondary action has to step back in visual weight. Don\'t merge them — make both colors come from the same token so the style stays unified.'
+  },
+  {
+    a: { nm:'.btn (desktop)', vl:'Height 36px' },
+    b: { nm:'.btn (mobile)', vl:'Height 44px' },
+    ask: 'The same button, different heights on two screens.',
+    merge: false,
+    why: 'This difference is called "touch-target minimum": a finger can\'t reliably hit 36px. The right implementation is one class with a responsive breakpoint, not two parallel classes — keep the difference, merge the implementation.'
+  },
+  {
+    a: { nm:'.card',  vl:'Radius 12px · shadow 0 2px 8px' },
+    b: { nm:'.panel', vl:'Radius 13px · shadow 0 2px 8px' },
+    ask: 'Two containers, 1px apart in radius, identical shadows.',
+    merge: true,
+    why: '13px is almost certainly a slip, or leftover from a "nudge it a bit bigger." A 1px gap is something even a designer can\'t measure, but it makes later people think there\'s a reason and they don\'t dare touch it. Merge.'
+  },
+  {
+    a: { nm:'.btn-primary', vl:'Background #0d9488 (brand)' },
+    b: { nm:'.btn-danger',  vl:'Background #dc2626 (red)' },
+    ask: 'The confirm button and the delete button use completely different colors.',
+    merge: false,
+    why: 'This difference is called "semantic color": red should make you hesitate a second before you press. It must stay. The move is to fold it into a token (--danger), not scatter #dc2626 all over the place.'
+  }
+];
+var jdDone = 0;
+
+function buildJd() {
+  document.getElementById('jdWrap').innerHTML = JD.map(function (it, i) {
+    return '<div class="jd-card">' +
+      '<div class="jd-pair">' +
+        '<div class="jd-side"><span class="nm">' + it.a.nm + '</span><span class="vl">' + it.a.vl + '</span></div>' +
+        '<div class="jd-side"><span class="nm">' + it.b.nm + '</span><span class="vl">' + it.b.vl + '</span></div>' +
+      '</div>' +
+      '<div class="jd-ask">' + it.ask + '</div>' +
+      '<div class="jd-opts">' +
+        '<button type="button" onclick="jdPick(' + i + ',1,this)">Merge these</button>' +
+        '<button type="button" onclick="jdPick(' + i + ',0,this)">Justified difference — keep</button>' +
+      '</div>' +
+      '<div class="jd-fb" id="jdFb' + i + '"></div>' +
+    '</div>';
+  }).join('');
+}
+
+function jdPick(i, saidMerge, btn) {
+  var card = btn.closest('.jd-card');
+  if (card.getAttribute('data-done')) return;
+  card.setAttribute('data-done', '1');
+  var it = JD[i];
+  var right = (!!saidMerge) === it.merge;
+  var btns = card.querySelectorAll('.jd-opts button');
+  btns.forEach(function (b, bi) {
+    b.disabled = true;
+    var isMergeBtn = bi === 0;
+    if (isMergeBtn === it.merge) b.classList.add('right');
+    else if ((isMergeBtn ? 1 : 0) === saidMerge) b.classList.add('wrong');
+  });
+  var fb = document.getElementById('jdFb' + i);
+  fb.className = 'jd-fb on ' + (right ? 'ok' : 'no');
+  fb.innerHTML = (right ? '<b class="y">You got it.</b>' : '<b class="n">Think again.</b>') + it.why;
+  jdDone++;
+  document.getElementById('jdScore').textContent = jdDone >= JD.length
+    ? 'All five judged. The rule is simple: if you can name the difference, keep it and fold it into a token; if you can\'t, it was a slip — merge it.'
+    : 'Judged ' + jdDone + ' / ' + JD.length + ' pairs.';
+}
+
+entRender();
+buildJd();
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.en.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

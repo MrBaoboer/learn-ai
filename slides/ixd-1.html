@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>能跑通了，然后呢？ | 交互工程</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="ixd.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="AI 默认交付的交互是「能跑通」级别：空态一片空白、报错弹 alert、删除不带确认。把 Cooper 的体贴软件清单反过来用，就是一张找茬清单。在一个能跑通的待办应用里逐个点出五处不体贴。">
+<meta name="keywords" content="交互工程,交互设计,About Face,体贴软件,AI 生成界面,找茬,Vibe Coding">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ixd-1.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ixd-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ixd-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ixd-1.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ixd-1.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="能跑通了，然后呢？">
+<meta property="og:description" content="好不好看一眼能看出来，好不好用要用起来才知道。交互的病更隐蔽，先学会找茬。">
+<meta property="og:url" content="https://xueai.app/slides/ixd-1.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="能跑通了，然后呢？">
+<meta name="twitter:description" content="好不好看一眼能看出来，好不好用要用起来才知道。交互的病更隐蔽，先学会找茬。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 找茬教具：一个「能跑通」的待办应用 ──
+   五处不体贴各占一块可点区域（.f1-spot），命中后区域定格高亮，
+   病历卡逐张滑入下方；除命中一瞬的抖动外没有稳态动画。
+   v1.3 质感：应用装进 .mockwin 浏览器外壳，底子按真产品做
+   （15/12.5/10.5 三档字阶、16px 内边距、真实待办文案），
+   五处病灶保持「敷衍的真实感」：光秃空态、生硬报错原样保留。 */
+.f1-stage{display:grid;grid-template-columns:minmax(0,360px) 1fr;gap:16px;align-items:start;}
+.f1-win{min-width:0;}
+.f1-app{background:#fff;font-size:12.5px;line-height:1.6;user-select:none;}
+.f1-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:#fff;border-bottom:1px solid #f1f3f5;}
+.f1-logo{display:block;font-weight:800;color:#111827;font-size:15px;}
+.f1-date{display:block;font-size:10.5px;color:#9ca3af;margin-top:2px;}
+.f1-spot{position:relative;cursor:pointer;transition:box-shadow .2s ease,background .2s ease;}
+.f1-spot:hover{box-shadow:0 0 0 2px var(--ct-line);}
+.f1-spot.hit{cursor:default;box-shadow:0 0 0 2px var(--ct);}
+.f1-spot.hit::after{content:attr(data-flaw);position:absolute;top:-8px;right:-4px;z-index:3;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--ct);color:#fff;animation:ixd-pop .3s cubic-bezier(.34,1.56,.64,1) both;}
+.f1-save{padding:6px 18px;border-radius:8px;background:#111827;color:#fff;font-weight:700;font-size:11px;box-shadow:0 1px 2px rgba(17,24,39,.2);flex-shrink:0;}
+.f1-ask{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px;background:#eff6ff;border-bottom:1px solid #dbeafe;color:#1e3a5f;font-size:11px;font-weight:600;}
+.f1-askbtn{padding:3px 12px;border-radius:6px;border:1px solid #93c5fd;background:#fff;font-size:10.5px;font-weight:700;color:#1d4ed8;}
+.f1-asknote{margin-left:auto;font-size:10.5px;color:#94a3b8;font-style:normal;}
+.f1-err{display:flex;align-items:center;gap:8px;padding:10px 16px;background:#fef2f2;border-bottom:1px solid #fecaca;color:#991b1b;font-family:ui-monospace,monospace;font-size:10.5px;}
+.f1-errbtn{margin-left:auto;padding:3px 12px;border:1px solid #fca5a5;border-radius:6px;background:#fff;font-weight:700;font-family:inherit;flex-shrink:0;}
+.f1-list{padding:4px 16px;display:flex;flex-direction:column;}
+.f1-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1f3f5;color:#111827;overflow:hidden;transition:max-height .3s ease,opacity .3s ease,padding .3s ease;max-height:64px;}
+.f1-item.gone{max-height:0;opacity:0;padding-top:0;padding-bottom:0;}
+.f1-ck{width:16px;height:16px;border-radius:5px;border:1.5px solid #d1d5db;flex-shrink:0;}
+.f1-tk{display:flex;flex-direction:column;min-width:0;}
+.f1-tt{font-size:12.5px;font-weight:600;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.f1-tm{font-size:10.5px;color:#9ca3af;margin-top:1px;}
+.f1-del{margin-left:auto;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-weight:800;font-size:14px;flex-shrink:0;}
+.f1-del:hover{background:#fee2e2;color:#dc2626;}
+.f1-tabs{display:flex;gap:16px;padding:10px 16px 0;border-top:1px solid #f1f3f5;font-size:11px;font-weight:700;color:#94a3b8;}
+.f1-tabs .on{color:#111827;border-bottom:2px solid #111827;padding-bottom:6px;}
+.f1-void{min-height:96px;background:#fff;}
+/* 病历卡堆栈 */
+.f1-cards{display:flex;flex-direction:column;gap:8px;min-height:88px;}
+.f1-empty{font-size:13px;color:var(--sub);padding:16px;border:1.5px dashed var(--border);border-radius:12px;line-height:1.7;}
+.f1-card{border:1.5px solid var(--ct-line);border-radius:12px;background:var(--ct-soft);padding:12px 16px;font-size:13px;line-height:1.75;color:var(--text);}
+.f1-card .fc-t{font-weight:800;color:var(--ct-deep);margin-bottom:2px;font-size:13.5px;}
+.f1-card .fc-src{display:block;margin-top:4px;font-size:12px;color:var(--sub);}
+.f1-done{border:1.5px solid rgba(22,163,74,.25);border-radius:12px;background:var(--good-soft);padding:12px 16px;font-size:13.5px;line-height:1.8;color:var(--text);display:none;}
+.f1-done.show{display:block;}
+.f1-done b{color:var(--good);}
+
+/* ── 保存反馈对决：两个迷你编辑器 ──
+   v1.3 质感：对决双方各装一个 .mockwin，垫在浅灰展台上；
+   编辑器正文写真文案（不用灰条），B 面是能单独截图的正面案例，
+   A 面的弹窗按老式系统对话框做：灰标题条、直角感、蓝色系统钮，
+   丑读成「选择错了」而非「没画完」。 */
+.f1-cap{margin-top:auto;padding:10px 16px;font-size:12px;color:var(--sub);border-top:1px solid var(--border);background:var(--card);line-height:1.6;}
+.duel-side{display:flex;flex-direction:column;background:#f1f5f9;}
+.duel .mockwin{margin:14px;flex:1;display:flex;flex-direction:column;}
+.duel .mockwin .mock{flex:1;}
+.f1-edit{min-height:208px;display:flex;flex-direction:column;gap:10px;padding:16px 18px;}
+.f1-edit .eh{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:2px;}
+.f1-doct{display:block;font-size:15px;font-weight:800;color:#111827;}
+.f1-docm{display:block;font-size:10.5px;color:#9ca3af;margin-top:2px;}
+.f1-line{margin:0;font-size:12.5px;color:#374151;line-height:1.75;}
+.f1-line.dim{color:#9ca3af;}
+.f1-modal{margin:10px auto 0;width:208px;border:1px solid #cbd5e1;border-radius:6px;box-shadow:0 16px 40px rgba(15,23,42,.25);background:#fff;overflow:hidden;text-align:center;}
+.f1-modal .mtb{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;font-size:10.5px;font-weight:700;color:#475569;}
+.f1-modal .mh{padding:16px 16px 12px;font-weight:700;color:#111827;font-size:12.5px;}
+.f1-modal .mb{display:inline-block;margin-bottom:14px;padding:4px 20px;border-radius:4px;background:#2563eb;color:#fff;font-size:10.5px;font-weight:700;}
+.f1-savedbtn{display:inline-flex;align-items:center;gap:4px;padding:4px 14px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:11px;font-weight:700;flex-shrink:0;}
+.f1-savedbtn svg{width:12px;height:12px;}
+.f1-toastline{margin-top:auto;align-self:flex-end;padding:5px 14px;border-radius:999px;background:rgba(17,24,39,.88);color:#f3f4f6;font-size:10.5px;box-shadow:0 2px 8px rgba(17,24,39,.25);}
+
+/* ── 自查投票：六条不体贴，选你最常忍的 ── */
+.f1-vote{display:flex;flex-direction:column;gap:8px;}
+.f1-vrow{display:grid;grid-template-columns:minmax(0,168px) 1fr 48px;gap:8px;align-items:center;padding:10px 14px;border:1.5px solid var(--border);border-radius:12px;background:var(--card);cursor:pointer;transition:border-color .2s ease,background .2s ease,transform .2s ease;}
+.f1-vrow:hover{border-color:var(--ct-line);transform:translateY(-1px);}
+.f1-vote.done .f1-vrow{cursor:default;}
+.f1-vote.done .f1-vrow:hover{border-color:var(--border);transform:none;}
+.f1-vote.done .f1-vrow.picked{border-color:var(--ct);background:var(--ct-soft);}
+.f1-vrow .vl{font-size:13px;font-weight:700;color:var(--text);}
+.f1-vrow.picked .vl{color:var(--ct-deep);}
+.f1-track{height:8px;border-radius:4px;background:rgba(0,0,0,.05);overflow:hidden;}
+.f1-bar{height:100%;width:0;border-radius:4px;background:var(--ct-line);transition:width .35s ease-out;}
+.f1-vrow.picked .f1-bar{background:var(--ct);}
+.f1-pct{font-size:12px;font-weight:800;color:var(--sub);text-align:right;font-variant-numeric:tabular-nums;opacity:0;transition:opacity .3s ease;}
+.f1-vote.done .f1-pct{opacity:1;}
+.f1-vnote{display:none;margin-top:16px;padding:16px;border-radius:10px;background:var(--ct-soft);border:1.5px solid var(--ct-line);font-size:13.5px;line-height:1.8;color:var(--text);}
+.f1-vnote.show{display:block;}
+.f1-vnote b{color:var(--ct-deep);}
+
+@media (max-width:768px){
+  .f1-stage{grid-template-columns:1fr;}
+  .f1-vrow{grid-template-columns:1fr;gap:4px;}
+  .f1-pct{text-align:left;}
+}
+@media (prefers-reduced-motion:reduce){
+  .f1-item,.f1-bar,.f1-vrow,.f1-spot{transition:none;}
+  .f1-spot.hit::after{animation:none;}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"能跑通了，然后呢？","name":"能跑通了，然后呢？","url":"https://xueai.app/slides/ixd-1.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 好用也成了瓶颈","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"AI 默认交付的交互是「能跑通」级别：空态一片空白、报错弹 alert、删除不带确认。把 Cooper 的体贴软件清单反过来用，就是一张找茬清单。在一个能跑通的待办应用里逐个点出五处不体贴。","datePublished":"2026-08-11","dateModified":"2026-08-16"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">交互工程 · 1 / 10</div>
+    <h1>能跑通了，然后呢？</h1>
+    <p class="subtitle">上一章练的是看出「哪里丑」，这一章练看出「哪里难用」。AI 交付的应用功能齐全、点哪都有反应，但用起来处处硌手。这一节先立住全章的地基：<b>交互的病比审美的病更隐蔽</b>，然后拿一张理论清单，亲手抓五个现行。</p>
+    <div class="chips"><span class="chip">开篇立论</span><span class="chip">体贴清单</span><span class="chip">找茬实验</span><span class="chip">自查投票</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>把「体贴软件」的特质清单反过来用，就是 AI 默认交互的找茬清单。在一个能跑通的应用里逐个点出五处不体贴，看看你平时都默默忍了什么</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">看一眼 vs 用一遍</div>
+    <p class="desc">审美的病暴露得快：页面一打开，配色乱、间距挤，三秒钟就皱眉头。交互的病藏得深：demo 演示那两分钟一切正常，等真实用户删错一条数据、断一次网、第一次打开空荡荡的页面，病才发作。</p>
+    <p class="desc" style="margin-top:16px">这就是 Vibe Coding 时代的新坑。AI 把「做出来」变得很容易，它默认交付的交互停在「能跑通」级别：空态一片空白、报错弹 alert、删除不带确认、保存了没动静。你验收时点两下觉得没问题，用户用一周就想卸载。</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>维度</th><th>审美的病</th><th>交互的病</th></tr>
+      <tr><td><b>暴露时机</b></td><td>页面打开的前三秒</td><td>用起来之后：删错数据、断网、第一次打开</td></tr>
+      <tr><td><b>谁先发现</b></td><td>你自己扫一眼就能发现</td><td>往往是用户替你发现，代价是流失</td></tr>
+      <tr><td><b>AI 犯错的样子</b></td><td>五颜六色、字号打架，看着就不对</td><td>demo 里一切正常，边界情况全是坑</td></tr>
+      <tr><td><b>验收方式</b></td><td>看：截图就能评审</td><td>用：把流程走一遍，把坏情况都试一遍</td></tr>
+    </table></div>
+    <div class="quote-card" style="margin-top:16px"><b>好不好看一眼能看出来，好不好用要用起来才知道。</b>所以交互的病更隐蔽，也更需要一张清单来兜底。</div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">体贴是一张清单，反过来用就是找茬清单</div>
+    <p class="desc">清单从哪来？Alan Cooper 在《About Face 4》第 8 章「数字产品的礼仪」里给过答案。他借了纳斯和里夫斯的研究，把结论落成一条设计原则：</p>
+    <div class="quote-card" style="margin-top:16px">「软件应该像人一样体贴。」<br><b>Alan Cooper，《About Face 4》第 8 章</b></div>
+    <p class="desc" style="margin-top:16px">Cooper 的观察很扎心：交互产品惹怒我们的原因通常不在缺功能，在不体贴。他列了十几条体贴软件的特质，挑出最适合检查 AI 产出的六条，每一条反过来读，就是一条找茬标准。</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>体贴的软件…</th><th>Cooper 的意思</th><th>AI 默认产出的反面</th></tr>
+      <tr><td><b>有预见</b></td><td>预判你下一步要什么，提前备好</td><td>第一次打开一片空白，下一步全靠猜</td></tr>
+      <tr><td><b>会及时通知</b></td><td>你关心的进展主动告诉你，不用你问</td><td>点了保存没动静，转了圈也没个说法</td></tr>
+      <tr><td><b>不因自己的问题烦你</b></td><td>技术故障自己消化，别拿代码味的话甩锅</td><td>一断网就把 Error: code 500 端到你脸上</td></tr>
+      <tr><td><b>是自信的，但备好退路</b></td><td>照你说的做，不反复质疑；万一你错了，帮你恢复</td><td>要么删前问三遍，要么删了就真没了</td></tr>
+      <tr><td><b>不问多余的问题</b></td><td>能记住的选择记住，能给默认值的给默认值</td><td>每次打开都把同一个问题再问一遍</td></tr>
+      <tr><td><b>帮你避免低级错误</b></td><td>看你要犯错，悄悄拉一把，别指责</td><td>眼睁睁看你误删，然后弹窗说操作失败</td></tr>
+    </table></div>
+    <p class="desc" style="margin-top:16px">这张表右边那一列，就是接下来找茬的靶子。别背，动手抓一遍就记住了。</p>
+    <p class="desc" style="margin-top:16px">顺带说清这一章和前后两章的分工：审美工程管好看，本章管好用，心理学篇管用户的感受。三章各出一张验收清单，配齐了就是「上线前三张清单」。</p>
+    <p class="desc" style="margin-top:16px">还有一个好消息：这六条病 AI 都治得好，它只是默认不治。你能说出病名，它就能开药，这也是全章反复练「说清要什么」的原因。</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">动手 · 五处不体贴，逐个点出来</div>
+    <p class="desc">下面是一个 AI 生成的待办应用「今日清单」，功能齐全，能跑通。它藏着<b>五处不体贴</b>，全在这一屏里。觉得哪里不对就点哪里，点中一处，右边立一张病历卡，写清它违反了清单上哪一条、该怎么改。</p>
+    <div class="toy" id="f1Find">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
+        <span class="toy-t">给「今日清单」挑毛病</span>
+        <span class="toy-badge" id="f1Badge">找到 0 / 5</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">五处毛病分布在顶部横幅、工具栏、报错条、列表和归档区，点错了没有惩罚</div>
+        <div class="f1-stage">
+          <div class="mockwin f1-win">
+            <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">todo.example.com</span></div>
+            <div class="f1-app" id="f1App">
+              <div class="f1-top">
+                <span><span class="f1-logo">今日清单</span><span class="f1-date">8 月 11 日 · 还剩 3 件</span></span>
+                <span class="f1-spot f1-save" data-k="1" data-flaw="存了没动静">保存</span>
+              </div>
+              <div class="f1-spot f1-ask" data-k="0" data-flaw="问个没完">
+                <span>要开启夜间模式吗？</span>
+                <span class="f1-askbtn">开启</span>
+                <span class="f1-askbtn">不了</span>
+                <em class="f1-asknote">每次打开都问一遍</em>
+              </div>
+              <div class="f1-spot f1-err" data-k="3" data-flaw="报错像甩锅">
+                <span>Error: request failed with status code 500</span>
+                <span class="f1-errbtn">确定</span>
+              </div>
+              <div class="f1-list">
+                <div class="f1-item" id="f1Item0"><span class="f1-ck"></span><span class="f1-tk"><span class="f1-tt">给猫买冻干</span><span class="f1-tm">今天 18:00 · 购物</span></span><span class="f1-spot f1-del" data-k="2" data-flaw="删了就没">×</span></div>
+                <div class="f1-item"><span class="f1-ck"></span><span class="f1-tk"><span class="f1-tt">交这个月电费</span><span class="f1-tm">明天截止 · 生活缴费</span></span><span class="f1-del">×</span></div>
+                <div class="f1-item"><span class="f1-ck"></span><span class="f1-tk"><span class="f1-tt">回房东消息</span><span class="f1-tm">已经拖了两天</span></span><span class="f1-del">×</span></div>
+              </div>
+              <div class="f1-tabs"><span>今天</span><span class="on">已归档</span></div>
+              <div class="f1-spot f1-void" data-k="4" data-flaw="空白空态"></div>
+            </div>
+          </div>
+          <div class="f1-cards" id="f1Cards">
+            <div class="f1-empty" id="f1Hint">病历卡会立在这里。先从最扎眼的地方下手：哪一块让你多想了一秒，哪一块就有问题。</div>
+          </div>
+        </div>
+        <div class="f1-done" id="f1Done"><b>五处全中。</b>回头看这五张病历卡：没有一处是功能缺失，应用照样能跑通，病全出在礼数上。这正是 Cooper 那句话的意思：惹怒用户的多数时候是不体贴，缺功能反倒排在后面。空态和报错怎么治，下一节整节展开；删了就没怎么治，第 3 节讲防错与可逆。</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">保存成功，用不用敲锣打鼓</div>
+    <p class="desc">找茬清单里有一对容易搞混的病：没反馈是病，反馈过度也是病。Cooper 在第 8 章专门点过名：交互产品爱用不必要的通知向我们炫耀，「文档保存成功！」这种弹窗等着被点掉，除了打断你没有别的作用。下面两个编辑器都做了保存反馈，<b>点你认为更体贴的那个</b>。</p>
+    <div class="toy" id="f1Duel">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
+        <span class="toy-t">同一个保存动作，两种反馈</span>
+        <span class="toy-badge">A/B 对决</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">点卡片投票，投完揭晓判词</div>
+        <div class="duel">
+          <div class="duel-side">
+            <span class="duel-tag">方案 A</span>
+            <div class="mockwin">
+              <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">docs.example.com/weekly</span></div>
+              <div class="mock f1-edit">
+                <div class="eh"><span><span class="f1-doct">周报草稿</span><span class="f1-docm">共 486 字 · 最后编辑 21:47</span></span><span class="mock-btn">保存</span></div>
+                <p class="f1-line">本周把订单导出功能收了尾，联调通过，周四已经上线。</p>
+                <p class="f1-line dim">下周计划：把导出格式扩到 Excel，预计三个工作日…</p>
+                <div class="f1-modal">
+                  <div class="mtb"><span>提示</span><span>✕</span></div>
+                  <div class="mh">保存成功！</div>
+                  <span class="mb">确定</span>
+                </div>
+              </div>
+            </div>
+            <div class="f1-cap">每次保存都弹窗庆祝，必须点掉「确定」才能继续写</div>
+          </div>
+          <div class="duel-side">
+            <span class="duel-tag">方案 B</span>
+            <div class="mockwin">
+              <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">docs.example.com/weekly</span></div>
+              <div class="mock f1-edit">
+                <div class="eh"><span><span class="f1-doct">周报草稿</span><span class="f1-docm">共 512 字 · 最后编辑 21:47</span></span><span class="f1-savedbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>已保存</span></div>
+                <p class="f1-line">本周把订单导出功能收了尾，联调通过，周四已经上线。</p>
+                <p class="f1-line">数据侧补齐了近 30 天的留存看板，口径和产品确认过。</p>
+                <p class="f1-line dim">下周计划：把导出格式扩到 Excel，预计三个工作日…</p>
+                <div class="f1-toastline">已自动保存 · 刚刚</div>
+              </div>
+            </div>
+            <div class="f1-cap">按钮原地变成「已保存」，角落留一行时间戳，手不用停</div>
+          </div>
+        </div>
+        <div class="duel-verdict"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">投一票 · 你都默默忍了什么</div>
+    <p class="desc">找茬清单看完，回想一下你天天在用的软件，包括你自己让 AI 做的那些。六种不体贴，<b>选一个你被折磨得最狠的</b>，投完看看别人都在忍什么。</p>
+    <div class="toy" id="f1Vote">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg></span>
+        <span class="toy-t">六种不体贴，哪个最折磨你</span>
+        <span class="toy-badge" id="f1VoteBadge">投一票</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">点一行投票，只投一次，投完显示票仓分布</div>
+        <div class="f1-vote" id="f1VoteList">
+          <div class="f1-vrow" data-k="0"><span class="vl">空白空态，下一步全靠猜</span><span class="f1-track"><span class="f1-bar"></span></span><span class="f1-pct"></span></div>
+          <div class="f1-vrow" data-k="1"><span class="vl">报错全是代码味黑话</span><span class="f1-track"><span class="f1-bar"></span></span><span class="f1-pct"></span></div>
+          <div class="f1-vrow" data-k="2"><span class="vl">手一滑删了，找不回来</span><span class="f1-track"><span class="f1-bar"></span></span><span class="f1-pct"></span></div>
+          <div class="f1-vrow" data-k="3"><span class="vl">点了没反应，不知道成没成</span><span class="f1-track"><span class="f1-bar"></span></span><span class="f1-pct"></span></div>
+          <div class="f1-vrow" data-k="4"><span class="vl">同一个问题每次都问</span><span class="f1-track"><span class="f1-bar"></span></span><span class="f1-pct"></span></div>
+          <div class="f1-vrow" data-k="5"><span class="vl">一崩溃，写了半天的东西全没了</span><span class="f1-track"><span class="f1-bar"></span></span><span class="f1-pct"></span></div>
+        </div>
+        <div class="f1-vnote" id="f1VoteNote"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">验收交互，按这个顺序走三遍</div>
+    <p class="desc">找茬清单有了，还差一个使用姿势。审美验收看截图就行，交互验收要动手走流程，而且要走三遍，每遍换一个身份。</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>第几遍</th><th>扮演谁</th><th>怎么走</th><th>抓什么病</th></tr>
+      <tr><td><b>第一遍</b></td><td>老用户</td><td>顺着理想路径把主流程走完</td><td>存了没动静、问个没完这类日常摩擦</td></tr>
+      <tr><td><b>第二遍</b></td><td>倒霉用户</td><td>故意犯错：删一条、断个网、输错格式、连点两次提交</td><td>报错像甩锅、删了就没、一崩全丢</td></tr>
+      <tr><td><b>第三遍</b></td><td>新用户</td><td>清掉数据从零开始，第一次打开的每一屏都停下来看</td><td>空白空态、下一步全靠猜</td></tr>
+    </table></div>
+    <p class="desc" style="margin-top:16px">第二遍和第三遍最容易被省略，AI 的病恰恰全堆在那里。demo 给你演示的永远是第一遍，网络流畅、数据现成、路径笔直。你替用户把另外两遍走了，病就在上线前被抓住。</p>
+    <p class="desc" style="margin-top:16px">走的时候手边放着那张体贴清单，每停一屏问一句：这一屏有预见吗？会通知吗？在甩锅吗？备好退路了吗？在问多余的问题吗？会帮我兜住低级错误吗？六个问号过完，这一屏才算验收完。</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">选一选 · 为什么交互的病更隐蔽</div>
+    <div class="toy" id="f1Quiz">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+        <span class="toy-t">AI 交付了一个能跑通的应用，为什么交互问题最容易漏掉？</span>
+        <span class="toy-badge">单选</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">选错也有解释，选到对的为止</div>
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>因为 AI 写的交互代码 bug 更多</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>因为交互问题只在真实使用中暴露，验收时点两下根本走不到那些时刻</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>因为用户不在乎交互，只在乎功能</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>因为交互设计没有标准，看不出对错</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">本节要点</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>交互的病更隐蔽：</b>审美问题三秒暴露，交互问题要等到删错数据、断网、第一次打开才发作，往往是用户替你发现的。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>能跑通只是及格线：</b>AI 默认交付的交互停在「能跑通」，惹怒用户的多数时候是不体贴，缺功能反倒排在后面（Cooper，《About Face 4》第 8 章）。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>体贴清单反过来就是找茬清单：</b>有预见、会通知、不甩锅、自信但备好退路、不问多余的问题、帮你避免低级错误。六条对着 AI 产出逐条过。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>验收交互要用，别只看：</b>把流程走一遍，把坏情况都试一遍：删一条、断个网、开个新账号。接下来四节把找茬的抓手逐个拆开，先从状态三件套开始。</p></div>
+    </div>
+    <p class="src-note"><b>内容来源：</b>小山学堂「交互工程」专题原创；部分交互原则整理自《About Face 4：交互设计精髓》。</p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="taste.js?v=20260810a"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<script>
+/* ── 找茬实验 ──
+   背景：体贴清单是本章的理论底座，光读表格记不住，
+   要让读者亲手在一个「能跑通」的应用里抓到五个现行。
+   设计意图：命中一瞬给两层反馈（区域抖动 + 病名徽章弹出），
+   病历卡滑入右栏，这些都是状态跳变动画，只播一次；
+   「删了就没」那一处命中时把列表项真的塌缩掉，让读者
+   亲眼看着数据消失，戏剧化正是病灶本身。
+   约束：SPOTS 顺序与 data-k 对应；点错处无惩罚也无反馈，
+   避免把探索行为标记成错误（第 15 章的立场，第 3 节展开）。 */
+(function () {
+  var app = document.getElementById('f1App');
+  var cards = document.getElementById('f1Cards');
+  var hint = document.getElementById('f1Hint');
+  var badge = document.getElementById('f1Badge');
+  var done = document.getElementById('f1Done');
+  var found = {};
+  var count = 0;
+
+  var SPOTS = [
+    {
+      t: '病历一 · 问个没完',
+      body: '夜间模式的答案上次就该记住，现在每次打开都再问一遍。Cooper 说体贴的软件不问多余的问题：提问会把主从关系颠倒过来，软件该提供选择、记住答案，把重复的问题变成默认值。',
+      fix: '改法：跟随系统外观，设置页留一个开关，横幅删掉。'
+    },
+    {
+      t: '病历二 · 存了没动静',
+      body: '点了保存，界面纹丝不动，成没成只能靠信仰。体贴的软件会及时通知：你关心的进展要让你看见，还不能靠弹窗打断你。',
+      fix: '改法：按钮原地短暂变成「已保存」，失败就地标红说明。'
+    },
+    {
+      t: '病历三 · 删了就没',
+      body: '刚才那条待办真的没了，没有确认，也没有撤销。Cooper 的标准是自信但备好退路：照用户说的做没错，但万一是手滑，得能恢复。两头都没有，用户只能靠手稳。',
+      fix: '改法：立即删除，滑入一条可撤销的提示。第 3 节整节讲这套。'
+    },
+    {
+      t: '病历四 · 报错像甩锅',
+      body: 'Error: code 500 是写给开发者看的日志，端给用户等于甩锅。体贴的软件不会因为自己的问题增加你的负担：技术故障自己消化，跟用户说人话。',
+      fix: '改法：讲清发生了什么、为什么、怎么办。第 2 节拆这个公式。'
+    },
+    {
+      t: '病历五 · 空白空态',
+      body: '「已归档」点开一片白，新用户只能猜这里是干嘛的。体贴的软件有预见、乐于助人：你还没开口，它已经把下一步铺好了。空态是新用户的第一屏，恰恰最该下功夫。',
+      fix: '改法：空态要教下一步、给示例。第 2 节展开。'
+    }
+  ];
+
+  app.addEventListener('click', function (e) {
+    var spot = e.target.closest('.f1-spot');
+    if (!spot || found[spot.dataset.k]) return;
+    var k = +spot.dataset.k;
+    found[k] = true;
+    count++;
+
+    spot.classList.add('hit', 'ixd-shake');
+    spot.addEventListener('animationend', function h() {
+      spot.classList.remove('ixd-shake');
+      spot.removeEventListener('animationend', h);
+    });
+
+    /* 「删了就没」命中时真删给读者看 */
+    if (k === 2) {
+      var item = document.getElementById('f1Item0');
+      setTimeout(function () { item.classList.add('gone'); }, 300);
+    }
+
+    if (hint) { hint.remove(); hint = null; }
+    var card = document.createElement('div');
+    card.className = 'f1-card ixd-slide-up';
+    card.innerHTML = '<div class="fc-t">' + SPOTS[k].t + '</div>' + SPOTS[k].body + '<span class="fc-src">' + SPOTS[k].fix + '</span>';
+    cards.appendChild(card);
+
+    badge.textContent = '找到 ' + count + ' / 5';
+    if (count === 5) {
+      badge.textContent = '5 / 5 全中';
+      badge.classList.add('solved');
+      done.classList.add('show', 'ixd-pop');
+    }
+  });
+})();
+
+/* A/B 对决：保存反馈的分寸。B 赢在反馈就地、不打断；
+   A 的弹窗是 Cooper 点名的「不必要的通知」，组件行为见 taste.js。 */
+tasteDuel('f1Duel', {
+  winner: 1,
+  verdict: '方案 A 每次保存都要你伺候一下那个「确定」，写十段话被打断十次。Cooper 管这叫不必要的通知：软件为一件理所应当的事邀功，代价是打断你。方案 B 把反馈放在原地，按钮变化 + 一行时间戳，你眼角余光确认完，手没停。反馈要有，分量要对：<b>成功要看得见，但不配打断你。</b>'
+});
+
+/* ── 自查投票 ──
+   背景：找茬清单要跟读者自己的日常经验挂钩才算焊牢。
+   设计意图：投票前票仓不可见，避免从众；投完六根柱子
+   一起做宽度过渡，你选的那根染主色。数据是课堂示意票仓，
+   判词按选项各写一份，把该选项对应的病连回清单条目。
+   约束：只投一次，不落存储，刷新可重投（本页无学后对照需求）。 */
+(function () {
+  var list = document.getElementById('f1VoteList');
+  var note = document.getElementById('f1VoteNote');
+  var badge = document.getElementById('f1VoteBadge');
+  var PCT = [12, 22, 18, 16, 20, 12];
+  var NOTES = [
+    '<b>空白空态排第六，但杀伤最静默。</b>被它劝退的用户一声不吭就走了，连吐槽都轮不到。它违反的是「有预见」：新用户最需要引导的那一屏，恰好什么都没给。下一节教它该长什么样。',
+    '<b>代码味报错是票仓第一，意料之中。</b>它一次违反两条：把自己的问题甩给用户，还用用户听不懂的话甩。治法有公式可套，下一节的错误态三要素专门管它。',
+    '<b>删了找不回来，是六种里唯一造成实际损失的。</b>「自信但备好退路」缺了后半句。第 3 节会让你亲手对比确认弹窗和撤销 toast 两种退路，差距一目了然。',
+    '<b>点了没反应，用户的第一反应是再点一次。</b>于是重复提交、重复下单。「会及时通知」这一条最容易修，也最容易被 AI 省略，因为 demo 里网络永远流畅。',
+    '<b>重复提问是最没必要的病。</b>答案明明可以记住，成本几乎为零。Cooper 的点餐比喻说的就是它：问题问到第五个，用户只想掀桌。检查 AI 产出时，看到弹出来的问题就问一句：这个答案它记得住吗？',
+    '<b>一崩全丢是最重的一种不体贴。</b>Cooper 的说法是「即使失败也不失风度」：崩溃可以原谅，把用户写了半天的东西陪葬不可以。让 AI 生成编辑类功能时，把「草稿自动保存」写进需求，一句话的事。'
+  ];
+
+  list.addEventListener('click', function (e) {
+    var row = e.target.closest('.f1-vrow');
+    if (!row || list.classList.contains('done')) return;
+    list.classList.add('done');
+    var picked = +row.dataset.k;
+    row.classList.add('picked');
+    var rows = list.querySelectorAll('.f1-vrow');
+    rows.forEach(function (r, i) {
+      r.querySelector('.f1-pct').textContent = PCT[i] + '%';
+      /* 下一帧再赋宽度，让 transition 生效 */
+      requestAnimationFrame(function () {
+        r.querySelector('.f1-bar').style.width = PCT[i] + '%';
+      });
+    });
+    note.innerHTML = NOTES[picked];
+    note.classList.add('show');
+    badge.textContent = '已投票';
+    badge.classList.add('solved');
+  });
+})();
+
+/* 点选题：交互问题为什么容易漏。判词把每个错项拆回本节论点。 */
+tasteQuiz('f1Quiz', {
+  answer: 1,
+  why: [
+    '恰恰相反，交互代码往往能跑通，bug 检测器抓不到它。「能跑通」和「好用」中间隔着的那段距离，测试用例覆盖不到。',
+    '交互的病只在特定时刻发作：第一次打开、出错、删错、等太久。验收时顺着理想路径点两下，这些时刻一个都碰不到，所以要主动把坏情况都试一遍。',
+    '用户嘴上不聊交互，脚很诚实。删错找不回来、报错看不懂，用户下次就不来了，只是他们离开时懒得写差评。',
+    '交互设计有大量可验证的标准，这一章讲的就是这些标准。空态给没给下一步、错误说没说人话、危险操作可不可逆，条条能核对。'
+  ]
+});
+</script>
+<script src="skill-data.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

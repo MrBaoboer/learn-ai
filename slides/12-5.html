@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Compaction 的真实策略与默认值 | xueai.app</title>
 <style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
-<link rel="stylesheet" href="lesson.css">
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
 <style>
 :root{--accent:#d99518;--gold:#f4b942;--soft:rgba(217,149,24,.09)}
 .lesson-header{position:relative;overflow:hidden;padding:42px 38px;border:1px solid rgba(217,149,24,.24);border-radius:24px;background:radial-gradient(circle at 87% 8%,rgba(244,185,66,.26),transparent 34%),linear-gradient(145deg,#fffaf0,var(--card));box-shadow:0 18px 50px rgba(100,64,7,.09)}
@@ -26,7 +27,8 @@
 <link rel="alternate" hreflang="en" href="https://xueai.app/slides/12-5.en.html">
 <link rel="alternate" hreflang="ko" href="https://xueai.app/slides/12-5.ko.html">
 <link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/12-5.html">
-<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Compaction：85% 阈值与可选 two-pass","name":"Compaction：85% 阈值与可选 two-pass","url":"https://xueai.app/slides/12-5.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · Agent 核心循环","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"核对 CompactionPolicy 的真实字段、默认值、85% 阈值、可选 two-pass 与 token estimation 判断逻辑。","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Compaction：85% 阈值与可选 two-pass","name":"Compaction：85% 阈值与可选 two-pass","url":"https://xueai.app/slides/12-5.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · Agent 核心循环","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"核对 CompactionPolicy 的真实字段、默认值、85% 阈值、可选 two-pass 与 token estimation 判断逻辑。","datePublished":"2026-07-17","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Compaction：85% 阈值与可选 two-pass"><meta property="og:description" content="核对 CompactionPolicy 的真实字段、默认值、85% 阈值、可选 two-pass 与 token estimation 判断逻辑。"><meta property="og:url" content="https://xueai.app/slides/12-5.html"><meta property="og:image" content="https://xueai.app/slides/og/12-5.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
 </head>
 <body>
 <article class="lesson wide">
@@ -34,9 +36,7 @@
     <div class="kicker">CHAPTER 12 · CONTEXT BUDGET</div>
     <h1>Compaction：85% 阈值与可选 two-pass</h1>
     <p class="subtitle">默认策略在上下文使用率达到 85% 时允许自动压缩。memory flush 和 two-pass 默认均关闭，启用后才进入对应流程。</p>
-  </header>
-
-  <div class="goal reveal"><b>课程目标</b><br>记住 <code>CompactionPolicy</code> 的五个真实字段与默认值，并能追到 <code>Agent::should_auto_compact</code> 和 <code>xai-token-estimation</code> 的阈值判断。</div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>核对自动压缩阈值、memory flush、two-pass 和超时预算的真实配置</p></aside><!--seo:end-->  <div class="goal reveal"><b>课程目标</b><br>记住 <code>CompactionPolicy</code> 的五个真实字段与默认值，并能追到 <code>Agent::should_auto_compact</code> 和 <code>xai-token-estimation</code> 的阈值判断。</div>
 
   <div class="section-title">核心视觉 · 自动压缩阈值</div>
   <div class="meter reveal">
@@ -73,7 +73,7 @@
     </div>
   </div>
 
-  <div class="note reveal paywall-locked" style="margin-top:14px;padding:15px 18px;border-left:4px solid var(--accent);background:var(--soft);line-height:1.7;font-size:13px"><b>调用位置：</b><code>Agent::should_auto_compact</code> 接收 <code>total_tokens</code> 与 <code>NonZeroU64 context_window</code>，再调用 <code>xai_token_estimation::exceeds_threshold</code>。策略结构体本身没有虚构的 <code>should_compact(&amp;self, usage: f64)</code> 方法。</div>
+  <div class="note reveal paywall-locked" style="margin-top:14px;padding:15px 18px;border-radius:10px;background:var(--soft);line-height:1.7;font-size:13px"><b>调用位置：</b><code>Agent::should_auto_compact</code> 接收 <code>total_tokens</code> 与 <code>NonZeroU64 context_window</code>，再调用 <code>xai_token_estimation::exceeds_threshold</code>。策略结构体本身没有虚构的 <code>should_compact(&amp;self, usage: f64)</code> 方法。</div>
 
   <div class="snapshot reveal paywall-locked"><b>源码快照说明</b>：本页依据本地同步副本核对。该副本没有 <code>.git</code> 元数据，因此不声称对应某个 commit 版本。</div>
 
@@ -82,9 +82,9 @@
 
   <div class="takeaway reveal paywall-locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2M5 19l2-2"/></svg><div><b>Takeaway</b>：默认阈值是 85，wall clock 是 300 秒，memory flush 与 two-pass 均为 false。Two-pass 是显式配置能力，自动触发判断落在 Agent 与 token estimation 中。</div></div>
 </article>
-<script src="i18n.js?v=20260808"></script>
+<script src="i18n.js?v=20260816b"></script>
 <script src="lesson.js"></script>
-<script src="nav-inject.js?v=20260809q"></script>
-<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260806b"></script><!--seo:end-->
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
 </body>
 </html>

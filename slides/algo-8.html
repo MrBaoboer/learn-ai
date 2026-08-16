@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BFS 与 DFS：Agent 在代码库里找文件 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="走迷宫动画看两种搜索的性格：BFS 一层层扫、DFS 一条道走到黑。Coding Agent 的 grep 检索、网络爬虫、共同好友推荐都是它们的变体。访问格子数和路径长度，一跑就见分晓。">
+<meta name="keywords" content="BFS,DFS,广度优先搜索,深度优先搜索,图搜索算法,迷宫算法,Coding Agent检索,零基础算法">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-8.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="小山学堂">
+<meta property="og:title" content="BFS 与 DFS：Agent 在代码库里找文件">
+<meta property="og:description" content="同一个迷宫，两种性格：BFS 波纹式层层扫、DFS 一条道走到黑。跑一遍就懂 Coding Agent 找代码的策略。">
+<meta property="og:url" content="https://xueai.app/slides/algo-8.html">
+<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BFS 与 DFS：Agent 在代码库里找文件">
+<meta name="twitter:description" content="同一个迷宫，两种性格：BFS 层层扫最短但费内存，DFS 深入省内存但绕路。">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── 迷宫 ── */
+.maze-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.maze-wrap{padding:18px;display:flex;justify-content:center;background:linear-gradient(to bottom,#fdf6fa,#fcf1f7)}
+.maze-grid{display:grid;grid-template-columns:repeat(11,1fr);gap:3px;width:100%;max-width:440px}
+.mz-cell{aspect-ratio:1;border-radius:5px;background:#fff;border:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;font-size:14px;transition:background .25s,box-shadow .25s,opacity .3s;position:relative}
+.mz-cell.wall{background:#3f3f46;border-color:#3f3f46}
+.mz-cell.head{box-shadow:0 0 0 2.5px var(--al-deep);z-index:2}
+.mz-cell.backtracked{opacity:.4}
+.mz-cell.path{background:rgba(22,163,74,.55)!important;box-shadow:0 0 0 1.5px rgba(22,163,74,.7);opacity:1}
+.maze-foot{padding:14px 18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px}
+.maze-btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn-al{background:var(--al);color:#fff;border:none;padding:10px 22px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-al.ghost{background:transparent;color:var(--al);border:1.5px solid var(--al-line)}
+.btn-al.ghost:hover:not(:disabled){background:var(--al-soft);filter:none}
+.maze-status{font-size:12.5px;color:var(--sub);font-weight:600}
+.maze-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat-card{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px}
+.stat-card h5{font-size:12.5px;font-weight:800;color:var(--sub);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.stat-card h5 .dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.stat-nums{display:flex;gap:20px}
+.stat-nums .sn{display:flex;flex-direction:column}
+.stat-nums .sn-label{font-size:10.5px;font-weight:700;color:var(--sub)}
+.stat-nums .sn-val{font-size:21px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums}
+.stat-nums .sn-val.good{color:var(--success)}
+.stat-nums .sn-val.bad{color:var(--danger)}
+.maze-verdict{margin:0 18px 16px;padding:14px 18px;background:var(--al-soft);border:1.5px dashed var(--al-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.85;color:var(--sub);opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.maze-verdict.show{opacity:1;transform:translateY(0)}
+.maze-verdict b{color:var(--al-deep)}
+
+/* ── AI 关联卡 ── */
+.ai-link-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.ai-link-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.ai-link-card .alc-icon{font-size:24px;margin-bottom:8px}
+.ai-link-card h4{font-size:14.5px;font-weight:800;color:var(--text);margin-bottom:6px}
+.ai-link-card p{font-size:12.5px;color:var(--sub);line-height:1.75}
+.ai-link-card p b{color:var(--text)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .ai-link-grid{grid-template-columns:1fr}
+  .maze-stats{grid-template-columns:1fr}
+  .mz-cell{font-size:11px;border-radius:4px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"BFS 与 DFS：Agent 在代码库里找文件","name":"BFS 与 DFS：Agent 在代码库里找文件","url":"https://xueai.app/slides/algo-8.html","inLanguage":"zh-CN","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"课程","educationalLevel":"入门到进阶","isPartOf":{"@type":"Course","name":"AI 实战课 · 搜索与决策","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"走迷宫动画看两种搜索的性格：BFS 一层层扫、DFS 一条道走到黑。Coding Agent 的 grep 检索、网络爬虫、共同好友推荐都是它们的变体。访问格子数和路径长度，一跑就见分晓。","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">编程基础篇 · 搜索与决策</div>
+    <h1>BFS 与 DFS：Agent 在代码库里找文件</h1>
+    <p class="subtitle">工程进阶篇里，Coding Agent 接到「找出登录报错的原因」后，会在几百个文件夹里翻代码。往哪儿翻？先翻完这层再下去，还是抓住一条线索钻到底？这是两种截然不同的性格——<b>BFS（广度优先）和 DFS（深度优先）</b>。这一课让它们各走一遍同一个迷宫，性格一眼见分晓。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句话速览</span><p>走迷宫动画看两种搜索的性格：一层层扫 vs 一条道走到黑；Coding Agent 的 grep 检索、网络爬虫都是它们的变体</p></aside><!--seo:end-->  <div class="sec-label">走迷宫看性格 · 同一张图，两种走法</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">🏁 是起点，🎯 是终点，深灰是墙。两个按钮各代表一种性格，<b style="color:var(--text)">留意三处</b>：染色的<b style="color:var(--text)">形状</b>（BFS 是一圈圈的波纹，DFS 是一条蛇）；下方两个<b style="color:var(--text)">计数器</b>；以及最后绿色高亮的路——<b style="color:var(--text)">谁的更短？谁探过的格子更多？</b></p>
+
+  <div class="maze-box">
+    <div class="maze-wrap"><div class="maze-grid" id="mazeGrid"></div></div>
+    <div class="maze-foot">
+      <div class="maze-btns">
+        <button class="btn-al" id="btnBFS">🌊 BFS 层层扫</button>
+        <button class="btn-al" id="btnDFS">🐍 DFS 一条道走到黑</button>
+        <button class="btn-al ghost" id="btnReset">清空 ↻</button>
+        <span class="maze-status" id="mazeStatus">先跑 BFS，看波纹怎么扩散</span>
+      </div>
+      <div class="maze-stats">
+        <div class="stat-card">
+          <h5><span class="dot" style="background:#db2777"></span>BFS · 波纹式层层扫</h5>
+          <div class="stat-nums">
+            <div class="sn"><span class="sn-label">访问格子数</span><span class="sn-val" id="bfsVisited">–</span></div>
+            <div class="sn"><span class="sn-label">最终路径长</span><span class="sn-val" id="bfsPath">–</span></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <h5><span class="dot" style="background:#7c3aed"></span>DFS · 单头蛇形深入</h5>
+          <div class="stat-nums">
+            <div class="sn"><span class="sn-label">访问格子数</span><span class="sn-val" id="dfsVisited">–</span></div>
+            <div class="sn"><span class="sn-label">最终路径长</span><span class="sn-val" id="dfsPath">–</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="maze-verdict" id="mazeVerdict"></div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>两个数字讲完了全部理论。</b>BFS 访问 77 格才碰到终点——它把「离起点 1 步、2 步、3 步……」的格子全泡开，代价是这一大片都得记在内存里；但正因为按距离一层层推进，<b>它撞到终点的那条路必然是最短的（23 格）</b>。DFS 只访问了 44 格就到了，内存里只需记住当前这一条路；但它走出的路 37 格，<b>比最短路绕了一半还多</b>——运气不好时还会一头扎进死胡同再倒出来（变浅的格子就是回溯）。
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">这和 AI 有什么关系？</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">把迷宫的格子换成文件夹和网页，这两种性格立刻出现在你身边：</p>
+
+  <div class="ai-link-grid paywall-locked">
+    <div class="ai-link-card">
+      <div class="alc-icon">🤖</div>
+      <h4>Coding Agent 找代码</h4>
+      <p>先 <code>ls</code> 看一眼顶层目录——这是 <b>BFS 扫一层</b>，快速建立全局感；发现 <code>auth/</code> 文件夹最可疑，就一头钻进去逐层深挖——切换成 <b>DFS</b>。真实 Agent 是<b>混合策略</b>：先广后深，还会用 grep 直接跳跃。</p>
+    </div>
+    <div class="ai-link-card">
+      <div class="alc-icon">🕷</div>
+      <h4>网络爬虫</h4>
+      <p>从首页出发，先抓完首页链出的所有页面，再抓「链接的链接」——典型 <b>BFS</b>，保证离首页近的重要页面先入库。要是 DFS，可能顺着一条链接链钻进某论坛第 999 页出不来。</p>
+    </div>
+    <div class="ai-link-card">
+      <div class="alc-icon">👥</div>
+      <h4>「共同好友」推荐</h4>
+      <p>「你可能认识的人」= 从你出发 <b>BFS 走两层</b>：第一层是你的好友，第二层就是「好友的好友」。离你 2 步的人排在离你 5 步的人前面——层数本身就是亲疏。</p>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>没有谁全面胜出，只有场景匹配。</b>要「最短 / 最近 / 最相关」，用 BFS，接受内存开销；要「先找到一个能用的解、内存又紧张」，用 DFS，接受路径可能绕。下一课的贪心和采样、再下一课的 Beam Search，本质上也是在这张「搜索策略光谱」上挑位置。
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 这一课想和你分享的</h3>
+    <ul>
+      <li><b>BFS 层层扫</b>：按距离一圈圈泡开，找到的一定最短——代价是内存里泡着一大片</li>
+      <li><b>DFS 一条道走到黑</b>：省内存、常常更快碰到解，但路径不保证短，还会回溯</li>
+      <li><b>访问数 vs 路径长</b>：77/23 对 44/37，两组数字就是两种性格的全部账本</li>
+      <li><b>真实系统混着用</b>：Agent 先 ls 一层（BFS）再钻可疑文件夹（DFS）</li>
+      <li><b>爬虫、共同好友推荐</b>都是图搜索——迷宫只是最直观的一张图</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 迷宫数据 ──
+   布局是程序搜出来的（不是随手画）：要求 BFS 最短路 23、访问 77 格；
+   DFS 按「右→下→左→上」的固定顺序走出 37 格长的路、访问 44 格、回溯 7 次。
+   这样两组计数器的反差足够大，且 DFS 有肉眼可见的回溯（变浅的格子）。 */
+const MAZE = [
+  'S...##.#.#.',
+  '.##.#.#....',
+  '#........##',
+  '...##......',
+  '...#..#....',
+  '#..##..#...',
+  '....##..#.#',
+  '#.#..#.#..#',
+  '.#.....#..#',
+  '..#...#.##.',
+  '#.##......G',
+];
+const N = 11;
+const START = [0, 0], GOAL = [10, 10];
+const wall = MAZE.map(r => [...r].map(c => c === '#'));
+
+const grid = document.getElementById('mazeGrid');
+grid.innerHTML = '';
+const cells = [];
+for (let r = 0; r < N; r++){
+  cells.push([]);
+  for (let c = 0; c < N; c++){
+    const d = document.createElement('div');
+    d.className = 'mz-cell' + (wall[r][c] ? ' wall' : '');
+    if (r === START[0] && c === START[1]) d.textContent = '🏁';
+    if (r === GOAL[0] && c === GOAL[1]) d.textContent = '🎯';
+    grid.appendChild(d);
+    cells[r].push(d);
+  }
+}
+
+const btnBFS = document.getElementById('btnBFS');
+const btnDFS = document.getElementById('btnDFS');
+const btnReset = document.getElementById('btnReset');
+const mazeStatus = document.getElementById('mazeStatus');
+const mazeVerdict = document.getElementById('mazeVerdict');
+const statEls = {
+  bfs: { v: document.getElementById('bfsVisited'), p: document.getElementById('bfsPath') },
+  dfs: { v: document.getElementById('dfsVisited'), p: document.getElementById('dfsPath') },
+};
+let runningMaze = false;
+let ranBFS = false, ranDFS = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+function key(r, c){ return r * N + c; }
+function inBoard(r, c){ return r >= 0 && r < N && c >= 0 && c < N && !wall[r][c]; }
+
+function clearColors(){
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++){
+    if (wall[r][c]) continue;
+    const el = cells[r][c];
+    el.style.background = '';
+    el.classList.remove('head', 'backtracked', 'path');
+  }
+}
+
+/* BFS：一次点亮一整层（波纹感来自「同层同时染色」），层色由浅到深 */
+async function runBFS(){
+  clearColors();
+  mazeStatus.textContent = 'BFS：同一圈波纹同时染色，越往外颜色越深';
+  const prev = new Map([[key(...START), null]]);
+  let layer = [START];
+  let visited = 1, depth = 0, found = false;
+  statEls.bfs.v.textContent = '1';
+  const MAXD = 24;   // 最短路 23，染色深度用它归一化
+  while (layer.length && !found){
+    const light = 94 - Math.min(1, depth / MAXD) * 36;   // 亮度 94% → 58%
+    for (const [r, c] of layer) cells[r][c].style.background = `hsl(332,72%,${light}%)`;
+    statEls.bfs.v.textContent = visited;
+    await sleep(200);
+    const next = [];
+    for (const [r, c] of layer){
+      for (const [dr, dc] of [[1,0],[0,1],[-1,0],[0,-1]]){
+        const nr = r + dr, nc = c + dc;
+        if (!inBoard(nr, nc) || prev.has(key(nr, nc))) continue;
+        prev.set(key(nr, nc), [r, c]);
+        next.push([nr, nc]);
+        visited++;
+        if (nr === GOAL[0] && nc === GOAL[1]) found = true;
+      }
+    }
+    layer = next;
+    depth++;
+  }
+  /* 终点所在的最后一层也染上色，不然计数和画面对不上 */
+  const lastLight = 94 - Math.min(1, depth / MAXD) * 36;
+  for (const [r, c] of layer) cells[r][c].style.background = `hsl(332,72%,${lastLight}%)`;
+  statEls.bfs.v.textContent = visited;
+  await sleep(200);
+  /* 回溯最短路 */
+  mazeStatus.textContent = '碰到终点了！沿「谁发现了谁」倒着走回去，就是最短路';
+  const path = [];
+  let cur = GOAL;
+  while (cur){ path.push(cur); cur = prev.get(key(...cur)); }
+  path.reverse();
+  for (let i = 0; i < path.length; i++){
+    cells[path[i][0]][path[i][1]].classList.add('path');
+    statEls.bfs.p.textContent = i + 1;
+    await sleep(55);
+  }
+  statEls.bfs.p.classList.add('good');
+  ranBFS = true;
+  return { visited, pathLen: path.length };
+}
+
+/* DFS：固定「右→下→左→上」的探索顺序（和迷宫设计时一致），
+   头部单格深入，撞死胡同弹栈——弹掉的格子变浅，回溯肉眼可见 */
+async function runDFS(){
+  clearColors();
+  mazeStatus.textContent = 'DFS：一条蛇往深处钻，变浅的格子 = 撞死胡同后倒出来的';
+  const visitedSet = new Set([key(...START)]);
+  const stack = [START];
+  let visited = 1, prevHead = null;
+  statEls.dfs.v.textContent = '1';
+  cells[START[0]][START[1]].style.background = 'hsl(262,60%,80%)';
+  while (stack.length){
+    const cur = stack[stack.length - 1];
+    if (prevHead) cells[prevHead[0]][prevHead[1]].classList.remove('head');
+    cells[cur[0]][cur[1]].classList.add('head');
+    prevHead = cur;
+    if (cur[0] === GOAL[0] && cur[1] === GOAL[1]) break;
+    let moved = false;
+    for (const [dr, dc] of [[0,1],[1,0],[0,-1],[-1,0]]){
+      const nr = cur[0] + dr, nc = cur[1] + dc;
+      if (!inBoard(nr, nc) || visitedSet.has(key(nr, nc))) continue;
+      visitedSet.add(key(nr, nc));
+      stack.push([nr, nc]);
+      visited++;
+      statEls.dfs.v.textContent = visited;
+      cells[nr][nc].style.background = 'hsl(262,60%,80%)';
+      moved = true;
+      break;
+    }
+    if (!moved){
+      const dead = stack.pop();
+      cells[dead[0]][dead[1]].classList.add('backtracked');
+    }
+    await sleep(95);
+  }
+  if (prevHead) cells[prevHead[0]][prevHead[1]].classList.remove('head');
+  /* 栈里剩下的就是它走出的那条路 */
+  mazeStatus.textContent = '到了！高亮它「记在栈里」的那条路——明显比 BFS 的绕';
+  for (let i = 0; i < stack.length; i++){
+    cells[stack[i][0]][stack[i][1]].classList.add('path');
+    statEls.dfs.p.textContent = i + 1;
+    await sleep(55);
+  }
+  statEls.dfs.p.classList.add('bad');
+  ranDFS = true;
+  return { visited, pathLen: stack.length };
+}
+
+function showVerdict(){
+  if (!(ranBFS && ranDFS)) return;
+  mazeVerdict.innerHTML = '<b>对比结论：</b>BFS 访问 <b>77</b> 格、路径 <b>23</b> 格——找到的<b>一定是最短路</b>，但要把一大片波纹全泡开、全记在内存里；DFS 只访问 <b>44</b> 格、内存里只揣着当前一条路，省得多，可走出的路长达 <b>37</b> 格，<b>不保证短</b>，还回溯了 7 次。<b>稳和省，选一样。</b>';
+  mazeVerdict.classList.add('show');
+}
+
+async function guard(fn){
+  if (runningMaze) return;
+  runningMaze = true;
+  btnBFS.disabled = btnDFS.disabled = btnReset.disabled = true;
+  await fn();
+  showVerdict();
+  btnBFS.disabled = btnDFS.disabled = btnReset.disabled = false;
+  runningMaze = false;
+}
+
+btnBFS.addEventListener('click', () => guard(runBFS));
+btnDFS.addEventListener('click', () => guard(runDFS));
+btnReset.addEventListener('click', () => {
+  if (runningMaze) return;
+  clearColors();
+  ranBFS = ranDFS = false;
+  mazeVerdict.classList.remove('show');
+  ['bfs','dfs'].forEach(k => {
+    statEls[k].v.textContent = '–';
+    statEls[k].p.textContent = '–';
+    statEls[k].p.classList.remove('good','bad');
+  });
+  mazeStatus.textContent = '先跑 BFS，看波纹怎么扩散';
+});
+</script>
+<script src="i18n.js?v=20260816b"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260816b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>
