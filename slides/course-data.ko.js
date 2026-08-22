@@ -262,6 +262,10 @@ window.COURSE = {
             { file: '7-3a.html', title: '단기 기억 = 컨텍스트 윈도우', desc: '메시지 리스트 시각화, 각 메시지의 Token 사용량과 역할 태그', tag: '심화' },
             { file: '7-3b.html', title: '컨텍스트 압축: 4단계 방어선', desc: '60% 트림 → 75% 소압축 → 85% 폴딩 → 95% 긴급, 슬라이더로 압축 과정 확인', tag: '심화' },
             { file: '7-3c.html', title: '장기 기억: 벡터 검색', desc: 'Embedding → 벡터 DB → 시맨틱 검색, topK와 minScore의 설계 결정', tag: '심화' },
+            { file: 'vector-db-1.html', title: 'Embedding에서 Milvus까지', desc: '시맨틱 유사도, ANN과 벡터 데이터베이스의 역할 경계', tag: '심화' },
+            { file: 'vector-db-2.html', title: 'Milvus 멘탈 모델', desc: 'Collection, Schema, Entity, Index, Search, Query와 Load', tag: '심화' },
+            { file: 'vector-db-3.html', title: 'Milvus 실습', desc: '연결, 생성, 배치 삽입, 인덱스, 검색, 조회와 삭제', tag: '실전' },
+            { file: 'vector-db-4.html', title: '검색에서 RAG까지', desc: '청킹, 필터링, 하이브리드 검색, RRF, 재순위화와 평가', tag: '심화' },
             { file: '7-4a.html', title: 'ReAct 루프: 생각→행동→관찰', desc: 'console.log 삭제 태스크가 14라운드를 거치며 자기 수정 포함', tag: '심화' },
             { file: '7-4b.html', title: 'Agent 멈춤의 5가지 패턴', desc: '파라미터 포맷 오류, 환각 도구, 무한 재귀, 정보 부족, API 이상', tag: '심화' },
             { file: '7-4c.html', title: '권한과 보안', desc: '5가지 권한 모드 + LLM 리스크 등급 + Human-in-the-loop 설계', tag: '심화' },
@@ -490,6 +494,7 @@ window.COURSE = {
           desc: 'Agent를 위한 좋은 도구 작성법: 네이밍, 설명, 파라미터와 ACI',
           lessons: [
             { file: '10-5.html', title: 'ACI: Agent-Computer Interface', desc: '도구는 Agent와 세계 사이의 계약. 인간-컴퓨터 인터페이스를 설계하듯 Agent 인터페이스를 설계하라', tag: '설계패턴' },
+            { file: 'vector-db-5.html', title: 'Agent 지식 도구로서의 Milvus', desc: '벡터 검색을 search_knowledge로 감싸기: ToolMessage, 메모리 분리, 호출/비호출 테스트', tag: '실전' },
             { file: '10-6.html', title: 'Think Tool: AI에게 먼저 생각하게 하기', desc: '복잡한 도구 체인에서 Agent에게 멈춰서 생각할 공간 부여, τ-bench 성능 54% 향상', tag: '심화' },
             { file: '10-7.html', title: 'Agent로 Agent의 도구를 최적화하기', desc: 'Claude Code 실전: AI가 도구 설명을 작성, 평가를 실행, 자동 반복 최적화', tag: '실전' },
           ],

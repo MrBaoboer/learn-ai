@@ -281,6 +281,10 @@ window.COURSE = {
             { file: '7-3a.html', title: '短期记忆 = 上下文窗口', desc: '消息列表可视化，每条消息的 Token 占用和角色标记', tag: '深入' , navTitle: '上下文窗口'},
             { file: '7-3b.html', title: '上下文压缩：四层防线', desc: '60% 裁剪 → 75% 微压缩 → 85% 折叠 → 95% 紧急，拖动滑块看压缩过程', tag: '深入' , navTitle: '上下文压缩四层策略'},
             { file: '7-3c.html', title: '长期记忆：向量检索', desc: 'Embedding → 向量数据库 → 语义搜索，topK 与 minScore 的设计决策', tag: '深入' , navTitle: '长期记忆'},
+            { file: 'vector-db-1.html', title: '从 Embedding 到 Milvus', desc: '语义相似度、ANN 与向量数据库的职责边界', tag: '深入' },
+            { file: 'vector-db-2.html', title: 'Milvus 心智模型', desc: 'Collection、Schema、Entity、Index、Search、Query 与 Load', tag: '深入' },
+            { file: 'vector-db-3.html', title: 'Milvus 实操', desc: '连接、建表、批量写入、索引、搜索、查询和删除', tag: '实战' },
+            { file: 'vector-db-4.html', title: '从检索到 RAG', desc: '切分、过滤、混合检索、RRF、重排与评测', tag: '深入' },
             { file: '7-4a.html', title: 'ReAct 循环：思考→行动→观察', desc: '一个删除 console.log 的任务经历 14 轮循环，含自我纠错', tag: '深入' , navTitle: 'ReAct 循环'},
             { file: '7-4b.html', title: 'Agent 卡死的 5 种模式', desc: '参数格式错误、幻觉工具、无限递归、信息不足、API 异常', tag: '深入' , navTitle: 'Agent 卡死的5种模式'},
             { file: '7-4c.html', title: '权限与安全', desc: '5 种权限模式 + LLM 风险分级 + Human-in-the-loop 设计', tag: '深入' },
@@ -526,6 +530,7 @@ window.COURSE = {
           desc: '如何为 Agent 写出好工具：命名、描述、参数与 ACI',
           lessons: [
             { file: '10-5.html', title: 'ACI：Agent-Computer Interface', desc: '工具是 Agent 和世界之间的契约。像设计人机界面一样设计 Agent 界面', tag: '设计模式' , navTitle: 'ACI 工具界面设计'},
+            { file: 'vector-db-5.html', title: 'Milvus 作为 Agent 知识库工具', desc: '把向量检索封成 search_knowledge：ToolMessage、记忆分层与调用/不调用的测试', tag: '实战' , navTitle: 'Agent 知识库工具'},
             { file: '10-6.html', title: 'Think Tool：让 AI 先想后做', desc: '在复杂工具链中给 Agent 一个暂停思考的空间，τ-bench 性能提升 54%', tag: '深入' , navTitle: 'Think Tool'},
             { file: '10-7.html', title: '用 Agent 优化 Agent 的工具', desc: 'Claude Code 实践：用 AI 写工具描述、跑评测、自动迭代优化', tag: '实战' , navTitle: '用 Agent 优化工具'},
           ],

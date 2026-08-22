@@ -216,6 +216,10 @@ const SLIDE_ORDER = [
   { file: '7-3a.html',                       title: '上下文窗口', tr: 'en ko' },
   { file: '7-3b.html',                       title: '上下文压缩四层策略', tr: 'en ko' },
   { file: '7-3c.html',                       title: '长期记忆', tr: 'en ko' },
+  { file: 'vector-db-1.html',                title: '从 Embedding 到 Milvus', tr: 'en ko' },
+  { file: 'vector-db-2.html',                title: 'Milvus 心智模型', tr: 'en ko' },
+  { file: 'vector-db-3.html',                title: 'Milvus 实操', tr: 'en ko' },
+  { file: 'vector-db-4.html',                title: '从检索到 RAG', tr: 'en ko' },
   { file: '7-4a.html',                       title: 'ReAct 循环', tr: 'en ko' },
   { file: '7-4b.html',                       title: 'Agent 卡死的5种模式', tr: 'en ko' },
   { file: '7-4c.html',                       title: '权限与安全', tr: 'en ko' },
@@ -293,6 +297,7 @@ const SLIDE_ORDER = [
   { file: '10-3.html',                       title: '上下文工程方法论', tr: 'en ko' },
   { file: '10-4.html',                       title: '上下文三板斧', tr: 'en ko' },
   { file: '10-5.html',                       title: 'ACI 工具界面设计', tr: 'en ko' },
+  { file: 'vector-db-5.html',                title: 'Agent 知识库工具', tr: 'en ko' },
   { file: '10-6.html',                       title: 'Think Tool', tr: 'en ko' },
   { file: '10-7.html',                       title: '用 Agent 优化工具', tr: 'en ko' },
   { file: '10-8.html',                       title: '评测方法论', tr: 'en ko' },
@@ -816,7 +821,7 @@ const I18N = window.XUEAI_I18N || {
       e.preventDefault();
       // 判断当前页属于哪个篇章
       const base = cur.replace('.html','');
-      const ch4Files = ['10-1','10-2','10-3','10-4','10-5','10-6','10-7',
+      const ch4Files = ['10-1','10-2','10-3','10-4','10-5','vector-db-5','10-6','10-7',
         '10-8','10-9','10-10','10-11','10-12','10-13','10-14','10-15','10-16',
         '10-17','10-summary','10-final'];
       const ch3Files = ['9-1','9-2','9-3','9-4','9-5','9-6','9-7','9-8','9-9','9-10',
@@ -825,7 +830,9 @@ const I18N = window.XUEAI_I18N || {
         '9-31','9-32','9-summary','9-final'];
       const ch2Files = ['5-1','5-2','6-0a','6-0b','6-1','6-2','6-3','6-4',
         'prompt-attack','prompt-attack-cases','prompt-defense',
-        '7-1','7-2','7-3','7-4','7-5','8-1','8-2','8-2b','8-3','8-4','8-5','8-5b',
+        '7-1','7-2','7-3','7-4','7-5',
+        'vector-db-1','vector-db-2','vector-db-3','vector-db-4',
+        '8-1','8-2','8-2b','8-3','8-4','8-5','8-5b',
         '8-6','8-7','8-8','cost-eval','engineering-philosophy','summary-2','summary-2b'];
       if (ch4Files.includes(base)) { location.href = I18N.locFile('learn.html') + '#10-1.html'; }
       else if (ch3Files.includes(base)) { location.href = I18N.locFile('learn.html') + '#9-1.html'; }

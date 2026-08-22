@@ -267,6 +267,10 @@ window.COURSE = {
             { file: '7-3a.html', title: 'Short-Term Memory = Context Window', desc: 'Message list visualization showing each message\'s Token usage and role label', tag: 'Deep Dive' },
             { file: '7-3b.html', title: 'Context Compression: Four Defense Lines', desc: '60% trim → 75% micro-compress → 85% fold → 95% emergency; drag the slider to watch the process', tag: 'Deep Dive' },
             { file: '7-3c.html', title: 'Long-Term Memory: Vector Retrieval', desc: 'Embedding → vector database → semantic search; design decisions for topK and minScore', tag: 'Deep Dive' },
+            { file: 'vector-db-1.html', title: 'From Embeddings to Milvus', desc: 'Semantic similarity, ANN, and the responsibility boundary of a vector database', tag: 'Deep Dive' },
+            { file: 'vector-db-2.html', title: 'The Milvus Mental Model', desc: 'Collection, Schema, Entity, Index, Search, Query, and Load', tag: 'Deep Dive' },
+            { file: 'vector-db-3.html', title: 'Hands-on Milvus', desc: 'Connect, create, batch insert, index, search, query, and delete', tag: 'Hands-on' },
+            { file: 'vector-db-4.html', title: 'From Retrieval to RAG', desc: 'Chunking, filtering, hybrid search, RRF, reranking, and evaluation', tag: 'Deep Dive' },
             { file: '7-4a.html', title: 'ReAct Loop: Think → Act → Observe', desc: 'A task to remove console.log goes through 14 iterations, including self-correction', tag: 'Deep Dive' },
             { file: '7-4b.html', title: '5 Patterns of Agent Deadlock', desc: 'Parameter format errors / hallucinated tools / infinite recursion / insufficient info / API exceptions', tag: 'Deep Dive' },
             { file: '7-4c.html', title: 'Permissions & Security', desc: '5 permission modes + LLM risk levels + Human-in-the-loop design', tag: 'Deep Dive' },
@@ -495,6 +499,7 @@ window.COURSE = {
           desc: 'How to write great tools for Agents: naming, descriptions, parameters, and ACI',
           lessons: [
             { file: '10-5.html', title: 'ACI: Agent-Computer Interface', desc: 'Tools are the contract between Agents and the world. Design Agent interfaces like you design human interfaces', tag: 'Design Pattern' },
+            { file: 'vector-db-5.html', title: 'Milvus as an Agent Knowledge Tool', desc: 'Wrap vector retrieval as search_knowledge: ToolMessage, memory separation, and testing both calls and non-calls', tag: 'Hands-on' },
             { file: '10-6.html', title: 'Think Tool: Making AI Think Before Acting', desc: 'Give the Agent a pause-to-think space in complex tool chains — τ-bench performance up 54%', tag: 'Deep Dive' },
             { file: '10-7.html', title: 'Using Agents to Optimize Agent Tools', desc: 'Claude Code in practice: using AI to write tool descriptions, run evals, and auto-iterate', tag: 'Hands-on' },
           ],
