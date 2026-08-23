@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trees: All a Coding Agent Sees | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="File trees, JSON, the page DOM, code syntax trees—when AI reads your project, it sees trees. Open a line of code and watch it grow into an AST.">
+<meta name="keywords" content="tree data structure,AST abstract syntax tree,file directory tree,JSON structure,DOM tree,Coding Agent internals">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-7.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ds-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ds-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ds-7.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ds-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Trees: All a Coding Agent Sees">
+<meta property="og:description" content="Wherever there’s hierarchy + containment, it’s a tree. Watch one line of code grow into an AST, and see why a Coding Agent can hit exactly what you name.">
+<meta property="og:url" content="https://xueai.app/slides/ds-7.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/ds-7.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Trees: All a Coding Agent Sees">
+<meta name="twitter:description" content="Wherever there’s hierarchy + containment, it’s a tree. Watch one line of code grow into an AST, and see why a Coding Agent can hit exactly what you name.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── 一物三看 ── */
+.tri-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.tri-tabs{display:flex;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.tri-tab{flex:1;padding:12px 8px;border:none;background:none;font-family:inherit;font-size:13.5px;font-weight:800;color:var(--sub);cursor:pointer;border-bottom:2.5px solid transparent;transition:color .15s,border-color .15s}
+.tri-tab:hover{color:var(--text)}
+.tri-tab.active{color:var(--ds);border-bottom-color:var(--ds)}
+.tri-stage{padding:18px 22px;min-height:300px}
+.tri-intro{font-size:12.5px;color:var(--sub);margin-bottom:12px;line-height:1.75}
+.tri-intro b{color:var(--ds-deep)}
+.tree-view{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;line-height:1.4}
+.tree-view ul{list-style:none;padding-left:24px;margin:0;position:relative}
+.tree-view > ul{padding-left:0}
+.tree-view > ul::before{display:none}
+.tree-view ul ul::before{content:'';position:absolute;left:9px;top:0;bottom:12px;border-left:1.5px solid var(--ds-line)}
+.tree-view ul ul li{position:relative}
+.tree-view ul ul li::before{content:'';position:absolute;left:-15px;top:13px;width:13px;border-top:1.5px solid var(--ds-line)}
+.tn-row{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:8px;margin:1px 0;cursor:default;transition:background .12s}
+.tn-row.has-kids{cursor:pointer}
+.tn-row.has-kids:hover{background:var(--ds-soft)}
+.tn-arrow{width:12px;font-size:9px;color:var(--ds);transition:transform .2s;display:inline-block;text-align:center;flex-shrink:0}
+.tn-node.closed > .tn-row .tn-arrow{transform:rotate(-90deg)}
+.tn-node.closed > ul{display:none}
+.tn-label{font-weight:600;color:var(--text)}
+.tn-note{font-size:11px;color:var(--sub);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+.tn-badge{font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;flex-shrink:0}
+.tn-badge.root{background:var(--ds);color:#fff}
+.tn-badge.leaf{background:rgba(22,163,74,.12);color:var(--success)}
+.tri-legend{display:flex;gap:16px;flex-wrap:wrap;padding:12px 22px;border-top:1px dashed var(--border);font-size:12px;color:var(--sub)}
+.tri-legend span b{color:var(--text)}
+
+/* ── AST 生长动画 ── */
+.ast-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.ast-code{padding:18px 22px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:17px;text-align:center;letter-spacing:.5px}
+.ast-code .tk{padding:3px 5px;border-radius:6px;color:var(--text);transition:background .25s,color .25s}
+.ast-code .tk.lit{background:var(--ds);color:#fff}
+.ast-code .tk.done{background:var(--ds-soft);color:var(--ds-deep)}
+.ast-code .tk.picked{background:var(--amber);color:#fff}
+.ast-stage{padding:10px 12px 4px;display:flex;justify-content:center}
+.ast-stage svg{width:100%;max-width:560px;height:auto;display:block}
+.ast-g{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+.ast-g.on{opacity:1;transform:translateY(0)}
+.ast-edge{stroke:var(--ds-line);stroke-width:2}
+.ast-op{fill:var(--ds)}
+.ast-op-txt{fill:#fff;font-size:19px;font-weight:800;font-family:"SF Mono",Menlo,monospace}
+.ast-leaf{fill:#fff;stroke:var(--ds-line);stroke-width:1.5}
+.ast-leaf-txt{fill:var(--text);font-size:13px;font-weight:700;font-family:"SF Mono",Menlo,monospace}
+.ast-node{cursor:default}
+svg.clickable .ast-node{cursor:pointer}
+.ast-node.picked .ast-op{fill:var(--amber)}
+.ast-node.picked .ast-leaf{stroke:var(--amber);stroke-width:2.5}
+.ast-tag{fill:var(--sub);font-size:10.5px;font-weight:700}
+.ast-narr{margin:0 22px;padding:12px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.75;color:var(--sub);min-height:46px}
+.ast-narr b{color:var(--ds-deep)}
+.ast-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 22px}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.ast-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── AI 关联卡 ── */
+.link-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.link-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.link-card .lk-icon{font-size:24px;margin-bottom:8px}
+.link-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.link-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.link-card p b{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .tri-stage{padding:14px 12px}
+  .tree-view{font-size:12px}
+  .ast-code{font-size:14px;padding:14px 10px}
+  .link-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Trees: All a Coding Agent Sees","name":"Trees: All a Coding Agent Sees","url":"https://xueai.app/slides/ds-7.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Trees & Graphs: AI's Home Turf","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"File trees, JSON, the page DOM, code syntax trees—when AI reads your project, it sees trees. Open a line of code and watch it grow into an AST.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Trees & Graphs: AI's Home Turf</div>
+    <h1>Trees: All a Coding Agent Sees</h1>
+    <p class="subtitle">Earlier lessons organized things in “rows.” This one flips the dimension: nesting <b>layer inside layer</b>. Drawers hold boxes, boxes hold bags—that hierarchy + containment is what programmers call a tree. And when a Coding Agent looks up, your project is trees all the way down.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>File trees, JSON, the page DOM, code syntax trees—when AI reads your project, it sees trees. Open a line of code and watch it grow into an AST</p></aside><!--seo:end-->  <div class="sec-label">One thing, three views · same project, three trees</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Suppose you ask AI to build a “milk-tea shop mini program.” The three tabs below are the project’s <b style="color:var(--text)">file tree</b>, one order’s <b style="color:var(--text)">JSON</b>, and the order page’s <b style="color:var(--text)">DOM</b>—they look totally different. Click the arrowed nodes to expand and collapse, and watch for one thing: <b style="color:var(--text)">don’t they share the exact same shape?</b> One root, branching down.</p>
+
+  <div class="tri-box">
+    <div class="tri-tabs" id="triTabs"></div>
+    <div class="tri-stage">
+      <p class="tri-intro" id="triIntro"></p>
+      <div class="tree-view" id="triTree"></div>
+    </div>
+    <div class="tri-legend">
+      <span><b style="color:var(--ds)">Root</b>: the top one—only one per tree</span>
+      <span><b>Parent / child</b>: the layer above is the parent; what expands is the child</span>
+      <span><b style="color:var(--success)">Leaf</b>: a tip node that can’t expand further</span>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>Wherever there’s hierarchy + containment, it’s a tree.</b> Folders contain files, orders contain item lists, pages contain cards that contain buttons—same organization logic. So once an Agent learns to “read trees,” it can read your project layout, API payloads, and the whole page at once. Three terms to keep: the top is the <b>root</b>, a node with kids is a <b>parent</b>, a tip with no kids is a <b>leaf</b>. That’s enough for a lifetime.
+  </div>
+
+  <div class="sec-label">The main act · one line of code becomes a tree</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked xa-peek">Trees’ greatest cameo is in the code itself. The total-price line below is a string of text to you; to a Coding Agent it’s a <b style="color:var(--text)">syntax tree (AST)</b>. Hit “Parse” and watch it grow <b style="color:var(--text)">bottom-up</b>—notice how each highlighted snippet maps to a new node on the tree.</p>
+
+  <div class="ast-box paywall-locked">
+    <div class="ast-code" id="astCode"><span class="tk" data-t="total">total</span><span class="tk" data-t="eq">=</span><span class="tk" data-t="price">price</span><span class="tk" data-t="mul">*</span><span class="tk" data-t="qty">qty</span><span class="tk" data-t="plus">+</span><span class="tk" data-t="fee">fee</span></div>
+    <div class="ast-stage">
+      <svg id="astSvg" viewBox="0 0 560 330" aria-label="AST syntax tree animation">
+        <g class="ast-g" id="astG1">
+          <line class="ast-edge" x1="290" y1="210" x2="230" y2="285"/>
+          <line class="ast-edge" x1="290" y1="210" x2="350" y2="285"/>
+          <g class="ast-node" data-n="price"><rect class="ast-leaf" x="194" y="268" width="72" height="34" rx="10"/><text class="ast-leaf-txt" x="230" y="290" text-anchor="middle">price</text></g>
+          <g class="ast-node" data-n="qty"><rect class="ast-leaf" x="314" y="268" width="72" height="34" rx="10"/><text class="ast-leaf-txt" x="350" y="290" text-anchor="middle">qty</text></g>
+          <g class="ast-node" data-n="mul"><circle class="ast-op" cx="290" cy="210" r="22"/><text class="ast-op-txt" x="290" y="217" text-anchor="middle">*</text></g>
+          <text class="ast-tag" x="230" y="322" text-anchor="middle">leaf</text>
+          <text class="ast-tag" x="350" y="322" text-anchor="middle">leaf</text>
+        </g>
+        <g class="ast-g" id="astG2">
+          <line class="ast-edge" x1="370" y1="135" x2="290" y2="210"/>
+          <line class="ast-edge" x1="370" y1="135" x2="450" y2="210"/>
+          <g class="ast-node" data-n="fee"><rect class="ast-leaf" x="414" y="193" width="72" height="34" rx="10"/><text class="ast-leaf-txt" x="450" y="215" text-anchor="middle">fee</text></g>
+          <g class="ast-node" data-n="plus"><circle class="ast-op" cx="370" cy="135" r="22"/><text class="ast-op-txt" x="370" y="142" text-anchor="middle">+</text></g>
+        </g>
+        <g class="ast-g" id="astG3">
+          <line class="ast-edge" x1="280" y1="60" x2="180" y2="135"/>
+          <line class="ast-edge" x1="280" y1="60" x2="370" y2="135"/>
+          <g class="ast-node" data-n="total"><rect class="ast-leaf" x="144" y="118" width="72" height="34" rx="10"/><text class="ast-leaf-txt" x="180" y="140" text-anchor="middle">total</text></g>
+          <g class="ast-node" data-n="eq"><circle class="ast-op" cx="280" cy="60" r="22"/><text class="ast-op-txt" x="280" y="67" text-anchor="middle">=</text></g>
+          <text class="ast-tag" x="322" y="52">← root</text>
+        </g>
+      </svg>
+    </div>
+    <div class="ast-narr" id="astNarr">Meaning: total = unit price × quantity + delivery fee. Hit “Parse” below and see how the Agent reads it.</div>
+    <div class="ast-foot">
+      <button class="btn-ds" id="btnAst">Parse this line ▶</button>
+      <span class="ast-status" id="astStatus">About 5 seconds—a tree grows bottom-up</span>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>That’s the secret behind a Coding Agent’s precise edits.</b> When you say “change the variable to the right of the multiply sign to quantity,” it doesn’t hunt the word “multiply” in a blob of text—it finds the <code>*</code> node on the tree, takes its right child, and <b>hits exactly what you named</b>. Then it “prints” the tree back to text without shifting a single space. Rename, extract function, bulk refactor—all surgery on this tree, not lucky text replace.
+  </div>
+
+  <div class="sec-label paywall-locked">What does this have to do with AI?</div>
+
+  <div class="link-grid paywall-locked">
+    <div class="link-card">
+      <div class="lk-icon">📂</div>
+      <h4>Agent reads a project = walk the file tree from the root</h4>
+      <p>Hand a project to a Coding Agent and its first move is starting at the <b>root directory</b>, expanding folders layer by layer—same gesture as opening the milk-tea mini program tree above. It reads the tree’s shape for the skeleton, then skims a few key “leaves.”</p>
+    </div>
+    <div class="link-card">
+      <div class="lk-icon">🔗</div>
+      <h4>JSON is the universal tree of the API world</h4>
+      <p>The message list you send to an LLM API, the docs RAG retrieves, the tasks Agents pass around—almost all ship as JSON, because it’s <b>a tree written as text</b> any program can peel layer by layer. Read trees, and you’ve read most of the AI world’s data.</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>What this lesson wants to share</h3>
+    <ul>
+      <li><b>Hierarchy is a tree</b>: nested containment means a tree—file trees, JSON, and the DOM all qualify</li>
+      <li><b>Three terms</b>: top is root, a node with kids is a parent, tips are leaves</li>
+      <li><b>AST is the map for precise AI edits</b>: Agents see the syntax tree, not raw text—so they hit what you name</li>
+      <li><b>Reading a project is walking the file tree</b>: start at the root, expand layer by layer, skeleton first then leaves</li>
+      <li><b>JSON is the universal tree of the API world</b>: most AI data exchange rides this “text tree”</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 一物三看 ──
+   三个 tab 共用一个递归渲染器。节点结构 {label, note, kids}，
+   根节点带「根」徽章、无孩子的带「叶」徽章，有孩子的可点击折叠。 */
+const TRI_DATA = [
+  {
+    name: '📂 File tree',
+    intro: 'What an Agent sees when it opens your project. <b>milktea-app is the root</b>; pages is its child and also home’s parent; the .js files are leaves.',
+    tree: { label:'milktea-app/', note:'project root', kids:[
+      { label:'pages/', note:'all pages', kids:[
+        { label:'home/', note:'home page', kids:[
+          { label:'home.js', note:'home logic' },
+          { label:'home.wxml', note:'home UI' },
+        ]},
+        { label:'menu/', note:'order page', kids:[
+          { label:'menu.js', note:'order logic' },
+          { label:'menu.wxml', note:'order UI' },
+        ]},
+        { label:'order/', note:'orders page', kids:[
+          { label:'order.js', note:'orders logic' },
+        ]},
+      ]},
+      { label:'images/', note:'image assets', kids:[
+        { label:'logo.png', note:'shop sign' },
+        { label:'banner.jpg', note:'banner carousel' },
+      ]},
+      { label:'app.js', note:'mini program entry' },
+    ]},
+  },
+  {
+    name: '🧾 JSON data',
+    intro: 'One order the mini program sends after checkout. <b>order is the root</b>; customer and items are branches; names and prices are leaves.',
+    tree: { label:'order', note:'one order', kids:[
+      { label:'orderId: "MT-0810-42"', note:'order id' },
+      { label:'customer', note:'customer info', kids:[
+        { label:'name: "小山"', note:'' },
+        { label:'phone: "138****0000"', note:'' },
+      ]},
+      { label:'items', note:'cart (2 items)', kids:[
+        { label:'[0]', note:'item 1', kids:[
+          { label:'name: "杨枝甘露"', note:'' },
+          { label:'sugar: "三分糖"', note:'' },
+          { label:'price: 18', note:'' },
+        ]},
+        { label:'[1]', note:'item 2', kids:[
+          { label:'name: "珍珠奶茶"', note:'' },
+          { label:'price: 15', note:'' },
+        ]},
+      ]},
+      { label:'total: 33', note:'total' },
+    ]},
+  },
+  {
+    name: '🌐 Page DOM',
+    intro: 'The order page’s skeleton in the browser. <b>&lt;html&gt; is the root</b>; every tag wrapping another is its child—the page itself is a tree.',
+    tree: { label:'<html>', note:'whole page', kids:[
+      { label:'<head>', note:'page meta', kids:[
+        { label:'<title> milk-tea order', note:'' },
+      ]},
+      { label:'<body>', note:'visible content', kids:[
+        { label:'<header>', note:'top bar', kids:[
+          { label:'<img> shop logo', note:'' },
+        ]},
+        { label:'<main>', note:'product area', kids:[
+          { label:'<div> product card', note:'杨枝甘露', kids:[
+            { label:'<img> product image', note:'' },
+            { label:'<button> add to cart', note:'' },
+          ]},
+          { label:'<div> product card', note:'珍珠奶茶', kids:[
+            { label:'<button> add to cart', note:'' },
+          ]},
+        ]},
+        { label:'<footer>', note:'footer bar', kids:[
+          { label:'<button> checkout', note:'' },
+        ]},
+      ]},
+    ]},
+  },
+];
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderNode(node, isRoot){
+  const hasKids = node.kids && node.kids.length > 0;
+  let html = '<li class="tn-node">';
+  html += `<span class="tn-row${hasKids ? ' has-kids' : ''}">`;
+  html += hasKids ? '<span class="tn-arrow">▾</span>' : '<span class="tn-arrow"></span>';
+  html += `<span class="tn-label">${esc(node.label)}</span>`;
+  if (node.note) html += `<span class="tn-note">${esc(node.note)}</span>`;
+  if (isRoot) html += '<span class="tn-badge root">root</span>';
+  else if (!hasKids) html += '<span class="tn-badge leaf">leaf</span>';
+  html += '</span>';
+  if (hasKids) html += '<ul>' + node.kids.map(k => renderNode(k, false)).join('') + '</ul>';
+  html += '</li>';
+  return html;
+}
+
+const triTabs = document.getElementById('triTabs');
+const triTree = document.getElementById('triTree');
+const triIntro = document.getElementById('triIntro');
+
+triTabs.innerHTML = TRI_DATA.map((d, i) =>
+  `<button class="tri-tab${i === 0 ? ' active' : ''}" data-i="${i}">${d.name}</button>`).join('');
+
+function showTab(i){
+  [...triTabs.children].forEach((b, j) => b.classList.toggle('active', j === i));
+  triIntro.innerHTML = TRI_DATA[i].intro;
+  triTree.innerHTML = '<ul>' + renderNode(TRI_DATA[i].tree, true) + '</ul>';
+}
+triTabs.addEventListener('click', e => {
+  const btn = e.target.closest('.tri-tab');
+  if (btn) showTab(+btn.dataset.i);
+});
+triTree.addEventListener('click', e => {
+  const row = e.target.closest('.tn-row.has-kids');
+  if (row) row.parentElement.classList.toggle('closed');
+});
+showTab(0);
+
+/* ── AST 生长动画 ──
+   三步自下而上：先 * 收拢 price/qty，再 + 合并 fee，最后 = 封顶。
+   播完后节点可点击：高亮该节点管辖的代码片段（真·指哪打哪）。 */
+const astSvg = document.getElementById('astSvg');
+const astNarr = document.getElementById('astNarr');
+const astStatus = document.getElementById('astStatus');
+const btnAst = document.getElementById('btnAst');
+const tks = {};
+document.querySelectorAll('#astCode .tk').forEach(t => { tks[t.dataset.t] = t; });
+
+const AST_STEPS = [
+  {
+    g: 'astG1', lit: ['price','mul','qty'],
+    narr: '<b>Step 1:</b> highest-precedence multiply first. <code>price * qty</code> folds into a <b>*</b> node, with price and qty as leaves—“unit price × quantity” is now one unit.',
+  },
+  {
+    g: 'astG2', lit: ['plus','fee'],
+    narr: '<b>Step 2:</b> that whole unit folds with <code>fee</code> into a <b>+</b> node. Note +’s left child isn’t a word—it’s the <b>entire * subtree</b>. Trees nest upward layer by layer.',
+  },
+  {
+    g: 'astG3', lit: ['total','eq'],
+    narr: '<b>Step 3:</b> <b>=</b> caps the tree as root: total on the left, the whole expression on the right. One line of text becomes a structured tree—that’s an <b>AST (abstract syntax tree)</b>.',
+  },
+];
+
+let astPlaying = false, astDone = false;
+function astSleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function astReset(){
+  AST_STEPS.forEach(s => document.getElementById(s.g).classList.remove('on'));
+  Object.values(tks).forEach(t => t.classList.remove('lit','done','picked'));
+  astSvg.classList.remove('clickable');
+  astSvg.querySelectorAll('.ast-node').forEach(n => n.classList.remove('picked'));
+}
+
+btnAst.addEventListener('click', async () => {
+  if (astPlaying) return;
+  astPlaying = true; astDone = false;
+  astReset();
+  btnAst.disabled = true;
+  for (const step of AST_STEPS){
+    Object.values(tks).forEach(t => { if (t.classList.contains('lit')) { t.classList.remove('lit'); t.classList.add('done'); } });
+    step.lit.forEach(k => tks[k].classList.add('lit'));
+    astNarr.innerHTML = step.narr;
+    await astSleep(450);
+    document.getElementById(step.g).classList.add('on');
+    await astSleep(1500);
+  }
+  Object.values(tks).forEach(t => { t.classList.remove('lit'); t.classList.add('done'); });
+  astNarr.innerHTML = '<b>Tree’s ready!</b> Now <b>click any node</b>—see which code span it “owns.” That’s how an Agent locates code.';
+  astStatus.textContent = 'Click tree nodes—feel “hit what you name”';
+  astSvg.classList.add('clickable');
+  btnAst.disabled = false;
+  btnAst.textContent = 'Parse again ↻';
+  astPlaying = false; astDone = true;
+});
+
+/* 每个节点管辖的代码 token（即它的整棵子树对应的片段） */
+const AST_SCOPE = {
+  price: ['price'], qty: ['qty'], fee: ['fee'], total: ['total'],
+  mul: ['price','mul','qty'],
+  plus: ['price','mul','qty','plus','fee'],
+  eq: ['total','eq','price','mul','qty','plus','fee'],
+};
+const AST_SCOPE_NARR = {
+  price: 'You clicked leaf <b>price</b>—it only owns itself. Say “rename the unit-price field,” and the Agent swaps just this node.',
+  qty: 'You clicked leaf <b>qty</b>. “Change the variable to the right of * to quantity”—the Agent finds *’s right child. One step.',
+  fee: 'You clicked leaf <b>fee</b>, the right child of +. Editing it won’t nick anything else.',
+  total: 'You clicked leaf <b>total</b>, the left child of =—the assignment target.',
+  mul: 'You clicked <b>*</b>, which owns all of <code>price * qty</code>. Want parentheses or a function extract? Operate on this subtree.',
+  plus: 'You clicked <b>+</b>, which owns <code>price * qty + fee</code>—everything right of =.',
+  eq: 'You clicked root <b>=</b>, which owns the whole line. From the root, any span is a walk down the branches.',
+};
+
+astSvg.addEventListener('click', e => {
+  if (!astDone) return;
+  const node = e.target.closest('.ast-node');
+  if (!node) return;
+  astSvg.querySelectorAll('.ast-node').forEach(n => n.classList.remove('picked'));
+  node.classList.add('picked');
+  const key = node.dataset.n;
+  Object.entries(tks).forEach(([k, t]) => {
+    t.classList.toggle('picked', AST_SCOPE[key].includes(k));
+  });
+  astNarr.innerHTML = AST_SCOPE_NARR[key];
+});
+
+/* 滚到 AST 区域时给个视觉提示（不自动播放，留给读者自己按）。
+   lessonOnView 由页尾的 lesson.js 提供，等 DOM 就绪后再挂。 */
+document.addEventListener('DOMContentLoaded', () => {
+  lessonOnView(document.getElementById('astSvg'), () => {
+    astStatus.textContent = '👆 Hit “Parse” to watch the tree grow';
+  });
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

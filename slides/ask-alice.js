@@ -92,6 +92,9 @@
         return ['用一个例子解释「' + t + '」', '「' + t + '」里最重要的概念是什么？', '这一页最容易被误解的地方是哪里？'];
       },
       qImage: '用一张图向我解释这一页。',
+      qInterview: function (t) {
+        return t ? '模拟面试：围绕「' + t + '」' : '模拟面试：围绕这一页';
+      },
       discoverIntro: 'Alice 不只是课程助教。在 Alice 桌面版里，她是一个有自己生活的 AI 伙伴——会发朋友圈、写游记、搭配衣橱，还能帮你干活。',
       dGallery: 'Alice 画廊', dGalleryDesc: '看看大家和 Alice 一起创作的作品',
       dMoments: '朋友圈 · 游记 · 衣橱', dMomentsDesc: 'Alice 的生活系统，在桌面版里体验',
@@ -182,6 +185,9 @@
         return ['Explain "' + t + '" with an example', 'What\'s the key idea of "' + t + '"?', 'What\'s most commonly misunderstood here?'];
       },
       qImage: 'Explain this page to me with one image.',
+      qInterview: function (t) {
+        return t ? 'Mock interview: on "' + t + '"' : 'Mock interview: on this page';
+      },
       discoverIntro: 'Alice is more than a course TA. In the Alice desktop app she\'s an AI companion with a life of her own — moments, travel journals, a wardrobe — and she gets real work done.',
       dGallery: 'Alice Gallery', dGalleryDesc: 'Artwork created together with Alice',
       dMoments: 'Moments · Journals · Wardrobe', dMomentsDesc: 'Alice\'s life system, in the desktop app',
@@ -271,6 +277,9 @@
         return ['"' + t + '"를 예시로 설명해줘', '"' + t + '"의 핵심 개념은?', '여기서 가장 오해하기 쉬운 부분은?'];
       },
       qImage: '이 페이지를 그림 한 장으로 설명해 주세요.',
+      qInterview: function (t) {
+        return t ? '모의 면접: "' + t + '" 중심으로' : '모의 면접: 이 페이지 중심으로';
+      },
       discoverIntro: 'Alice는 단순한 조교가 아닙니다. 데스크톱 앱에서는 모멘트, 여행 일기, 옷장까지 가진 AI 동반자예요.',
       dGallery: 'Alice 갤러리', dGalleryDesc: 'Alice와 함께 만든 작품들',
       dMoments: '모멘트 · 여행기 · 옷장', dMomentsDesc: '데스크톱 앱에서 Alice의 생활 시스템 체험',
@@ -305,9 +314,11 @@
   // 与 miyang_alice/src/public/avatars/avatar_512.png 同源：黑微卷 + 淡金发带 + 星星项链。
   // 曾用 Image2 另生「老师脸」会漂成另一个人，不合规；UI 圆裁由 CSS border-radius 完成。
   var AVATAR_SRC = 'alice-teacher.png?v=20260808j';
-  // 本轮任务标记：与 alice-service 的 *_INTENT 对齐（后端只认这两个白名单值）
+  // 本轮任务标记：与 alice-service 的 *_INTENT 对齐（后端只认这几个白名单值）
   var COURSE_SEARCH_INTENT = 'course_search';
   var FEEDBACK_INTENT = 'feedback';
+  // 模拟面试是唯一**跨轮**的标记：她出题、他答、她判分，整场都得带着（见 state.interview）
+  var MOCK_INTERVIEW_INTENT = 'mock_interview';
   var pendingIntent = '';
   var PAGE_FILE = location.pathname.split('/').pop();
   var PAGE_TITLE = (document.title || '').replace(/\s*\|\s*xueai\.app\s*$/, '');
@@ -340,7 +351,11 @@
     streaming: false,
     sessionsOpen: false,
     pageQuestions: null,      // 本页推荐问题（null=未加载）
-    followups: []             // 上一轮回答带回的「接着问」（PRD 39）
+    followups: [],            // 上一轮回答带回的「接着问」（PRD 39）
+    // 这一会话正在模拟面试（PRD 41）。它不是一次性的：面试是多轮的，每一轮都要把
+    // 意图带上，否则那段规则第二轮就不在上下文里，她会开始自己给答案。收场由她判断
+    // （总评给完就当普通答疑），这里只跟着会话走：换会话/新对话即清。
+    interview: false
   };
 
   var SID_KEY = 'alice_session_id';   // localStorage：登录用户上次会话
@@ -2186,7 +2201,7 @@
     // 照它渲染会让老用户先看到一句「请先登录」再变回自己的笔记。
     if (!state.loggedIn && state.meOk) {
       notesEl.innerHTML = '<div class="al-disc-intro">' + esc(T.ntLoginTip) +
-        ' <a href="' + loginUrl() + '">' + esc(T.loginBtn) + '</a></div>';
+        ' ' + loginLink(T.loginBtn) + '</div>';
       return;
     }
     if (!notesCache.length) {
@@ -3397,8 +3412,7 @@
   }
 
   function renderImgLoginNote() {
-    noteEl.innerHTML = esc(T.imgLoginTip) +
-      ' <a href="' + loginUrl() + '">' + esc(T.loginBtn) + '</a>';
+    noteEl.innerHTML = esc(T.imgLoginTip) + ' ' + loginLink(T.loginBtn);
     noteEl.dataset.show = '1';
     if (state.tab === 'chat') noteEl.style.display = '';
   }
@@ -3547,8 +3561,29 @@
   });
 
   // ── 登录态 / 额度 ─────────────────────────────────────────────────────
+  // 课件多数时候跑在 learn.html 的 iframe 里，而 /auth/login 会 302 到
+  // miyang.cn/login，那页带 X-Frame-Options: DENY——在框里点登录只会把课件区换成
+  // 一格空白（用户报的「登不上」就是这个）。所以链接必须 target="_top" 带走整页，
+  // next 也要回阅读器外壳而不是裸课件页，否则登完落在没有目录、没有翻页条的页面
+  // 上。口径与 paywall.js 一致；hash 用中文基名，三个语言外壳共用一套。
   function loginUrl() {
-    return '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
+    var next = location.pathname + location.search;
+    if (window.self !== window.top) {
+      var file = location.pathname.split('/').pop();
+      if (file) {
+        var base = (window.XUEAI_I18N && window.XUEAI_I18N.baseFile)
+          ? window.XUEAI_I18N.baseFile(file)
+          : file.replace(/\.(en|ko)\.html$/, '.html');
+        var reader = LANG === 'zh' ? 'learn.html' : 'learn.' + LANG + '.html';
+        next = '/slides/' + reader + '#' + base;
+      }
+    }
+    return '/auth/login?next=' + encodeURIComponent(next);
+  }
+
+  function loginLink(label) {
+    return '<a href="' + loginUrl() + '"' +
+      (window.self !== window.top ? ' target="_top"' : '') + '>' + esc(label) + '</a>';
   }
 
   function rememberedLowRice() {
@@ -3578,6 +3613,7 @@
           // 同浏览器切换账号后，所有账号级内存必须立刻丢弃，不能等新请求覆盖。
           state.messages = [];
           state.sessionId = null;
+          state.interview = false;
           momentsCache = [];
           momentsFetchedAt = 0;
           notesCache = [];
@@ -3637,10 +3673,9 @@
   function renderNote() {
     var html = '';
     if (!state.loggedIn) {
-      html = esc(T.loginTip) + ' <a href="' + loginUrl() + '">' + esc(T.loginBtn) + '</a>';
+      html = esc(T.loginTip) + ' ' + loginLink(T.loginBtn);
     } else if (state.needRelogin) {
-      html = esc(T.reloginTip) + ' <a href="' + loginUrl() + '">' +
-        esc(T.reloginBtn) + '</a>';
+      html = esc(T.reloginTip) + ' ' + loginLink(T.reloginBtn);
     }
     noteEl.innerHTML = html;
     noteEl.dataset.show = html ? '1' : '0';
@@ -3671,12 +3706,19 @@
   // ── 推荐问题（本页）──────────────────────────────────────────────────
   var questionsPromise = null;
 
+  // 第五题的题面里带着本页标题：她要知道围绕什么考（也让用户一眼看出考的是这一页）。
+  function interviewQuestion() {
+    return T.qInterview(PAGE_TITLE ? PAGE_TITLE.slice(0, 30) : '');
+  }
+
   function finishQuestions(qs) {
+    var img = T.qImage, iv = interviewQuestion();
     qs = Array.isArray(qs) ? qs.filter(function (q) {
-      return typeof q === 'string' && q && q !== T.qImage;
+      return typeof q === 'string' && q && q !== img && q !== iv;
     }) : [];
-    // 固定保留三条页面理解题，第四条交给讲解配图；所有语言都要有。
-    state.pageQuestions = qs.slice(0, 3).concat([T.qImage]);
+    // 固定保留三条页面理解题，第四条交给讲解配图，第五条是模拟面试（PRD 41）；
+    // 所有语言都要有。
+    state.pageQuestions = qs.slice(0, 3).concat([img, iv]);
     return state.pageQuestions;
   }
 
@@ -3814,13 +3856,19 @@
       loadQuestions().then(function (qs) {
         var wrap = bodyEl.querySelector('#al-qs');
         if (!wrap || state.messages.length) return;
-        // 即使旧 render 注册的回调稍后才回来，也只替换当前四条，不做累加。
+        // 即使旧 render 注册的回调稍后才回来，也只替换当前这几条，不做累加。
         wrap.innerHTML = '';
+        var iv = interviewQuestion();
         qs.forEach(function (q) {
           var b = document.createElement('button');
           b.className = 'al-q';
           b.textContent = q;
           b.addEventListener('click', function () {
+            // 面试那条点下去就开考：挂上这一条的意图，再当普通提问发出去——刻意走
+            // send() 这条正路，长期记忆、画像、笔记召回、计费、审核全都照常。
+            // 「这一场在面试中」由 send() 在请求真的发出去时才立（未登录被拦下的
+            // 那次不算）。
+            if (q === iv) pendingIntent = MOCK_INTERVIEW_INTENT;
             inputEl.value = q;
             send();
           });
@@ -4194,8 +4242,12 @@
         if (requestAccount !== state.accountKey) return;
         if (!d.ok) return;
         // 换了会话：上一场的「接着问」跟着走就成了张冠李戴（同一会话的静默
-        // 重拉不动它，否则刚收到的追问会被自己的对账请求扫掉）
-        if (state.sessionId !== sid) setFollowups([]);
+        // 重拉不动它，否则刚收到的追问会被自己的对账请求扫掉）。面试同理——
+        // 翻开一段旧对话，不该继续给那边的每一条打面试标记。
+        if (state.sessionId !== sid) {
+          setFollowups([]);
+          state.interview = false;
+        }
         state.sessionId = sid;
         rememberSessionId(sid);
         // 追问只活在本地（库里那张表只有 content 一列，不该为它加字段）。服务端
@@ -4237,6 +4289,7 @@
     state.sessionId = null;
     state.messages = [];
     state.followups = [];
+    state.interview = false;   // 换一轮对话就是退出面试；空态那条题在原地等着再点
     rememberSessionId(null);
     stashMessages();
     renderMessages();
@@ -4288,7 +4341,10 @@
       // 本站是多页导航，翻一页 DOM 全重建，不存就等于「点开下一页那几句就没了」。
       localStorage.setItem(MSGS_KEY, JSON.stringify({
         account: state.accountKey,
-        sid: state.sessionId || '', ts: messagesFetchedAt, messages: keep.slice(-40)
+        sid: state.sessionId || '', ts: messagesFetchedAt, messages: keep.slice(-40),
+        // 面试跟着这份快照过页：本站是多页导航，考到第三题去翻一眼课件再回来，
+        // 不存就等于这场面试当场散了（她会把他的答案当新问题讲）。
+        iv: !!state.interview
       }));
     } catch (e) {}
   }
@@ -4307,6 +4363,7 @@
     state.sessionId = sid || null;
     messagesFetchedAt = c.ts || 0;
     state.followups = tailFollowups();
+    state.interview = !!c.iv;
     return true;
   }
 
@@ -4368,6 +4425,7 @@
     // 发一次 messages 请求；跨设备的变化仍由五分钟后的静默校正兜底。
     state.messages = c.messages || [];
     messagesFetchedAt = c.ts || Date.now();
+    state.interview = !!c.iv;   // 同一段对话在那边开了考，这边接着发的也算面试
     renderMessages();
     // 另一个页签那轮的追问跟着消息一起过来：这边显示的是同一段对话，建议也该同一套
     setFollowups(tailFollowups());
@@ -4551,8 +4609,13 @@
     var images = state.attachImages.slice();
     var social = rememberSocial(text);
     // 本轮任务标记（目录搜索 / 从「有意见」入口进来）与引用、截图同批清掉：
-    // renderChip 要靠 pendingIntent 决定还画不画样本句，清晚了它就赖在输入框上面
-    var intent = pendingIntent;
+    // renderChip 要靠 pendingIntent 决定还画不画样本句，清晚了它就赖在输入框上面。
+    // 面试是这里唯一不清的一种：它跟着会话，直到新对话/换会话（见 state.interview）。
+    // 一次性标记优先——面试中划词点「吐槽」，这一条该按意见处理。
+    var intent = pendingIntent ||
+      (state.interview ? MOCK_INTERVIEW_INTENT : '');
+    // 面试从这一条起就立住了，一直带到新对话/换会话为止
+    if (intent === MOCK_INTERVIEW_INTENT) state.interview = true;
     state.pendingQuote = '';
     state.attachImages = [];
     pendingIntent = '';

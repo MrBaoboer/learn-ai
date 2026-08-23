@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>영속화 거버넌스: 버전, fork 경계, 해석 거부 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson .sec-label{margin:56px 0 20px}
+.lesson p.reveal{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.flow{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:var(--shadow-card);margin-bottom:20px}
+.flow svg{width:100%;height:auto;display:block}
+.visual-caption{font-size:12px;color:var(--sub);text-align:center;margin-top:12px}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.doc-quote{background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:20px 22px;margin:12px 0 20px;font-size:14px;line-height:1.9;color:var(--text)}
+.doc-quote .q-src{display:block;margin-top:8px;font-size:12px;color:var(--sub)}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eef1ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.cmp{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;color:var(--text)}
+.cmp-card h3 svg{color:var(--accent);flex:none}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+
+/* ── 交互演示：로그 고고학 현장 ── */
+#demo-persist{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:12px}
+.dp-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.dp-scenes{display:flex;gap:8px;flex-wrap:wrap;margin-right:auto}
+.dp-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(77,107,254,.4);background:var(--accent-soft);color:var(--accent-deep);border-radius:11px;padding:12px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px}
+.dp-btn svg{flex:0 0 auto}
+.dp-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.dp-btn.scene{min-height:44px;padding:9px 13px;font-size:13px}
+.dp-btn.scene.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.dp-file{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px}
+.dp-file-title{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--sub);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.dp-file-title svg{color:var(--accent)}
+.dp-header-line{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.3);color:var(--accent-deep);border-radius:8px;padding:5px 10px;font:700 11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:8px}
+.dp-header-line.newer{background:rgba(217,119,6,.08);border-color:rgba(217,119,6,.4);color:var(--amber)}
+.dp-chips{display:flex;flex-wrap:wrap;gap:6px}
+.dp-chip{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:5px 9px;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s,border-color .2s,box-shadow .2s}
+.dp-chip.in{opacity:1;transform:translateY(0)}
+.dp-chip b{color:var(--accent);font-weight:800}
+.dp-chip.unknown b{color:var(--amber)}
+.dp-chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(77,107,254,.18)}
+.dp-chip .tag{display:inline-block;margin-left:5px;padding:0 5px;border-radius:5px;font-size:10px;font-weight:800;background:rgba(217,119,6,.12);color:var(--amber)}
+.dp-panes{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dp-pane{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;min-width:0;transition:border-color .3s,box-shadow .3s}
+.dp-pane.refused{border-color:rgba(220,38,38,.5);box-shadow:0 0 0 2px rgba(220,38,38,.12)}
+.dp-pane.ok{border-color:rgba(22,163,74,.5);box-shadow:0 0 0 2px rgba(22,163,74,.12)}
+.dp-pane.warn{border-color:rgba(217,119,6,.5);box-shadow:0 0 0 2px rgba(217,119,6,.12)}
+.dp-pane-title{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--sub);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.dp-pane-title svg{color:var(--accent)}
+.dp-msg{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:7px 10px;margin-bottom:7px;font-size:12.5px;line-height:1.6;color:var(--text);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s,border-color .2s,box-shadow .2s}
+.dp-msg.in{opacity:1;transform:translateY(0)}
+.dp-msg .role{font-weight:800;color:var(--accent);margin-right:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+.dp-msg.gap{border-color:rgba(220,38,38,.55);box-shadow:0 0 0 2px rgba(220,38,38,.15)}
+.dp-msg.garbled{border-color:rgba(217,119,6,.45);background:rgba(217,119,6,.05);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--sub)}
+.dp-banner{display:none;margin-top:8px;border-radius:9px;padding:10px 12px;font:11.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+.dp-banner.fail{display:block;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.4);color:var(--danger)}
+.dp-banner.ok{display:block;background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.4);color:var(--success)}
+.dp-banner.warn{display:block;background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.45);color:var(--amber)}
+.dp-empty{font-size:12px;color:var(--sub);padding:4px 2px}
+.dp-caption{display:flex;gap:9px;align-items:flex-start;margin-top:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.8;color:var(--text)}
+.dp-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+.dp-note{font-size:12px;color:var(--sub);margin-top:12px;line-height:1.7}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}.cmp{grid-template-columns:1fr}
+  .dp-panes{grid-template-columns:1fr}
+  .source-head{flex-direction:column}.flow{padding:12px}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .dp-btn{flex:1 1 auto;justify-content:center}
+}
+</style>
+<meta name="description" content="세션 로그 형식이 어떻게 진화하는가: 단조 정수 버전, 방향별 읽기 규칙, 알 수 없는 이벤트는 기본 해석 거부, 그리고 fork의 이중 경계">
+<meta name="author" content="뤄샤오산(洛小山)">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"영속화 거버넌스: 버전, fork 경계, 해석 거부","name":"영속화 거버넌스: 버전, fork 경계, 해석 거부","url":"https://xueai.app/slides/dsh-23.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문에서 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 영속화와 인프라","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"세션 로그 형식이 어떻게 진화하는가: 단조 정수 버전, 방향별 읽기 규칙, 알 수 없는 이벤트는 기본 해석 거부, 그리고 fork의 이중 경계","datePublished":"2026-08-13","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="영속화 거버넌스: 버전, fork 경계, 해석 거부"><meta property="og:description" content="세션 로그 형식이 어떻게 진화하는가: 단조 정수 버전, 방향별 읽기 규칙, 알 수 없는 이벤트는 기본 해석 거부, 그리고 fork의 이중 경계"><meta property="og:url" content="https://xueai.app/slides/dsh-23.ko.html"><meta property="og:image" content="https://xueai.app/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.app/slides/dsh-23.ko.html">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:locale" content="ko_KR">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/dsh-23.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/dsh-23.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/dsh-23.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/dsh-23.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 영속화와 인프라</div>
+    <h1>영속화 거버넌스: 버전, fork 경계, 해석 거부</h1>
+    <p class="subtitle">로그 형식은 어떻게 진화하고, fork 경계는 어떻게 정하며, 읽지 못하는 데이터는 차라리 거부합니다.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>로그 형식은 어떻게 진화하고, fork 경계는 어떻게 정하며, 읽지 못하는 데이터는 차라리 거부합니다</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>강의 목표</b>읽고 나면 세 가지를 말할 수 있어요. 세션 로그 형식 버전이 왜 단조 정수 하나인지; 신구 버전이 서로의 로그를 읽을 때 운명이 왜 다른지; 그리고 DSH 눈에는 알 수 없는 이벤트를 조용히 건너뛰는 일이 왜 보안 사고여서, 차라리 세션 전체를 열지 않는지.</span>
+  </div>
+
+  <div class="sec-label">인터랙티브 데모 · 로그 고고학 현장</div>
+  <p class="reveal">먼저 해보고 말할게요. 위는 디스크의 세션 로그—header 한 줄과 이벤트 나열. 아래 로더 둘이 동시에 읽어요: 왼쪽은 DSH「해석 거부」식—못 읽으면 오류; 오른쪽은 흔한 best-effort 건너뛰기—못 읽으면 건너뛰고 계속. 시나리오 셋, 각기 문제 로그. 재생을 눌러 같은 바이트가 두 로더에서 어떻게 되는지 보세요.</p>
+  <div id="demo-persist" class="reveal">
+    <div class="dp-toolbar">
+      <div class="dp-scenes">
+        <button class="dp-btn scene active" data-scn="A">시나리오 A · 알 수 없는 이벤트</button>
+        <button class="dp-btn scene" data-scn="B">시나리오 B · ignorable 이벤트</button>
+        <button class="dp-btn scene" data-scn="C">시나리오 C · 새 버전 로그</button>
+      </div>
+      <button class="dp-btn primary" id="dpPlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>재생</button>
+      <button class="dp-btn" id="dpStep"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>단스텝</button>
+      <button class="dp-btn" id="dpReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>초기화</button>
+    </div>
+    <div class="dp-file">
+      <div class="dp-file-title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        디스크의 로그 (~/.dsh/sessions/session-42/log.jsonl.zst)
+      </div>
+      <div class="dp-header-line" id="dpHeader"></div>
+      <div class="dp-chips" id="dpChips"></div>
+    </div>
+    <div class="dp-panes">
+      <div class="dp-pane" id="dpPaneL">
+        <div class="dp-pane-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          DSH 로더(해석 거부식)
+        </div>
+        <div id="dpConvL"><div class="dp-empty">(아직 복원된 메시지 없음)</div></div>
+        <div class="dp-banner" id="dpBannerL"></div>
+      </div>
+      <div class="dp-pane" id="dpPaneR">
+        <div class="dp-pane-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+          best-effort 로더(건너뛰기식)
+        </div>
+        <div id="dpConvR"><div class="dp-empty">(아직 복원된 메시지 없음)</div></div>
+        <div class="dp-banner" id="dpBannerR"></div>
+      </div>
+    </div>
+    <div class="dp-caption">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      <span id="dpCaption">「재생」을 눌러 두 로더가 같은 로그를 동시에 읽는 모습을 보세요.</span>
+    </div>
+    <div class="dp-note">데모는 수업용 시뮬레이션이지만, 왼쪽 거부 문장 두 줄은 <code>coordinator.ts</code> 79행·1064행 템플릿을 글자 그대로 복제했어요. 실제 DSH에는 오른쪽 best-effort 로더가 없습니다—대조용 반면교사예요.</div>
+  </div>
+
+  <div class="sec-label">로직 분해 · 정수 하나가 버전을 맡는다</div>
+  <p class="reveal">한 줄 배경: DSH 세션 로그가 유일한 진실이고, 복구·fork·리플레이가 전부 여기서 파생돼요(<a href="dsh-2.html">이전 레슨의 불변조건</a>). 진실은 어떤 프로그램 버전보다 오래 살아야 하니 형식 진화는 작은 일이 아니에요. 오늘 쓴 로그를 내년 harness가 읽어야 하고, 반대로 새 버전이 쓴 로그가 옛 버전에 오면 옛 버전은 못 읽는다는 걸 알아야 합니다.</p>
+  <p class="reveal">DSH 버전 방안은 숫자 하나로 단순해요: <code>SESSION_FORMAT_VERSION</code>, 현재 0, <code>packages/core/session/src/types.ts</code> 56행. 1.2.3 같은 대·소 버전이 없어요. 설계 노트 이유: 어떤 단계가 자동 변환 가능한지는 그 단계 업그레이더를 쓸 수 있느냐로 정해지고, 두 단 번호는 설계 때 모르는 일을 미리 약속하는 셈입니다.</p>
+  <p class="reveal">올릴지 말지 기준은 분명해요. 옛 런타임이 새 로그를 의미상 완전히 올바르게 다룰 수 없을 때만 올립니다. 「파싱만 되면」은 안 쳐요—다 읽었는데 잘못된 세션을 재구성하면 그건 오독입니다. 확 안 서면 올리세요. 거의 항등인 업그레이더는 비용이 거의 없고, 한 번 놓치면 옛 버전이 조용히 데이터를 망가뜨립니다.</p>
+
+  <div class="sec-label">세 운명 · 방향별 읽기 규칙</div>
+  <p class="reveal">저장된 로그를 열 때 먼저 버전을 비교하고, 세 결과가 전혀 다른 처리로 이어져요:</p>
+  <div class="flow reveal">
+    <svg viewBox="0 0 940 330" role="img" aria-label="로그 버전 세 운명의 분기 그림">
+      <defs>
+        <linearGradient id="g23" x1="0" x2="1"><stop stop-color="#3450d4"/><stop offset="1" stop-color="#4d6bfe"/></linearGradient>
+        <marker id="a23" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#4d6bfe"/></marker>
+      </defs>
+      <rect x="30" y="120" width="200" height="90" rx="14" fill="url(#g23)"/>
+      <text x="130" y="158" fill="#ffffff" text-anchor="middle" font-size="14" font-weight="800">저장된 로그 열기</text>
+      <text x="130" y="182" fill="#e6ebff" text-anchor="middle" font-size="12">header.version 읽기</text>
+      <path fill="none" d="M230 140 H320" stroke="#4d6bfe" stroke-width="2" marker-end="url(#a23)"/>
+      <text x="275" y="130" fill="#9ca3af" text-anchor="middle" font-size="11">같음</text>
+      <rect x="332" y="96" width="256" height="80" rx="13" fill="#ffffff" stroke="rgba(22,163,74,.6)"/>
+      <text x="460" y="128" fill="#16a34a" text-anchor="middle" font-size="13" font-weight="700">정상 읽기</text>
+      <text x="460" y="152" fill="#6b7280" text-anchor="middle" font-size="11">그다음 이벤트마다 알 수 없는 타입 가드</text>
+      <path d="M230 165 H320 V236 H332" stroke="#4d6bfe" stroke-width="2" marker-end="url(#a23)" fill="none"/>
+      <text x="275" y="228" fill="#9ca3af" text-anchor="middle" font-size="11">로그가 더 오래됨</text>
+      <rect x="332" y="200" width="256" height="92" rx="13" fill="#ffffff" stroke="rgba(77,107,254,.45)"/>
+      <text x="460" y="230" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">업그레이더 체인 n → n+1 단계 변환</text>
+      <text x="460" y="252" fill="#6b7280" text-anchor="middle" font-size="11">조회는 메모리에서만 변환, 파일은 그대로</text>
+      <text x="460" y="272" fill="#6b7280" text-anchor="middle" font-size="11">세션을 이어갈 때만 저장: 원자 교체 + 백업 유지</text>
+      <path d="M230 190 H300 V50 H332" stroke="#dc2626" stroke-width="2" fill="none"/>
+      <path fill="none" d="M330 50 H332" stroke="#dc2626" stroke-width="2" marker-end="url(#a23)"/>
+      <text x="275" y="44" fill="#dc2626" text-anchor="middle" font-size="11">로그가 더 새로움</text>
+      <rect x="332" y="16" width="256" height="66" rx="13" fill="#ffffff" stroke="rgba(220,38,38,.55)"/>
+      <text x="460" y="43" fill="#dc2626" text-anchor="middle" font-size="13" font-weight="700">거부하고, 방향을 밝힌다</text>
+      <text x="460" y="65" fill="#6b7280" text-anchor="middle" font-size="11">「harness를 업그레이드하세요」+ 원본 파일 경로</text>
+      <path fill="none" d="M588 136 H668" stroke="#4d6bfe" stroke-width="2" marker-end="url(#a23)"/>
+      <rect x="680" y="88" width="236" height="112" rx="13" fill="#ffffff" stroke="rgba(77,107,254,.45)"/>
+      <text x="798" y="118" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">알 수 없는 이벤트 타입 가드</text>
+      <text x="798" y="142" fill="#6b7280" text-anchor="middle" font-size="11">KNOWN_SESSION_EVENT_TYPES에 있나? 통과</text>
+      <text x="798" y="162" fill="#6b7280" text-anchor="middle" font-size="11">없는데 ignorable: true? 건너뛰기</text>
+      <text x="798" y="182" fill="#dc2626" text-anchor="middle" font-size="11">없고 표시도 없음? 세션 전체 복원 거부</text>
+      <text x="470" y="318" fill="#9ca3af" text-anchor="middle" font-size="11">두 게이트는 모두 읽기 쪽: 쓰기 쪽은 어휘 검사를 안 해요. 쓸 때 거부하면 활성 세션 영속화가 중간에 멈춥니다</text>
+    </svg>
+    <div class="visual-caption">수업용 구조도: session-log-version-mechanism Agent Note와 coordinator.ts 소스를 바탕으로 정리했습니다.</div>
+  </div>
+  <p class="reveal">가장 곱씹을 칸은 「거부하고, 방향을 밝힌다」예요. 예전 <code>assertVersion</code>은 버전 불일치마다 같은 모호한 오류를 던졌고, 바꾼 뒤에는 방향별로 갈라요. 로그가 더 새로우면 「더 새 harness가 썼으니 업그레이드하세요」와 원본 경로를 말하고; 더 오래됐는데 업그레이드 체인이 끊겼으면 「이 빌드에는 업그레이드 경로가 없습니다」라고 합니다. 사용자는 늘 「업그레이드할 때」를 보지, 「파일 손상」을 보지 않아요. 데이터는 안 망가졌는데 손상이라 하면 억울합니다.</p>
+  <p class="reveal">옛 로그를 읽는 방향에도 디테일이 있어요. 새 버전이 옛 로그를 열면 업그레이더 체인은 메모리에서만 단계 변환하고, 한눈 보는 건 저장하지 않아요. 사용자가 진짜 세션을 이어갈 때만 결과가 원자 교체로 디스크에 쓰이고 원본은 백업으로 남습니다. 설계 노트는 「조회 시 자동 마이그레이션 저장」을 거절했어요. 열자마자 고치면 읽기가 파괴적 쓰기가 되고, 변환기에 버그가 있으면 브라우징만으로 로그가 망가집니다.</p>
+
+  <div class="sec-label">왜 「알 수 없는 이벤트 건너뛰기」가 보안 사고인가</div>
+  <p class="reveal">버전 번호는 구조 변경을 다루고 어휘 성장은 못 다뤄요. 이벤트 종류는 걸린 플러그인에 달려 정수 하나로 설명할 수 없습니다. DSH 해법은 이벤트마다 표시. 읽기가 모르는 타입을 만나면 기본으로 세션 전체 복원을 거부하고, 봉투에 작성자가 선언한 <code>ignorable: true</code>가 있을 때만 예외예요. 알려진 어휘 <code>KNOWN_SESSION_EVENT_TYPES</code>는 손으로 안 쓰고, 저장소 전체 이벤트 선언을 스크립트가 합쳐 44종으로 만들며, 946줄 영속 이벤트 목록 <code>docs/persistence-catalog.zh.md</code>와 함께 전용 검증 스크립트가 낡지 않게 지킵니다.</p>
+  <p class="reveal paywall-locked xa-peek">왜 기본은 필수이고, 표시를 빼먹으면 차라리 과하게 거부하나? 설계 노트가 셈을 분명히 해요. <code>ignorable</code>를 빼먹으면 복구 가능했던 세션이 거부되어 사용자가 불편—경험 문제; 반대로 기본 무시면 같은 실수가 내용이 빈 세션을 조용히 복원하고 모델이 잘못된 이력 위에서 일합니다—보안 사고예요. 데모 시나리오 A가 후자의 현장: 사용자 메시지를 담은 알 수 없는 이벤트를 건너뛰면, 복원된 대화에서 어시스턴트가 없는 질문에 답합니다. 실패가 비대칭이라 방벽은 시끄러운 쪽으로 기울어요.</p>
+  <div class="facts paywall-locked">
+    <div class="fact reveal"><code>버전은 단조 정수 하나</code><p>대·소 버전을 나누지 않아요. 자동 업그레이드 가능 여부는 그 단계 업그레이더 존재로 표현하고, 번호 체계는 미리 약속하지 않습니다. 현재 <code>SESSION_FORMAT_VERSION = 0</code>.</p></div>
+    <div class="fact reveal"><code>알 수 없는 이벤트는 기본 필수</code><p>읽기는 알 수 없는 타입이 있는 로그의 해석을 거부하고, 이벤트에 <code>ignorable: true</code>가 있을 때만 예외예요. 방향성 거부가 best-effort parse보다 낫고, 조용한 건너뛰기는 오독입니다.</p></div>
+    <div class="fact reveal"><code>fork 경계를 두 번 쓴다</code><p>header의 <code>seedLength</code>는 영속적인 혈통 경계이고; 로그의 <code>session/end-seed</code> 이벤트는 저장 바이트만 가진 독자를 위한 거예요. <code>seed.length</code>는 어느 쪽도 대신하지 못합니다.</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked">fork의 이중 경계 · seedLength와 session/end-seed</div>
+  <p class="reveal paywall-locked">세션을 fork한다는 건 원 세션을 어떤 안정 지점까지 이벤트를 깊은 복사해 자식 세션의 씨앗으로 쓰는 일이에요. 골치는 경계: 자식 로그 앞반은 상속 씨앗, 뒷반은 스스로 쓴 것인데 바이트로는 똑같아 보입니다. 어디에 금이 그어지나?</p>
+  <p class="reveal paywall-locked">직관적 답은 생성 때 씨앗이 몇 줄인지 세는 것, 곧 <code>seed.length</code>. 이 답은 교묘히 틀려요. 복원된 세션은 전체 저장 로그를 생성 씨앗으로 쓰니 <code>seed.length</code> 경계가 다시 열릴 때마다 뒤로 밀리고; header의 <code>seedLength</code>만이 처음 fork 때의 값을 지킵니다. 그래서 DSH는 경계를 두 번 씁니다. 첫째 header—<code>fork()</code>가 자식 생성 때 <code>parentSession</code>과 <code>seedLength</code>를 메타에 넣고; 둘째 로그—씨앗 있는 세션이 <code>session/end-seed</code>를 씨앗 뒤 첫 실시간 쓰기로 붙여, 저장 바이트만 가진 소비자를 위해 씁니다.</p>
+  <p class="reveal paywall-locked">이 경계 이벤트가 푸는 문제는 구체적이에요. 씨앗 이력에 짝 없는 <code>compaction/start</code>가 있을 수 있는데, 「지난 수명주기가 압축 중간에 죽었다」인지 「지금 압축 중」인지 바이트만으로는 모릅니다. <code>session/end-seed</code>가 있으면 그 앞의 짝 없는 시작 표시는 모두 끝난 수명주기 몫이에요. 타입 JSDoc에는 독한 한 줄이 있습니다: <code>Session</code> 생성자만이 합법 작성자이고, 플러그인이 제멋대로 한 줄을 붙이면 그 앞의 모든 실시간 작업을 조용히 씨앗 이력으로 분류하는 셈입니다.</p>
+  <p class="reveal paywall-locked">큰 로그 복원 비용 한 마디. 이벤트 130만·압축 62MiB 세션을 복원할 때 DSH는 전체 평문을 물질화하지 않고, 이번 최적화로 복원 허가를 약 600ms에서 263ms로 줄였어요(Agent Note 2026-08-05). 체크섬과 동결은 하나도 아끼지 않았습니다. 영속 저장은 런타임 경계라 방벽 자체는 움직이지 않아요.</p>
+
+  <div class="sec-label paywall-locked">핵심 증거 · 거부의 원문</div>
+  <p class="reveal paywall-locked">「방향별 구분」은 소스에서 다섯 줄 작은 함수 <code>sessionFormatVersionRefusal</code>예요. 버전이 더 크면 「더 새 harness가 썼으니 harness를 업그레이드해 여세요」; 더 작은데 경로가 없으면 「이 빌드에는 업그레이드 경로가 없습니다」. 코디네이터 로드 검사와 각 저장 백엔드가 공유하고, 백엔드는 어떤 구조든 디코딩하기 전에 이걸로 외부 버전을 거부해 사용자가 늘 「업그레이드하세요」만 보게 합니다—「손상」이 아니에요. 데모 왼쪽 빨간 오류가 그 원문입니다.</p>
+  <p class="src-note reveal paywall-locked">출처:<code>packages/session/session-persistence/src/coordinator.ts</code> 77–81행, 확인일 2026-08-13.</p>
+  <p class="reveal paywall-locked">「알 수 없는 이벤트 기본 거부」가드는 더 짧아 루프 하나예요. 타입이 목록에 있거나 작성자가 <code>ignorable</code>를 달면 통과; 아니면 던지며 이벤트 타입·seq·「대개 더 새 harness가 씀」방향 힌트를 실어요:</p>
+  <div class="source reveal paywall-locked">
+    <div class="source-head"><span>packages/session/session-persistence/src/coordinator.ts</span><span>1061–1066행</span></div>
+    <pre><code>  <span class="kw">private</span> <span class="fn">assertEventsSupported</span>(meta: <span class="ty">SessionHeader</span>, events: <span class="kw">readonly</span> <span class="ty">SessionEvent</span>[]): <span class="ty">void</span> {
+    <span class="kw">for</span> (<span class="kw">const</span> event <span class="kw">of</span> events) {
+      <span class="kw">if</span> (KNOWN_SESSION_EVENT_TYPES.<span class="fn">has</span>(event.type) || event.ignorable === <span class="kw">true</span>) <span class="kw">continue</span>
+      <span class="kw">throw</span> <span class="kw">this</span>.<span class="fn">unsupported</span>(meta, <span class="str">`session "${meta.id}" contains event type "${event.type}" (seq ${event.seq}) unknown to this harness and not marked ignorable; refusing to interpret the log — it was likely written by a newer harness`</span>)
+    }
+  }</code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>소스 스냅샷 안내:</b>로컬 저장소 <code>deepseek-harness-master</code> 기준, 확인 파일 <code>packages/session/session-persistence/src/coordinator.ts</code>, 확인일 2026-08-13. 코드 블록은 소스 원문을 유지합니다.</div>
+
+  <div class="sec-label paywall-locked">가로 비교 · 다른 집은 읽지 못하는 데이터를 어떻게 다루나</div>
+  <div class="cmp paywall-locked">
+    <div class="cmp-card reveal">
+      <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build</h3>
+      <p>세션 요약 읽기는 표준 serde 역직렬화 경로예요. <code>persistence.rs</code> 700–725행 resume 선읽기 루프에서 읽히지 않거나 파싱 안 되는 <code>summary.json</code>은 바로 <code>continue</code>로 건너뛰고, 오류도 흔적도 없습니다.</p>
+      <p>세션 관련 serde 구조체에 <code>deny_unknown_fields</code>가 한 곳도 없어 알 수 없는 필드는 기본으로 조용히 버려요. 새 버전이 넣은 필드를 옛 버전이 읽고 다시 쓰면 사라집니다. 빠른 제품 제품의 흔한 취사선택이고, 형식 진화의 올바름을 「신구 버전을 섞지 말자」가정에 맡길 뿐입니다.</p>
+    </div>
+    <div class="cmp-card reveal">
+      <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code</h3>
+      <p>세션은 <code>~/.claude</code> 아래 <code>.jsonl</code>로 두고 resume·조회를 지원해요. 원고 자료(claude-code-sourcemap study 장)는 기동·컨텍스트 관리·관측 가능성을 다루지만, 세션 로그 형식 버전 협상이나 알 수 없는 기록 거부 메커니즘의 복원 코드는 나오지 않습니다.</p>
+      <p>공개 증거 기준으로, 모르는 데이터를 읽었을 때의 동작은 알 수 없어요. 클로즈드 제품은 「클라이언트가 늘 최신」으로 버틸 수 있지만; DSH는 오픈 인프라라 버전이 오래 공존해 그 가정이 성립하지 않으니, 거부 규칙을 읽기에 넣었습니다.</p>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">수업 실습</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>플러그인 이벤트에 기본값을 고르세요</h3><p>DSH 플러그인을 만들어 세션 로그에 맞춤 이벤트 <code>myplugin/audit</code>를 붙여 도구 호출마다 감사를 남긴다고 해 봐요. 두 경우를 추리하세요. <code>ignorable</code>를 안 달고 사용자가 플러그인 없는 같은 버전 harness에 로그를 복사해 열면? (힌트: <code>KNOWN_SESSION_EVENT_TYPES</code>는 저장소 안 선언으로 생성되고, 저장소 밖 플러그인 이벤트는 구조상 목록 밖.) <code>ignorable: true</code>를 달면? 감사 정보는 재구성에서 어디로 가나? 각 선택은 어떤 이벤트에 맞는지 「잃으면 나머지 로그 해석이 달라지나」자로 재 보세요.</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway:</b>버전은 단조 정수 하나이고, 읽기 규칙은 방향별로: 같으면 정상 읽기, 더 오래되면 업그레이더 체인으로 메모리 변환, 더 새로우면 분명히 거부하며 「업그레이드하세요」를 가리킵니다. 알 수 없는 이벤트는 기본 해석 거부—과한 거부는 경험 문제, 조용한 건너뛰기는 보안 사고. fork 경계는 두 번 씁니다. header의 <code>seedLength</code>와 로그의 <code>session/end-seed</code>, <code>seed.length</code>는 어느 쪽도 대신 못 해요.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  /* ── 로그 고고학 현장 ──
+     左侧加载器的拒绝文案逐字复刻 coordinator.ts 第 79 行（版本方向拒绝）
+     与第 1064 行（未知事件拒绝）的模板，代入演示 fixture 的值。 */
+  var REFUSE_UNKNOWN = 'SessionFormatUnsupportedError: session "session-42" contains event type "user/message-v2" (seq 3) unknown to this harness and not marked ignorable; refusing to interpret the log — it was likely written by a newer harness (raw log: ~/.dsh/sessions/session-42/log.jsonl.zst)';
+  var REFUSE_NEWER = 'SessionFormatUnsupportedError: session "session-42" uses log format v1, but this harness reads only v0: the log was written by a newer harness — upgrade the harness to open it (raw log: ~/.dsh/sessions/session-42/log.jsonl.zst)';
+
+  var SCENES = {
+    A: {
+      header: { text: 'header · version: 0 · id: session-42', newer: false },
+      intro: '이 로그에 새 harness가 쓴 이벤트가 섞였어요: user/message-v2, 사용자 메시지를 담은 새 봉투, ignorable 미표시.',
+      events: [
+        { type: 'turn/start', body: 'turn 1', cap: 'turn/start는 기장 이벤트라 양쪽 모두 메시지를 만들지 않아요.' },
+        { type: 'user/message', msg: { role: 'user', text: '로그인 API가 가끔 401이에요. 좀 봐 주세요' }, cap: '평범한 사용자 메시지, 양쪽 모두 정상 복원.' },
+        { type: 'assistant/message', msg: { role: 'assistant', text: '찾았어요. 시계 어긋남으로 토큰이 너무 일찍 만료됐어요' }, cap: '어시스턴트 답도 정상 복원. 여기까지는 양쪽 차이가 안 보여요.' },
+        { type: 'user/message-v2', unknown: true, hiddenMsg: { role: 'user', text: '그럼 허용 창을 30초로 맞춰 주세요' }, cap: '알 수 없는 이벤트가 왔어요. DSH는 그 자리에서 거부해 세션 전체를 복원하지 않고; best-effort는 조용히 건너뛰어 아무 일도 없던 듯합니다.', refuseL: REFUSE_UNKNOWN },
+        { type: 'assistant/message', msg: { role: 'assistant', text: '허용 창을 30초로 바꾸고 회귀 테스트도 넣었어요' }, cap: 'best-effort는 계속 읽어요. 오른쪽을 보세요: 어시스턴트가 없는 질문에 답합니다.', gapR: true },
+        { type: 'turn/end', body: 'completed', cap: '끝났어요. 오른쪽 세션은 쓸 만해 보이지만 사용자 그 말이 빠져 모델이 빈약한 이력 위에서 일합니다. 왼쪽은 아무것도 복원하지 않았지만, 이유와 파일 위치를 분명히 알려 줘요.', doneR: { kind: 'warn', text: '복원 「성공」: 이벤트 4, 조용히 1 건너뜀. 대화에서 빠진 그 말은 어떤 로그·경보에도 안 나옵니다.' } }
+      ]
+    },
+    B: {
+      header: { text: 'header · version: 0 · id: session-42', newer: false },
+      intro: '마찬가지로 알 수 없는 이벤트가 섞였지만, 순수 표시 정보라 작성자가 봉투에 ignorable: true를 달았어요.',
+      events: [
+        { type: 'turn/start', body: 'turn 1', cap: '기장 이벤트, 평소처럼.' },
+        { type: 'user/message', msg: { role: 'user', text: '빌드 스크립트 좀 빠르게 해 주세요' }, cap: '사용자 메시지, 양쪽 정상 복원.' },
+        { type: 'ui/theme-hint', unknown: true, ignorable: true, cap: '알 수 없는 이벤트지만 ignorable: true. 작성자 약속: 잃어도 재구성에 영향 없음. DSH는 표시를 확인한 뒤 건너뛰고 계속 읽어요.' },
+        { type: 'assistant/message', msg: { role: 'assistant', text: '두 단계를 병렬화해 빌드가 6분에서 2분으로 줄었어요' }, cap: '양쪽 모두 완전 복원.' },
+        { type: 'turn/end', body: 'completed', cap: '이게 어휘 성장의 바른길이에요. 평범한 새 이벤트는 버전을 안 올리고, 작성자가 무시 가능을 선언하면 옛 읽기가 안전하게 건너뜁니다. 기본 필수 + 명시 면제, 양쪽을 다 챙겼어요.', doneL: { kind: 'ok', text: '복원 성공: 작성자가 무시 가능이라 한 이벤트 1개를 건너뛰고, 재구성 결과는 완전해요.' }, doneR: { kind: 'ok', text: '복원 성공: 이벤트 1개를 건너뛰었어요.' } }
+      ]
+    },
+    C: {
+      header: { text: 'header · version: 1 · id: session-42', newer: true },
+      intro: '이 로그는 더 새 harness가 썼고 header version은 1인데, 현재 빌드는 v0만 알아요.',
+      events: [
+        { type: '(header)', headerCheck: true, cap: 'DSH는 어떤 이벤트든 디코딩하기 전에 버전을 비교해요. 1>0, 방향 분명: 거부하고 「harness를 업그레이드하세요」와 원본 경로를 밝힙니다. 데이터는 안 망가졌는데 손상이라 하면 억울해요.', refuseL: REFUSE_NEWER },
+        { type: 'user/message', garbled: true, raw: '{ role: ???, envelope: v1 }', cap: 'best-effort는 버전을 안 보고 억지 파싱해요. v1 봉투 모양이 바뀌어 필드가 안 맞습니다.' },
+        { type: 'assistant/message', garbled: true, raw: '[object Object]', cap: '계속 억지로 읽어, 복원된 것이 갈수록 말이 안 돼요.' },
+        { type: 'turn/end', body: '???', cap: '끝났어요. 오른쪽은 「복원」된 듯한 세션을 만들었지만 메시지마다 틀려요. 왼쪽은 처음부터 손을 멈춰, 사용자가 harness를 올린 뒤 이 로그를 온전히 열 수 있습니다.', doneR: { kind: 'warn', text: '복원 「성공」: 메시지 2, 내용이 실제 세션과 무관. 사용자가 이 엉망 이력 위에서 대화를 이어 갈 수 있어요.' } }
+      ]
+    }
+  };
+
+  var chipsEl = document.getElementById('dpChips');
+  var headerEl = document.getElementById('dpHeader');
+  var convL = document.getElementById('dpConvL');
+  var convR = document.getElementById('dpConvR');
+  var bannerL = document.getElementById('dpBannerL');
+  var bannerR = document.getElementById('dpBannerR');
+  var paneL = document.getElementById('dpPaneL');
+  var paneR = document.getElementById('dpPaneR');
+  var captionEl = document.getElementById('dpCaption');
+
+  var cur = 'A';
+  var idx = 0;
+  var timer = null;
+  var refusedL = false;
+  var runId = 0;
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function setCaption(t) { captionEl.textContent = t; }
+
+  function reset() {
+    runId++;
+    clearTimeout(timer);
+    timer = null;
+    idx = 0;
+    refusedL = false;
+    var sc = SCENES[cur];
+    headerEl.className = 'dp-header-line' + (sc.header.newer ? ' newer' : '');
+    headerEl.textContent = sc.header.text;
+    chipsEl.innerHTML = '';
+    convL.innerHTML = '<div class="dp-empty">(아직 복원된 메시지 없음)</div>';
+    convR.innerHTML = '<div class="dp-empty">(아직 복원된 메시지 없음)</div>';
+    bannerL.className = 'dp-banner'; bannerL.textContent = '';
+    bannerR.className = 'dp-banner'; bannerR.textContent = '';
+    paneL.className = 'dp-pane'; paneR.className = 'dp-pane';
+    setCaption(sc.intro + ' 「재생」또는 「단스텝」을 누르세요.');
+  }
+
+  function addChip(ev, seq) {
+    var chip = document.createElement('div');
+    chip.className = 'dp-chip' + (ev.unknown ? ' unknown' : '');
+    var label = '<b>' + esc(ev.type) + '</b>';
+    if (ev.ignorable) label += '<span class="tag">ignorable</span>';
+    chip.innerHTML = 'seq ' + seq + ' · ' + label;
+    chipsEl.appendChild(chip);
+    var olds = chipsEl.querySelectorAll('.dp-chip.active');
+    Array.prototype.forEach.call(olds, function (c) { c.classList.remove('active'); });
+    chip.classList.add('active');
+    requestAnimationFrame(function () { chip.classList.add('in'); });
+  }
+
+  function addMsg(box, msg, extraClass) {
+    var empty = box.querySelector('.dp-empty');
+    if (empty) empty.remove();
+    var row = document.createElement('div');
+    row.className = 'dp-msg' + (extraClass ? ' ' + extraClass : '');
+    if (msg.raw !== undefined) {
+      row.textContent = msg.raw;
+      row.classList.add('garbled');
+    } else {
+      row.innerHTML = '<span class="role">' + esc(msg.role) + '</span>' + esc(msg.text);
+    }
+    box.appendChild(row);
+    requestAnimationFrame(function () { row.classList.add('in'); });
+  }
+
+  function setBanner(el, pane, kind, text) {
+    el.className = 'dp-banner ' + kind;
+    el.textContent = text;
+    pane.className = 'dp-pane ' + (kind === 'fail' ? 'refused' : kind);
+  }
+
+  function doStep() {
+    var sc = SCENES[cur];
+    if (idx >= sc.events.length) { clearTimeout(timer); timer = null; return; }
+    var ev = sc.events[idx];
+    var seq = idx;
+    idx++;
+    if (!ev.headerCheck) addChip(ev, seq);
+    if (ev.cap) setCaption(ev.cap);
+
+    /* 左：DSH 加载器 */
+    if (!refusedL) {
+      if (ev.refuseL) {
+        refusedL = true;
+        setBanner(bannerL, paneL, 'fail', ev.refuseL);
+      } else if (ev.msg && !ev.garbled) {
+        addMsg(convL, ev.msg);
+      }
+    }
+    /* 右：best-effort 加载器 */
+    if (ev.garbled) {
+      addMsg(convR, { raw: ev.raw });
+    } else if (ev.msg) {
+      addMsg(convR, ev.msg, ev.gapR ? 'gap' : '');
+    }
+    /* 未知且不可忽略：右边静默跳过，什么都不画，这正是问题所在 */
+
+    if (ev.doneL) setBanner(bannerL, paneL, ev.doneL.kind, ev.doneL.text);
+    if (ev.doneR) setBanner(bannerR, paneR, ev.doneR.kind, ev.doneR.text);
+
+    if (timer !== null && idx < sc.events.length) {
+      var rid = runId;
+      timer = setTimeout(function () { if (rid === runId) doStep(); }, 1900);
+    } else if (idx >= sc.events.length) {
+      timer = null;
+    }
+  }
+
+  function play() {
+    if (timer !== null) return;
+    if (idx >= SCENES[cur].events.length) reset();
+    timer = setTimeout(function () {}, 0); /* 标记自动播放中 */
+    doStep();
+  }
+  function stepOnce() {
+    clearTimeout(timer);
+    timer = null;
+    if (idx >= SCENES[cur].events.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-persist .scene'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-persist .scene'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  document.getElementById('dpPlay').addEventListener('click', play);
+  document.getElementById('dpStep').addEventListener('click', stepOnce);
+  document.getElementById('dpReset').addEventListener('click', reset);
+
+  reset();
+  if (typeof window.lessonOnView === 'function') {
+    window.lessonOnView(document.getElementById('demo-persist'), play);
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

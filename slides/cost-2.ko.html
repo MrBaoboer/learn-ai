@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Token은 어떻게 세나: BPE와 숨은 Token 세금 | Token 비용 엔지니어링</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Token은 글자도 단어도 아니라, 통계 규칙으로 만들어진 서브워드예요. 단어 단위·문자 단위에서 BPE로의 진화, 중·영 Token 계산의 정량 비교, 그리고 중국어 사용자가 왜 선천적으로 약 2배의 숨은 Token 세금을 내는지.">
+<meta name="keywords" content="Token,BPE,토큰화,tiktoken,cl100k_base,Token 세금,중국어 분절,LLM 과금">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-2.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/cost-2.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/cost-2.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/cost-2.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/cost-2.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="Token은 어떻게 세나: BPE와 숨은 Token 세금">
+<meta property="og:description" content="중국어가 왜 선천적으로 2배 비쌀까요? BPE 병합 규칙부터 숨은 Token 세금까지.">
+<meta property="og:url" content="https://xueai.app/slides/cost-2.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/cost-2.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Token은 어떻게 세나: BPE와 숨은 Token 세금">
+<meta name="twitter:description" content="중국어가 왜 선천적으로 2배 비쌀까요? BPE 병합 규칙부터 숨은 Token 세금까지.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+
+/* 步骤卡 */
+.steps{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.step{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 17px;box-shadow:var(--shadow-card)}
+.step-num{width:28px;height:28px;border-radius:9px;background:var(--ct-soft);color:var(--ct-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;margin-top:2px}
+.step p{font-size:14px;color:var(--sub);line-height:1.75;margin:0}
+.step p b{color:var(--ct-deep)}
+
+/* 对比表 */
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl td.warn{color:var(--warn);font-weight:800}
+.tbl-wrap{overflow-x:auto}
+
+/* 交互：Token 税估算 */
+.tk-demo{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.tk-row{display:flex;flex-wrap:wrap;gap:9px}
+.tk-btn{padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:700;color:var(--text);transition:all .18s;min-height:42px}
+.tk-btn.on{border-color:var(--ct);background:var(--ct-soft);color:var(--ct-deep)}
+.tk-stage{margin-top:16px;min-height:120px}
+.tk-text{font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px;word-break:break-all}
+.tk-bars{display:flex;flex-direction:column;gap:10px}
+.tkb{display:flex;align-items:center;gap:10px}
+.tkb .n{font-size:12.5px;font-weight:700;color:var(--sub);width:110px;flex-shrink:0}
+.tkb .t{flex:1;height:24px;background:rgba(0,0,0,.045);border-radius:7px;overflow:hidden}
+.tkb .f{height:100%;border-radius:7px;transition:width .3s;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:12px;font-weight:800;color:#fff;min-width:60px}
+.tkb.en .f{background:#2563eb}
+.tkb.zh .f{background:var(--warn)}
+.tk-note{margin-top:12px;font-size:13.5px;color:var(--sub);line-height:1.75}
+.tk-note b{color:var(--ct-deep)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Token은 어떻게 세나: BPE와 숨은 Token 세금","name":"Token은 어떻게 세나: BPE와 숨은 Token 세금","url":"https://xueai.app/slides/cost-2.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 가격이 곧 아키텍처","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":true,"description":"Token은 글자도 단어도 아니라, 통계 규칙으로 만들어진 서브워드예요. 단어 단위·문자 단위에서 BPE로의 진화, 중·영 Token 계산의 정량 비교, 그리고 중국어 사용자가 왜 선천적으로 약 2배의 숨은 Token 세금을 내는지.","datePublished":"2026-08-10","dateModified":"2026-08-17"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 비용 엔지니어링 · 2 / 13</div>
+    <h1>Token은 어떻게 세나: BPE와 숨은 「Token 세금」</h1>
+    <p class="subtitle">청구서는 Token으로 정산되지만, Token은 도대체 어떻게 셀까요? 글자도 단어도 아니고, 통계 규칙으로 만들어진 「서브워드」예요. 이 규칙을 이해해야, 같은 한 문장이 중국어로는 왜 영어보다 선천적으로 2배 비싼지 알게 됩니다.</p>
+    <div class="chips"><span class="chip">BPE</span><span class="chip">서브워드 토큰화</span><span class="chip">tiktoken</span><span class="chip">Token 세금</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>문자에서 서브워드로의 진화, BPE 병합 규칙, 중국어가 왜 선천적으로 2배 비싼지; 「주인에게 뭘 남기세요」의 기묘한 병합</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">문자에서 서브워드로: 두 극단의 균형점</div>
+    <p class="desc">초기 NLP는 두 극단을 오갔어요. <b>단어 단위 분절</b>은 의미가 분명하지만, 영어 수십만 단어에 활용형(look / looks / looking / looked)까지 더하면 어휘 사전이 폭발하고, 본 적 없는 신조어(OOV)도 못 다룹니다. <b>문자 단위 분절</b>은 어떤 단어든 쪼개지만 시퀀스가 너무 길고, 글자 하나 정보량이 낮아 추론 효율이 최악이에요.</p>
+    <p class="desc" style="margin-top:10px">현대 LLM은 중간 길을 택했습니다——<b>서브워드 토큰화(Subword Tokenization)</b>: 흔한 단어는 통째 Token으로 두고, 드문 단어는 의미 있는 조각으로 나눕니다. 어휘 사전은 32k~200k로 유지해, 폭발도 없고 무엇이나 표현할 수 있어요.</p>
+    <div class="fig-wrap">
+      <img src="images/cost/tokenize-evolution.webp" alt="문자·단어·서브워드 단위로의 Tokenization 진화" loading="lazy">
+      <div class="fig-cap">Token은 단순한 글자나 단어가 아니라, 통계 규칙으로 만들어진 「서브워드」예요. BPE는 어휘 크기와 의미 표현의 균형을 맞춰 현대 LLM 학습·추론의 초석이 되었습니다. (그림: 저자 공유 원본)</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">BPE: 출현 빈도로 병합해 만든 어휘 사전</div>
+    <p class="desc">GPT 계열, Llama 3 모두 <b>BPE(Byte-Pair Encoding, 바이트 쌍 인코딩)</b>를 씁니다. 어휘 사전은 사람이 만든 게 아니라, 코퍼스에서 「병합」해 나온 거예요:</p>
+    <div class="steps">
+      <div class="step"><span class="step-num">1</span><p><b>초기화:</b> 코퍼스 전체를 최소 단위로 쪼갭니다(유니코드 텍스트는 먼저 UTF-8 인코딩 후 바이트 단위).</p></div>
+      <div class="step"><span class="step-num">2</span><p><b>빈도 집계:</b> 인접 바이트 쌍이 코퍼스에 얼마나 자주 나오는지 셉니다.</p></div>
+      <div class="step"><span class="step-num">3</span><p><b>가장 잦은 쌍을 병합:</b> 예를 들어 "u"와 "g"가 자주 이웃하면 새 기호 "ug"로 합쳐 어휘에 넣어요.</p></div>
+      <div class="step"><span class="step-num">4</span><p><b>반복:</b> 2·3단계를 어휘가 목표 크기에 이를 때까지——Llama 2는 32,000, GPT-4의 cl100k_base는 100,277.</p></div>
+    </div>
+    <p class="desc" style="margin-top:12px">추론 때는 반대로 조회: 흔한 단어 "hug"는 Token 하나; 드문 "bug"는 ["b", "ug"] 둘. <b>어휘가 클수록, 텍스트가 「흔할수록」 Token은 줄고 청구서는 얇아져요.</b> GPT-4가 10만 어휘로 바꾼 뒤 다단 들여쓰기 공백 시퀀스를 단일 Token으로 합친 이유——코드 생성 효율이 몇 배 뛰었습니다.</p>
+    <div class="fig-wrap">
+      <img src="images/cost/bpe.webp" alt="BPE 학습과 추론 과정" loading="lazy">
+      <div class="fig-cap">왼쪽: BPE 학습 시 최고빈도 바이트 쌍을 반복 병합해 어휘를 구축. 오른쪽: 추론 시 정규식으로 선분절한 뒤 병합 우선순위로 탐욕 병합. (그림: 저자 공유 원본)</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">숨은 「Token 세금」: 중국어는 선천적으로 2배 비싸다</div>
+    <p class="desc">주류 모델 Tokenizer 학습 코퍼스는 영어 비중이 커서, BPE가 배운 병합 규칙은 영어 어휘에 심하게 기울어요. 결과: <b>비라틴 문자권(중국어·일본어·한국어)은 토큰화에서 심각한 효율 열세</b>를 겪고, 업계는 이를 「Token 세금」이라 부릅니다.</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>언어</th><th>예시</th><th>Token 수</th><th>비율</th><th>현상 설명</th></tr>
+      <tr><td><b>영어</b></td><td>Donald John Trump</td><td>3</td><td>~0.75 Token/단어</td><td>흔한 단어가 곧 Token 1개로 매핑</td></tr>
+      <tr><td><b>중국어</b></td><td>唐纳德·约翰·特朗普</td><td class="warn">6</td><td class="warn">~1.5 – 2.5 Token/자</td><td>흔한 글자는 Token 1개, 희귀 글자는 2–3개 바이트 Token으로 쪼개짐</td></tr>
+      <tr><td><b>한국어</b></td><td>도널드 존 트럼프</td><td class="warn">7</td><td class="warn">~1.5 – 3.0 Token/자</td><td>인코딩 공간 커버가 부족해 자주 바이트 인코딩으로 후퇴</td></tr>
+    </table></div>
+    <p class="desc" style="margin-top:12px">같은 의미를 담을 때 중국어 사용자는 영어 사용자보다 <b>2배 이상 Token</b>을 씁니다: API 요금도 더 내고, 컨텍스트 윈도우도 사실상 짧아져요.</p>
+    <div class="fig-wrap">
+      <img src="images/cost/token-tax.webp" alt="다국어 환경의 Token 계산 차이" loading="lazy">
+      <div class="fig-cap">BPE는 영어에 편향: 같은 의미라도 중국어는 더 잘게 잘리고, 컨텍스트 윈도우도 사실상 더 짧아집니다. (그림: 저자 공유 원본)</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">인터랙티브 데모 · 같은 문장의 중·영 청구서</div>
+    <p class="desc">문장 하나를 골라 중·영 버전이 각각 몇 Token인지 비교해 보세요(전형 비율로 추정). 정확한 절단이 궁금하면 <a href="https://platform.openai.com/tokenizer" target="_blank" rel="noopener">OpenAI Tokenizer</a>에서 직접 시험하세요.</p>
+    <div class="tk-demo" id="tkDemo">
+      <div class="tk-row" id="tkRow"></div>
+      <div class="tk-stage">
+        <div class="tk-text" id="tkText">위 문장 중 아무거나 눌러 시작하세요.</div>
+        <div class="tk-bars" id="tkBars" style="display:none">
+          <div class="tkb en"><span class="n">영어판</span><div class="t"><div class="f" id="tkEnBar"></div></div></div>
+          <div class="tkb zh"><span class="n">중국어판</span><div class="t"><div class="f" id="tkZhBar"></div></div></div>
+        </div>
+        <p class="tk-note" id="tkNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">중국어의 또 다른 함정: 공백 없는 「알몸 질주」</div>
+    <p class="desc">영어에는 천연 가드레일이 있어요: BPE 병합 전에 공백으로 <b>선분절</b>하니, 병합은 단어 안에서만 일어나고 Token 경계가 대체로 언어학 직관과 맞습니다. 중국어는 공백이 없어 BPE가 경계를 <b>통계적 공출현 빈도에만 의존</b>해야 해요——논리 없는 광고 문구라도 코퍼스에 수백만 번 반복되면, BPE는 그걸 통째 「나눌 수 없는 최소 의미 단위」로 병합합니다.</p>
+    <p class="desc" style="margin-top:10px">가장 유명한 예가 「<b>给主人留下些什么吧</b>」(주인에게 뭘 남기세요): 블로그 시대 고빈도 방명록 문구가 GPT 어휘에서 강제 병합되어 독립 Token이 된, 유명한 「글리치 Token」이에요. 농담이 아니라 BPE 통계 논리의 필연 산물입니다.</p>
+    <div class="fig-wrap">
+      <img src="images/cost/zh-bpe.webp" alt="영어 선분절 가드레일과 중국어 공출현 빈도 의존 대비" loading="lazy">
+      <div class="fig-cap">영어는 공백 선분절로 경계가 직관에 맞고, 중국어는 공출현 빈도에 기대 고빈도 텍스트가 단일 Token으로 강제 병합됩니다. (그림: 저자 공유 원본)</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">핵심 요점</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Token은 통계로 만든 서브워드,</b> 글자도 단어도 아니에요. BPE는 코퍼스 빈도로 반복 병합하고, 어휘 크기는 하이퍼파라미터입니다.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>중국어는 선천적으로 Token 세금을 내요:</b> 같은 의미에 영어보다 2배 이상 들고, 컨텍스트 윈도우도 사실상 짧아집니다. 예산 잡을 때 영어 감으로 찍지 마세요.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>어휘가 압축률을 정합니다.</b> cl100k_base 10만 어휘 + 공백 병합 최적화가 GPT-4 코드 효율의 직접 원인이에요. 모델 고를 때 Tokenizer 효율도 비용 파라미터입니다.</p></div>
+    </div>
+    <p class="src-note">
+      <b>출처:</b> 저자 팀 내부 공유 《AI Token 비용 엔지니어링 전략 공유》 제1부 「Token의 구성」에서 정리. BPE 세부사항은 <a href="https://platform.openai.com/tokenizer" target="_blank" rel="noopener">OpenAI Tokenizer</a>와 tiktoken 오픈소스 라이브러리를 참고하세요. 분절과 어휘 사전의 하부 원리를 복습하려면 <a href="1-2-vocab.html">대규모 언어 모델 원리 · 어휘 사전과 학습</a>으로 돌아가세요.
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<script>
+/* ── Token 税对比：按典型比率估算（英文 ~0.75 Token/词，中文 ~1.8 Token/字） ── */
+var TK = [
+  {label:'일상 한 마디', en:'Please summarize this meeting in three sentences.', zh:'请用三句话总结这场会议。',
+   note:'짧은 문장은 차이가 덜하지만, 중국어는 글자마다 과금되고 영어는 단어 하나가 곧 Token인 경우가 많아요.'},
+  {label:'고객센터 답변', en:'We have received your refund request and will process it within 3 business days.', zh:'我们已收到您的退款申请，将在 3 个工作日内为您处理完毕。',
+   note:'중국어 예의 표현(您, 为您, 完毕)도 고분고분 세금을 내요. 시스템 프롬프트에 이런 말이 수백만 번 쌓이면 무시 못 합니다.'},
+  {label:'전문 용어', en:'Retrieval-Augmented Generation reduces hallucination.', zh:'检索增强生成技术能够降低大模型幻觉。',
+   note:'영어 RAG 관련 어휘는 코퍼스에 고빈도로 나와 병합이 잘 되고, 중국어 기술어는 낱글자·심지어 바이트로 쪼개지기 쉬워요.'},
+  {label:'희귀 내용', en:'The ancient bronze tripod bears inscriptions.', zh:'这尊青铜鼎镌刻着铭文，饕餮纹饰斑驳。',
+   note:'「镌」「饕餮」 같은 희귀 글자는 2–3개 바이트 Token으로 쪼개져, 글자 하나가 영어 여러 단어 값을 합니다.'}
+];
+function tkEstEn(s){ return Math.round(s.split(/\s+/).length * 1.05); }
+function tkEstZh(s){ return Math.round(s.replace(/[^\u4e00-\u9fa5]/g,'').length * 1.8 + s.replace(/[\u4e00-\u9fa5\s]/g,'').length * 0.6); }
+var tkCur = -1;
+function tkRender(){
+  var row = document.getElementById('tkRow'); row.innerHTML='';
+  TK.forEach(function(t,i){
+    var b=document.createElement('button'); b.className='tk-btn'+(i===tkCur?' on':''); b.type='button';
+    b.textContent=t.label; b.onclick=function(){tkPick(i);}; row.appendChild(b);
+  });
+}
+function tkPick(i){
+  tkCur=i; var t=TK[i];
+  document.getElementById('tkText').innerHTML='EN：'+t.en+'<br>중：'+t.zh;
+  document.getElementById('tkBars').style.display='flex';
+  var en=tkEstEn(t.en), zh=tkEstZh(t.zh), mx=Math.max(en,zh);
+  var eb=document.getElementById('tkEnBar'), zb=document.getElementById('tkZhBar');
+  eb.style.width=Math.max(15,Math.round(en/mx*100))+'%'; eb.textContent='≈'+en+' Tokens';
+  zb.style.width=Math.max(15,Math.round(zh/mx*100))+'%'; zb.textContent='≈'+zh+' Tokens';
+  document.getElementById('tkNote').innerHTML='중국어는 영어의 약 <b>'+(zh/en).toFixed(1)+'배</b>예요. '+t.note+' (추정치, 정확한 절단은 공식 Tokenizer를 쓰세요)';
+  tkRender();
+}
+tkRender();
+lessonOnView(document.getElementById('tkDemo'), function(){ if(tkCur<0) tkPick(0); });
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

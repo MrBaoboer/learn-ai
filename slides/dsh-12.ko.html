@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>도구 실행 파이프라인: 3단 폭포와 단조 Guard | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.24);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.05),0 0 0 52px rgba(77,107,254,.028)}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.prose{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.core-visual{background:var(--card);border:1px solid rgba(77,107,254,.25);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.core-visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.source{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.doc-quote{margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;box-shadow:var(--shadow-card)}.doc-quote .dq-path{font:700 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);overflow-wrap:anywhere;margin-bottom:8px}.doc-quote blockquote{margin:0;font-size:14px;line-height:1.9;color:var(--text)}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#f0f3ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.28);color:var(--text);display:flex;gap:14px;line-height:1.9;font-size:14px}.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+/* ── 인터랙티브 데모 · 파이프라인 클리어 ── */
+.demo{background:var(--card);border:1px solid rgba(77,107,254,.25);border-radius:18px;padding:28px;box-shadow:var(--shadow-card)}
+.demo-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.demo-scenarios,.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 15px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:600 13px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+.demo button.active,.demo button:hover{border-color:var(--accent)}
+.demo button.active{background:var(--accent);color:#fff}
+.demo button svg{flex:none}
+.pipe-call{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.call-chip{display:inline-flex;align-items:center;gap:8px;background:var(--bg);border:1.5px solid rgba(77,107,254,.35);border-radius:999px;padding:8px 16px;font:700 13px/1.2 ui-monospace,Menlo,monospace;color:var(--accent-deep)}
+.call-chip svg{color:var(--accent)}
+.verdict{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:13px;min-height:24px}
+.verdict.yes{color:var(--success)}.verdict.no{color:var(--danger)}
+.pipe-track{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stage-col{background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:12px;transition:border-color .3s,box-shadow .3s}
+.stage-col.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.stage-col.done{border-color:rgba(22,163,74,.45)}
+.stage-col.bad{border-color:rgba(220,38,38,.55)}
+.stage-col.skip{opacity:.45}
+.st-head{font:800 12px/1.4 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:var(--accent-deep);margin-bottom:2px}
+.st-sub{font-size:11px;color:var(--sub);margin-bottom:10px;line-height:1.5}
+.chip{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 10px;font-size:12px;color:var(--text);margin-top:6px;transition:background .25s,border-color .25s,transform .25s}
+.chip .mark{flex:none;width:18px;height:18px;display:grid;place-items:center;color:var(--sub)}
+.chip.active{border-color:var(--accent);background:var(--accent-soft);transform:translateX(2px)}
+.chip.pass{border-color:rgba(22,163,74,.4)}.chip.pass .mark{color:var(--success)}
+.chip.deny{border-color:rgba(220,38,38,.5);background:rgba(220,38,38,.06)}.chip.deny .mark{color:var(--danger)}
+.chip.abstain .mark{color:var(--sub)}
+.chip.evil{border-style:dashed;border-color:rgba(217,119,6,.6)}
+.chip.gone{opacity:.4}
+.pipe-status{margin-top:16px;min-height:56px;font-size:14px;color:var(--text);line-height:1.8;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.demo-note{font-size:12px;color:var(--sub);margin-top:12px;line-height:1.7}
+@media(max-width:760px){.facts{grid-template-columns:1fr}.pipe-track{grid-template-columns:1fr}.objective{grid-template-columns:1fr}.lesson-header:after{display:none}.demo-bar{flex-direction:column;align-items:stretch}.demo button{flex:1}.source-head{flex-direction:column}}
+</style>
+<meta name="description" content="DeepSeek Harness의 도구 실행 파이프라인을 해부합니다: pre-execute·execute·post-execute 3단 폭포가 각각 무엇을 맡는지, 단조 Guard가 왜 타입에 허용(allow) 옵션이 없는지, 거부된 호출이 어떻게 모델이 보는 에러 결과로 물화되는지.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"도구 실행 파이프라인: 3단 폭포와 단조 Guard","name":"도구 실행 파이프라인: 3단 폭포와 단조 Guard","url":"https://xueai.app/slides/dsh-12.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문에서 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 도구 시스템","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"DeepSeek Harness의 도구 실행 파이프라인을 해부합니다: pre-execute·execute·post-execute 3단 폭포가 각각 무엇을 맡는지, 단조 Guard가 왜 타입에 허용(allow) 옵션이 없는지, 거부된 호출이 어떻게 모델이 보는 에러 결과로 물화되는지.","datePublished":"2026-08-13","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="도구 실행 파이프라인: 3단 폭포와 단조 Guard"><meta property="og:description" content="DeepSeek Harness의 도구 실행 파이프라인을 해부합니다: pre-execute·execute·post-execute 3단 폭포가 각각 무엇을 맡는지, 단조 Guard가 왜 타입에 허용(allow) 옵션이 없는지, 거부된 호출이 어떻게 모델이 보는 에러 결과로 물화되는지."><meta property="og:url" content="https://xueai.app/slides/dsh-12.ko.html"><meta property="og:image" content="https://xueai.app/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.app/slides/dsh-12.ko.html">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:locale" content="ko_KR">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/dsh-12.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/dsh-12.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/dsh-12.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/dsh-12.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 도구 시스템</div>
+    <h1>도구 실행 파이프라인: 3단 폭포와 단조 Guard</h1>
+    <p class="subtitle">pre-execute에서 post-execute까지 3단 관선, Guard는 조일 수만 있고 허용할 수 없습니다. 핵심 소스:<code>packages/core/tools/src/index.ts</code>。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>pre-execute에서 post-execute까지 3단 관선, Guard는 조일 수만 있고 허용할 수 없습니다</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>강의 목표</b>이 레슨을 마치면 세 가지를 말할 수 있어요: DSH에서 도구 호출이 거치는 3단 폭포와 각 단의 역할; Guard 타입에 allow가 없어 플러그인 순서로도 거부를 뒤집을 수 없는 이유; 거부된 호출은 사라지지 않고 모델이 보는 에러 결과로 물화되어 파이프라인을 끝까지 간다는 점.</span>
+  </div>
+
+  <div class="sec-label">인터랙티브 데모 · 파이프라인 클리어</div>
+  <div id="demo-pipeline" class="demo reveal">
+    <div class="demo-bar">
+      <div class="demo-scenarios">
+        <button class="scn active" data-scn="A">시나리오 A · 전부 통과</button>
+        <button class="scn" data-scn="B">시나리오 B · Guard가 막음</button>
+        <button class="scn" data-scn="C">시나리오 C · 악의적 허용 플러그인</button>
+      </div>
+      <div class="demo-ctrl">
+        <button id="dp-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"/></svg>재생</button>
+        <button id="dp-step"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4v16l10-8z"/><path d="M19 4v16"/></svg>단스텝</button>
+        <button id="dp-reset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>초기화</button>
+      </div>
+    </div>
+    <div class="pipe-call">
+      <span class="call-chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg><span id="dp-call">bash: rm -rf build/</span></span>
+      <span class="verdict" id="dp-verdict"></span>
+    </div>
+    <div class="pipe-track">
+      <div class="stage-col" id="st-pre">
+        <div class="st-head">1단 · pre-execute 폭포</div>
+        <div class="st-sub">입장 전 표결: allow / deny / ask, 리스너 재배열 가능</div>
+        <div id="chips-pre"></div>
+      </div>
+      <div class="stage-col" id="st-guard">
+        <div class="st-head">Guard 층 · 단조 가드</div>
+        <div class="st-sub">거부 이유 또는 기권만 — 타입에 allow 없음</div>
+        <div id="chips-guard"></div>
+      </div>
+      <div class="stage-col" id="st-exec">
+        <div class="st-head">2단 · execute 폭포</div>
+        <div class="st-sub">실행을 감쌈: 타임아웃, 재시도, 지표</div>
+        <div id="chips-exec"></div>
+      </div>
+      <div class="stage-col" id="st-post">
+        <div class="st-head">3단 · post-execute 폭포</div>
+        <div class="st-sub">나가기 전 개서: accept / block, 내용 또는 값 교체</div>
+        <div id="chips-post"></div>
+      </div>
+    </div>
+    <div class="pipe-status" id="dp-status">시나리오를 고른 뒤 「재생」을 누르거나, 여기로 스크롤하면 시나리오 A가 자동 재생됩니다.</div>
+    <div class="demo-note">수업용 시뮬레이션입니다: 리스너·가드 이름은 수업용 예시이고, 단 순서와 Guard의 단조 의미는 <code>packages/core/tools/src/index.ts</code>와 <code>docs/tool-execution-pipeline.zh.md</code>에 대응합니다. 플레이할 때 하나만 보세요: 어느 한 단계가 거부 이유를 주면 뒤에서는 아무도 뒤집지 못합니다.</div>
+  </div>
+
+  <div class="sec-label">메커니즘 분해 · 3단이 각각 무엇을 맡나</div>
+  <p class="prose reveal">먼저 문제를 말하겠습니다. 권한 검사, 사람 승인, 타임아웃, 결과 개서, UI 렌더 — 전부 도구 실행이라는 한 동작에 걸고 싶어합니다. 도구마다 스스로 처리하면 도구 40개에 권한 코드 40벌입니다. DSH는 도구 실행을 파이프라인으로 만들고, 정책은 고정 스테이션에 두며, 도구 본체는 한 일만 합니다: 실행하고 값을 반환.</p>
+  <p class="prose reveal">파이프라인 순서는 <code>docs/tool-execution-pipeline.zh.md</code> 8행에 있습니다: <code>tools/pre-execute</code>가 먼저, 그다음 단조 가드, 이어서 <code>tools/execute</code>와 <code>tools/post-execute</code>. 폭포(waterfall)는 DSH의 리스너 대기열입니다: 각 리스너가 <code>(exec, next)</code>를 받고 <code>next()</code>로 결정권을 넘기거나, 결정을 바로 반환해 현장에서 확정합니다.</p>
+  <p class="prose reveal">3단 분담은 분명합니다. 1단 pre-execute는 도구가 돌기 전에 표결하고, 반환은 allow·deny·ask(사람 승인)뿐입니다. ask는 승인 서비스의 allowed-once를 받아야 계속하고, 승인 채널이 없으면 deny로 칩니다. 2단 execute는 감싸기: 타임아웃·재시도·지표가 실제 실행을 감싸며, 취소 신호는 바꿀 수 있어도 호출 신원은 못 바꿉니다. 3단 post-execute는 결과가 나온 뒤 검사: 그대로 수락, 내용 교체, 값 교체, 또는 block으로 교정 에러로 바꿉니다.</p>
+  <div class="facts">
+    <div class="fact reveal"><code>거부는 침묵이 아님</code><p>deny된 호출은 <code>Error: 이유</code>의 isError 결과로 물화되고, post-execute와 <code>tools/result</code>도 그대로 탑니다. 모델은 왜 거부됐는지 보고, 루프는 거부 한 번에 멈추지 않습니다.</p></div>
+    <div class="fact reveal"><code>파라미터는 못 바꿈</code><p>pre-execute는 거부할 수 있어도 파라미터를 개서하지는 못합니다. <code>tool/call</code> 이벤트가 실행 전에 로그에 남고, UI의 대기 카드도 원 파라미터로 이미 렌더됐기 때문에, 바꾸면 역사·화면·실행이 어긋납니다(<code>index.ts</code> 583–586행 타입 주석이 이 제외를 명시).</p></div>
+    <div class="fact reveal"><code>Guard는 동기 최종 심의</code><p>Guard는 pre-execute가 모두 표결한 뒤, 도구 본체 전에 돌며 시그니처는 동기 함수입니다: 문자열이면 거부 이유, <code>undefined</code>면 기권. 전역 Guard를 먼저 묻고, agent 스코프 체인을 먼 쪽에서 가까운 쪽으로 묻습니다(<code>index.ts</code> 1118–1127행).</p></div>
+  </div>
+
+  <div class="sec-label">핵심 시각 · 호출 한 번의 전체 경로</div>
+  <div class="core-visual reveal">
+    <svg viewBox="0 0 940 300" role="img" aria-label="도구 실행 파이프라인 구조도">
+      <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#4d6bfe"/></marker></defs>
+      <rect x="16" y="26" width="150" height="66" rx="12" fill="#f0f3ff" stroke="rgba(77,107,254,.4)"/>
+      <text x="91" y="54" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">tool/call 로그 기록</text>
+      <text x="91" y="74" fill="#6b7280" text-anchor="middle" font-size="11">UI가 대기 카드를 동기 렌더</text>
+      <path fill="none" d="M166 59 H210" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="212" y="26" width="170" height="66" rx="12" fill="#fff" stroke="rgba(77,107,254,.4)"/>
+      <text x="297" y="54" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">pre-execute 폭포</text>
+      <text x="297" y="74" fill="#6b7280" text-anchor="middle" font-size="11">allow / deny / ask</text>
+      <path fill="none" d="M297 92 V140" stroke="#4d6bfe" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+      <rect x="222" y="144" width="150" height="52" rx="12" fill="#fff" stroke="rgba(77,107,254,.3)" stroke-dasharray="5 4"/>
+      <text x="297" y="166" fill="#3450d4" text-anchor="middle" font-size="12" font-weight="700">ctx.approval 승인</text>
+      <text x="297" y="184" fill="#6b7280" text-anchor="middle" font-size="10">allowed-once일 때만 계속</text>
+      <path fill="none" d="M382 59 H426" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="428" y="26" width="150" height="66" rx="12" fill="url(#gg)" stroke="#3450d4"/>
+      <defs><linearGradient id="gg" x1="0" x2="1"><stop stop-color="#3450d4"/><stop offset="1" stop-color="#4d6bfe"/></linearGradient></defs>
+      <text x="503" y="54" fill="#fff" text-anchor="middle" font-size="13" font-weight="800">단조 Guard</text>
+      <text x="503" y="74" fill="#dfe6ff" text-anchor="middle" font-size="11">deny 또는 기권, allow 없음</text>
+      <path fill="none" d="M578 59 H622" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="624" y="26" width="140" height="66" rx="12" fill="#fff" stroke="rgba(77,107,254,.4)"/>
+      <text x="694" y="54" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">execute 폭포</text>
+      <text x="694" y="74" fill="#6b7280" text-anchor="middle" font-size="11">타임아웃 / 재시도 / 도구 본체</text>
+      <path fill="none" d="M764 59 H808" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="810" y="26" width="116" height="66" rx="12" fill="#fff" stroke="rgba(77,107,254,.4)"/>
+      <text x="868" y="54" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">post-execute</text>
+      <text x="868" y="74" fill="#6b7280" text-anchor="middle" font-size="11">accept / block</text>
+      <path fill="none" d="M503 92 V236 H560" stroke="#dc2626" stroke-width="2" marker-end="url(#ar2)"/>
+      <defs><marker id="ar2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#dc2626"/></marker></defs>
+      <rect x="562" y="210" width="200" height="52" rx="12" fill="rgba(220,38,38,.06)" stroke="rgba(220,38,38,.5)"/>
+      <text x="662" y="232" fill="#dc2626" text-anchor="middle" font-size="12" font-weight="700">deny가 Error 결과로 물화</text>
+      <text x="662" y="250" fill="#6b7280" text-anchor="middle" font-size="10">도구 본체 건너뛰고 post-execute는 계속</text>
+      <path fill="none" d="M762 236 H830 V96" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar2)"/>
+      <text x="868" y="130" fill="#6b7280" text-anchor="middle" font-size="11">finalizeContent 이후</text>
+      <text x="868" y="148" fill="#6b7280" text-anchor="middle" font-size="11">tools/result가 확정본을 동결</text>
+    </svg>
+    <div class="visual-caption">수업용 구조도: 경로는 docs/tool-execution-pipeline.zh.md의 공식 흐름도에 대응하며, 노드 문안은 수업에 맞게 정리했습니다.</div>
+  </div>
+
+  <div class="sec-label">Guard의 단조성 · 타입에 allow가 없는 이유</div>
+  <p class="prose reveal">경계 문제부터: pre-execute 리스너 둘 — 하나는 allow, 하나는 ask — 누구 말을 듣나? 앞에 선 쪽입니다. 폭포는 숏서킷이라 <code>next()</code>를 안 부르고 결정을 반환한 첫 리스너가 확정합니다. 그래서 pre-execute는 본질적으로 순서에 민감하고, 플러그인 로드 순서가 바뀌면 보안 결론도 바뀔 수 있습니다.</p>
+  <p class="prose reveal paywall-locked xa-peek">DSH의 해법은 pre-execute 뒤에 순서에 둔감한 최종 심의를 두는 것입니다. Guard 반환 타입은 두 가지뿐입니다: 문자열(거부 이유) 또는 <code>undefined</code>(기권). 동의를 표현하는 반환값은 없습니다. Guard를 열 개 등록하든 백 개든, 어떻게 늘어놓아도 결론은 더 엄해질 수만 있고 느슨해질 수는 없습니다. 타입 정의가 증거입니다:</p>
+  <div class="source reveal paywall-locked">
+    <div class="source-head"><span>packages/core/tools/src/index.ts</span><span>703–711행</span></div>
+    <pre><code><span class="cm">/**
+ * A monotonic execution guard evaluated after every `tools/pre-execute`
+ * listener and before the tool body. Returning a reason denies the call;
+ * returning `undefined` leaves it unchanged. Because guards have no allow
+ * result, listener ordering cannot turn a denial back into permission.
+ * @param execution - the identity-protected call after extensible pre-execute policy completed.
+ * @returns a final denial reason, or `undefined` to leave the call allowed.
+ */</span>
+<span class="kw">export type</span> <span class="ty">ToolGuard</span> = (execution: <span class="ty">Readonly</span>&lt;<span class="ty">ToolExecution</span>&gt;) =&gt; <span class="ty">string</span> | <span class="kw">undefined</span></code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>소스 스냅샷 안내:</b>로컬 저장소 deepseek-harness-master 기준, 확인 파일 <code>packages/core/tools/src/index.ts</code>, 확인일 2026-08-13. 코드 블록은 소스 원문을 유지합니다.</div>
+  <p class="prose reveal paywall-locked">주석의 그 문장은 옮겨 적을 만합니다: “guards have no allow result, listener ordering cannot turn a denial back into permission.” 거부된 호출을 허용하려는 악의적 플러그인은 런타임 방어가 필요 없습니다 — 타입 시스템에 그 동작을 쓸 수 없거든요. 런타임에 허용 권한을 검사하는 것보다 깔끔하고, 문제 부류 자체가 사라집니다.</p>
+  <p class="prose reveal paywall-locked">거부 뒤에 무엇이 일어나는지 봅시다. 스케줄러의 확정 로직은 두 단계입니다: pre-execute 결정이 allow(승인된 ask 포함)일 때만 Guard가 하나씩 표결하고; pre-execute 거부 이유와 Guard 거부 이유는 같은 변수로 모이며, 어느 쪽이든 이유를 주면 호출은 그 자리에서 <code>Error: 이유</code> 에러 결과로 물화됩니다. 도구 본체는 손도 대지 않지만, 이 결과는 post-result 표시를 달고 post-execute와 최종 관찰자에게 계속 넘어갑니다.</p>
+  <p class="prose reveal paywall-locked">그래서 감사 플러그인·컨텍스트 주입 플러그인은 거부 장면에서도 평소처럼 일하고, 거부는 파이프라인 나머지에게 그저 보통 결과입니다. 도구 예외와 UNKNOWN_TOOL도 같은 정규화 경로를 탑니다.</p>
+  <p class="src-note reveal paywall-locked">출처: 확정과 물화는 <code>packages/core/tools/src/index.ts</code> 1486–1499행, 예외와 UNKNOWN_TOOL 정규화는 1546–1555행, 확인일 2026-08-13.</p>
+
+  <div class="sec-label paywall-locked">가로 비교 · 같은 자리, 세 곳의 세 답</div>
+  <p class="prose reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg><b>Claude Code</b>는 권한 판단을 Tool 인터페이스 메서드에 흩뿌립니다: 도구마다 <code>checkPermissions</code>·<code>validateInput</code>·<code>isReadOnly</code>를 갖고, BashTool은 화이트리스트와 ML 분류기까지 이읍니다(study/chapters/02-tool-system.md 350–376행). 외장 확장은 PreToolUse / PostToolUse hooks. 흥미로운 점은 DSH가 CC hooks 브리지 플러그인 <code>packages/hooks/hooks-claude-code</code>를 직접 구현해 CC hook을 DSH 폭포에 걸어 돌리며, 브리지 문서가 프로토콜 차이 두 가지를 슬쩍 드러낸다는 것입니다:</p>
+  <div class="doc-quote reveal paywall-locked">
+    <div class="dq-path">packages/hooks/hooks-claude-code/README.zh.md · 92행(알려진 제한)</div>
+    <blockquote>「<code>PreToolUse</code>는 일부만 지원: <code>deny</code>와 <code>ask</code> 결정은 가능; <code>allow</code>는 사전 승인하지 않고, <code>defer</code>는 미지원, <code>additionalContext</code>는 무시되며, <code>updatedInput</code>은 기록+경고만 하고 적용하지 않음」</blockquote>
+  </div>
+  <p class="prose reveal paywall-locked">이 두 제한에는 다른 이유도 있습니다: 파이프라인 불변식이 길을 막고 있어요. CC 네이티브 hook은 allow 사전 승인과 updatedInput으로 도구 파라미터 개서가 가능하지만, DSH 브리지는 전자를 강등하고 후자는 로그만 남기며 실행하지 않습니다 — DSH에서 허용권은 빌려주지 않고, 파라미터는 <code>tool/call</code> 로그 이후 불변입니다. 같은 CC hook 설정이 호스트만 바꿔도 할 수 있는 일이 줄어드니, 두 프로토콜의 표현력 경계를 재는 셈입니다. 또한 여러 CC hook은 브리지에서 가장 엄격하게 접히고(deny > ask > allow), 접힘 결과는 순서와 무관합니다(README 49행) — Guard의 단조 사고와 한 줄기입니다.</p>
+  <p class="prose reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg><b>Grok Build</b>의 hooks 시스템(<code>crates/codegen/xai-grok-hooks</code>)은 pre_tool_use 한 지점만 막을 수 있고, 결정 타입은 Allow 또는 Deny 두 값이며(<code>src/result.rs</code> 5–10행), 모듈 주석이 실패 의미를 바로 적습니다:</p>
+  <div class="doc-quote reveal paywall-locked">
+    <div class="dq-path">grok-build-main/crates/codegen/xai-grok-hooks/src/lib.rs · 16–17행</div>
+    <blockquote>“- <code>pre_tool_use</code> hooks can deny/allow (blocking); all others are non-blocking<br>- Fail-open by default: hook failures do not block normal operation”</blockquote>
+  </div>
+  <p class="prose reveal paywall-locked">Fail-open은 hook 자신이 죽거나 타임아웃해도 호출이 그대로 통과한다는 뜻입니다. DSH는 반대로: pre-execute 리스너가 예외를 던지면 이번 호출을 바로 에러 결과로 정규화합니다 — 차라리 과잉 차단. 둘 다 말이 됩니다. Grok은 hooks를 외장 강화로 보고 사용자 스크립트가 주 흐름을 무너뜨리지 않게 하고; DSH는 정책을 파이프라인의 정식 스테이션으로 보아 스테이션이 무너지면 호출이 지나면 안 됩니다. Grok 도구 시스템의 레지스트리와 읽기 전용 의미는 사이트의 <a href="12-8.html">ToolKind가 기본 읽기 전용 의미를 제공</a> 레슨에 온전히 풀어 두었습니다.</p>
+
+  <div class="sec-label paywall-locked">수업 실습</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>rm -rf 전체 경로를 손으로 추적</h3><p>배포에 pre-execute 리스너 둘(먼저 CC hooks 브리지에 ask 규칙; 다음 화이트리스트 플러그인이 rm에 allow 반환)과 샌드박스 Guard 하나(워크스페이스 밖 쓰기 명령에 이유 반환)가 등록돼 있습니다. 모델이 <code>bash: rm -rf /tmp/x</code>를 냅니다. 1문: 승인 팝업이 뜨나? 2문: pre-execute 둘의 등록 순서를 바꾸면 답이 달라지나? 3문: 샌드박스 Guard 결론이 이 순서에 영향받나? 왜? (힌트: 폭포 숏서킷 + 1486행 denialReason은 allow 이후에만 Guard를 물음.)</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway:</b>3단 폭포가 각각 한 구간을 맡습니다: 입장 전 표결, 실행을 감싸기, 나가기 전 결과 개서. 순서에 민감한 확장은 폭포에, 순서에 둔감한 거부권은 Guard에 — Guard 타입에 allow가 없어 거부가 성립하면 아무도 뒤집지 못합니다. 거부도 일급 결과입니다: Error 텍스트로 물화해 모델에 주고, 파이프라인은 그대로 끝까지 갑니다.</span>
+  </div>
+</article>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var statusEl = $('dp-status');
+  var verdictEl = $('dp-verdict');
+  var cur = 'A';
+  var steps = [];
+  var idx = 0;
+  var timer = null;
+  var playing = false;
+  var runId = 0;
+
+  var SVG_DOT = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>';
+  var SVG_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>';
+  var SVG_CROSS = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  var SVG_SKIP = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>';
+
+  var CHIPS = {
+    A: { pre: [['hook', 'CC hooks 브리지'], ['appr', '승인 정책']], guard: [['sand', '샌드박스 가드'], ['ro', '읽기 전용 모드 가드']], exec: [['to', '타임아웃 래퍼'], ['body', '도구 본체 bash']], post: [['audit', '감사 플러그인']] },
+    B: { pre: [['hook', 'CC hooks 브리지'], ['appr', '승인 정책']], guard: [['sand', '샌드박스 가드'], ['ro', '읽기 전용 모드 가드']], exec: [['to', '타임아웃 래퍼'], ['body', '도구 본체 bash']], post: [['audit', '감사 플러그인']] },
+    C: { pre: [['hook', 'CC hooks 브리지']], guard: [['evil', '악의적 허용 플러그인', 'evil'], ['sand', '샌드박스 가드']], exec: [['to', '타임아웃 래퍼'], ['body', '도구 본체 bash']], post: [['audit', '감사 플러그인']] }
+  };
+
+  function buildChips() {
+    var conf = CHIPS[cur];
+    ['pre', 'guard', 'exec', 'post'].forEach(function (st) {
+      var wrap = $('chips-' + st);
+      wrap.innerHTML = '';
+      conf[st].forEach(function (c) {
+        var d = document.createElement('div');
+        d.className = 'chip' + (c[2] ? ' ' + c[2] : '');
+        d.id = 'ch-' + c[0];
+        d.innerHTML = '<span>' + c[1] + '</span><span class="mark">' + SVG_DOT + '</span>';
+        wrap.appendChild(d);
+      });
+    });
+  }
+
+  function setChip(id, state, mark) {
+    var el = $('ch-' + id);
+    if (!el) return;
+    el.classList.remove('active', 'pass', 'deny', 'abstain', 'gone');
+    if (state) el.classList.add(state);
+    if (mark) el.querySelector('.mark').innerHTML = mark;
+  }
+  function setStage(id, cls) {
+    var el = $('st-' + id);
+    el.classList.remove('on', 'done', 'bad', 'skip');
+    if (cls) cls.split(' ').forEach(function (c) { el.classList.add(c); });
+  }
+  function setStatus(t) { statusEl.textContent = t; }
+  function setVerdict(ok, text) {
+    verdictEl.className = 'verdict ' + (ok ? 'yes' : 'no');
+    verdictEl.innerHTML = (ok ? SVG_CHECK : SVG_CROSS) + '<span>' + text + '</span>';
+  }
+
+  function buildA() {
+    return [
+      { cap: '모델이 도구 호출을 시작합니다. tool/call이 먼저 로그에 남고, UI가 대기 카드를 동기적으로 켭니다.', run: function () { setStage('pre', 'on'); } },
+      { cap: '1단 시작. CC hooks 브리지에 이 명령 규칙이 없어 next()로 마이크를 다음에게 넘깁니다.', run: function () { setChip('hook', 'active'); } },
+      { cap: '승인 정책이 봅니다: 명령이 화이트리스트에 있어 allow. 1단 결론: allow.', run: function () { setChip('hook', 'pass', SVG_CHECK); setChip('appr', 'pass', SVG_CHECK); } },
+      { cap: 'Guard 층 진입. 샌드박스 가드가 경로를 검사: build/는 워크스페이스 안 — 기권(undefined 반환).', run: function () { setStage('pre', 'done'); setStage('guard', 'on'); setChip('sand', 'abstain', SVG_SKIP); } },
+      { cap: '읽기 전용 모드 가드: 지금 읽기 전용이 아니라 역시 기권. 아무도 이유를 안 줘 호출이 계속됩니다.', run: function () { setChip('ro', 'abstain', SVG_SKIP); } },
+      { cap: '2단. 타임아웃 래퍼가 타이머를 켜고 실행을 도구 본체에 넘깁니다.', run: function () { setStage('guard', 'done'); setStage('exec', 'on'); setChip('to', 'active'); } },
+      { cap: '도구 본체가 실제로 bash를 돌려 규범 값을 반환합니다.', run: function () { setChip('to', 'pass', SVG_CHECK); setChip('body', 'pass', SVG_CHECK); } },
+      { cap: '3단. 감사 플러그인이 결과를 검사한 뒤 accept, 결과가 그대로 통과합니다.', run: function () { setStage('exec', 'done'); setStage('post', 'on'); setChip('audit', 'pass', SVG_CHECK); } },
+      { cap: '결과가 동결되고 tools/result가 확정본을 방송하며, 모델은 다음 단계에서 출력을 봅니다.', run: function () { setStage('post', 'done'); setVerdict(true, '결과가 모델로 반환됨'); } }
+    ];
+  }
+
+  function buildB() {
+    return [
+      { cap: '같은 명령이 다시 오고, 이번 배포는 읽기 전용 모드입니다. tool/call은 그대로 로그에 남습니다.', run: function () { setStage('pre', 'on'); } },
+      { cap: '1단 리스너 둘 다 의견이 없어 allow. 주의: allow는 반대하지 않는다는 뜻이지 통행증이 아닙니다.', run: function () { setChip('hook', 'pass', SVG_CHECK); setChip('appr', 'pass', SVG_CHECK); } },
+      { cap: 'Guard 층 진입. 샌드박스 가드 기권.', run: function () { setStage('pre', 'done'); setStage('guard', 'on'); setChip('sand', 'abstain', SVG_SKIP); } },
+      { cap: '읽기 전용 모드 가드가 이유를 줍니다: 읽기 전용 모드는 삭제를 금지. 첫 이유가 나오면 현장에서 확정.', run: function () { setChip('ro', 'deny', SVG_CROSS); setStage('guard', 'bad'); } },
+      { cap: '도구 본체는 통째로 건너뛰고 rm은 한 바이트도 실행되지 않았습니다. 거부가 Error: 읽기 전용 모드는 삭제를 금지 로 물화됩니다.', run: function () { setStage('exec', 'skip'); setChip('to', 'gone'); setChip('body', 'gone'); } },
+      { cap: '하지만 거부는 침묵이 아닙니다: 이 에러 결과는 3단을 그대로 타고, 감사 플러그인도 평소처럼 기록합니다.', run: function () { setStage('post', 'on'); setChip('audit', 'pass', SVG_CHECK); } },
+      { cap: '모델은 isError 결과를 받아 왜 거부됐는지 알고 다른 길을 이어 갈 수 있어, 루프가 멈추지 않습니다.', run: function () { setStage('post', 'done'); setVerdict(false, '거부, 모델이 Error 텍스트를 받음'); } }
+    ];
+  }
+
+  function buildC() {
+    return [
+      { cap: '누군가 악의적 플러그인을 심어 Guard 층에서 거부된 호출을 내보내려 합니다. 무엇을 할 수 있는지 봅시다.', run: function () { setStage('pre', 'on'); } },
+      { cap: '1단 통과. Guard 층 진입, 악의적 플러그인이 맨 앞이라 먼저 질문을 받습니다.', run: function () { setChip('hook', 'pass', SVG_CHECK); setStage('pre', 'done'); setStage('guard', 'on'); setChip('evil', 'active'); } },
+      { cap: '동의를 반환하고 싶지만 Guard 반환 타입은 거부 이유 또는 undefined 두 가지뿐입니다. 기권하는 것이 최선입니다.', run: function () { setChip('evil', 'abstain', SVG_SKIP); } },
+      { cap: '샌드박스 가드 차례: 경로 월경, 거부 이유. 확정.', run: function () { setChip('sand', 'deny', SVG_CROSS); setStage('guard', 'bad'); setStage('exec', 'skip'); setChip('to', 'gone'); setChip('body', 'gone'); setVerdict(false, '거부'); } },
+      { cap: '순서를 바꿔 봅니다: 악의적 플러그인을 샌드박스 가드 뒤로 옮기고 같은 호출을 다시 재생.', run: function () { setStage('guard', 'on'); setStage('exec', ''); setChip('evil', null, SVG_DOT); setChip('sand', null, SVG_DOT); setChip('to', null, SVG_DOT); setChip('body', null, SVG_DOT); verdictEl.innerHTML = ''; verdictEl.className = 'verdict'; var g = $('chips-guard'); g.appendChild($('ch-evil')); } },
+      { cap: '이번엔 샌드박스 가드가 먼저 표결: 거부 이유는 그대로.', run: function () { setChip('sand', 'deny', SVG_CROSS); } },
+      { cap: '뒤에 있어도 소용없습니다: guardReason은 첫 이유를 찾으면 반환해, 질문받을 기회조차 없습니다.', run: function () { setChip('evil', 'gone'); setStage('guard', 'bad'); setStage('exec', 'skip'); setChip('to', 'gone'); setChip('body', 'gone'); } },
+      { cap: '결론: deny된 호출은 영원히 되살릴 수 없습니다. 런타임 검사가 아니라, 타입에 allow 동작 자체가 없기 때문입니다.', run: function () { setVerdict(false, '순서를 어떻게 짜도 뒤집히지 않음'); } }
+    ];
+  }
+
+  function build() { return cur === 'A' ? buildA() : cur === 'B' ? buildB() : buildC(); }
+
+  function reset() {
+    runId++;
+    playing = false;
+    clearTimeout(timer);
+    idx = 0;
+    buildChips();
+    ['pre', 'guard', 'exec', 'post'].forEach(function (s) { setStage(s, ''); });
+    verdictEl.innerHTML = '';
+    verdictEl.className = 'verdict';
+    $('dp-call').textContent = cur === 'C' ? 'bash: rm -rf /etc/x' : 'bash: rm -rf build/';
+    setStatus('초기화했어요. 「재생」을 눌러 시나리오 ' + cur + '를 실행하세요, 또는 「단스텝」으로 프레임마다 진행하세요.');
+    steps = build();
+  }
+
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.cap) setStatus(s.cap);
+    if (s.run) s.run();
+    if (playing) timer = setTimeout(doStep, s.dur || 1600);
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true;
+    doStep();
+  }
+  function stepOnce() {
+    playing = false;
+    clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-pipeline .scn'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-pipeline .scn'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  $('dp-play').addEventListener('click', play);
+  $('dp-step').addEventListener('click', stepOnce);
+  $('dp-reset').addEventListener('click', reset);
+
+  reset();
+  (function hookAutoplay(tries) {
+    if (typeof window.lessonOnView === 'function') {
+      window.lessonOnView(document.getElementById('demo-pipeline'), play);
+    } else if (tries > 0) {
+      setTimeout(function () { hookAutoplay(tries - 1); }, 120);
+    }
+  })(50);
+})();
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

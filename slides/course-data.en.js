@@ -27,12 +27,15 @@ window.COURSE = {
       desc: 'Three opening lessons: locate yourself on the Dunning-Kruger curve, learn how to study so the knowledge actually sticks, and see why the fundamentals are worth your time — once they click, every later solution explains itself.',
       color: '#64748b',
       prologue: true,
+      group: 'main',
+      routes: ['use', 'pro', 'pm', 'build'],
       topics: [
         {
           id: 't-intro',
           title: 'Orientation',
           desc: 'Figure out where we are and why foundations matter',
           lessons: [
+            { file: 'roadmap.html', title: 'First, pick a path that fits you', desc: 'Five learning paths scope the course by goal: just want to use AI, use AI professionally, build AI products, build it yourself, want it all. Pick one and the catalog trims itself—switch anytime', tag: 'Intro' },
             { file: '0-intro.html', title: 'Where Are We? The Dunning-Kruger Effect', desc: 'Use the Dunning-Kruger curve to locate where learners stand; clarify the course goal: from the peak of ignorance to the plateau of competence', tag: 'Intro' },
             { file: '0-how.html', title: 'How to Actually Learn', desc: 'Watching ≠ learning: pause at every case study, map it to your own business, and try to articulate it', tag: 'Intro' },
             { file: '0-why.html', title: 'Why Spend Time on Fundamentals', desc: 'Every AI Harness operation is essentially processing a message list. Understand it, and every solution makes sense', tag: 'Intro' },
@@ -47,6 +50,8 @@ window.COURSE = {
       desc: 'No jargon, no math. Eight short interactive lessons that build the right instincts about AI: the amazing things it can do, why it bluffs with a straight face, how to talk to it, and what you can safely hand over. Friendly to complete beginners — the whole chapter is free, no login required.',
       color: '#0891b2',
       prologue: true,
+      group: 'main',
+      routes: ['use', 'pro', 'pm', 'build'],
       topics: [
         {
           id: 't-zero-what',
@@ -147,6 +152,8 @@ window.COURSE = {
       title: 'How LLMs Came to Be',
       desc: 'From training data and Tokens to the GPT breakthrough, then to the causes of LLM hallucinations and four mitigation strategies — building a complete understanding of LLM fundamentals.',
       color: '#0066ff',
+      group: 'main',
+      routes: ['pro', 'pm', 'build'],
       topics: [
         {
           id: 't-basic',
@@ -217,6 +224,8 @@ window.COURSE = {
       title: 'AI Harness',
       desc: 'Context engineering, advanced Prompt techniques and security, Agent design and tool calling, a five-layer cost optimization system — turning LLMs into real products.',
       color: '#7c3aed',
+      group: 'main',
+      routes: ['use', 'pro', 'pm', 'build'],
       topics: [
         {
           id: 't-context',
@@ -244,6 +253,7 @@ window.COURSE = {
           id: 't-security',
           title: 'Prompt Security',
           desc: 'Prompt Injection: principles, cases, and defense in practice',
+          routes: ['pm', 'build'],
           lessons: [
             { file: 'prompt-attack.html', title: 'Prompt Injection: Why Attacks Work', desc: 'SQL injection analogy → message list essence → lack of parameterization → overview of 5 attack types', tag: 'Security' },
             { file: 'prompt-attack-cases.html', title: 'Prompt Injection: 12 Attack Cases', desc: 'Privilege escalation / role-play / Few-Shot / structural injection / metaphor disguise — vulnerable vs defended versions', tag: 'Security' },
@@ -256,6 +266,7 @@ window.COURSE = {
           id: 't-agent',
           title: 'Agent Engineering',
           desc: 'Agent capabilities, tool calling, ReAct, memory, Skill, and scaffolding',
+          routes: ['pm', 'build'],
           lessons: [
             { file: '7-1.html', title: 'Agent: AI That Gets Things Done', desc: 'Four capabilities: Plan / Tool / Memory / Act — click to see real-world cases', tag: 'Interactive' },
             { file: '7-2.html', title: 'The Secret of Tool Calling', desc: 'Model outputs JSON → framework parses & executes → result injected back; four-step flow visualization', tag: 'Interactive' },
@@ -288,6 +299,7 @@ window.COURSE = {
           id: 't-cost',
           title: 'Cost Optimization & Model Selection',
           desc: 'KV Cache, caching, image Tokens, syntax/semantic/output-layer optimization, and model selection',
+          routes: ['pm', 'build'],
           lessons: [
             { file: '8-1.html', title: 'Why Multi-Turn Conversations Get More Expensive', desc: 'Token cost accumulation visualization; drag the turn count to see exponential cost growth', tag: 'Interactive' },
             { file: '8-2.html', title: 'KV Cache: Trading Space for Time (and Money)', desc: 'Analogy-based explanation + savings calculator; drag the turn count to see savings ratio', tag: 'Interactive' },
@@ -319,6 +331,7 @@ window.COURSE = {
           id: 't-summary2',
           title: 'Course Wrap-Up',
           desc: 'Part 2 review + full course summary',
+          routes: ['pm', 'build'],
           lessons: [
             { file: 'summary-2.html', title: 'Recap (Part A) · Prompt Engineering + Agent', desc: 'Context overflow strategies / Prompt six elements / tool calling truth / Skill + scaffolding', tag: 'Recap' },
             { file: 'summary-2b.html', title: 'Recap (Part B) · Cost Optimization + PM Perspective', desc: 'Five-layer cost system / KV Cache principles / image Tokens / full course capability checklist', tag: 'Recap' },
@@ -331,6 +344,7 @@ window.COURSE = {
           id: 't-build2',
           title: 'What You Can Do Now',
           desc: 'After this chapter, what you can start doing today',
+          routes: ['pm', 'build'],
           lessons: [
             { file: 'build-2.html', title: 'Make Five Runs in a Row All Usable', desc: 'Same-input five-run demo; three tasks: write the first prompt, classify the instability, add examples and a ban list then rerun and compare', tag: 'Hands-on' },
           ],
@@ -339,6 +353,7 @@ window.COURSE = {
           id: 't-interview2',
           title: 'They Will Quiz You',
           desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
+          routes: ['pm', 'build'],
           lessons: [
             { file: 'interview-2.html', title: 'AI Harness · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: context overflow / Prompt engineering / injection defense / tool calling / cost accounting / KV Cache / output formats', tag: 'Quiz' },
           ],
@@ -351,6 +366,9 @@ window.COURSE = {
       title: 'Practice · From Demo to Product',
       desc: 'Using a real AI Agent desktop app as a case study: image generation productization, Agent loop control, context compression, long-term memory, Prompt Harness, multi-Agent collaboration, permissions & security, and the MCP ecosystem — the full journey from "API works" to "users can use it."',
       color: '#059669',
+      group: 'main',
+      prereq: 'Suggested first: AI Harness',
+      routes: ['pm', 'build'],
       topics: [
         {
           id: 't-alice-intro',
@@ -376,6 +394,7 @@ window.COURSE = {
           id: 't-agentloop',
           title: 'Agent Loop',
           desc: 'Production-grade loop control, safeguards, and streaming UX',
+          routes: ['build'],
           lessons: [
             { file: '9-6.html', title: 'Textbook 3 Steps vs Real-World N Steps', desc: 'ReAct isn\'t just Think-Act-Observe three steps; what else each iteration must do in production', tag: 'Concept' },
             { file: '9-7.html', title: 'Why Agents Get Stuck', desc: 'Typical failure patterns when loops hang in real scenarios, and what users see', tag: 'Case Study' },
@@ -388,6 +407,7 @@ window.COURSE = {
           id: 't-ctxmgmt',
           title: 'Context Management',
           desc: 'Longer conversations get more expensive and less smart: the art and trade-offs of compression',
+          routes: ['build'],
           lessons: [
             { file: '9-11.html', title: 'Longer = More Expensive + Less Smart', desc: 'Rising cost + attention decay + limited window — three reasons context must be managed', tag: 'Concept' },
             { file: '9-12.html', title: 'Compression Is an Art of Trade-offs', desc: 'Some things can be removed, some can\'t, some cost money to compress — a PM decision framework', tag: 'Hands-on' },
@@ -399,6 +419,7 @@ window.COURSE = {
           id: 't-memory',
           title: 'Long-Term Memory',
           desc: 'Making AI know you: memory extraction, conflicts, and injection',
+          routes: ['build'],
           lessons: [
             { file: '9-15.html', title: 'Context ≠ Memory', desc: 'The whiteboard (context window) vs the notebook (long-term memory) — why two systems are needed', tag: 'Concept' },
             { file: '9-16.html', title: 'What\'s Worth Remembering', desc: 'Not every conversation has value: the gatekeeper mindset and filtering logic', tag: 'Hands-on' },
@@ -410,6 +431,7 @@ window.COURSE = {
           id: 't-prompteng',
           title: 'Prompt Harness',
           desc: 'From strings to architecture: layering, on-demand loading, and Skill modularization',
+          routes: ['build'],
           lessons: [
             { file: '9-19.html', title: 'System Prompt Isn\'t a Blob of Text', desc: 'Why layered management is necessary: identity, environment, and tool instructions — each independent, non-interfering', tag: 'Architecture' },
             { file: '9-20.html', title: 'Don\'t Show AI What It Doesn\'t Need', desc: '100 tools all in system? Token explosion. This calls for on-demand loading design', tag: 'Hands-on' },
@@ -421,6 +443,7 @@ window.COURSE = {
           id: 't-multiagent',
           title: 'Multi-Agent',
           desc: 'Parallelism, brainstorming, scheduled tasks, and collaboration cost',
+          routes: ['build'],
           lessons: [
             { file: '9-23.html', title: 'When Do You Need Multiple Agents?', desc: 'Parallel acceleration, role separation, risk isolation — three real-world scenarios', tag: 'Concept' },
             { file: '9-24.html', title: 'The Price of Concurrency: What Can Run Simultaneously?', desc: '"Read" can be parallel, "write" must queue — why, and how to decide', tag: 'Hands-on' },
@@ -432,6 +455,7 @@ window.COURSE = {
           id: 't-security',
           title: 'Permissions & Security',
           desc: 'The Agent\'s reins: permission tiers, approvals, and observability',
+          routes: ['build'],
           lessons: [
             { file: '9-27.html', title: 'How Much Freedom Should AI Have?', desc: 'Fully autonomous vs step-by-step approval — five permission modes and their use cases', tag: 'Concept' },
             { file: '9-28.html', title: 'Too Many Popups Annoy Users, None Is Unsafe', desc: 'The Human-in-the-loop balance point: a risk-tier approach', tag: 'Hands-on' },
@@ -442,6 +466,7 @@ window.COURSE = {
           id: 't-mcp',
           title: 'MCP in Practice',
           desc: 'The tool ecosystem\'s bidirectional connection: consuming, providing, and self-configuration',
+          routes: ['build'],
           lessons: [
             { file: '9-30.html', title: 'MCP Isn\'t Just "Calling Tools"', desc: 'Same protocol, two directions: consuming others\' tools vs exposing your own', tag: 'Concept' },
             { file: '9-31.html', title: 'Lazy Connections: Don\'t Connect If Not Needed', desc: '10 MCP services registered — connect them all at startup, or wait until needed?', tag: 'Hands-on' },
@@ -481,6 +506,9 @@ window.COURSE = {
       title: 'Advanced · AI Engineering Design Patterns',
       desc: 'Based on Anthropic\'s open-sourced Claude Code and engineering blog posts — deep dives into production Agent design patterns: context engineering, tool design, evaluation methodology, long-running Agents, brain-hand separation architecture, and security containerization.',
       color: '#dc2626',
+      group: 'main',
+      prereq: 'Suggested first: Practice · From Demo to Product',
+      routes: ['pm', 'build'],
       topics: [
         {
           id: 't-agent-patterns',
@@ -518,6 +546,7 @@ window.COURSE = {
           id: 't-long-running',
           title: 'Long-Running Agents',
           desc: 'From single-turn chat to hours-long runs: Harness design and evolution',
+          routes: ['build'],
           lessons: [
             { file: '10-11.html', title: 'Why Agents Can\'t Handle Long Tasks', desc: 'Trying to do too much at once, or quitting after one round — two classic failure modes', tag: 'Case Study' },
             { file: '10-12.html', title: 'Initializer + Coding Agent', desc: 'The initializer sets up the environment, the coding Agent progresses incrementally — a dual-role Harness design', tag: 'Design Pattern' },
@@ -529,6 +558,7 @@ window.COURSE = {
           id: 't-security-advanced',
           title: 'Security & Containerization',
           desc: 'How Anthropic constrains Claude in production',
+          routes: ['build'],
           lessons: [
             { file: '10-15.html', title: 'Three Risk Categories: Abuse, Misbehavior, External Attack', desc: 'Anthropic\'s safety taxonomy: user abuse / model misbehavior / Prompt Injection', tag: 'Security' },
             { file: '10-16.html', title: 'Sandbox & Credential Isolation', desc: 'Generated code and secrets never share the same container. Structural security beats prompt-based security', tag: 'Security' },
@@ -568,6 +598,9 @@ window.COURSE = {
       title: 'Harness & Self-Improvement',
       desc: 'From Harness design patterns to recursive self-improvement: when Agents start optimizing their own scaffolding, AI engineering enters a new era. Based on Lilian Weng\'s 2026 frontier survey.',
       color: '#7c3aed',
+      group: 'main',
+      prereq: 'Suggested first: Advanced · AI Engineering Design Patterns',
+      routes: ['build'],
       topics: [
         {
           id: 't-harness-intro',
@@ -623,11 +656,570 @@ window.COURSE = {
       ],
     },
     {
+      id: 'p7',
+      num: 'Part 7',
+      title: 'Vibe Coding Methodology',
+      desc: 'Based on the author\'s open-source xs_vibe_rules repo — distilling AI collaboration best practices from real projects into a course: flow control, quality baselines, documentation, safety gates, and writing style — making AI code fast and stable.',
+      color: '#0d9488',
+      group: 'indie',
+      cluster: 'chain',
+      routes: ['use', 'pro', 'pm', 'build'],
+      topics: [
+        {
+          id: 't-vibe-why',
+          title: 'Philosophy & Intro',
+          desc: 'Why AI coding fast actually backfires easily, and why Rules are the most stable constraint method',
+          routes: ['use', 'pro', 'pm', 'build'],
+          lessons: [
+            { file: 'vibe-1.html', title: 'Why AI Needs Rules', desc: 'Four types of Vibe Coding accidents, and why Rules are the most stable context injection method', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-vibe-flow',
+          title: 'Flow Control',
+          desc: 'Setting human checkpoints before AI starts coding',
+          routes: ['pro', 'pm', 'build'],
+          lessons: [
+            { file: 'vibe-2.html', title: 'Four Steps: Restate, PRD, Confirm, Code', desc: 'Bringing requirements confirmation into human-AI collaboration; batch changes need a plan first, new features need a duplicate check first', tag: 'Interactive' },
+            { file: 'vibe-3.html', title: 'PlayGround: A Fitting Room for Components', desc: 'A simplified Storybook approach: build an isolated demo, tune it, then integrate — demos only grow, never shrink', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-vibe-quality',
+          title: 'Quality Baselines',
+          desc: 'Hard requirements for comments, debugging, and complete implementation',
+          routes: ['pro', 'pm', 'build'],
+          lessons: [
+            { file: 'vibe-3b.html', title: "Style Convergence: Don't Ship Eight CSS Kits for One Button", desc: 'Why styles proliferate, how to fold them into design tokens in batches, and which differences should stay', tag: 'Interactive' },
+            { file: 'vibe-4.html', title: 'Three Comment Elements & Code Protection', desc: 'Background, design intent, key constraints — all three required; no silent deletion of code or dependencies', tag: 'Interactive' },
+            { file: 'vibe-5.html', title: 'Debug Iron Rule: Log First, Fix Later', desc: 'No speculative fixes allowed; answer three questions before fixing; declare impact scope after fixing', tag: 'Interactive' },
+            { file: 'vibe-6.html', title: 'No Installment Delivery Accepted', desc: 'Why AI loves to deliver "the simple version first," and why you must break this pattern', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-vibe-docs',
+          title: 'Documentation & Persistence',
+          desc: 'Making decisions survive beyond conversations and across time',
+          routes: ['pro', 'pm', 'build'],
+          lessons: [
+            { file: 'vibe-7.html', title: 'Three Documents & Methodology Persistence', desc: 'FEATURES / CHANGELOG / RELEASE_NOTES each covers one dimension; METHODOLOGY preserves product taste', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-vibe-env',
+          title: 'Environment & Safety',
+          desc: 'Hardcode environment facts; gate destructive operations',
+          routes: ['pro', 'pm', 'build'],
+          lessons: [
+            { file: 'vibe-8.html', title: 'Write Environment Facts into Rules', desc: 'Model config, tech-stack lock-in, data format taxonomy, and must-know traps like isComposing', tag: 'Interactive' },
+            { file: 'vibe-9.html', title: 'Three Gates for Destructive Operations', desc: 'Backup the DB first; provide a rollback plan for irreversible ops; diff review before release', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-vibe-comm',
+          title: 'Communication & Writing',
+          desc: 'Fighting context drift and eliminating AI-sounding prose',
+          routes: ['use', 'pro', 'pm', 'build'],
+          lessons: [
+            { file: 'vibe-10.html', title: 'Long-Chat Anchoring & Writing Standards', desc: 'Force a goal restatement after 10+ turns; a banned-phrases list to rid copy of AI-speak', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-vibe-final',
+          title: 'Topic Wrap-Up',
+          desc: 'Adapting these rules into your own',
+          routes: ['use', 'pro', 'pm', 'build'],
+          lessons: [
+            { file: 'vibe-final.html', title: 'The Value of Rules: Each Solves a Real Problem', desc: 'Overview recap + usage guide + four actions to adapt rules to your own project', tag: 'Finale' },
+          ],
+        },
+        {
+          id: 't-build6',
+          title: 'What You Can Do Now',
+          desc: 'After this chapter, what you can start doing today',
+          routes: ['pro', 'pm', 'build'],
+          lessons: [
+            { file: 'build-6.html', title: 'Distill Your Own Collaboration Spec', desc: 'A four-step flow comparison; three tasks: write your first Rule, walk a real requirement through the flow, export the Build Log and shape it into spec v1', tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-interview7',
+          title: 'They Will Quiz You',
+          desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
+          routes: ['pro', 'pm', 'build'],
+          lessons: [
+            { file: 'interview-7.html', title: 'Vibe Coding Methodology · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: why make rules / quality ownership / code merge gate / reject installments / decision persistence / safety gates', tag: 'Quiz' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-taste',
+      num: 'Special Topic',
+      title: 'Taste Engineering: Getting AI to Make Things with Taste',
+      desc: "Once the collaboration workflow holds, taste is the first thing that stops you. After AI knocks down the barrier to execution, anyone can make something usable in ten minutes — \"usable\" itself starts to devalue, and taste becomes the new dividing line. This chapter trains two skills: recognizing beauty, four handles (hierarchy, whitespace, restraint, consistency), each with an A/B spot-the-difference; and translating taste for AI — a taste vocabulary, prompts for generating UI and images, reference images and a reference library. Innate \"creating beauty\" can't be taught; \"seeing what's off\" and \"saying what you want\" can, if you practice.",
+      color: '#db2777',
+      group: 'indie',
+      cluster: 'chain',
+      routes: ['pm', 'build'],
+      topics: [
+        {
+          id: 't-taste-why',
+          title: 'Taste Is the New Bottleneck',
+          desc: 'Once execution is leveled, judgment starts getting expensive',
+          lessons: [
+            { file: 'taste-1.html', title: 'Execution Is Free. Judgment Just Got Expensive', desc: 'Once anyone can make something usable in ten minutes, "usable" starts to devalue. Vote on three interfaces by gut feel first — come back after this chapter and vote again. See if your eye changed', tag: 'Intro' },
+            { file: 'taste-2.html', title: 'Where the AI Look Comes From', desc: 'Purple gradient, frosted glass, rounded cards: AI defaults to the average of its training data, and average is mediocre. Tap the AI-look tells on a typical AI-generated page; collect them all to unlock why', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-taste-eye',
+          title: 'Four Handles for Recognizing Beauty',
+          desc: 'Hierarchy, whitespace, restraint, consistency — each with a spot-the-difference',
+          lessons: [
+            { file: 'taste-3.html', title: 'Hierarchy: One Hero per Screen', desc: 'Emphasize everything and you emphasize nothing. How type size, weight, and color allocate attention — and A/B spot-the-difference to catch screens that steal the scene', tag: 'Interactive' },
+            { file: 'taste-4.html', title: 'Whitespace & Alignment: Most Ugliness Is Spacing', desc: "When you can't name what's ugly, spacing is usually why. Drag the slider to feel breathing room, then learn the 8pt grid — a lazy genius of a tool", tag: 'Interactive' },
+            { file: 'taste-5.html', title: 'Restraint: Budget Your Colors and Type', desc: 'One primary, two weights, one radius set. Dump colors onto a UI until it looks like a year-end party flyer, then one-click subtract and feel the premium feel snap back', tag: 'Interactive' },
+            { file: 'taste-6.html', title: 'Consistency: Where System Feel Comes From', desc: "Good-looking sites sit on a set of design variables. Open this site's real CSS: why control height, radius, and color stay one tier sitewide — change once, everywhere updates", tag: 'Case Study' },
+          ],
+        },
+        {
+          id: 't-taste-speak',
+          title: 'Translate Taste for AI',
+          desc: 'Your taste vocabulary decides how good AI output gets',
+          lessons: [
+            { file: 'taste-7.html', title: 'A Hundred Concrete Ways to Say "Looks Good"', desc: "Information density, visual noise, breathing room, contrast hierarchy… tap a taste word for its definition and do/don't cases. Name it, and you can direct the AI", tag: 'Interactive' },
+            { file: 'taste-8.html', title: 'Generating UI: From Adjectives to a Spec', desc: "“Make a nice page” vs “reference Linear's information density, one primary color only” — a whole tier apart. Compare three prompt levels and watch the gap", tag: 'Hands-on' },
+            { file: 'taste-9.html', title: 'Generating Images: The Language of Composition, Light and Shadow, Color', desc: 'The aesthetic trio for image prompts: composition, light and shadow, color. Build intuition on three compare sets, then pick the right one from four candidates', tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-taste-library',
+          title: 'Build Your Own Reference Library',
+          desc: 'Learn to look, then get AI to ship from your references',
+          lessons: [
+            { file: 'taste-10.html', title: 'What It Means to Really Look at Design', desc: 'Bookmarking a hundred sites is useless. Tear them down in order: hierarchy, then spacing, then colors. Use this flow to dissect a good design live', tag: 'Method' },
+            { file: 'taste-11.html', title: 'Feeding References to AI', desc: 'Describing style by mouth alone is inefficient. When to use reference images, style descriptions, or design variables — plus templates — so AI ships from your reference library', tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-taste-final',
+          title: 'Series Finale',
+          desc: 'Before you sign off, run through the list',
+          lessons: [
+            { file: 'taste-final.html', title: 'Acceptance Checklist: Run Through This Before You Sign Off', desc: 'For AI-delivered UI and images, walk the list item by item: hierarchy, spacing, restraint, consistency, detail. Interactive checklist you can tick, plus further reading', tag: 'Finale' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-ixd',
+      num: 'Special Topic',
+      title: 'Interaction Engineering: Getting AI to Make Usable Things',
+      desc: "Looks you can judge at a glance; usability you only know by using it — so interaction bugs hide deeper than taste bugs. AI's default interaction ships at the \"it runs\" level: blank empty states, errors that pop an alert, Delete with no confirm, five-step wizards that skip no step. This chapter continues from Taste Engineering: first learn to spot (the three states, error prevention and reversibility, flow restraint, conventions), then tighten interface details (which control to pick, how the copy should read), and finally translate interaction requirements for AI (goal-oriented requirements; put the state machine and boundaries in the prompt). Source material is drawn from the classic interaction-design textbook About Face 4.",
+      color: '#2563eb',
+      group: 'indie',
+      cluster: 'chain',
+      routes: ['pm', 'build'],
+      topics: [
+        {
+          id: 't-ixd-why',
+          title: 'Usability Is Also the Bottleneck',
+          desc: '"It runs" and "usable" are a whole chapter apart',
+          lessons: [
+            { file: 'ixd-1.html', title: 'It Runs. Now What?', desc: "Flip the \"considerate software\" trait list and you get AI's default interaction flaw list. Click five inconsiderate spots in an app that runs fine, and see what you've been quietly putting up with", tag: 'Intro' },
+          ],
+        },
+        {
+          id: 't-ixd-spot',
+          title: 'Four Handles for Spotting Good Interaction',
+          desc: 'States, error prevention, flow, conventions',
+          lessons: [
+            { file: 'ixd-2.html', title: 'The Three States: Loading, Empty, Error', desc: 'The three abnormal moments in a UI are exactly where experience splits. Empty states should teach the next step; loading should report progress; errors should speak plain language and offer a way out. Pick winners in three A/B duels yourself', tag: 'Interactive' },
+            { file: 'ixd-3.html', title: "Error Prevention & Reversibility: So Users Aren't Afraid to Click", desc: 'Stop errors before they happen rather than report them after; undo makes exploration safe; confirm dialogs are the weakest error prevention. Redesign three dangerous buttons yourself', tag: 'Interactive' },
+            { file: 'ixd-4.html', title: 'Flow Restraint: Every Extra Step Drops Another Batch', desc: "Actions that don't directly serve the goal are excise. Trim a five-step signup to two, step by step, and watch who stays in the funnel", tag: 'Interactive' },
+            { file: 'ixd-5.html', title: "Conventions: Don't Let AI Invent New Interactions", desc: "Users operate software through conventions — learn once, use everywhere. Spot which control is faking innovation, and which thing that looks like a button isn't one", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-ixd-detail',
+          title: 'Interface Details',
+          desc: 'Which control to pick, how the copy should read',
+          lessons: [
+            { file: 'ixd-6.html', title: 'Did You Pick the Right Control: Radio, Checkbox, Toggle & Dropdown', desc: 'Mutually exclusive pick-one uses a radio button; multi-select uses checkboxes; instant effect uses a toggle; dropdown only when options overflow one screen. Six match-up scenes plus a cheat sheet you paste into prompts', tag: 'Interactive' },
+            { file: 'ixd-7.html', title: 'The UI Speaks: How Users Read Your Copy', desc: "\"Delete these 3\" is more honest than \"OK.\" Button verbs must name the consequence; labels use the user's words; don't serve database field names to users. Rewrite three lines in a dialog by hand", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-ixd-translate',
+          title: 'Translating Interaction for AI',
+          desc: 'Goal-oriented plus a state machine — then AI knows what you want',
+          lessons: [
+            { file: 'ixd-8.html', title: 'Goal-Oriented: Describe Requirements by Goals, Not Feature Lists', desc: 'Telling AI "Xiaomei needs to file expenses in three minutes" beats "need upload, form, buttons" by a mile. Duel two prompts, then practice rewriting a feature list into a scenario', tag: 'Hands-on' },
+            { file: 'ixd-9.html', title: 'Put the State Machine and Boundaries in the Prompt', desc: 'For every screen, list every state, nail the edge cases, and write error-prevention requirements. State-machine completer + edge-case wheel, with a copy-ready acceptance phrasing template', tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-ixd-final',
+          title: 'Series Finale',
+          desc: 'The second list before launch',
+          lessons: [
+            { file: 'ixd-final.html', title: 'Interaction Acceptance Checklist: The Second List Before Launch', desc: 'Are the states complete? Are dangerous actions reversible? Can the flow still be cut? Did you pick the right controls? Is the copy in plain language? A checkable interactive list — paired with the Taste and Psychology lists as one set', tag: 'Finale' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-psy',
+      num: 'Special Topic',
+      title: 'AI Product Psychology: Making Users Feel It Works Well',
+      desc: 'Taste and interaction covered making it look good and making it usable. That leaves a third thing: making users feel it works well. AI products are slow, wrong, and opaque by nature, and engineering can only take the edge off those three in the short run—but what users think is decided by perception, and perception can be designed. This chapter lays out sixteen psychological effects along the user journey: waiting anxiety, the labor illusion, the peak-end rule, trust calibration, algorithm aversion, defensiveness, the honeymoon cliff, the AI label discount, cognitive offloading, emotional attachment, and on through the pain of paying, pricing anchors, and silence bias. Every lesson pairs one effect with a set of engineering switches you can flip on the spot.',
+      color: '#0d9488',
+      group: 'indie',
+      cluster: 'chain',
+      routes: ['pm', 'build'],
+      topics: [
+        {
+          id: 't-psy-perceive',
+          title: 'Perceived Performance',
+          desc: "The user's stopwatch and the server's stopwatch don't tick the same",
+          lessons: [
+            { file: 'psy-1.html', title: 'Engineering metrics pass. Why do users still call it slow?', desc: "Same 5-second request races blank freeze, spinner, streaming, and visible steps side by side—feel how identical wall-clock time can differ 3× in feel; then meet three timing quirks of the user's stopwatch", tag: 'Intro' },
+          ],
+        },
+        {
+          id: 't-psy-wait',
+          title: 'Waiting and Process Design',
+          desc: 'What hurts was never really those 5 seconds',
+          lessons: [
+            { file: 'psy-2.html', title: 'The Psychology of Waiting: It Was Never Really About Those 5 Seconds', desc: 'Three laws of waiting with Disney and Houston airport cases; drag the duration slider across three presentation tiers: under 1s show it raw, under 10s must stream, over 10s go async', tag: 'Interactive' },
+            { file: 'psy-3.html', title: 'Labor Illusion: Make AI Show Its Work', desc: 'Harvard study: showing the work makes users happier even when they wait longer. Instant reply vs. visible-process A/B, three birds one stone from visible thinking and retrieval sources, plus three lines you must not cross', tag: 'Interactive' },
+            { file: 'psy-4.html', title: 'Peak-End Rule: Users Only Remember the Peak and the End', desc: 'Four session plots show how average score and memory score diverge; the product version of the cold-water experiment: spend the flagship model on first impression, put validation up front to protect the last step, and save freely in the middle', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-psy-trust',
+          title: 'Trust and Defense',
+          desc: "You can't trust it fully—and you can't afford not to use it",
+          lessons: [
+            { file: 'psy-5.html', title: 'Trust Calibration: The Best Users Are Half-Skeptical', desc: 'Full trust pastes fabricated case law into court filings; no trust turns AI into a paperweight. Judge trust yourself across six scenarios; clickable citations, proxy confidence signals, and conditional warnings', tag: 'Interactive' },
+            { file: 'psy-9.html', title: 'Algorithm Aversion: One Mistake and the AI Gets Permanently Blocked', desc: 'Dietvorst’s experiment: people abandon an algorithm after seeing it err once—even when it’s more accurate overall. Cast a vote to catch your own bias, then try the attribution translator and tweak-permission switch, and watch how four levers pull the abandonment-rate dial back', tag: 'Interactive' },
+            { file: 'psy-6.html', title: 'Defensiveness: Users Aren’t Unable — They’re Afraid to Use It', desc: 'Data, competence, and responsibility defensiveness; sense of control, reversibility, and transparency as three levers; redesign three high-defensiveness designs yourself — watch for buried placebo traps; the hand-off-to-human button paradox', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-psy-mind',
+          title: 'Mental Models and Anthropomorphism',
+          desc: "Users brought the wrong manual—don't blame the users",
+          lessons: [
+            { file: 'psy-7.html', title: 'Mental Models: Users Brought the Wrong Manual', desc: 'Treat AI as a search engine, a database, a learning apprentice, or a calculator—four mismatches, four kinds of bad reviews. Spot-the-difference across four dialogues, then three correction moves: empty-state examples, boundary-first, and memory visibility', tag: 'Interactive' },
+            { file: 'psy-8.html', title: 'How Far to Anthropomorphize, and the Art of AI Apology', desc: 'CASA paradigm: users will treat AI as a person—you only pick the level. Seat five product types; compare four apology scripts for the same miss; three-elements recipe and the service recovery paradox', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-psy-longterm',
+          title: 'Long-term Use',
+          desc: "The honeymoon ends—that's when the relationship starts",
+          lessons: [
+            { file: 'psy-10.html', title: 'Honeymoon Cliff: Hype Raises Expectation—Retention Pays It Back', desc: 'Expectation-confirmation theory: satisfaction equals experience minus expectation. Play the gacha to see “demo is P99, users get P50,” drag the hype slider to watch signup conversion and 30-day retention trade off, then flip three levers on the expectation-curve editor', tag: 'Interactive' },
+            { file: 'psy-11.html', title: 'AI Label Discount: Same Content, Mark It AI and It Drops in Value', desc: 'Label content AI-generated and ratings drop systematically; people who use AI at work still fear being seen. Feel the discount in a double-blind rating, judge five scenes on whether to show the label, drag a wording ladder for depth, then pick the export page users dare to share', tag: 'Interactive' },
+            { file: 'psy-12.html', title: 'Cognitive Offloading: Users Rely on You—and Fear Going Rusty', desc: 'The Google effect shows people drop from memory what they can look up; AI expands outsourcing from recall to thinking. Pick an outsourcing checklist to see which offloads are risky, drag the Copilot-to-Autopilot positioning slider, flip switches to turn answers from “think for you” into “think with you”', tag: 'Interactive' },
+            { file: 'psy-13.html', title: 'Emotional Attachment: After Users Fall in Love with Your Product', desc: 'Attachment is real—the Replika 2023 incident proved depth and risk. Grade six user messages with the attachment-signal classifier, open the four-act Replika timeline, then flip three safety valves: identity reminder, vulnerable-topic handoff, impermanence disclosure', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-psy-money',
+          title: 'Paying and Pricing',
+          desc: 'Getting paid is psychology design too',
+          lessons: [
+            { file: 'psy-14.html', title: 'The Psychology of Paying: Where It Hurts to Pay for a Probabilistic Good', desc: 'Feel metering anxiety as usage billing makes every follow-up sting, then switch to monthly and watch the same chat’s mood change; four mental-accounting questions show how reframing the same money changes the pain; three quota levers turn free quota from a cost sink into a converter', tag: 'Interactive' },
+            { file: 'psy-15.html', title: 'The Psychology of Pricing: Anchors, Decoys, and Decent Price Discrimination', desc: "Recreate The Economist's decoy experiment: remove the tier nobody picks and sales flip; flip switches to build your own pricing-page anchors; judge which of five forms of price discrimination are decent and which are career-ending; finally pick the price-hike email that won't get you roasted", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-psy-feedback',
+          title: 'Feedback Design',
+          desc: 'How bad news can actually get heard',
+          lessons: [
+            { file: 'psy-16.html', title: 'The Psychology of Feedback: Why Users Don’t Thumbs-Down', desc: 'A thousand unhappy users; only a dozen thumbs-down. The feedback-funnel simulator shows how silence bias eats signal layer by layer; six behaviors read as implicit signals (regenerate, copy, edit); post-thumbs-down experience duel: feedback needs an instant payoff', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-psy-books',
+          title: 'Further Reading',
+          desc: 'Every pattern in this chapter has a source',
+          lessons: [
+            { file: 'psy-books.html', title: 'Nine Books to Thicken This Chapter', desc: 'From Kahneman, Norman, Cialdini, and Thaler to The Media Equation: nine books unpack nineteen principles every PM needs, each with an AI product application and a lesson to revisit; pick by the problem your product has now, then take a quick principle-matching quiz', tag: 'Reading List' },
+          ],
+        },
+        {
+          id: 't-psy-final',
+          title: 'Series Finale',
+          desc: 'Sixteen effects on one comparison table',
+          lessons: [
+            { file: 'psy-final.html', title: 'Finale · Sixteen Effects on One Table, Plus Fourteen Pre-Launch Questions', desc: 'From perceived performance to silence bias—sixteen psychological effects × engineering levers in full; the right column is all switches you’ve learned; a checkable fourteen-question pre-launch list, plus eleven further-reading picks', tag: 'Finale' },
+          ],
+        },
+        {
+          id: 't-psy-interview',
+          title: 'How They Will Test You',
+          desc: 'How interviewers, bosses, and tech colleagues will test this chapter',
+          lessons: [
+            { file: 'psy-interview.html', title: 'AI Product Psychology · 40 Soul-Searching Questions', desc: 'Each question comes with what they’re assessing, an answer framework, and bonus points: perceived performance / peak-end tradeoffs / trust calibration / dismantling defensiveness / algorithm aversion / label discount / emotional attachment / payment & pricing / silence bias / how to write experience metrics into OKRs', tag: 'Quiz' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-cost',
+      num: 'Special Topic',
+      title: 'Token Cost Engineering: Cost Engineering for AI Apps',
+      desc: "The previous three chapters were about making users happy. This one asks a different question: do the numbers work? The better the product, the more users use it, and the thinner the margin gets—AI commercialization is a bet you place against your own users. This chapter is adapted from the author's internal team talk: first understand how tokens are counted and what the price sheet hides (the tiers and the tier-jump traps—the 200-output cliff, the 32k input red line, the image pixel tax, the input-dominated Agent), then peel cost away layer by layer across syntax, semantics, architecture, and output. Saving tokens is really about raising information density: high signal-to-noise equals high intelligence.",
+      color: '#16a34a',
+      group: 'indie',
+      cluster: 'chain',
+      routes: ['pm', 'build'],
+      topics: [
+        {
+          id: 't-cost-why',
+          title: 'Pricing Is Architecture',
+          desc: 'Cost makeup, how Tokens are counted, how to read a price sheet',
+          lessons: [
+            { file: 'cost-1.html', title: 'A Business That Bets Against Its Users', desc: "Does the usage bill leave you gasping? Token cost isn't just a finance bill—it's a direct map of latency and throughput. This chapter is about peeling that cost down", tag: 'Intro' },
+            { file: 'cost-2.html', title: 'How Tokens Are Counted: BPE and the Hidden Token Tax', desc: 'From characters to subwords, BPE merge rules, and why Chinese is inherently ~2× more expensive—plus the eerie merge of “leave something for the host”', tag: 'Interactive' },
+            { file: 'cost-3.html', title: 'Price Sheet at a Glance and the Three Tiers', desc: "How T0 Flagship / T1 Workhorse / T2 High-volume divide the work; knowing which is expensive isn't enough—watch the price-jump boundaries", tag: 'Selection' },
+          ],
+        },
+        {
+          id: 't-cost-cliff',
+          title: 'Three Tier-Jump Traps',
+          desc: 'Cost assassins hiding in the price-jump boundaries',
+          lessons: [
+            { file: 'cost-4.html', title: "GLM's Short-Output Game: the 200-Token Cliff", desc: '199 vs 201 output Tokens are two prices—and input gets a retroactive bump too; drag the slider to watch the bill jump, plus four counter-strategies', tag: 'Interactive' },
+            { file: 'cost-5.html', title: "Qwen's Tier Escape: the 32k Red Line", desc: '1k extra Tokens doubles the whole bill via full-request billing; use budget-aware truncation—stop paying double for RAG junk', tag: 'Interactive' },
+            { file: 'cost-6.html', title: 'Image Tokens: Pixels Pay Tax Too', desc: 'A live resolution→Token calculator; 32-pixel alignment tier jumps, the resolution curse, and three image-cost red lines', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-cost-agent',
+          title: 'The Agent Bill',
+          desc: 'Looping execution makes cost balloon',
+          lessons: [
+            { file: 'cost-7.html', title: 'Input-Dominated: a 62:1 I/O Ratio', desc: 'Every Agent turn re-reads the full history. Step through an Excel task turn by turn and watch Input roll up to 31,460 Tokens', tag: 'Interactive' },
+            { file: 'cost-8.html', title: 'Four Agent Cost Traps and the Circuit Breaker', desc: 'Tool-return explosion, thinking tax, infinite loops, history snowball: one shippable strategy per trap, plus three red lines', tag: 'Deep Dive' },
+          ],
+        },
+        {
+          id: 't-cost-practice',
+          title: 'Four-Layer Hands-on Optimization',
+          desc: 'Syntax, semantics, architecture, output—peel cost down layer by layer',
+          lessons: [
+            { file: 'cost-9.html', title: 'Syntax Layer: Prompts Are Written for Machines', desc: 'Bold ** alone eats 8.5% of Tokens; YAML for complex objects, CSV for flat lists, force Minified JSON on backend output', tag: 'Hands-on' },
+            { file: 'cost-10.html', title: 'Semantic Layer: Double Distillation', desc: 'Lost-in-the-middle: the more you stuff in, the less it holds onto what matters. Dynamic Few-Shot cuts 4000 to 500; LLMLingua-2 compresses 5–20×', tag: 'Hands-on' },
+            { file: 'cost-11.html', title: 'Architecture Layer: KV Cache Caveats', desc: 'Prefix matching saves up to 90%; why switching tools invalidates the entire cache; sliding window vs chapter cache', tag: 'Hands-on' },
+            { file: 'cost-12.html', title: "Output Layer: Keep the Model's Mouth Shut", desc: "Explicit negative constraints cut ~30% fluff; polish with Diff, don't rewrite the whole passage; use stop sequences as a hard cut", tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-cost-final',
+          title: 'Series Finale',
+          desc: 'Where saving money ends: information density',
+          lessons: [
+            { file: 'cost-final.html', title: 'Minimalism in the Age of Compute', desc: 'Is every Token contributing value to the final result? Full recap checklist + eighteen further-reading pieces by topic', tag: 'Finale' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-ds',
+      num: 'Programming Fundamentals',
+      title: 'Data Structures: The Skeleton of the AI World',
+      desc: "No memorizing definitions, no hand-writing linked lists. Using AI concepts you already know as the examples—a message list is an array, KV Cache is a cache, RAG retrieval is nearest-neighbor search—you'll get all eight core data structures in one pass. By the end you can tell what structures AI-generated code is using, and what's inside a large model's belly.",
+      color: '#0284c7',
+      group: 'indie',
+      cluster: 'hardcore',
+      routes: ['use', 'pro', 'pm', 'build'],
+      topics: [
+        {
+          id: 't-ds-why',
+          title: 'Why It Still Matters in the AI Era',
+          desc: "You don't have to write code—but you do need to check the code AI writes",
+          routes: ['use', 'pro', 'pm', 'build'],
+          lessons: [
+            { file: 'ds-1.html', title: "It's 2026 — Why Still Learn Data Structures?", desc: "One metaphor for the whole chapter: a data structure = a way of organizing. Play “find the key” once and feel how slow the wrong organizer is; then see how people who don't get structure ship AI's slow code straight to production", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-ds-linear',
+          title: 'Linear Structures: You Use Them Every Day',
+          desc: 'Arrays, stacks, queues—the foundation of AI chats and Agent scheduling',
+          routes: ['use', 'pro', 'pm', 'build'],
+          lessons: [
+            { file: 'ds-2.html', title: 'Arrays: Every Message You Chat Lies in One', desc: 'A message list is just an array: how chat history lines up, why context truncation cuts the head and keeps the tail; plus how expensive inserting one item into the middle of an array is', tag: 'Interactive' },
+            { file: 'ds-3.html', title: 'Stacks: The Secret Behind Cmd+Z and Stack Overflow', desc: "Last in, first out: undo, function calls, and an Agent's subtasks all rely on it. Push and pop yourself, then watch how recursion without a base case overflows the stack", tag: 'Interactive' },
+            { file: 'ds-4.html', title: "Queues: An Agent's Work Gets Done in Line", desc: 'First in, first out: task queues, message queues, producer-consumer. Drag production and consumption speed—watch when the queue backs up, and when it spins idle', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-ds-hash',
+          title: 'Hashing & Caching: Space for Time',
+          desc: 'Fast lookups and lower bills—same move underneath',
+          routes: ['pm', 'build'],
+          lessons: [
+            { file: 'ds-5.html', title: 'Hash Tables: Why Lookups Are Unreasonably Fast', desc: 'Drop keys into buckets yourself—watch the hash function turn “walk the list” into a “direct hit,” then see how two keys colliding in one bucket get handled', tag: 'Interactive' },
+            { file: 'ds-6.html', title: 'Caches: The Invisible Discount on Your AI Bill', desc: "KV Cache and semantic cache are the same move: don't recompute. Drag the hit-rate slider and watch the bill change live—the underlying principle of cost optimization in the Harness core part", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-ds-tree',
+          title: "Trees & Graphs: AI's Home Turf",
+          desc: 'The world as Coding Agents and knowledge graphs see it',
+          routes: ['build'],
+          lessons: [
+            { file: 'ds-7.html', title: 'Trees: All a Coding Agent Sees', desc: 'File trees, JSON, the page DOM, code syntax trees—when AI reads your project, it sees trees. Open a line of code and watch it grow into an AST', tag: 'Interactive' },
+            { file: 'ds-8.html', title: 'Graphs: From Knowledge Graphs to Multi-Agent Collaboration', desc: 'Nodes plus relations make a graph: social nets, knowledge graphs, Agent workflow DAGs. Click a node and watch relations ripple out hop by hop', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-ds-llm',
+          title: 'Data Structures Inside the LLM',
+          desc: 'Setups planted in earlier chapters—payoff here',
+          routes: ['pro', 'pm', 'build'],
+          lessons: [
+            { file: 'ds-9.html', title: 'Vocabulary & Trie: How Tokenizers Cut Words', desc: 'You saw tokenization in the LLM fundamentals part—now the underbelly: how a prefix tree recognizes “五花肉” (streaky pork) as one chunk. Walk a Trie and tokenize by hand', tag: 'Interactive' },
+            { file: 'ds-10.html', title: 'Vectors: RAG Retrieval Is Finding Nearest Neighbors', desc: 'Embedding turns meaning into coordinates; similarity is distance. Drag the query point on a plane to watch nearest neighbors change, then see why HNSW finds answers instantly among hundreds of millions of vectors', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-ds-summary',
+          title: 'Part Summary',
+          desc: 'A recap of the core ideas in the Data Structures part',
+          routes: ['build'],
+          lessons: [
+            { file: 'ds-summary.html', title: 'Recap · Eight Structures, One Decision Table', desc: 'Array/stack/queue/hash table/cache/tree/graph/vector—each with strengths, weaknesses, and its real form in AI; tap a scenario to see which way of organizing fits', tag: 'Recap' },
+          ],
+        },
+        {
+          id: 't-ds-build',
+          title: 'What You Can Do Now',
+          desc: 'After this chapter, what you can actually put your hands on today',
+          routes: ['build'],
+          lessons: [
+            { file: 'ds-build.html', title: 'Check AI-Written Code Once Through', desc: 'Three tiers: have AI explain the structure it picked, demand an alternate implementation and compare trade-offs, pick a way of organizing for your own project', tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-ds-interview',
+          title: 'How They Will Test You',
+          desc: 'How interviewers, bosses, and tech colleagues will test this chapter',
+          routes: ['build'],
+          lessons: [
+            { file: 'ds-interview.html', title: 'Data Structures · 30 Tough Questions', desc: "Each question comes with what they're assessing, an answer framework, and bonus points: array vs linked list / hash collisions / tree traversal / cache design / vector retrieval / scenario selection", tag: 'Quiz' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'p-algo',
+      num: 'Programming Fundamentals',
+      title: 'Algorithms: How AI Thinks',
+      desc: 'Starting from the gut feel for "how long will this code run," this chapter works through five classic families—complexity, search and sort, recursion and divide and conquer, graph search, and greedy sampling—each mapped to a real mechanism inside a large model: attention is O(n²), Rerank is sorting, Compaction is divide and conquer, decoding is greedy plus sampling. It closes with the ultimate question: now that AI can solve the problems, should you still grind LeetCode?',
+      color: '#db2777',
+      group: 'indie',
+      cluster: 'hardcore',
+      routes: ['use', 'pro', 'pm', 'build'],
+      topics: [
+        {
+          id: 't-algo-bigo',
+          title: 'Complexity: Is This Code Worth It?',
+          desc: "No math needed—build an intuition for what's fast and what's slow",
+          routes: ['use', 'pro', 'pm', 'build'],
+          lessons: [
+            { file: 'algo-1.html', title: 'Big-O: See at a Glance How Long Code Will Run', desc: 'Drag the data-size slider and watch O(1), O(log n), O(n), and O(n²) diverge; 10× the data—who barely flinches, who blows up on the spot', tag: 'Interactive' },
+            { file: 'algo-2.html', title: 'Why Longer Context Costs More: The O(n²) Bill', desc: 'The attention mechanism makes every token look at every token: drag context length and watch compute and the bill climb with the square—why long chats get slow and expensive', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-algo-sort',
+          title: 'Search and Sorting',
+          desc: "The art of cutting in half—and sorting's real face in AI",
+          routes: ['build'],
+          lessons: [
+            { file: 'algo-3.html', title: 'Binary Search: The Optimal Number-Guessing Game', desc: 'Play a 1-to-100 number-guessing round and feel the range cut in half each guess; a billion items found in 30 tries—how fast log n really is', tag: 'Interactive' },
+            { file: 'algo-4.html', title: 'Sorting: Bubble Sort vs Quicksort Race', desc: 'A head-to-head visual animation of two sorts: watch bubble sort nudge step by step and quicksort leap by partitions; see how lopsided the gap gets once the data grows', tag: 'Animation' },
+            { file: 'algo-5.html', title: "Sorting's Real Face in AI: Rerank", desc: "Passages RAG retrieves can't go in as-is: coarse ranking first, then fine ranking. Tweak the weights yourself and watch candidates reshuffle—feeds and search results work the same way", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-algo-recur',
+          title: 'Recursion and Divide-and-Conquer',
+          desc: 'Break a big job into the same smaller job',
+          routes: ['build'],
+          lessons: [
+            { file: 'algo-6.html', title: 'Recursion: Break a Big Job into the Same Smaller Job', desc: 'Walk a directory tree, break down tasks, draw a fractal tree—same playbook: call yourself. Watch an Agent recursively split “build a site” into actionable small jobs', tag: 'Interactive' },
+            { file: 'algo-7.html', title: 'Divide and Conquer: The Algorithm Behind Context Compression', desc: 'Compaction in the AI Practicum is really divide and conquer: split a long chat, summarize each chunk, then merge. Run recursive summarization yourself and watch information compress layer by layer', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-algo-search',
+          title: 'Search and Decision',
+          desc: 'Walk a maze, roll the dice, look a few steps ahead',
+          routes: ['build'],
+          lessons: [
+            { file: 'algo-8.html', title: 'BFS and DFS: How an Agent Finds Files in a Codebase', desc: 'Watch two search personalities in a maze animation: sweep layer by layer vs go all the way down one path; Coding Agent grep and web crawlers are variants of both', tag: 'Interactive' },
+            { file: 'algo-9.html', title: 'Greedy and Sampling: Two Personalities When AI Picks Words', desc: 'Always picking the biggest is greedy decoding; rolling dice by probability is sampling—the algorithms behind Temperature. Compare sentences from both strategies yourself', tag: 'Interactive' },
+            { file: 'algo-10.html', title: 'Beam Search: Look a Few Steps Ahead Before Choosing', desc: 'One greedy misstep cascades; Beam Search keeps several candidate paths and explores ahead. Interactively compare the sentences each strategy walks, and feel where “think first, then answer” comes from', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-algo-learn',
+          title: 'Learning Algorithms in the AI Era',
+          desc: 'Whether you still need to grind problems—and how to learn with AI',
+          routes: ['use', 'pro', 'pm', 'build'],
+          lessons: [
+            { file: 'algo-11.html', title: 'AI Can Solve the Problems—Do You Still Need LeetCode?', desc: 'Honest talk on interviews today: which roles still test algorithms, how hard, and which stopped caring. Tap your target role and find your seat', tag: 'Interactive' },
+            { file: 'algo-12.html', title: 'The Right Way to Learn Algorithms with AI', desc: 'Let it set problems, play examiner, and walk complexity line by line—three ready-to-use prompt templates that turn AI from doing problems for you into practicing with you', tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-algo-summary',
+          title: 'Part Summary',
+          desc: 'A recap of the core ideas in the Algorithms Part',
+          routes: ['build'],
+          lessons: [
+            { file: 'algo-summary.html', title: 'Summary · Five Algorithm Ideas at a Glance', desc: 'Complexity / search & sorting / recursion & divide-and-conquer / graph search / greedy & sampling—each maps to a real mechanism in AI; take the whole chapter home on one table', tag: 'Recap' },
+          ],
+        },
+        {
+          id: 't-algo-build',
+          title: 'What You Can Do Now',
+          desc: 'After this chapter, what you can put your hands on today',
+          routes: ['build'],
+          lessons: [
+            { file: 'algo-build.html', title: 'Run a Complexity Checkup on AI-Written Code', desc: "Three tiers: have AI self-report complexity, demand one-tier optimization and spell out the cost, then benchmark on large data to verify it isn't bluffing", tag: 'Hands-on' },
+          ],
+        },
+        {
+          id: 't-algo-interview',
+          title: 'How They Will Test You',
+          desc: 'How interviewers, bosses, and tech colleagues will test this chapter',
+          routes: ['build'],
+          lessons: [
+            { file: 'algo-interview.html', title: 'Algorithms · 30 Must-Answer Questions', desc: "Each question comes with What they're assessing, Answer framework, and Bonus point: Big-O intuition / binary-search premises / recursion risks / BFS vs DFS / sampling strategy / do they still test algorithms in the AI era", tag: 'Quiz' },
+          ],
+        },
+      ],
+    },
+    {
       id: 'p6',
       num: 'Part 6',
       title: 'Dissecting Grok Build: A Production Coding Agent in Rust',
       desc: 'Based on xAI\'s open-sourced Grok Build Rust codebase — examining the runtime, tools, memory, security, and extensibility design across 79 Workspace members.',
       color: '#f59e0b',
+      group: 'indie',
+      cluster: 'hardcore',
+      routes: [],
+      hardcore: true,
       topics: [
         {
           id: 't-grok-map',
@@ -720,197 +1312,120 @@ window.COURSE = {
       ],
     },
     {
-      id: 'p7',
-      num: 'Part 7',
-      title: 'Vibe Coding Methodology',
-      desc: 'Based on the author\'s open-source xs_vibe_rules repo — distilling AI collaboration best practices from real projects into a course: flow control, quality baselines, documentation, safety gates, and writing style — making AI code fast and stable.',
-      color: '#0d9488',
-      topics: [
-        {
-          id: 't-vibe-why',
-          title: 'Philosophy & Intro',
-          desc: 'Why AI coding fast actually backfires easily, and why Rules are the most stable constraint method',
-          lessons: [
-            { file: 'vibe-1.html', title: 'Why AI Needs Rules', desc: 'Four types of Vibe Coding accidents, and why Rules are the most stable context injection method', tag: 'Interactive' },
-          ],
-        },
-        {
-          id: 't-vibe-flow',
-          title: 'Flow Control',
-          desc: 'Setting human checkpoints before AI starts coding',
-          lessons: [
-            { file: 'vibe-2.html', title: 'Four Steps: Restate, PRD, Confirm, Code', desc: 'Bringing requirements confirmation into human-AI collaboration; batch changes need a plan first, new features need a duplicate check first', tag: 'Interactive' },
-            { file: 'vibe-3.html', title: 'PlayGround: A Fitting Room for Components', desc: 'A simplified Storybook approach: build an isolated demo, tune it, then integrate — demos only grow, never shrink', tag: 'Interactive' },
-          ],
-        },
-        {
-          id: 't-vibe-quality',
-          title: 'Quality Baselines',
-          desc: 'Hard requirements for comments, debugging, and complete implementation',
-          lessons: [
-            { file: 'vibe-3b.html', title: "Style Convergence: Don't Ship Eight CSS Kits for One Button", desc: 'Why styles proliferate, how to fold them into design tokens in batches, and which differences should stay', tag: 'Interactive' },
-            { file: 'vibe-4.html', title: 'Three Comment Elements & Code Protection', desc: 'Background, design intent, key constraints — all three required; no silent deletion of code or dependencies', tag: 'Interactive' },
-            { file: 'vibe-5.html', title: 'Debug Iron Rule: Log First, Fix Later', desc: 'No speculative fixes allowed; answer three questions before fixing; declare impact scope after fixing', tag: 'Interactive' },
-            { file: 'vibe-6.html', title: 'No Installment Delivery Accepted', desc: 'Why AI loves to deliver "the simple version first," and why you must break this pattern', tag: 'Interactive' },
-          ],
-        },
-        {
-          id: 't-vibe-docs',
-          title: 'Documentation & Persistence',
-          desc: 'Making decisions survive beyond conversations and across time',
-          lessons: [
-            { file: 'vibe-7.html', title: 'Three Documents & Methodology Persistence', desc: 'FEATURES / CHANGELOG / RELEASE_NOTES each covers one dimension; METHODOLOGY preserves product taste', tag: 'Interactive' },
-          ],
-        },
-        {
-          id: 't-vibe-env',
-          title: 'Environment & Safety',
-          desc: 'Hardcode environment facts; gate destructive operations',
-          lessons: [
-            { file: 'vibe-8.html', title: 'Write Environment Facts into Rules', desc: 'Model config, tech-stack lock-in, data format taxonomy, and must-know traps like isComposing', tag: 'Interactive' },
-            { file: 'vibe-9.html', title: 'Three Gates for Destructive Operations', desc: 'Backup the DB first; provide a rollback plan for irreversible ops; diff review before release', tag: 'Interactive' },
-          ],
-        },
-        {
-          id: 't-vibe-comm',
-          title: 'Communication & Writing',
-          desc: 'Fighting context drift and eliminating AI-sounding prose',
-          lessons: [
-            { file: 'vibe-10.html', title: 'Long-Chat Anchoring & Writing Standards', desc: 'Force a goal restatement after 10+ turns; a banned-phrases list to rid copy of AI-speak', tag: 'Interactive' },
-          ],
-        },
-        {
-          id: 't-vibe-final',
-          title: 'Topic Wrap-Up',
-          desc: 'Adapting these rules into your own',
-          lessons: [
-            { file: 'vibe-final.html', title: 'The Value of Rules: Each Solves a Real Problem', desc: 'Overview recap + usage guide + four actions to adapt rules to your own project', tag: 'Finale' },
-          ],
-        },
-        {
-          id: 't-build6',
-          title: 'What You Can Do Now',
-          desc: 'After this chapter, what you can start doing today',
-          lessons: [
-            { file: 'build-6.html', title: 'Distill Your Own Collaboration Spec', desc: 'A four-step flow comparison; three tasks: write your first Rule, walk a real requirement through the flow, export the Build Log and shape it into spec v1', tag: 'Hands-on' },
-          ],
-        },
-        {
-          id: 't-interview7',
-          title: 'They Will Quiz You',
-          desc: 'How interviewers, bosses, and tech colleagues will test you on this chapter',
-          lessons: [
-            { file: 'interview-7.html', title: 'Vibe Coding Methodology · 30 Tough Questions', desc: 'Each with intent, framework, and bonus points: why make rules / quality ownership / code merge gate / reject installments / decision persistence / safety gates', tag: 'Quiz' },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'p-taste',
+      id: 'p-dsh',
       num: 'Special Topic',
-      title: 'Taste Engineering: Getting AI to Make Things with Taste',
-      desc: "Once the collaboration workflow holds, taste is the first thing that stops you. After AI knocks down the barrier to execution, anyone can make something usable in ten minutes — \"usable\" itself starts to devalue, and taste becomes the new dividing line. This chapter trains two skills: recognizing beauty, four handles (hierarchy, whitespace, restraint, consistency), each with an A/B spot-the-difference; and translating taste for AI — a taste vocabulary, prompts for generating UI and images, reference images and a reference library. Innate \"creating beauty\" can't be taught; \"seeing what's off\" and \"saying what you want\" can, if you practice.",
-      color: '#db2777',
+      title: 'Dissecting DeepSeek Harness: An All-Plugins Agent Foundation',
+      desc: "This chapter reads TypeScript source; skipping it won't affect anything that follows. The Agent Harness DeepSeek open-sourced in 2026 turns the model, tools, sessions, sandbox, and UI all into swappable Cordis plugins, and sets one runtime invariant: everything the model sees must be reconstructible verbatim from the session log. Following the source, this chapter takes apart its plugin kernel, the Turn/Step loop, the dual-queue Inbox, the two Compaction paths, and the Code Mode sandbox, drawing evidence-based comparisons with Claude Code and Grok Build lesson by lesson.",
+      color: '#4d6bfe',
+      group: 'indie',
+      cluster: 'hardcore',
+      routes: [],
+      hardcore: true,
       topics: [
         {
-          id: 't-taste-why',
-          title: 'Taste Is the New Bottleneck',
-          desc: 'Once execution is leveled, judgment starts getting expensive',
+          id: 't-dsh-map',
+          title: 'System Map',
+          desc: 'Cordis plugin kernel and three-layer config',
           lessons: [
-            { file: 'taste-1.html', title: 'Execution Is Free. Judgment Just Got Expensive', desc: 'Once anyone can make something usable in ten minutes, "usable" starts to devalue. Vote on three interfaces by gut feel first — come back after this chapter and vote again. See if your eye changed', tag: 'Intro' },
-            { file: 'taste-2.html', title: 'Where the AI Look Comes From', desc: 'Purple gradient, frosted glass, rounded cards: AI defaults to the average of its training data, and average is mediocre. Tap the AI-look tells on a typical AI-generated page; collect them all to unlock why', tag: 'Interactive' },
+            { file: 'dsh-1.html', title: 'Everything Is a Plugin: Announcement vs Source', desc: 'Map the launch copy’s four modes, session log, and plugin ecosystem line by line onto the repo’s YAML presets and package layout', tag: 'Architecture' },
+            { file: 'dsh-6.html', title: 'Profile / Bundle / Patch: How Far Users Can Reshape the Product', desc: 'How the three-layer config lets users swap deep capabilities without editing source', tag: 'Architecture' },
           ],
         },
         {
-          id: 't-taste-eye',
-          title: 'Four Handles for Recognizing Beauty',
-          desc: 'Hierarchy, whitespace, restraint, consistency — each with a spot-the-difference',
+          id: 't-dsh-loop',
+          title: 'Sessions & Loops',
+          desc: 'Log invariant, Dual-Queue Inbox, cancel recovery, and Goal',
           lessons: [
-            { file: 'taste-3.html', title: 'Hierarchy: One Hero per Screen', desc: 'Emphasize everything and you emphasize nothing. How type size, weight, and color allocate attention — and A/B spot-the-difference to catch screens that steal the scene', tag: 'Interactive' },
-            { file: 'taste-4.html', title: 'Whitespace & Alignment: Most Ugliness Is Spacing', desc: "When you can't name what's ugly, spacing is usually why. Drag the slider to feel breathing room, then learn the 8pt grid — a lazy genius of a tool", tag: 'Interactive' },
-            { file: 'taste-5.html', title: 'Restraint: Budget Your Colors and Type', desc: 'One primary, two weights, one radius set. Dump colors onto a UI until it looks like a year-end party flyer, then one-click subtract and feel the premium feel snap back', tag: 'Interactive' },
-            { file: 'taste-6.html', title: 'Consistency: Where System Feel Comes From', desc: "Good-looking sites sit on a set of design variables. Open this site's real CSS: why control height, radius, and color stay one tier sitewide — change once, everywhere updates", tag: 'Case Study' },
+            { file: 'dsh-2.html', title: 'Model-visible ⟺ logged: An Invariant That Crashes in Your Face', desc: 'Starting from the byte-for-byte check in invariant.ts: why everything the model sees must be reconstructable from the log', tag: 'Deep Dive' },
+            { file: 'dsh-3.html', title: 'followup / steer / inject: Dual-Queue Inbox', desc: 'Break down enqueue, claim, and wake semantics for the next-turn and next-step queues, and contrast Claude Code’s interrupt model', tag: 'Interactive' },
+            { file: 'dsh-7.html', title: 'What Happens After Esc: Cancel, Crash Recovery, and Re-entry', desc: 'One AbortSignal per turn; write the log even on interrupt; crash, restart, and keep going', tag: 'Deep Dive' },
+            { file: 'dsh-8.html', title: 'Goal: Provenance Is Permission', desc: 'How long-term goals are stored, who may change them—auth looks at message provenance', tag: 'Design Pattern' },
           ],
         },
         {
-          id: 't-taste-speak',
-          title: 'Translate Taste for AI',
-          desc: 'Your taste vocabulary decides how good AI output gets',
+          id: 't-dsh-context',
+          title: 'Context Engineering',
+          desc: 'Compaction dual paths, accounting, Spill, and search',
           lessons: [
-            { file: 'taste-7.html', title: 'A Hundred Concrete Ways to Say "Looks Good"', desc: "Information density, visual noise, breathing room, contrast hierarchy… tap a taste word for its definition and do/don't cases. Name it, and you can direct the AI", tag: 'Interactive' },
-            { file: 'taste-8.html', title: 'Generating UI: From Adjectives to a Spec', desc: "“Make a nice page” vs “reference Linear's information density, one primary color only” — a whole tier apart. Compare three prompt levels and watch the gap", tag: 'Hands-on' },
-            { file: 'taste-9.html', title: 'Generating Images: The Language of Composition, Light and Shadow, Color', desc: 'The aesthetic trio for image prompts: composition, light and shadow, color. Build intuition on three compare sets, then pick the right one from four candidates', tag: 'Hands-on' },
+            { file: 'dsh-4.html', title: 'Compaction Dual Paths & replaceGeneration', desc: 'Two orthogonal paths — pressure trigger and overflow recovery — plus requiring a generation number to prove compaction actually happened before retry is allowed', tag: 'Deep Dive' },
+            { file: 'dsh-9.html', title: 'Token Accounting: Replay for Decisions, Projection for Display', desc: 'Two meters, each its own job—compaction decisions never trust the UI number', tag: 'Concept' },
+            { file: 'dsh-10.html', title: 'Spill: When Tool Output Is Too Large', desc: 'Over-limit output is archived to disk; the model keeps a retrieval credential', tag: 'Hands-on' },
+            { file: 'dsh-11.html', title: 'Session Search & Cross-Session Citations', desc: 'Old sessions are a searchable corpus; citations can carry provenance', tag: 'Deep Dive' },
           ],
         },
         {
-          id: 't-taste-library',
-          title: 'Build Your Own Reference Library',
-          desc: 'Learn to look, then get AI to ship from your references',
+          id: 't-dsh-tools',
+          title: 'Tool System',
+          desc: 'Three-stage cascade, output contract, file edit, and unique tool surface',
           lessons: [
-            { file: 'taste-10.html', title: 'What It Means to Really Look at Design', desc: 'Bookmarking a hundred sites is useless. Tear them down in order: hierarchy, then spacing, then colors. Use this flow to dissect a good design live', tag: 'Method' },
-            { file: 'taste-11.html', title: 'Feeding References to AI', desc: 'Describing style by mouth alone is inefficient. When to use reference images, style descriptions, or design variables — plus templates — so AI ships from your reference library', tag: 'Hands-on' },
+            { file: 'dsh-12.html', title: 'Tool Execution Pipeline: Three-Stage Cascade & Monotone Guard', desc: 'A three-stage line from pre-execute to post-execute — Guard can only tighten, never allow', tag: 'Architecture' },
+            { file: 'dsh-13.html', title: 'Tool Output Contract: Value Separated from Display', desc: 'Same result — what the model sees and what people see can differ', tag: 'Design Pattern' },
+            { file: 'dsh-14.html', title: 'File-Edit Engineering: Read Before Write', desc: 'The read / edit / write trio — unread files can’t be edited', tag: 'Hands-on' },
+            { file: 'dsh-17.html', title: 'DSH-Only Tool Surface: terminal / lsp / jobs', desc: 'What the tools others lack each solve', tag: 'Case Study' },
           ],
         },
         {
-          id: 't-taste-final',
-          title: 'Series Finale',
-          desc: 'Before you sign off, run through the list',
+          id: 't-dsh-security',
+          title: 'Approvals & Sandbox',
+          desc: 'Two independent knobs and a swappable Execution World',
           lessons: [
-            { file: 'taste-final.html', title: 'Acceptance Checklist: Run Through This Before You Sign Off', desc: 'For AI-delivered UI and images, walk the list item by item: hierarchy, spacing, restraint, consistency, detail. Interactive checklist you can tick, plus further reading', tag: 'Finale' },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'p-ixd',
-      num: 'Special Topic',
-      title: 'Interaction Engineering: Getting AI to Make Usable Things',
-      desc: "Looks you can judge at a glance; usability you only know by using it — so interaction bugs hide deeper than taste bugs. AI's default interaction ships at the \"it runs\" level: blank empty states, errors that pop an alert, Delete with no confirm, five-step wizards that skip no step. This chapter continues from Taste Engineering: first learn to spot (the three states, error prevention and reversibility, flow restraint, conventions), then tighten interface details (which control to pick, how the copy should read), and finally translate interaction requirements for AI (goal-oriented requirements; put the state machine and boundaries in the prompt). Source material is drawn from the classic interaction-design textbook About Face 4.",
-      color: '#2563eb',
-      topics: [
-        {
-          id: 't-ixd-why',
-          title: 'Usability Is Also the Bottleneck',
-          desc: '"It runs" and "usable" are a whole chapter apart',
-          lessons: [
-            { file: 'ixd-1.html', title: 'It Runs. Now What?', desc: "Flip the \"considerate software\" trait list and you get AI's default interaction flaw list. Click five inconsiderate spots in an app that runs fine, and see what you've been quietly putting up with", tag: 'Intro' },
+            { file: 'dsh-15.html', title: 'Approvals & Permissions: Two Knobs, One Dropdown', desc: 'Sandbox mode and approval policy are two independent knobs; presets are just common combos', tag: 'Security' },
+            { file: 'dsh-16.html', title: 'Sandbox: From seatbelt to the Execution World', desc: 'ctx.fs and ctx.subprocess share one path namespace, so the whole execution environment can be swapped', tag: 'Security' },
           ],
         },
         {
-          id: 't-ixd-spot',
-          title: 'Four Handles for Spotting Good Interaction',
-          desc: 'States, error prevention, flow, conventions',
+          id: 't-dsh-code',
+          title: 'Code Mode',
+          desc: 'Let the model write programs to orchestrate tool calls',
           lessons: [
-            { file: 'ixd-2.html', title: 'The Three States: Loading, Empty, Error', desc: 'The three abnormal moments in a UI are exactly where experience splits. Empty states should teach the next step; loading should report progress; errors should speak plain language and offer a way out. Pick winners in three A/B duels yourself', tag: 'Interactive' },
-            { file: 'ixd-3.html', title: "Error Prevention & Reversibility: So Users Aren't Afraid to Click", desc: 'Stop errors before they happen rather than report them after; undo makes exploration safe; confirm dialogs are the weakest error prevention. Redesign three dangerous buttons yourself', tag: 'Interactive' },
-            { file: 'ixd-4.html', title: 'Flow Restraint: Every Extra Step Drops Another Batch', desc: "Actions that don't directly serve the goal are excise. Trim a five-step signup to two, step by step, and watch who stays in the funnel", tag: 'Interactive' },
-            { file: 'ixd-5.html', title: "Conventions: Don't Let AI Invent New Interactions", desc: "Users operate software through conventions — learn once, use everywhere. Spot which control is faking innovation, and which thing that looks like a button isn't one", tag: 'Interactive' },
+            { file: 'dsh-5.html', title: 'Code Mode: One Program Beats Many Tool Rounds', desc: 'Announcement calls it PTC, source calls it code mode: worker sandbox isolation, message protocol, and double bookkeeping', tag: 'Frontier' },
           ],
         },
         {
-          id: 't-ixd-detail',
-          title: 'Interface Details',
-          desc: 'Which control to pick, how the copy should read',
+          id: 't-dsh-orch',
+          title: 'Orchestration & Subagents',
+          desc: 'Subagent seam and four orchestration primitives',
           lessons: [
-            { file: 'ixd-6.html', title: 'Did You Pick the Right Control: Radio, Checkbox, Toggle & Dropdown', desc: 'Mutually exclusive pick-one uses a radio button; multi-select uses checkboxes; instant effect uses a toggle; dropdown only when options overflow one screen. Six match-up scenes plus a cheat sheet you paste into prompts', tag: 'Interactive' },
-            { file: 'ixd-7.html', title: 'The UI Speaks: How Users Read Your Copy', desc: "\"Delete these 3\" is more honest than \"OK.\" Button verbs must name the consequence; labels use the user's words; don't serve database field names to users. Rewrite five lazy buttons by hand", tag: 'Interactive' },
+            { file: 'dsh-18.html', title: 'Subagent Is a Seam: In-Process to Delegating Claude Code', desc: 'A sub-Agent is a capability seam — in-process, remote, or another product can plug in', tag: 'Architecture' },
+            { file: 'dsh-19.html', title: 'workflow / schedule / plan / todo: Orchestration Primitives', desc: 'What each of the four orchestration primitives owns, and why they were never merged into one monolith', tag: 'Concept' },
+            { file: 'dsh-20.html', title: 'Skill, Preset, and Self-Modification', desc: 'cordis_define lets an Agent rewrite its own runtime while running', tag: 'Frontier' },
           ],
         },
         {
-          id: 't-ixd-translate',
-          title: 'Translating Interaction for AI',
-          desc: 'Goal-oriented plus a state machine — then AI knows what you want',
+          id: 't-dsh-integration',
+          title: 'Models & External Integration',
+          desc: 'LLM adapter layer, MCP, and test infrastructure',
           lessons: [
-            { file: 'ixd-8.html', title: 'Goal-Oriented: Describe Requirements by Goals, Not Feature Lists', desc: 'Telling AI "Xiaomei needs to file expenses in three minutes" beats "need upload, form, buttons" by a mile. Duel two prompts, then practice rewriting a feature list into a scenario', tag: 'Hands-on' },
-            { file: 'ixd-9.html', title: 'Put the State Machine and Boundaries in the Prompt', desc: 'For every screen, list every state, nail the edge cases, and write error-prevention requirements. State-machine completer + edge-case wheel, with a copy-ready acceptance phrasing template', tag: 'Hands-on' },
+            { file: 'dsh-21.html', title: 'MCP & Extensions: Two Paths to External Tools', desc: 'How bridging the ecosystem standard and native extensions divide the work', tag: 'Deep Dive' },
+            { file: 'dsh-22.html', title: 'LLM Adapter Layer: Single Attempt, Explicit Retry, Dual-Stream Persistence', desc: 'Reasoning and text streams stored separately; retries are explicit events', tag: 'Deep Dive' },
+            { file: 'dsh-26.html', title: 'Testing a Nondeterministic System', desc: 'Deterministic replay, property-based testing, and a fault server built to trick LLM clients', tag: 'Hands-on' },
           ],
         },
         {
-          id: 't-ixd-final',
-          title: 'Series Finale',
-          desc: 'The second list before launch',
+          id: 't-dsh-persist',
+          title: 'Persistence & Infrastructure',
+          desc: 'Log governance, credential storage, and multi-entry kernel',
           lessons: [
-            { file: 'ixd-final.html', title: 'Interaction Acceptance Checklist: The Second List Before Launch', desc: 'Are the states complete? Are dangerous actions reversible? Can the flow still be cut? Did you pick the right controls? Is the copy in plain language? A checkable interactive list — paired with the Taste and Psychology lists as one set', tag: 'Finale' },
+            { file: 'dsh-23.html', title: 'Persistence Governance: Versions, fork Boundaries, Refuse-to-Parse', desc: 'How log formats evolve, how fork boundaries are set, and prefer refusing data you can’t read', tag: 'Architecture' },
+            { file: 'dsh-24.html', title: 'Credentials, Settings, Storage, and Telemetry', desc: 'Unsexy and full of traps: credentials resolved every time, secrets never land in config', tag: 'Hands-on' },
+            { file: 'dsh-25.html', title: 'Multi-Entry & Typert: One Kernel, Five Faces', desc: 'Web, headless, ACP, SDK, and HTTP share one kernel', tag: 'Architecture' },
+          ],
+        },
+        {
+          id: 't-dsh-method',
+          title: 'Engineering Methodology',
+          desc: 'A discipline system for building AI with AI',
+          lessons: [
+            { file: 'dsh-27.html', title: 'Agent Notes & AGENTS.md: Discipline for Building AI with AI', desc: 'Four-state design notes and coding standards written for AI — your team can copy them immediately', tag: 'Recap' },
+            { file: 'dsh-28.html', title: 'KV Cache Is an Interface', desc: 'Treat prompt prefix stability as a compatibility promise', tag: 'Frontier' },
+          ],
+        },
+        {
+          id: 't-dsh-final',
+          title: 'Beyond the Source',
+          desc: 'Five engineering views and a minimum copy list',
+          lessons: [
+            { file: 'dsh-29.html', title: 'Finale: Five Engineering Views — What Should We Copy?', desc: 'Five harnesses’ design-philosophy master table, plus a minimum copy list and a scale-trap list', tag: 'Finale' },
           ],
         },
       ],
@@ -921,6 +1436,9 @@ window.COURSE = {
       title: 'Open Source, Distillation, and Local Deployment',
       desc: 'The news announces another open-source model every week, but what exactly is being opened? This chapter starts from the weights, teaches you to read a license yourself, and works out the business calculation behind each vendor\'s open-source strategy. Then it turns to how models get smaller: emergence, distillation, and the homogenization that distillation costs you. Finally, hands-on: work out how large a model your own computer can run, and get it running with Ollama or LM Studio.',
       color: '#4f46e5',
+      group: 'indie',
+      cluster: 'hardcore',
+      routes: [],
       topics: [
         {
           id: 't-oss-what',
@@ -961,6 +1479,8 @@ window.COURSE = {
       desc: 'Each chapter comes with a 50-question exam based on its content. Mock exams randomly draw 25 questions with shuffled options — take it twice and it won\'t repeat; sequential mode grades each question instantly with explanations. After all seven chapters, a cross-chapter comprehensive exam draws 35 questions evenly. Incorrect topics are logged to your profile as weak points with direct lesson links.',
       color: '#7c3aed',
       exam: true,
+      group: 'extra',
+      routes: ['pm', 'build'],
       topics: [
         {
           id: 't-exam-entry',
@@ -1009,17 +1529,95 @@ window.COURSE = {
       ],
     },
     {
+      id: 'p9',
+      num: 'Bonus',
+      title: 'One-Person Company (OPC)',
+      desc: "AI lets one person ship a product—and also multiplies what can be taken from you. This chapter is about securing rights and staying compliant: trademarks, software copyright, patents, domains, ICP filing, registered capital, equity. Every lesson cites the statute and a real case. Do it early and it's an investment; do it late and it's a loss. The first two lessons are open; the rest require signing in.",
+      color: '#b45309',
+      group: 'extra',
+      routes: ['use', 'pro', 'pm', 'build'],
+      topics: [
+        {
+          id: 't-opc-basics',
+          title: 'The Foundations of Rights Clearance',
+          desc: 'The matching lock for each asset',
+          routes: ['use', 'pro', 'pm', 'build'],
+          lessons: [
+            { file: 'opc-1.html', title: 'Six Weapons: The Right Lock for Each Asset', desc: 'Trademark locks the name, software copyright locks the code, patent locks the technical solution, trade secret locks the know-how, copyright locks the content, domain name locks the entry point', tag: 'Intro' },
+            { file: 'opc-2.html', title: 'Clear Rights Early: Early Is Investment, Late Is Loss', desc: 'Two timelines side by side: the same move costs a few hundred yuan early or hundreds of thousands late—and some losses never come back', tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-opc-tm',
+          title: 'Trademarks and Domain Names',
+          desc: "The brand's household registry and its front door",
+          routes: ['use', 'pro', 'pm', 'build'],
+          lessons: [
+            { file: 'opc-3.html', title: "One Trademark Isn't Enough: Take Classes 35, 42, and 41 Together", desc: 'Class 35 is the license for commercial monetization, 42 covers software platforms, 41 covers course content—plus a Class Checklist Generator', tag: 'Interactive' },
+            { file: 'opc-4.html', title: 'After a Refusal: Clear the Blocking Mark', desc: 'Real-case replay: refusal → three-year non-use cancellation → review of refusal; who bears the burden of proof; the fifteen-day review deadline', tag: 'Case Study' },
+            { file: 'opc-5.html', title: 'Lock Down the Domains: How a ¥100,000 Ask Became ¥5,000', desc: 'Real bargaining replay: how many extensions you hold is how much leverage you have at the table', tag: 'Case Study' },
+          ],
+        },
+        {
+          id: 't-opc-code',
+          title: 'Code, Content, and Technology',
+          desc: 'Copyright arises automatically; evidence you earn',
+          routes: ['pm', 'build'],
+          lessons: [
+            { file: 'opc-6.html', title: 'Software Copyright and Recordation: Rights Arise Automatically, Evidence You Earn', desc: 'Roles of software copyright registration, copyright recordation, and trusted timestamps; the outsourcing ownership trap', tag: 'Interactive' },
+            { file: 'opc-7.html', title: 'Patent or Trade Secret: File First, Disclose Later', desc: "Disclosure for exclusivity, or secrecy for no expiry; once novelty is gone it's irreversible—wrong order has no fix", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-opc-entity',
+          title: 'Entity Setup and Go-Live Compliance',
+          desc: 'Filing, licenses, registered capital',
+          routes: ['pm', 'build'],
+          lessons: [
+            { file: 'opc-8.html', title: 'ICP Filing Is the Foundation; an ICP License Is the Right to Charge', desc: 'ICP filing governs whether you can open the door; an ICP license governs whether you can take money: RMB 1,000,000 registered capital plus Type II value-added telecom', tag: 'Interactive' },
+            { file: 'opc-9.html', title: "Don't Inflate Registered Capital: You Must Pay It In Within Five Years", desc: "New Company Law five-year paid-in; a one-person company must prove company property is separate from the owner's—fail that and you're jointly and severally liable", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-opc-equity',
+          title: 'Partnership and Equity',
+          desc: 'Complementarity, control, nominee arrangements, and exit',
+          routes: ['pm', 'build'],
+          lessons: [
+            { file: 'opc-10.html', title: "Partners Must Complement: Don't Partner with Someone Whose Skills Overlap Yours", desc: "Complementarity before shared passion; without radical trust, don't partner; run a project trial first", tag: 'Interactive' },
+            { file: 'opc-11.html', title: 'Equal Thirds Is the Most Expensive Kind of Fairness', desc: 'Two voting lines: more than half, and two-thirds; the Equity Structure Simulator shows why the core founder needs 70%', tag: 'Interactive' },
+            { file: 'opc-12.html', title: "Don't Split Equity by Gut Feel: Run Five Dimensions", desc: 'Overall capability, capital, opportunity cost, idea source, responsibility—the two easiest to miss are ~40%', tag: 'Interactive' },
+            { file: 'opc-13.html', title: 'Sign a Nominee Agreement First; File the Company Registry Change When It Vests', desc: "Why a departing founder's refusal to sign can lock up the company; nominee agreements' force and limits, vesting, exit and repurchase", tag: 'Interactive' },
+          ],
+        },
+        {
+          id: 't-opc-strategy',
+          title: 'Strategy and Finale',
+          desc: 'Going global, model selection, and the new startup formula',
+          routes: ['pm', 'build'],
+          lessons: [
+            { file: 'opc-14.html', title: "Server Location Doesn't Matter—Where Your Users Are Does", desc: "Fake going-global doesn't dodge domestic duties—the law looks at whom you serve; real going-global is a separate project", tag: 'Interactive' },
+            { file: 'opc-15.html', title: 'The Long Tail Big Tech Ignores Is Where a Solo Founder Wins', desc: "The ROI bar blocks your strongest rivals; China domestic models' capability gap is already small, price gap still large—pick by scenario", tag: 'Interactive' },
+            { file: 'opc-final.html', title: 'The New Startup Formula: Find Buyers First, Then Build with AI', desc: '15-lesson panorama, 15-item rights & compliance checklist, the seven-character mantra and cutting losses, plus three things to do this week', tag: 'Finale' },
+          ],
+        },
+      ],
+    },
+    {
       id: 'p-seo',
       num: 'Bonus',
       title: 'Get Found: SEO & GEO',
       desc: "Your product is built and the rights are locked down \u2014 the next question is whether anyone can find it. This chapter covers two things: the SEO minimum viable checklist (crawlable, readable, indexable), and GEO, the new battleground (getting ChatGPT, Perplexity, Kimi, and Doubao to cite you when they answer a question). The whole chapter uses one of Xiaoshan Academy's own real overhauls as the case study \u2014 no black hat, no ranking promises, just checklists you can verify yourself. The first two lessons are open without login; the rest require signing in.",
       color: '#4338ca',
       bonus: true,
+      group: 'extra',
+      routes: ['use', 'pro', 'pm', 'build'],
       topics: [
         {
           id: 't-seo-why',
           title: 'First, Get Clear on Being Found',
           desc: 'Shipping it is not the same as anyone showing up',
+          routes: ['use', 'pro', 'pm', 'build'],
           lessons: [
             { file: 'seo-1.html', title: "You Built It. Why Isn't Anyone Coming?", desc: 'Three traffic doors, each with its own temperament: search engines where users look, AI engines where users ask, and social where other people speak for you. Play through the indexing funnel first and find the layer your product is stuck on', tag: 'Intro' },
           ],
@@ -1028,6 +1626,7 @@ window.COURSE = {
           id: 't-seo-field',
           title: 'Two Battlegrounds',
           desc: 'Search engines hand out links; AI engines hand out answers',
+          routes: ['use', 'pro', 'pm', 'build'],
           lessons: [
             { file: 'seo-2.html', title: 'The SEO Minimum Viable Checklist: Crawlable, Readable, Indexable', desc: 'Only the parts that pay off the moment you do them: one topic per page, a title written the way a person talks, body text that does not depend on JS to render, plus sitemap and webmaster-tool submission. Flip the crawl simulator between two states to see what the crawler actually receives', tag: 'Hands-on' },
             { file: 'seo-3.html', title: 'GEO: Get AI Engines to Cite You', desc: 'Users no longer only search \u2014 they ask. Self-contained paragraphs, FAQ structured data, llms.txt, and freshness signals: four levers, each with a toy you can play with on the spot, plus a roster of the AI crawlers worth knowing', tag: 'Interactive' },
@@ -1037,6 +1636,7 @@ window.COURSE = {
           id: 't-seo-case',
           title: 'Dissecting a Real Case',
           desc: "Using this site's own overhaul log as the dissection table",
+          routes: ['pm', 'build'],
           lessons: [
             { file: 'seo-4.html', title: 'Dissecting This Site: Google Indexes 693 Pages, Bing Only 50', desc: "Xiaoshan Academy's real August 2026 audit, replayed: the sitemap dropped every English and Korean page, the Q&A pages threw away their FAQ citations, and the logs discarded every crawler. For each gap \u2014 how it surfaced, what changed, and what to check it against", tag: 'Case Study' },
           ],
@@ -1045,6 +1645,7 @@ window.COURSE = {
           id: 't-seo-final',
           title: 'Priorities and Wrap-up',
           desc: 'A solo builder has no SEO team, only the ability to put things in order',
+          routes: ['pm', 'build'],
           lessons: [
             { file: 'seo-5.html', title: 'Solo Priorities: Write Questions People Actually Search', desc: 'Write the question a user would really type before piling on features, and trade real experience for credibility. The do-not list lives here too: buying backlinks, keyword stuffing, and mass-generated AI filler pages \u2014 which of them will get you killed', tag: 'Hands-on' },
             { file: 'seo-final.html', title: 'Getting-Found Launch Checklist: One Last Pass Before You Ship', desc: 'Twelve items you can tick off: one topic per page, body text visible server-side, sitemap, one-sentence answer block, FAQ structured data, llms.txt. Plus four ways to measure whether any of it actually worked', tag: 'Finale' },
@@ -1059,6 +1660,8 @@ window.COURSE = {
       desc: "This isn't an AI course — it's a dessert after the main course: compiled from Lei Jun's oral startup lectures, covering products, word-of-mouth, fundraising, valuation, equity, and cash flow. For those looking to build a one-person company (OPC) with AI, this fills in the \"how to run a business\" methodology. The entire chapter is free and open without login.",
       color: '#f97316',
       bonus: true,
+      group: 'extra',
+      routes: ['pm', 'build'],
       topics: [
         {
           id: 't-lei-mind',

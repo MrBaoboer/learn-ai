@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>캐시: AI 청구서의 보이지 않는 할인 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="KV Cache와 시맨틱 캐시는 같은 수예요: 이미 계산한 건 다시 계산하지 마세요. 두 라운드 대화에서 접두 token이 어떻게 「캐시 히트, 계산 면제」되는지 보고, 히트율 슬라이더를 끌어 고객지원 봇 월 청구서가 6,000위안에서 수백 위안으로 떨어지는 걸 보세요—Harness 핵심 편의 비용 최적화 밑바닥 원리예요.">
+<meta name="keywords" content="KV Cache,시맨틱 캐시,프롬프트 캐시,prompt caching,AI 비용 최적화,캐시 무효화,자료구조 입문">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-6.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ds-6.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ds-6.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ds-6.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ds-6.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="캐시: AI 청구서의 보이지 않는 할인">
+<meta property="og:description" content="KV Cache와 시맨틱 캐시는 같은 수예요: 이미 계산한 건 다시 계산하지 마세요. 히트율 슬라이더를 끌어 청구서가 실시간으로 바뀌는 걸 보세요.">
+<meta property="og:url" content="https://xueai.app/slides/ds-6.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/ds-6.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="캐시: AI 청구서의 보이지 않는 할인">
+<meta name="twitter:description" content="KV Cache와 시맨틱 캐시는 같은 수예요: 이미 계산한 건 다시 계산하지 마세요. 히트율 슬라이더를 끌어 청구서가 실시간으로 바뀌는 걸 보세요.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+
+/* ── 交互 1：KV Cache token 序列 ── */
+.kv-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 22px}
+.kv-round{margin-bottom:18px}
+.kv-round-head{display:flex;align-items:baseline;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+.kv-round-head h5{font-size:14px;font-weight:800;color:var(--text)}
+.kv-round-note{font-size:12px;color:var(--sub);font-weight:600}
+.tok-strip{display:flex;flex-wrap:wrap;gap:4px;align-items:flex-end}
+.tok-group{display:flex;flex-direction:column;gap:4px}
+.tok-group-label{font-size:10.5px;font-weight:800;color:var(--sub);text-align:center;letter-spacing:.3px}
+.tok-cells{display:flex;gap:4px}
+.tok{width:22px;height:22px;border-radius:5px;background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.05);transition:background .18s,box-shadow .18s,transform .18s}
+.tok.calc{background:var(--amber);box-shadow:0 0 0 1.5px rgba(217,119,6,.35);transform:scale(1.12)}
+.tok.done{background:rgba(217,119,6,.4);transform:scale(1)}
+.tok.hit{background:var(--success);box-shadow:0 0 0 1.5px rgba(22,163,74,.3)}
+.tok.ghost{opacity:.25}
+.kv-legend{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 16px;font-size:12px;color:var(--sub);font-weight:600}
+.kv-legend .dot{display:inline-block;width:11px;height:11px;border-radius:3.5px;vertical-align:-1px;margin-right:5px}
+.kv-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}
+.kv-status{font-size:12.5px;color:var(--sub);font-weight:600}
+.kv-status b{color:var(--ds-deep)}
+.kv-compare{margin-top:18px;border-top:1px dashed var(--border);padding-top:16px;opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.kv-compare.show{opacity:1;transform:translateY(0)}
+.kv-compare h6{font-size:12.5px;font-weight:800;color:var(--text);margin-bottom:10px}
+.kvc-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.kvc-label{width:130px;font-size:12px;font-weight:700;color:var(--sub);text-align:right;flex-shrink:0}
+.kvc-track{flex:1;height:16px;border-radius:6px;background:rgba(0,0,0,.05);overflow:hidden}
+.kvc-fill{height:100%;border-radius:6px;width:0;transition:width .8s cubic-bezier(.25,1,.5,1)}
+.kvc-row.nocache .kvc-fill{background:var(--amber)}
+.kvc-row.cache .kvc-fill{background:var(--success)}
+.kvc-val{width:120px;font-size:12.5px;font-weight:800;flex-shrink:0;font-variant-numeric:tabular-nums}
+.kvc-row.nocache .kvc-val{color:var(--amber)}
+.kvc-row.cache .kvc-val{color:var(--success)}
+.kv-verdict{margin-top:12px;padding:14px 18px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;color:var(--sub)}
+.kv-verdict b{color:var(--ds-deep)}
+
+/* ── 交互 2：시맨틱 캐시账单 ── */
+.bill-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.bill-scene{font-size:13.5px;color:var(--sub);line-height:1.8;margin-bottom:16px}
+.bill-scene b{color:var(--text)}
+.bill-slider-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.bill-slider-row label{font-size:13.5px;font-weight:800;color:var(--text);flex-shrink:0}
+.bill-slider-row input[type=range]{flex:1;min-width:160px;accent-color:var(--ds)}
+.bill-rate{font-size:16px;font-weight:900;color:var(--ds);font-variant-numeric:tabular-nums;min-width:52px}
+.bill-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.bill-card{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:16px 18px;text-align:center}
+.bill-card .bc-label{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:6px}
+.bill-card .bc-val{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.2}
+.bill-card.pay .bc-val{color:var(--danger)}
+.bill-card.save .bc-val{color:var(--success)}
+.bill-card .bc-sub{font-size:11.5px;color:var(--sub);margin-top:5px;font-weight:600}
+.bill-note{margin-top:16px;font-size:13px;color:var(--sub);line-height:1.8;border-top:1px dashed var(--border);padding-top:13px;min-height:44px}
+.bill-note b{color:var(--ds-deep)}
+
+/* 缓存失效提醒卡 */
+.expire-card{margin-top:18px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a;border-radius:var(--radius);padding:20px 24px}
+.expire-card h4{font-size:15px;font-weight:800;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.expire-card p{font-size:13.5px;color:#78350f;line-height:1.85}
+.expire-card p b{color:#92400e}
+
+/* ── AI 真身 ── */
+.ai-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.ai-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 16px;box-shadow:var(--shadow-card)}
+.ai-card .ic{font-size:24px;margin-bottom:7px}
+.ai-card h4{font-size:14px;font-weight:800;color:var(--text);margin-bottom:5px}
+.ai-card p{font-size:12.5px;color:var(--sub);line-height:1.7}
+.ai-card p b{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .tok{width:15px;height:15px}
+  .bill-cards{grid-template-columns:1fr}
+  .ai-grid{grid-template-columns:1fr 1fr}
+  .kvc-label{width:96px;font-size:11px}
+  .kvc-val{width:92px;font-size:11px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"캐시: AI 청구서의 보이지 않는 할인","name":"캐시: AI 청구서의 보이지 않는 할인","url":"https://xueai.app/slides/ds-6.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문에서 중급까지","isPartOf":{"@type":"Course","name":"AI 실전 강의 · 해시와 캐시: 공간으로 시간을 사다","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"KV Cache와 시맨틱 캐시는 같은 수예요: 이미 계산한 건 다시 계산하지 마세요. 두 라운드 대화에서 접두 token이 어떻게 「캐시 히트, 계산 면제」되는지 보고, 히트율 슬라이더를 끌어 고객지원 봇 월 청구서가 6,000위안에서 수백 위안으로 떨어지는 걸 보세요—Harness 핵심 편의 비용 최적화 밑바닥 원리예요.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">프로그래밍 기초 · 해시와 캐시: 공간으로 시간을 사다</div>
+    <h1>캐시: AI 청구서의 보이지 않는 할인</h1>
+    <p class="subtitle">지난 레슨의 해시 테이블이 「어떻게 순식간에 찾을까」를 풀었다면, 이번엔 다른 문제예요: <b>이미 계산한 건 두 번 계산하지 마세요</b>. 모델 가격표의 「캐시 히트 반값, 심지어 1할」, 청구서에서 아끼는 모든 돈 뒤에는 같은 수납 방식이 있어요—계산한 결과를 저장해 두고 다음에 바로 꺼내기.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>KV Cache와 시맨틱 캐시는 같은 수예요: 이미 계산한 건 다시 계산하지 마세요. 히트율 슬라이더를 끌어 청구서가 실시간으로 바뀌는 걸 보세요—Harness 핵심 편의 비용 최적화 밑바닥 원리</p></aside><!--seo:end-->  <div class="sec-label">일상 장면부터</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">「37 × 89 = 3293」을 한 번 계산했는데, 다음 날 또 물어요—세로셈을 다시 할까요? 아니요, 답을 바로 말하죠. <b style="color:var(--text)">캐시는 컴퓨터의 그 「바로 답하기」</b>예요: 계산 결과를 key로 지난 레슨의 해시 테이블에 넣고, 같은 key가 오면 한 번에 꺼냅니다. 해시 테이블은 「어디에, 어떻게 찾을지」, 캐시는 「무엇을 저장할 가치가 있는지」. 두 레슨을 합쳐야 완전한 「공간으로 시간을 사다」예요.</p>
+
+  <div class="sec-label">인터랙티브 1 · KV Cache: 같은 앞부분을 두 번 계산하지 마세요</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">대규모 모델이 글자를 하나 생성할 때마다 앞 token을 전부 「되돌아보고」 각 token의 어텐션 중간 결과를 계산해요. 핵심은: <b style="color:var(--text)">접두가 똑같으면 중간 결과도 똑같아요</b>—그럼 두 번째 라운드에서 왜 다시 계산할까요? 아래 작은 칸이 각각 token이에요. 「1라운드 재생」을 누른 뒤 「2라운드 재생」을 누르세요. <b style="color:var(--amber)">눈여겨보세요</b> 2라운드에서 초록 칸이 나타나는 속도: 계산된 게 아니라 캐시에서 가져온 거예요.</p>
+
+  <div class="kv-box">
+    <div class="kv-legend">
+      <span><span class="dot" style="background:var(--amber)"></span>계산 중(연산 소모)</span>
+      <span><span class="dot" style="background:rgba(217,119,6,.4)"></span>이번 라운드 계산됨</span>
+      <span><span class="dot" style="background:var(--success)"></span>캐시 히트, 계산 면제</span>
+      <span><span class="dot" style="background:rgba(0,0,0,.06)"></span>아직</span>
+    </div>
+    <div class="kv-round">
+      <div class="kv-round-head"><h5>1라운드 대화</h5><span class="kv-round-note">시스템 프롬프트 + 질문①—모든 token을 처음부터 계산</span></div>
+      <div class="tok-strip" id="strip1"></div>
+    </div>
+    <div class="kv-round">
+      <div class="kv-round-head"><h5>2라운드 대화</h5><span class="kv-round-note">접두(시스템 프롬프트 + 1라운드 전부) 한 글자도 안 바뀜</span></div>
+      <div class="tok-strip" id="strip2"></div>
+    </div>
+    <div class="kv-controls">
+      <button class="btn-ds" id="btnRound1">▶ 1라운드 재생</button>
+      <button class="btn-ds" id="btnRound2" disabled>▶ 2라운드 재생</button>
+      <span class="kv-status" id="kvStatus">먼저 1라운드를 재생해 token이 하나씩 켜지며 계산되는 걸 보세요</span>
+    </div>
+    <div class="kv-compare" id="kvCompare">
+      <h6>2라운드 계산량 비교(칸 수 = 계산할 token 수)</h6>
+      <div class="kvc-row nocache">
+        <div class="kvc-label">KV Cache 없음</div>
+        <div class="kvc-track"><div class="kvc-fill" id="kvcNo"></div></div>
+        <div class="kvc-val" id="kvcNoVal">0개 token</div>
+      </div>
+      <div class="kvc-row cache">
+        <div class="kvc-label">KV Cache 있음</div>
+        <div class="kvc-track"><div class="kvc-fill" id="kvcYes"></div></div>
+        <div class="kvc-val" id="kvcYesVal">0개 token</div>
+      </div>
+      <div class="kv-verdict">
+        <b>KV Cache가 저장하는 건 「이미 계산한 어텐션 중간 결과」</b>(각 token의 Key와 Value—이름이 여기서 왔어요), 답 자체가 아니에요. 대화가 한 라운드 늘수록 접두가 길어지고 아끼는 것도 커져요—실제 시스템 프롬프트는 수천 token이 흔하고, 라운드마다 다시 계산하면 라운드마다 정가예요. 모델사 가격표의 「캐시 히트 입력 token 1할」이 바로 이 초록 칸을 말해요.
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked xa-peek" style="margin-top:18px;">
+    <b>바로 쓸 수 있는 검수 직감:</b> KV Cache는 「접두가 똑같을」 때만 인정해요. 앱이 라운드마다 시스템 프롬프트를 한 글자만 바꿔도(예: 맨 앞에 현재 시각), 캐시는 라운드마다 깨지고 청구서가 몇 배로 뛰어요. 변하는 내용은 프롬프트 <b>끝</b>에, 고정은 <b>앞</b>에—1분이면 큰돈을 아끼는 아키텍처 습관이에요.
+  </div>
+
+  <div class="sec-label paywall-locked">인터랙티브 2 · 시맨틱 캐시 청구서</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">KV Cache가 아끼는 건 「같은 앞부분」이고, 더 센 수도 있어요: <b style="color:var(--text)">같은 질문은 답 전체를 다시 계산하지 마세요</b>. 고객지원 봇이 매일 「반품 어떻게 해요」를 1만 번 듣는데, 말투는 제각각이어도 뜻은 같아요—「뜻」을 key로(벡터 유사도, 10번째 레슨), 히트면 저장 답을 바로 돌려주고 모델 호출은 0. 히트율 슬라이더를 끌어 <b style="color:var(--amber)">눈여겨보세요</b> 월 청구서 변화.</p>
+
+  <div class="bill-box paywall-locked">
+    <div class="bill-scene">장면: 고객지원 봇이 매일 <b>10,000회</b> 질문받고, 호출당 약 <b>0.02위안</b>, 한 달 30일. 캐시 히트면 저장 답을 바로 반환해 <b>호출비가 안 나와요</b>.</div>
+    <div class="bill-slider-row">
+      <label>시맨틱 캐시 히트율</label>
+      <input type="range" id="hitRange" min="0" max="95" value="0" step="5">
+      <span class="bill-rate" id="hitRate">0%</span>
+    </div>
+    <div class="bill-cards">
+      <div class="bill-card pay">
+        <div class="bc-label">이번 달 납부</div>
+        <div class="bc-val" id="billPay">¥6,000</div>
+        <div class="bc-sub" id="billPaySub">매일 10,000회 전부 실제 호출</div>
+      </div>
+      <div class="bill-card save">
+        <div class="bc-label">캐시가 아껴 준 금액</div>
+        <div class="bc-val" id="billSave">¥0</div>
+        <div class="bc-sub">Harness 핵심 편에서 말한 시맨틱 캐시 전략이 돈을 아끼는 장면이에요</div>
+      </div>
+    </div>
+    <div class="bill-note" id="billNote"></div>
+  </div>
+
+  <div class="expire-card paywall-locked">
+    <h4>⚠️ 그런데—반품 정책이 바뀌면?</h4>
+    <p>캐시에는 아직 <b>옛 정책</b>으로 만든 표준 답이 누워 있고, 봇은 열흘 보름 진지하게 그걸로 답해요—캐시 없을 때보다 더 안정적으로, 더 당당하게 틀려요. 그래서 엔지니어들은 말해요: <b>캐시에서 제일 어려운 건 저장이 아니라, 언제 버릴지 아는 것</b>(용어 「캐시 무효화」, CS 양대 난제 중 하나). 흔한 방법: TTL(예: 24시간 만료), 또는 정책이 바뀌는 순간 관련 항목을 지워요. 어떤 캐시든 이 단계를 먼저 설계하세요—안 그러면 아낀 돈을 고객 민원으로 갚아요.</p>
+  </div>
+
+  <div class="sec-label paywall-locked">AI 세계에서의 진짜 모습</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">「이미 계산한 건 다시 계산하지 마세요」는 어디에나 있어요. 아래 네 가지는 매일 누리는 것들이고, 본질은 같은 구조예요.</p>
+
+  <div class="ai-grid paywall-locked">
+    <div class="ai-card"><div class="ic">🧠</div><h4>KV Cache</h4><p>대규모 모델 추론의 기본 장비: 접두 token의 어텐션 중간 결과는 한 번만 계산. <b>없으면 긴 대화는 아예 못 돌아가요</b>.</p></div>
+    <div class="ai-card"><div class="ic">💬</div><h4>시맨틱 캐시</h4><p>「질문의 뜻」을 key로, 비슷한 질문은 답을 재사용. 고빈도 고객지원에서 호출비 절반 이상을 깎을 수 있어요.</p></div>
+    <div class="ai-card"><div class="ic">🌐</div><h4>브라우저 캐시</h4><p>이미지·스타일을 한 번 받아 로컬에 두고, 두 번째 페이지는 순식간—웹이 빠른 이유의 절반은 이것이에요.</p></div>
+    <div class="ai-card"><div class="ic">🗺</div><h4>CDN</h4><p>콘텐츠를 가장 가까운 POP에 미리 두어, 전국 사용자가 로컬 서버처럼 느껴요. <b>캐시 + 지리</b>—같은 수예요.</p></div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>이 강의가 전하고 싶은 것</h3>
+    <ul>
+      <li><b>캐시 = 이미 계산한 건 다시 계산하지 마세요</b>: 결과를 key로 해시 테이블에 두고 다음에 바로 꺼냄—지난 레슨의 구조가 이번 레슨에서 돈을 벌기 시작해요</li>
+      <li><b>KV Cache는 접두를 봐요</b>: 고정은 프롬프트 앞, 변하는 건 끝—캐시 히트율이 청구서를 결정해요</li>
+      <li><b>시맨틱 캐시는 더 세요</b>: 뜻이 같은 질문은 모델도 안 부르고, 고빈도에서 절감 효과가 히트율에 비례해 커져요</li>
+      <li><b>캐시 세 질문</b>: 무엇을(재사용할 가치 있는 결과), 어디에(메모리 / 디스크 / 사용자 근처), 언제 버릴지(제일 어려운 질문)</li>
+      <li><b>검수 관점</b>: 「요청마다 모델을 다시 부르거나 다시 계산」하는 설계를 보면 「왜 캐시가 없지?」라고 물어야 해요</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* ══ 交互 1：KV Cache token 序列 ══
+   token 数是示意（真实系统提示词动辄几千 token），
+   比例设计成前缀占大头，让「免算」的绿色一眼占优。 */
+const GROUPS1 = [
+  { label: '시스템 프롬프트', n: 10 },
+  { label: '질문①', n: 4 },
+  { label: '답①', n: 5 },
+];
+const GROUPS2 = [
+  { label: '시스템 프롬프트', n: 10 },
+  { label: '질문①', n: 4 },
+  { label: '답①', n: 5 },
+  { label: '질문②', n: 4 },
+];
+function renderStrip(el, groups){
+  el.innerHTML = groups.map(g => `
+    <div class="tok-group">
+      <div class="tok-cells">${'<div class="tok"></div>'.repeat(g.n)}</div>
+      <div class="tok-group-label">${g.label}</div>
+    </div>`).join('');
+  return [...el.querySelectorAll('.tok')];
+}
+const strip1 = document.getElementById('strip1');
+const strip2 = document.getElementById('strip2');
+const toks1 = renderStrip(strip1, GROUPS1);
+const toks2 = renderStrip(strip2, GROUPS2);
+toks2.forEach(t => t.classList.add('ghost'));
+
+const btnRound1 = document.getElementById('btnRound1');
+const btnRound2 = document.getElementById('btnRound2');
+const kvStatus = document.getElementById('kvStatus');
+const kvCompare = document.getElementById('kvCompare');
+const PREFIX_N = 19;   /* 系统提示词10 + 问题①4 + 回答①5 */
+const ROUND2_TOTAL = 23;
+let kvBusy = false;
+
+btnRound1.addEventListener('click', async () => {
+  if (kvBusy) return;
+  kvBusy = true;
+  btnRound1.disabled = true;
+  toks1.forEach(t => t.className = 'tok');
+  kvStatus.innerHTML = '1라운드: token이 하나씩 켜지며 계산……';
+  for (let i = 0; i < toks1.length; i++){
+    if (i > 0) { toks1[i-1].classList.remove('calc'); toks1[i-1].classList.add('done'); }
+    toks1[i].classList.add('calc');
+    await sleep(110);
+  }
+  toks1[toks1.length-1].classList.remove('calc');
+  toks1[toks1.length-1].classList.add('done');
+  kvStatus.innerHTML = `1라운드 완료 <b>${toks1.length}개 token</b>, 중간 결과 전부 KV Cache에 저장. 이제 2라운드`;
+  btnRound2.disabled = false;
+  kvBusy = false;
+});
+
+btnRound2.addEventListener('click', async () => {
+  if (kvBusy) return;
+  kvBusy = true;
+  btnRound2.disabled = true;
+  toks2.forEach(t => t.className = 'tok ghost');
+  kvStatus.innerHTML = '2라운드: 먼저 접두……';
+  await sleep(400);
+  /* 前缀 19 个 token 快速刷绿：캐시 히트, 계산 면제 */
+  for (let i = 0; i < PREFIX_N; i++){
+    toks2[i].classList.remove('ghost');
+    toks2[i].classList.add('hit');
+    await sleep(28);
+  }
+  kvStatus.innerHTML = `접두 <b>${PREFIX_N}개 token 캐시 히트, 계산 면제</b>—이전 라운드 결과에서 바로 가져옴`;
+  await sleep(800);
+  /* 只有新增的问题② 4 个 token 需要计算 */
+  for (let i = PREFIX_N; i < toks2.length; i++){
+    if (i > PREFIX_N) { toks2[i-1].classList.remove('calc'); toks2[i-1].classList.add('done'); }
+    toks2[i].classList.remove('ghost');
+    toks2[i].classList.add('calc');
+    await sleep(160);
+  }
+  toks2[toks2.length-1].classList.remove('calc');
+  toks2[toks2.length-1].classList.add('done');
+  kvStatus.innerHTML = `2라운드는 실제로 <b>${ROUND2_TOTAL - PREFIX_N}개 새 token</b>만 계산`;
+  await sleep(400);
+  /* 对比条 */
+  kvCompare.classList.add('show');
+  await sleep(60);
+  document.getElementById('kvcNo').style.width = '100%';
+  document.getElementById('kvcNoVal').textContent = ROUND2_TOTAL + '개 token 정가';
+  document.getElementById('kvcYes').style.width = ((ROUND2_TOTAL - PREFIX_N) / ROUND2_TOTAL * 100) + '%';
+  document.getElementById('kvcYesVal').textContent = (ROUND2_TOTAL - PREFIX_N) + '개 token, ' + Math.round(PREFIX_N / ROUND2_TOTAL * 100) + '% 절약';
+  btnRound1.disabled = false;
+  btnRound1.textContent = '↻ 1라운드 다시 재생';
+  kvBusy = false;
+});
+
+/* ══ 交互 2：시맨틱 캐시账单 ══
+   月账单 = 10000 次/天 × 30 天 × 0.02 元 × (1 - 命中率) = 6000 × (1 - h)。
+   数字用短动画过渡，拖滑块时有「账单在掉」的体感。 */
+const hitRange = document.getElementById('hitRange');
+const hitRate = document.getElementById('hitRate');
+const billPay = document.getElementById('billPay');
+const billSave = document.getElementById('billSave');
+const billPaySub = document.getElementById('billPaySub');
+const billNote = document.getElementById('billNote');
+const FULL_BILL = 10000 * 30 * 0.02;   /* 6000 元 */
+let shownPay = FULL_BILL, shownSave = 0, billAnim = null;
+
+function fmtYuan(v){ return '¥' + Math.round(v).toLocaleString('zh-CN'); }
+
+function animateBill(targetPay, targetSave){
+  if (billAnim) cancelAnimationFrame(billAnim);
+  const fromPay = shownPay, fromSave = shownSave, t0 = performance.now();
+  function tick(t){
+    const p = Math.min(1, (t - t0) / 300);
+    const e = p * (2 - p);
+    shownPay = fromPay + (targetPay - fromPay) * e;
+    shownSave = fromSave + (targetSave - fromSave) * e;
+    billPay.textContent = fmtYuan(shownPay);
+    billSave.textContent = fmtYuan(shownSave);
+    if (p < 1) billAnim = requestAnimationFrame(tick); else billAnim = null;
+  }
+  billAnim = requestAnimationFrame(tick);
+}
+
+function updBill(){
+  const h = +hitRange.value;
+  hitRate.textContent = h + '%';
+  const pay = FULL_BILL * (1 - h / 100);
+  animateBill(pay, FULL_BILL - pay);
+  const missPerDay = Math.round(10000 * (1 - h / 100));
+  billPaySub.textContent = h === 0 ? '매일 10,000회 전부 실제 호출' : `매일 실제로 모델을 부르는 건 ${missPerDay.toLocaleString('zh-CN')}회뿐`;
+  if (h === 0) {
+    billNote.innerHTML = '<b>히트율 0%, 정가.</b> 「반품 어떻게」마다 모델이 거의 같은 답을 처음부터 다시 만들어요—37 × 89를 매번 세로셈하는 셈. 오른쪽으로 끌어 보세요.';
+  } else if (h < 50) {
+    billNote.innerHTML = `<b>히트율 ${h}%, 청구서가 느슨해지기 시작.</b> 고빈도 반복 질문이 캐시에 먼저 잡혔어요. 고객지원 질문은 쏠림이 커서, 표준 Q&A 수십 개면 트래픽 대부분을 덮는 경우가 많아요.`;
+  } else if (h < 80) {
+    billNote.innerHTML = `<b>히트율 ${h}%, 청구서 절반 이상 삭감.</b> 아끼는 건 돈만이 아니에요: 캐시 히트 답은 거의 지연 0이라 UX가 오히려 좋아져요—절약과 속도가 여기서는 같은 일이에요.`;
+  } else {
+    billNote.innerHTML = `<b>히트율 ${h}%, 천장에 가까워요.</b> 남은 건 진짜 롱테일 새 질문—써야 할 돈이에요. 다만 히트율이 높을수록 아래 카드의 「무효화」 위험을 더 진지하게—저장 답이 늘면 만료된 것도 늘어요.`;
+  }
+}
+hitRange.addEventListener('input', updBill);
+updBill();
+
+/* 进入视野时轻推一下滑块演示，提示这里可以拖。
+   lessonOnView 定义在 lesson.js（本脚本之后加载），所以等 DOMContentLoaded 再调 */
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof lessonOnView !== 'function') return;
+  lessonOnView(document.querySelector('.bill-box'), async () => {
+    if (+hitRange.value !== 0) return;
+    await sleep(600);
+    if (+hitRange.value !== 0) return;
+    hitRange.value = 30;
+    updBill();
+  });
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.ko.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caches: The Invisible Discount on Your AI Bill | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="KV Cache and semantic cache are the same move: don't recompute what you've already computed. Watch how prefix tokens “cache-hit, skip compute” across two chat rounds; then drag the hit-rate slider and see a support bot's monthly bill fall from ¥6,000 to a few hundred—the underlying principle behind cost optimization in the Harness core part.">
+<meta name="keywords" content="KV Cache,semantic cache,prompt caching,AI cost optimization,cache invalidation,data structures intro">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-6.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ds-6.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ds-6.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ds-6.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ds-6.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Caches: The Invisible Discount on Your AI Bill">
+<meta property="og:description" content="KV Cache and semantic cache are the same move: don't recompute what you've already computed. Drag the hit-rate slider and watch the bill change live.">
+<meta property="og:url" content="https://xueai.app/slides/ds-6.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/ds-6.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Caches: The Invisible Discount on Your AI Bill">
+<meta name="twitter:description" content="KV Cache and semantic cache are the same move: don't recompute what you've already computed. Drag the hit-rate slider and watch the bill change live.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+
+/* ── 交互 1：KV Cache token 序列 ── */
+.kv-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 22px}
+.kv-round{margin-bottom:18px}
+.kv-round-head{display:flex;align-items:baseline;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+.kv-round-head h5{font-size:14px;font-weight:800;color:var(--text)}
+.kv-round-note{font-size:12px;color:var(--sub);font-weight:600}
+.tok-strip{display:flex;flex-wrap:wrap;gap:4px;align-items:flex-end}
+.tok-group{display:flex;flex-direction:column;gap:4px}
+.tok-group-label{font-size:10.5px;font-weight:800;color:var(--sub);text-align:center;letter-spacing:.3px}
+.tok-cells{display:flex;gap:4px}
+.tok{width:22px;height:22px;border-radius:5px;background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.05);transition:background .18s,box-shadow .18s,transform .18s}
+.tok.calc{background:var(--amber);box-shadow:0 0 0 1.5px rgba(217,119,6,.35);transform:scale(1.12)}
+.tok.done{background:rgba(217,119,6,.4);transform:scale(1)}
+.tok.hit{background:var(--success);box-shadow:0 0 0 1.5px rgba(22,163,74,.3)}
+.tok.ghost{opacity:.25}
+.kv-legend{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 16px;font-size:12px;color:var(--sub);font-weight:600}
+.kv-legend .dot{display:inline-block;width:11px;height:11px;border-radius:3.5px;vertical-align:-1px;margin-right:5px}
+.kv-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}
+.kv-status{font-size:12.5px;color:var(--sub);font-weight:600}
+.kv-status b{color:var(--ds-deep)}
+.kv-compare{margin-top:18px;border-top:1px dashed var(--border);padding-top:16px;opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.kv-compare.show{opacity:1;transform:translateY(0)}
+.kv-compare h6{font-size:12.5px;font-weight:800;color:var(--text);margin-bottom:10px}
+.kvc-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.kvc-label{width:130px;font-size:12px;font-weight:700;color:var(--sub);text-align:right;flex-shrink:0}
+.kvc-track{flex:1;height:16px;border-radius:6px;background:rgba(0,0,0,.05);overflow:hidden}
+.kvc-fill{height:100%;border-radius:6px;width:0;transition:width .8s cubic-bezier(.25,1,.5,1)}
+.kvc-row.nocache .kvc-fill{background:var(--amber)}
+.kvc-row.cache .kvc-fill{background:var(--success)}
+.kvc-val{width:120px;font-size:12.5px;font-weight:800;flex-shrink:0;font-variant-numeric:tabular-nums}
+.kvc-row.nocache .kvc-val{color:var(--amber)}
+.kvc-row.cache .kvc-val{color:var(--success)}
+.kv-verdict{margin-top:12px;padding:14px 18px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;color:var(--sub)}
+.kv-verdict b{color:var(--ds-deep)}
+
+/* ── 交互 2：Semantic cache账单 ── */
+.bill-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.bill-scene{font-size:13.5px;color:var(--sub);line-height:1.8;margin-bottom:16px}
+.bill-scene b{color:var(--text)}
+.bill-slider-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.bill-slider-row label{font-size:13.5px;font-weight:800;color:var(--text);flex-shrink:0}
+.bill-slider-row input[type=range]{flex:1;min-width:160px;accent-color:var(--ds)}
+.bill-rate{font-size:16px;font-weight:900;color:var(--ds);font-variant-numeric:tabular-nums;min-width:52px}
+.bill-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.bill-card{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:16px 18px;text-align:center}
+.bill-card .bc-label{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:6px}
+.bill-card .bc-val{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.2}
+.bill-card.pay .bc-val{color:var(--danger)}
+.bill-card.save .bc-val{color:var(--success)}
+.bill-card .bc-sub{font-size:11.5px;color:var(--sub);margin-top:5px;font-weight:600}
+.bill-note{margin-top:16px;font-size:13px;color:var(--sub);line-height:1.8;border-top:1px dashed var(--border);padding-top:13px;min-height:44px}
+.bill-note b{color:var(--ds-deep)}
+
+/* 缓存失效提醒卡 */
+.expire-card{margin-top:18px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a;border-radius:var(--radius);padding:20px 24px}
+.expire-card h4{font-size:15px;font-weight:800;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.expire-card p{font-size:13.5px;color:#78350f;line-height:1.85}
+.expire-card p b{color:#92400e}
+
+/* ── AI 真身 ── */
+.ai-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.ai-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 16px;box-shadow:var(--shadow-card)}
+.ai-card .ic{font-size:24px;margin-bottom:7px}
+.ai-card h4{font-size:14px;font-weight:800;color:var(--text);margin-bottom:5px}
+.ai-card p{font-size:12.5px;color:var(--sub);line-height:1.7}
+.ai-card p b{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .tok{width:15px;height:15px}
+  .bill-cards{grid-template-columns:1fr}
+  .ai-grid{grid-template-columns:1fr 1fr}
+  .kvc-label{width:96px;font-size:11px}
+  .kvc-val{width:92px;font-size:11px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Caches: The Invisible Discount on Your AI Bill","name":"Caches: The Invisible Discount on Your AI Bill","url":"https://xueai.app/slides/ds-6.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Lesson","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Hashing & Caching: Space for Time","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"KV Cache and semantic cache are the same move: don't recompute what you've already computed. Watch how prefix tokens “cache-hit, skip compute” across two chat rounds; then drag the hit-rate slider and see a support bot's monthly bill fall from ¥6,000 to a few hundred—the underlying principle behind cost optimization in the Harness core part.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Hashing & Caching: Space for Time</div>
+    <h1>Caches: The Invisible Discount on Your AI Bill</h1>
+    <p class="subtitle">Last lesson's hash table solved “how to find instantly.” This one solves another: <b>don't compute the same thing twice</b>. The “cache hit half-price or even 90% off” on model price sheets—every cent saved on the bill—is the same way of organizing: store results you've computed, fetch next time.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>KV Cache and semantic cache are the same move: don't recompute. Drag the hit-rate slider and watch the bill change live—the underlying principle of cost optimization in the Harness core part</p></aside><!--seo:end-->  <div class="sec-label">Start with an everyday scene</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">You once computed “37 × 89 = 3293.” Next day someone asks again—do you redo the long multiplication? No, you just give the answer. <b style="color:var(--text)">A cache is the computer's “just give the answer”</b>: store results by key in last lesson's hash table; same key next time, one-step fetch. Hash tables handle “where & how to find”; caches handle “what's worth keeping.” Together they're the full “trade space for time.”</p>
+
+  <div class="sec-label">Interactive 1 · KV Cache: don't recompute the same prefix twice</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Every time a large model generates a token, it “looks back” at all prior tokens and computes attention intermediates for each. The key: <b style="color:var(--text)">if the prefix is identical, those intermediates are identical</b>—so why recompute them in round two? Each square below is a token. Play “Round 1,” then “Round 2.” <b style="color:var(--amber)">Watch for</b> how fast the green squares appear in round two: they weren't computed—they came from cache.</p>
+
+  <div class="kv-box">
+    <div class="kv-legend">
+      <span><span class="dot" style="background:var(--amber)"></span>Computing (burning compute)</span>
+      <span><span class="dot" style="background:rgba(217,119,6,.4)"></span>Computed this round</span>
+      <span><span class="dot" style="background:var(--success)"></span>Cache hit, skip compute</span>
+      <span><span class="dot" style="background:rgba(0,0,0,.06)"></span>Not yet</span>
+    </div>
+    <div class="kv-round">
+      <div class="kv-round-head"><h5>Round 1 conversation</h5><span class="kv-round-note">System prompt + question ①—every token computed from scratch</span></div>
+      <div class="tok-strip" id="strip1"></div>
+    </div>
+    <div class="kv-round">
+      <div class="kv-round-head"><h5>Round 2 conversation</h5><span class="kv-round-note">Prefix (system prompt + all of round 1) unchanged</span></div>
+      <div class="tok-strip" id="strip2"></div>
+    </div>
+    <div class="kv-controls">
+      <button class="btn-ds" id="btnRound1">▶ Play round 1</button>
+      <button class="btn-ds" id="btnRound2" disabled>▶ Play round 2</button>
+      <span class="kv-status" id="kvStatus">Play round 1 first—watch each token light up as it's computed</span>
+    </div>
+    <div class="kv-compare" id="kvCompare">
+      <h6>Round-2 compute comparison (squares = tokens to compute)</h6>
+      <div class="kvc-row nocache">
+        <div class="kvc-label">Without KV Cache</div>
+        <div class="kvc-track"><div class="kvc-fill" id="kvcNo"></div></div>
+        <div class="kvc-val" id="kvcNoVal">0 tokens</div>
+      </div>
+      <div class="kvc-row cache">
+        <div class="kvc-label">With KV Cache</div>
+        <div class="kvc-track"><div class="kvc-fill" id="kvcYes"></div></div>
+        <div class="kvc-val" id="kvcYesVal">0 tokens</div>
+      </div>
+      <div class="kv-verdict">
+        <b>KV Cache stores “already-computed attention intermediates”</b> (each token's Key and Value—that's where the name comes from), not the answer itself. Every extra round lengthens the prefix and saves more—real system prompts are often thousands of tokens; recomputing every round is paying full price every round. On vendor price sheets, “cached input tokens at 10% off” means exactly these green squares.
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked xa-peek" style="margin-top:18px;">
+    <b>A review intuition you can use immediately:</b> KV Cache only accepts an “identical prefix.” If your app changes one character of the system prompt every round (e.g. stamps the current time at the front), the cache misses every round and the bill multiplies. Put changing content at the prompt's <b>end</b>, fixed content at the <b>start</b>—a one-minute architecture habit that saves real money.
+  </div>
+
+  <div class="sec-label paywall-locked">Interactive 2 · the semantic-cache bill</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">KV Cache saves on “the same opening.” There's a fiercer move: <b style="color:var(--text)">same question—don't recompute the whole answer</b>. A support bot gets asked “how do I return this?” 10,000 times a day—wordings vary, meaning doesn't. Treat “meaning” as the key (vector similarity; lesson ten), and on a hit return the stored answer with zero model calls. Drag the hit-rate slider—<b style="color:var(--amber)">watch for</b> the monthly bill.</p>
+
+  <div class="bill-box paywall-locked">
+    <div class="bill-scene">Scene: a support bot gets <b>10,000</b> questions/day; each LLM call costs about <b>¥0.02</b>; 30 days a month. Cache hits return the stored answer—<b>no call fee</b>.</div>
+    <div class="bill-slider-row">
+      <label>Semantic cache hit rate</label>
+      <input type="range" id="hitRange" min="0" max="95" value="0" step="5">
+      <span class="bill-rate" id="hitRate">0%</span>
+    </div>
+    <div class="bill-cards">
+      <div class="bill-card pay">
+        <div class="bc-label">This month you pay</div>
+        <div class="bc-val" id="billPay">¥6,000</div>
+        <div class="bc-sub" id="billPaySub">10,000 real calls every day</div>
+      </div>
+      <div class="bill-card save">
+        <div class="bc-label">Cache saves you</div>
+        <div class="bc-val" id="billSave">¥0</div>
+        <div class="bc-sub">That's the semantic-cache strategy from the Harness core part saving money</div>
+      </div>
+    </div>
+    <div class="bill-note" id="billNote"></div>
+  </div>
+
+  <div class="expire-card paywall-locked">
+    <h4>⚠️ But—what if the return policy changes?</h4>
+    <p>The cache still holds a standard answer generated under the <b>old policy</b>. The bot will keep serving it earnestly for days or weeks—wronger than no cache, and more confidently. Engineers say: <b>the hard part of caching isn't storing—it's knowing when to invalidate</b> (jargon: “cache invalidation,” one of CS's two hard problems). Common moves: TTL (e.g. expire in 24 hours), or purge related entries the moment policy updates. Design that step before any cache—or the money you save comes back as support tickets.</p>
+  </div>
+
+  <div class="sec-label paywall-locked">Its real form in the AI world</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">“Don't recompute” is everywhere. These four things you enjoy every day are the same structure underneath.</p>
+
+  <div class="ai-grid paywall-locked">
+    <div class="ai-card"><div class="ic">🧠</div><h4>KV Cache</h4><p>Standard kit for LLM inference: attention intermediates for prefix tokens are computed once. <b>Without it, long chats simply don't run</b>.</p></div>
+    <div class="ai-card"><div class="ic">💬</div><h4>Semantic cache</h4><p>Treat “question meaning” as the key; similar asks reuse the answer. High-volume support can cut call fees in half or more.</p></div>
+    <div class="ai-card"><div class="ic">🌐</div><h4>Browser cache</h4><p>Images and styles download once and stay local; the second page load is instant—half of why browsing feels fast.</p></div>
+    <div class="ai-card"><div class="ic">🗺</div><h4>CDN</h4><p>Store content ahead of time in the nearest POP so users everywhere feel like hitting a local server. <b>Cache + geography</b>—same move.</p></div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>What this lesson wants to share</h3>
+    <ul>
+      <li><b>Cache = don't recompute</b>: store results by key in a hash table, fetch next time—last lesson's structure starts earning money here</li>
+      <li><b>KV Cache keys on prefix</b>: fixed content at the prompt head, changing bits at the end—hit rate writes the bill</li>
+      <li><b>Semantic cache is fiercer</b>: same-meaning asks skip the model entirely; savings scale linearly with hit rate in high-volume scenes</li>
+      <li><b>Three cache questions</b>: what to store (results worth reuse), where (RAM / disk / near the user), when to invalidate (the hardest)</li>
+      <li><b>Review lens</b>: when every request re-calls the model / recomputes, ask “why isn't this cached?”</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* ══ 交互 1：KV Cache token 序列 ══
+   token 数是示意（真实系统提示词动辄几千 token），
+   比例设计成前缀占大头，让「免算」的绿色一眼占优。 */
+const GROUPS1 = [
+  { label: 'System prompt', n: 10 },
+  { label: 'Q①', n: 4 },
+  { label: 'A①', n: 5 },
+];
+const GROUPS2 = [
+  { label: 'System prompt', n: 10 },
+  { label: 'Q①', n: 4 },
+  { label: 'A①', n: 5 },
+  { label: 'Q②', n: 4 },
+];
+function renderStrip(el, groups){
+  el.innerHTML = groups.map(g => `
+    <div class="tok-group">
+      <div class="tok-cells">${'<div class="tok"></div>'.repeat(g.n)}</div>
+      <div class="tok-group-label">${g.label}</div>
+    </div>`).join('');
+  return [...el.querySelectorAll('.tok')];
+}
+const strip1 = document.getElementById('strip1');
+const strip2 = document.getElementById('strip2');
+const toks1 = renderStrip(strip1, GROUPS1);
+const toks2 = renderStrip(strip2, GROUPS2);
+toks2.forEach(t => t.classList.add('ghost'));
+
+const btnRound1 = document.getElementById('btnRound1');
+const btnRound2 = document.getElementById('btnRound2');
+const kvStatus = document.getElementById('kvStatus');
+const kvCompare = document.getElementById('kvCompare');
+const PREFIX_N = 19;   /* 系统提示词10 + 问题①4 + 回答①5 */
+const ROUND2_TOTAL = 23;
+let kvBusy = false;
+
+btnRound1.addEventListener('click', async () => {
+  if (kvBusy) return;
+  kvBusy = true;
+  btnRound1.disabled = true;
+  toks1.forEach(t => t.className = 'tok');
+  kvStatus.innerHTML = 'Round 1: each token lights up as it's computed…';
+  for (let i = 0; i < toks1.length; i++){
+    if (i > 0) { toks1[i-1].classList.remove('calc'); toks1[i-1].classList.add('done'); }
+    toks1[i].classList.add('calc');
+    await sleep(110);
+  }
+  toks1[toks1.length-1].classList.remove('calc');
+  toks1[toks1.length-1].classList.add('done');
+  kvStatus.innerHTML = `Round 1 done: <b>${toks1.length} tokens</b>; intermediates stored in KV Cache. Now play round 2`;
+  btnRound2.disabled = false;
+  kvBusy = false;
+});
+
+btnRound2.addEventListener('click', async () => {
+  if (kvBusy) return;
+  kvBusy = true;
+  btnRound2.disabled = true;
+  toks2.forEach(t => t.className = 'tok ghost');
+  kvStatus.innerHTML = 'Round 2: watch the prefix…';
+  await sleep(400);
+  /* 前缀 19 个 token 快速刷绿：Cache hit, skip compute */
+  for (let i = 0; i < PREFIX_N; i++){
+    toks2[i].classList.remove('ghost');
+    toks2[i].classList.add('hit');
+    await sleep(28);
+  }
+  kvStatus.innerHTML = `Prefix: <b>${PREFIX_N} tokens cache-hit, skip compute</b>—fetched from last round`;
+  await sleep(800);
+  /* 只有新增的问题② 4 个 token 需要计算 */
+  for (let i = PREFIX_N; i < toks2.length; i++){
+    if (i > PREFIX_N) { toks2[i-1].classList.remove('calc'); toks2[i-1].classList.add('done'); }
+    toks2[i].classList.remove('ghost');
+    toks2[i].classList.add('calc');
+    await sleep(160);
+  }
+  toks2[toks2.length-1].classList.remove('calc');
+  toks2[toks2.length-1].classList.add('done');
+  kvStatus.innerHTML = `Round 2 truly computed only <b>${ROUND2_TOTAL - PREFIX_N} new tokens</b>`;
+  await sleep(400);
+  /* 对比条 */
+  kvCompare.classList.add('show');
+  await sleep(60);
+  document.getElementById('kvcNo').style.width = '100%';
+  document.getElementById('kvcNoVal').textContent = ROUND2_TOTAL + ' tokens at full price';
+  document.getElementById('kvcYes').style.width = ((ROUND2_TOTAL - PREFIX_N) / ROUND2_TOTAL * 100) + '%';
+  document.getElementById('kvcYesVal').textContent = (ROUND2_TOTAL - PREFIX_N) + ' tokens, save ' + Math.round(PREFIX_N / ROUND2_TOTAL * 100) + '%';
+  btnRound1.disabled = false;
+  btnRound1.textContent = '↻ Replay round 1';
+  kvBusy = false;
+});
+
+/* ══ 交互 2：Semantic cache账单 ══
+   月账单 = 10000 次/天 × 30 天 × 0.02 元 × (1 - 命中率) = 6000 × (1 - h)。
+   数字用短动画过渡，拖滑块时有「账单在掉」的体感。 */
+const hitRange = document.getElementById('hitRange');
+const hitRate = document.getElementById('hitRate');
+const billPay = document.getElementById('billPay');
+const billSave = document.getElementById('billSave');
+const billPaySub = document.getElementById('billPaySub');
+const billNote = document.getElementById('billNote');
+const FULL_BILL = 10000 * 30 * 0.02;   /* 6000 元 */
+let shownPay = FULL_BILL, shownSave = 0, billAnim = null;
+
+function fmtYuan(v){ return '¥' + Math.round(v).toLocaleString('zh-CN'); }
+
+function animateBill(targetPay, targetSave){
+  if (billAnim) cancelAnimationFrame(billAnim);
+  const fromPay = shownPay, fromSave = shownSave, t0 = performance.now();
+  function tick(t){
+    const p = Math.min(1, (t - t0) / 300);
+    const e = p * (2 - p);
+    shownPay = fromPay + (targetPay - fromPay) * e;
+    shownSave = fromSave + (targetSave - fromSave) * e;
+    billPay.textContent = fmtYuan(shownPay);
+    billSave.textContent = fmtYuan(shownSave);
+    if (p < 1) billAnim = requestAnimationFrame(tick); else billAnim = null;
+  }
+  billAnim = requestAnimationFrame(tick);
+}
+
+function updBill(){
+  const h = +hitRange.value;
+  hitRate.textContent = h + '%';
+  const pay = FULL_BILL * (1 - h / 100);
+  animateBill(pay, FULL_BILL - pay);
+  const missPerDay = Math.round(10000 * (1 - h / 100));
+  billPaySub.textContent = h === 0 ? '10,000 real calls every day' : `Only ${missPerDay.toLocaleString('zh-CN')} real model calls per day`;
+  if (h === 0) {
+    billNote.innerHTML = '<b>Hit rate 0%—full price.</b> Every “how do I return this?” makes the model regenerate nearly the same answer from scratch—like redoing 37 × 89 every time. Drag right.';
+  } else if (h < 50) {
+    billNote.innerHTML = `<b>Hit rate ${h}%—the bill loosens.</b> High-frequency repeats get caught by cache first. Support questions cluster hard; dozens of FAQs often cover most traffic.`;
+  } else if (h < 80) {
+    billNote.innerHTML = `<b>Hit rate ${h}%—bill cut more than half.</b> It's not just money: cache hits answer near zero latency—UX gets better. Saving money and speeding up are the same thing here.`;
+  } else {
+    billNote.innerHTML = `<b>Hit rate ${h}%—near the ceiling.</b> What's left is real long-tail novelty—money worth spending. But the higher the hit rate, the more seriously take the “invalidation” risk on the card below—more stored answers means more stale ones.`;
+  }
+}
+hitRange.addEventListener('input', updBill);
+updBill();
+
+/* 进入视野时轻推一下滑块演示，提示这里可以拖。
+   lessonOnView 定义在 lesson.js（本脚本之后加载），所以等 DOMContentLoaded 再调 */
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof lessonOnView !== 'function') return;
+  lessonOnView(document.querySelector('.bill-box'), async () => {
+    if (+hitRange.value !== 0) return;
+    await sleep(600);
+    if (+hitRange.value !== 0) return;
+    hitRange.value = 30;
+    updBill();
+  });
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.en.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

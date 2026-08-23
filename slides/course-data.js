@@ -44,6 +44,60 @@ window.COURSE = {
         },
       ],
     },
+    /* 学习方法专题：开篇讲了「怎样学才过脑子」，这一章把那一节展开成十一节可操作的做法。
+       标 prologue，所以不占主线编号，后面篇章的序号不变；四条路线都可见，因为提问、验证、
+       留住知识这三件事跟学员想走哪条路无关。 */
+    {
+      id: 'p-learn',
+      num: '学习方法',
+      title: 'AI 教我学习：把它当老师用',
+      desc: '知识随手就能问出来之后，学得好不好取决于三件事：问得准、验得住、留得下。十一节课分别讲提问的结构、当场识破一本正经的错话、把读不下去的长材料拆开、带 AI 精读几十万行的开源仓库、让它出题考你、给它装上你的外部记忆、怎么判断自己真学会了、AI 学习最舒服的三个陷阱、给自己设计一门课，以及把站内侧边栏的 Alice 用成随时在场的助教。',
+      color: '#b45309',
+      group: 'main',
+      routes: ['use', 'pro', 'pm', 'build'],
+      prologue: true,
+      topics: [
+        {
+          id: 't-learn-ask',
+          title: '把 AI 变成老师',
+          desc: '知识随手可得之后，提问的方式成了分水岭',
+          lessons: [
+            { file: 'learn-1.html', title: '知识唾手可得之后，稀缺的是什么', desc: '任何知识都能随时问出来。决定学得好不好的，是提问、验证，以及把东西留下来的能力。', tag: '认知', navTitle: '稀缺的是什么' },
+            { file: 'learn-2.html', title: '别让它讲，让它考你', desc: '怎么提问，才能让 AI 真的教会你一件事。四个部件，加上你自己给的比方，再让它把问题交还给你。', tag: '提问', navTitle: '提问结构' },
+            { file: 'learn-3.html', title: '它会一本正经骗你，三道防线', desc: 'AI 说错话的时候语气和说对话完全一样。学习场景里，错的会被你当成知识存进脑子。这一页给你三道能当场用的防线。', tag: '验证', navTitle: '三道防线' },
+            { file: 'learn-11.html', title: '把侧边栏的 Alice 用起来', desc: '站上就有一个助教。怎么问，才不是白问。', tag: '助教', navTitle: '用好 Alice' },
+          ],
+        },
+        {
+          id: 't-learn-hard',
+          title: '啃硬材料',
+          desc: '看三行就想放弃的东西，怎么拆开读',
+          lessons: [
+            { file: 'learn-4.html', title: '读不懂的东西，怎么让 AI 拆', desc: '一篇看三行就想放弃的论文或长文档，怎么让它变得读得下去？', tag: '阅读', navTitle: '拆解硬材料' },
+            { file: 'learn-5.html', title: '带 AI 精读一个大型开源仓库', desc: '几十万行的陌生代码，带着 AI 读出设计决策。约束只有一条：每一个技术论断都能回到源码的具体行。', tag: '源码', navTitle: '精读源码' },
+          ],
+        },
+        {
+          id: 't-learn-keep',
+          title: '让知识留下来',
+          desc: '学过和记住之间，差一次主动回忆',
+          lessons: [
+            { file: 'learn-6.html', title: '让 AI 当出题机', desc: '读十遍，加固的是见过这件事。自测一遍，加固的是还能想起来。', tag: '记忆', navTitle: 'AI 当出题机' },
+            { file: 'learn-7.html', title: '给 AI 装上你的记忆', desc: '每次开新对话都要重新交代背景。窗口管这一次看得见的字，写在外面的那一层才会留下。', tag: '上下文', navTitle: '外部记忆' },
+          ],
+        },
+        {
+          id: 't-learn-check',
+          title: '自查与避坑',
+          desc: '怎么确认真学会了，以及哪些坑掉进去时感觉还很好',
+          lessons: [
+            { file: 'learn-8.html', title: '怎么判断自己真学会了', desc: '看懂了和学会了差在哪。三道递进判据：讲得清、改得动、预测得准。', tag: '自查', navTitle: '三级判据' },
+            { file: 'learn-9.html', title: 'AI 学习的三个陷阱', desc: '用 AI 学习最容易掉进哪些坑，而且掉进去的时候感觉还很好。', tag: '避坑', navTitle: '三个陷阱' },
+            { file: 'learn-10.html', title: '给自己设计一门课', desc: '先写清学完能做什么，再拆成带验证产出的里程碑。时间预算一变，路径就要跟着伸缩。', tag: '规划', navTitle: '设计一门课' },
+          ],
+        },
+      ],
+    },
     {
       id: 'p0',
       num: '零基础入门',
@@ -850,7 +904,7 @@ window.COURSE = {
           desc: '控件怎么选，文案怎么说',
           lessons: [
             { file: 'ixd-6.html', title: '控件选对了吗：单选、多选、开关与下拉', desc: '互斥选一个用单选钮，可勾多个用复选框，立即生效用开关，选项超过一屏才配用下拉。六个场景连连看，配一张能抄进提示词的速查表', tag: '交互' , navTitle: '控件怎么选'},
-            { file: 'ixd-7.html', title: '界面会说话：用户怎么理解你的文案', desc: '「删除这 3 条」比「确定」诚实。按钮动词要说清后果，标签用用户的词，别把数据库字段名端给用户。亲手改写五个偷懒按钮', tag: '交互' , navTitle: '界面文案'},
+            { file: 'ixd-7.html', title: '界面会说话：用户怎么理解你的文案', desc: '「删除这 3 条」比「确定」诚实。按钮动词要说清后果，标签用用户的词，别把数据库字段名端给用户。亲手改写一个弹窗的三处文案', tag: '交互' , navTitle: '界面文案'},
           ],
         },
         {
@@ -915,7 +969,7 @@ window.COURSE = {
           title: '心智模型与拟人化',
           desc: '用户拿错说明书，怪不到用户头上',
           lessons: [
-            { file: 'psy-7.html', title: '心智模型：用户拿错了说明书', desc: '把 AI 当搜索引擎、当数据库、当会学习的学徒、当计算器，四种错配四类差评。四段对话找茬，再给空状态示例、边界前置、记忆外显四个纠正手段', tag: '交互' , navTitle: '心智模型错配'},
+            { file: 'psy-7.html', title: '心智模型：用户拿错了说明书', desc: '把 AI 当搜索引擎、当数据库、当会学习的学徒、当计算器，四种错配四类差评。四段对话找茬，再给空状态示例、边界前置、记忆外显三个纠正手段', tag: '交互' , navTitle: '心智模型错配'},
             { file: 'psy-8.html', title: '拟人化的度，与 AI 道歉的艺术', desc: 'CASA 范式：用户必然把 AI 当人，你只能选档位。五类产品对号入座；同一个错误四种道歉文案对比，三要素配方与服务补救悖论', tag: '交互' , navTitle: '拟人化与道歉'},
           ],
         },
@@ -1099,7 +1153,7 @@ window.COURSE = {
           title: '篇章汇总',
           desc: '数据结构篇核心知识回顾',
           lessons: [
-            { file: 'ds-summary.html', title: '汇总 · 八种结构一张决策表', desc: '数组/栈/队列/哈希/树/图/Trie/向量各自的强项弱项与 AI 里的真身；点选场景，看该用哪种收纳方式', tag: '汇总' , navTitle: '数据结构篇汇总'},
+            { file: 'ds-summary.html', title: '汇总 · 八种结构一张决策表', desc: '数组/栈/队列/哈希表/缓存/树/图/向量各自的强项弱项与 AI 里的真身；点选场景，看该用哪种收纳方式', tag: '汇总' , navTitle: '数据结构篇汇总'},
           ],
         },
         {
@@ -1434,6 +1488,114 @@ window.COURSE = {
       ],
     },
     {
+      id: 'p-codex',
+      num: '专题篇章',
+      title: '解剖 OpenAI Codex：把安全观写进类型系统',
+      desc: '这一章要读 Rust 源码，不看不影响任何后续内容。Codex 面对的问题和别家一样：模型要读文件、跑命令、改代码，而这些动作没有人逐条审过。它的答案是把约束尽量往前推，能让编译器管的交给类型，类型管不了的写进 code review，运行时管不了的交给沙箱和审批。本章沿源码拆解上下文注入的类型系统、Windows 上的三道关卡、自带测试用例的命令策略、用模型审批模型的 Guardian，以及给模型专门设计的 diff 与代码模式，逐课与 DeepSeek Harness、Claude Code 做证据化对照。',
+      color: '#414b5a',
+      group: 'indie',
+      cluster: 'hardcore',
+      routes: [],   // 硬核选修，只在完整目录里
+      hardcore: true,
+      topics: [
+        {
+          id: 't-codex-loop',
+          title: '治理与循环',
+          desc: '一轮对话在内部转几圈，谁有资格喊停',
+          lessons: [
+            { file: 'codex-01.html', title: '新功能先找落脚的 crate，core 是最后一档', desc: '打开仓库，第一反应是往 core 里加。仓库把这件事写成禁令：先找现有的非 core crate，否则新建一个。依赖方向会把叶子类型挡在核心之外。', tag: '工程', navTitle: 'crate 治理' },
+            { file: 'codex-02.html', title: '三层 Turn Loop：谁有资格决定继续', desc: '你看到的是一轮对话。内部叠了任务壳、轮次、采样三层循环。各层只回答自己那一个问题，控制权每次只在一层。', tag: '架构', navTitle: '三层 Turn Loop' },
+            { file: 'codex-03.html', title: '流还在走，工具已经开工', desc: '模型还在打字，读文件的声音已经响了。采样循环的时序是：流内建 future，流后统一 drain。先 persist，再等结果。', tag: '架构', navTitle: 'SSE 与工具循环' },
+            { file: 'codex-04.html', title: '中途插话：这句话进本轮、下一轮，还是被拒', desc: 'Agent 正在改第三个文件，你看见方向偏了，补了一句：配置用 YAML。回车之后，这句话是开工、插进当前轮，还是当场被拒，Core 当场拍板，不等模型开口。', tag: '架构', navTitle: 'Turn 输入与 Inbox' },
+            { file: 'codex-05.html', title: '按下取消之后，各层怎么收手', desc: '工具失败回给模型，用户按 Esc 才停 turn。取消令牌从任务传到采样再传到工具。已完成的结果留在历史里，100 毫秒之后的硬拆不可逆。', tag: '架构', navTitle: '取消与错误' },
+          ],
+        },
+        {
+          id: 't-codex-context',
+          title: '上下文',
+          desc: '往模型上下文里塞东西，谁来管',
+          lessons: [
+            { file: 'codex-06.html', title: '往模型上下文里塞东西，先给它造一个类型', desc: '每一种注入都是一个类型，自己知道 role、marker 和 body；组装按字段分拣，事后靠同一对 marker 认回', tag: '上下文', navTitle: '上下文碎片' },
+            { file: 'codex-07.html', title: '把上下文治理写进 code review', desc: '长度、频率、前缀稳定这些编译器证明不了的事，用六条禁令加评审规则守住', tag: '工程', navTitle: '上下文治理' },
+            { file: 'codex-08.html', title: '满窗之后，砍哪一段留哪一段', desc: '三个时机共用一个分发器，三种实现由开关选中。同一份摘要在中途必须停在历史最后一项。', tag: '上下文', navTitle: '上下文压缩' },
+            { file: 'codex-09.html', title: 'JSONL 是真相，SQLite 是镜像', desc: '昨天关了终端，今天列表还在，对话也能接着改。这两件事看起来像同一份存储，落盘时却走两条轨。上轨按行追加，下轨只抄封面。中途拔电之后，能捡回来的永远是已经过了闸门的那几行。', tag: '存储', navTitle: 'JSONL 与 SQLite' },
+          ],
+        },
+        {
+          id: 't-codex-tools',
+          title: '工具',
+          desc: '模型能调什么，怎么并发，从哪个门出去',
+          lessons: [
+            { file: 'codex-10.html', title: '模型看见的工具清单，是一次采样算出来的', desc: '同一段对话、同一份配置，下一轮采样却可能多出 MCP 名字、协作入口或 tool_search。变的是这一次允许广告哪些 handler。', tag: '工具', navTitle: '工具清单' },
+            { file: 'codex-11.html', title: '对模型说随便并行，底下用锁管住', desc: '模型看见的、实际执行的、历史记录的，是三套顺序。一面旗允许一次发多个调用，一把读写锁决定谁能叠着进。', tag: '工具', navTitle: '并行工具与锁' },
+            { file: 'codex-12.html', title: '统一入口：一条命令按特征分叉', desc: '模型只看见 exec_command 和 write_stdin。进门之后，tty、远程环境和 150 毫秒窗口会把同一条命令送到 PTY、pipe、exec-server，或者送进重试门。', tag: '执行', navTitle: '统一执行入口' },
+          ],
+        },
+        {
+          id: 't-codex-sandbox',
+          title: '沙箱',
+          desc: '命令跑起来之前，拦在哪几道关',
+          lessons: [
+            { file: 'codex-13.html', title: '沙箱管理器：把权限档案编译成一行命令', desc: '工作区可写，网络收紧。同一条 git status，Mac 套上 sandbox-exec，Linux 套上 helper，Windows 可能原样出门。差别出在编译器。', tag: '沙箱', navTitle: '沙箱管理器' },
+            { file: 'codex-14.html', title: 'macOS：把安全策略拼成一个字符串', desc: 'Seatbelt 吃的是一段文本。文本由静态基线加现拼的读写网段组成。路径不进这段文本，走旁边的参数表。', tag: '沙箱', navTitle: 'macOS Seatbelt' },
+            { file: 'codex-15.html', title: 'Linux：先建视图，再上 seccomp，最后 exec', desc: '同一条读取，Mac 上回 Operation not permitted，Linux 上回 No such file or directory。差别在于 Linux 先换进程能看见的文件树，再收紧它能调用的系统接口。', tag: '沙箱', navTitle: 'Linux 沙箱' },
+            { file: 'codex-16.html', title: 'Windows：受限令牌、防火墙过滤器与两个专用系统用户', desc: '没有 seatbelt 和 bubblewrap 的平台怎么叠出沙箱，以及 AppContainer 为什么被否掉', tag: '沙箱', navTitle: 'Windows 沙箱' },
+            { file: 'codex-17.html', title: 'execpolicy：让策略文件自带测试用例', desc: '正反例写进规则本身，加载期就跑一遍；前缀精确匹配，多规则取最严', tag: '策略', navTitle: 'execpolicy' },
+          ],
+        },
+        {
+          id: 't-codex-approval',
+          title: '审批与网络',
+          desc: '拦不住的交给人，或者交给另一个模型',
+          lessons: [
+            { file: 'codex-18.html', title: '审批策略：同一条命令，问不问看哪两颗旋钮', desc: '默认问不问跟沙箱种类绑在一起。问过一次之后，记住的是完整命令，还是一段前缀。', tag: '审批', navTitle: '审批策略' },
+            { file: 'codex-19.html', title: 'Guardian：让一个模型去审批另一个模型', desc: '四步法、失败关闸、超时与拒绝分账，以及按 turn 计数的熔断器', tag: '审批', navTitle: 'Guardian' },
+            { file: 'codex-20.html', title: '网络与凭据代理：模型看不见的那把钥匙', desc: '出站要过几道门。真 token 不进子进程。模型看见的是假值和一句 403。', tag: '网络', navTitle: '网络与凭据代理' },
+          ],
+        },
+        {
+          id: 't-codex-modelapi',
+          title: '给模型设计的接口',
+          desc: '让模型好用的格式，和跑不完时的收场',
+          lessons: [
+            { file: 'codex-21.html', title: 'apply-patch，给模型设计一种 diff', desc: '一份没有行号的补丁语言：定位靠上下文锚点，应用靠四级匹配，单文件对不上就不写盘', tag: '工具', navTitle: 'apply-patch' },
+            { file: 'codex-22.html', title: 'exec 与 wait：跑不完的程序怎么收场', desc: '能力做减法的 V8 isolate，以及跑不完就让出 cell、用 wait 续跑的长任务协议', tag: '代码模式', navTitle: 'exec 与 wait' },
+            { file: 'codex-23.html', title: '宿主拆分：程序挂在谁身上', desc: '上一课讲 exec 和 wait 的语义。这一课问另一件事：这段 JavaScript 到底挂在谁身上，挂点换了之后，故障域和状态归属怎么变。', tag: '代码模式', navTitle: 'Code Mode 宿主' },
+          ],
+        },
+        {
+          id: 't-codex-extend',
+          title: '扩展',
+          desc: '把别人的能力接进来，把自己的能力派出去',
+          lessons: [
+            { file: 'codex-24.html', title: '多 Agent 是一张要持久化的图', desc: '派出去的是节点，边一出生就是 Open。信先入队，followup 才叫醒。关掉的是边，历史还在。', tag: '多 Agent', navTitle: '多 Agent 图' },
+            { file: 'codex-25.html', title: '挂钩点能改什么，由事件合同决定', desc: '一次 turn 会经过十一个挂钩。协议认四种处理器，运行表只装命令和 MCP。超时默认放行，拆卸期丢掉 stdout。', tag: '扩展', navTitle: 'Hooks' },
+            { file: 'codex-26.html', title: 'MCP 接进来：模型看见翻译过的名字', desc: '外部 server 的工具要先过一层翻译才进模型眼睛。skill 目录常在，缺 MCP 时另问人。', tag: '扩展', navTitle: 'MCP 与 Skills' },
+            { file: 'codex-27.html', title: '搬家只搬对得上的字段', desc: '换到 Codex 的第一周，最怕去年攒的 hook、MCP 和插件还在不在。检测会列出一份清单。导入只收下能映射的那一部分。', tag: '扩展', navTitle: '插件迁移' },
+          ],
+        },
+        {
+          id: 't-codex-protocol',
+          title: '协议与界面',
+          desc: '内核和外壳之间说什么话，终端上怎么显示',
+          lessons: [
+            { file: 'codex-28.html', title: 'SQ 进、EQ 出：同一件事两副面孔', desc: '命令走进程内的 Submission Queue。事件走能写成 JSON 的 Event Queue。Rust 名叫 TurnStarted，磁盘上仍写 task_started。', tag: '协议', navTitle: 'SQ/EQ 事件语言' },
+            { file: 'codex-29.html', title: '对外协议是投影', desc: 'IDE 看见的是 Thread / Turn / Item，不是内核 EventMsg。一次 turn/start 先回响应，再推事件流；审批是反向请求，不回包这一轮就停住。', tag: '协议', navTitle: 'app-server 协议' },
+            { file: 'codex-30.html', title: '流式输出怎么在终端两区之间定稿', desc: '模型按 token 往外推，终端却是一个写出去就改不了的字符网格。已经不会变的行交给 scrollback，还可能变的尾巴留在活动 cell，表格没闭合之前整段扣住。', tag: '界面', navTitle: 'TUI 流式渲染' },
+          ],
+        },
+        {
+          id: 't-codex-closing',
+          title: '收束',
+          desc: '把架构写成检查项，再回看两套安全观',
+          lessons: [
+            { file: 'codex-31.html', title: '把架构决策写成 lint', desc: '同一份 AGENTS.md 里，有命令的规则会在三台操作系统上亮红。只有路径的那条，重命名之后没人发现。', tag: '工程', navTitle: '架构即 lint' },
+            { file: 'codex-32.html', title: '两种安全视角：同一条命令，两套判词', desc: '出事之前有没有门可以拒绝，出事之后能不能复原模型当时看见的世界。同一条危险命令上，这两套视角会一致，也会给出相反结论。', tag: '安全', navTitle: '两种安全视角' },
+          ],
+        },
+      ],
+    },
+    {
       id: 'p-oss',
       num: '专题篇章',
       title: '开源、蒸馏与本地部署',
@@ -1558,7 +1720,7 @@ window.COURSE = {
           desc: '品牌的户籍和入口',
           lessons: [
             { file: 'opc-3.html', title: '商标一个不够：35、42、41 一起拿', desc: '35 类是商业变现的许可证，42 类管软件平台，41 类管课程内容；附类别清单生成器', tag: '交互' , navTitle: '商标类别'},
-            { file: 'opc-4.html', title: '被驳回不等于名字没了', desc: '真实案例复盘：驳回、撤三、复审三步怎么走，举证责任在谁身上，十五日复审期限', tag: '案例' , navTitle: '商标被驳回'},
+            { file: 'opc-4.html', title: '被驳回之后：把挡路的商标拿掉', desc: '真实案例复盘：驳回、撤三、复审三步怎么走，举证责任在谁身上，十五日复审期限', tag: '案例' , navTitle: '商标被驳回'},
             { file: 'opc-5.html', title: '域名全拿下：十万的报价怎么谈到五千', desc: '真实议价过程复盘：手上握着多少后缀，谈判桌上就有多少筹码', tag: '案例' , navTitle: '域名议价'},
           ],
         },

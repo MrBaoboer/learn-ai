@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Engineering metrics pass. Why do users still call it slow? | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="psy.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="AI Product Psychology lesson 1: the server's stopwatch and the user's stopwatch don't tick the same. Four playable experiments: the same 5-second request races blank freeze, spinner, streaming, and visible steps side by side—pick the worst one; feel out 8 seconds and see how much no-feedback waiting gets overestimated; drag the TTFT slider to replay typing and watch first-token time trade for feel score; three timing quirks, one tier at a time. Perceived performance is what users score you on.">
+<meta name="keywords" content="perceived performance,TTFT,time to first token,streaming,waiting experience,perceived time,AI Product Psychology,AI product manager">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/psy-1.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/psy-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/psy-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/psy-1.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/psy-1.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Engineering metrics pass. Why do users still call it slow?">
+<meta property="og:description" content="Same 5-second request, four presentations racing side by side; then time 8 seconds by feel and drag a TTFT slider. Perceived performance is what users score you on.">
+<meta property="og:url" content="https://xueai.app/slides/psy-1.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/psy-1.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Engineering metrics pass. Why do users still call it slow?">
+<meta name="twitter:description" content="Same 5-second request, four presentations racing side by side—identical wall-clock time, feel differs by 3×. Four experiments you play yourself.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 实验一：四方案并排跑 ── */
+.race-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.race-box{background:var(--card);border:2px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:border-color .15s,transform .15s;}
+.race-box:hover{transform:translateY(-2px);}
+.race-box.voted{border-color:var(--ct);box-shadow:0 0 0 2px var(--ct-line);}
+.race-head{padding:11px 15px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.race-head h4{font-size:13.5px;font-weight:800;color:var(--text);}
+.race-tag{font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--ct-soft);color:var(--ct-deep);white-space:nowrap;}
+.race-stage{padding:13px 15px;min-height:132px;font-size:12.5px;line-height:1.75;color:var(--sub);flex:1;}
+.race-stage .rs-answer{color:var(--text);}
+.race-stage .rs-hint{color:#9ca3af;font-size:12px;}
+.race-spinner{width:22px;height:22px;border:3px solid var(--ct-line);border-top-color:var(--ct);border-radius:50%;animation:rspin .8s linear infinite;margin:8px 0;}
+@keyframes rspin{to{transform:rotate(360deg)}}
+.race-steps{display:flex;flex-direction:column;gap:6px;}
+.race-step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub);opacity:0;transform:translateX(-6px);transition:opacity .3s,transform .3s;}
+.race-step.on{opacity:1;transform:none;}
+.race-step .st-dot{width:7px;height:7px;border-radius:50%;background:var(--ct);flex-shrink:0;}
+.race-step.doing .st-dot{animation:stpulse 1s ease infinite;}
+@keyframes stpulse{50%{transform:scale(1.7);opacity:.5}}
+.race-foot{padding:9px 15px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--sub);}
+.race-foot .rf-time{font-variant-numeric:tabular-nums;}
+.race-foot .rf-feel{color:var(--ct-deep);opacity:0;transition:opacity .3s;text-align:right;}
+.race-foot .rf-feel.show{opacity:1;}
+.race-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;}
+.btn-ct{background:var(--ct);color:#fff;border:none;padding:10px 24px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s;}
+.btn-ct:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px);}
+.btn-ct:disabled{background:#c4c8cf;cursor:not-allowed;}
+.race-status{font-size:12.5px;color:var(--sub);font-weight:600;}
+.race-verdict{margin-top:14px;padding:14px 18px;background:var(--ct-soft);border:1.5px dashed var(--ct-line);border-radius:10px;font-size:13.5px;line-height:1.8;color:var(--sub);display:none;}
+.race-verdict.show{display:block;animation:psy-slide-up .35s ease;}
+.race-verdict b{color:var(--ct-deep);}
+
+/* ── 实验二：秒表估时游戏 ── */
+.sw-wrap{display:grid;grid-template-columns:7fr 5fr;gap:16px;align-items:stretch;}
+.sw-panel{border:2px solid var(--border);border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;min-height:200px;font-size:12.5px;color:#9ca3af;user-select:none;}
+.sw-panel.run{color:#d1d5db;}
+.sw-side{display:flex;flex-direction:column;gap:12px;justify-content:center;}
+.sw-side p{font-size:13px;color:var(--sub);line-height:1.75;}
+.sw-side p b{color:var(--ct-deep);}
+.sw-result{display:none;}
+.sw-result.show{display:block;animation:psy-pop .3s ease;}
+.sw-nums{display:flex;gap:10px;margin-bottom:10px;}
+.sw-num{flex:1;background:var(--ct-soft);border:1px solid var(--ct-line);border-radius:10px;padding:10px 12px;text-align:center;}
+.sw-num i{display:block;font-style:normal;font-size:10.5px;font-weight:800;color:var(--sub);margin-bottom:3px;}
+.sw-num b{font-size:16px;color:var(--ct-deep);font-variant-numeric:tabular-nums;}
+.sw-verdict{font-size:13px;line-height:1.8;color:var(--sub);}
+.sw-verdict b{color:var(--ct-deep);}
+
+/* ── 实验三：TTFT 滑块 + 聊天重放 ── */
+.tf-wrap{display:grid;grid-template-columns:6fr 6fr;gap:16px;align-items:start;}
+.tf-chat{border:2px solid var(--border);border-radius:12px;display:flex;flex-direction:column;gap:10px;min-height:216px;}
+.tf-msg{max-width:88%;padding:9px 13px;border-radius:12px;font-size:12px;line-height:1.7;}
+.tf-msg.user{align-self:flex-end;background:var(--ct);color:#fff;border-bottom-right-radius:4px;}
+.tf-msg.ai{align-self:flex-start;background:#f3f4f6;color:#374151;border-bottom-left-radius:4px;min-height:38px;min-width:130px;}
+.tf-wait::after{content:'';';animation:tfblink .8s step-end infinite;color:#9ca3af;}
+@keyframes tfblink{50%{opacity:0}}
+.tf-ctrl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;}
+.tf-kv{margin-top:12px;font-size:13px;line-height:1.8;color:var(--sub);}
+.tf-kv b{color:var(--ct-deep);}
+.tf-note{margin-top:12px;font-size:12.5px;color:var(--sub);line-height:1.75;background:rgba(0,0,0,.03);border-radius:9px;padding:10px 14px;}
+.tf-note b{color:var(--ct-deep);}
+
+/* ── 实验四：三个走时怪癖 ── */
+.qk-pane{display:none;margin-top:16px;}
+.qk-pane.on{display:block;}
+.qk-cap{font-size:13px;color:var(--sub);line-height:1.8;margin-top:14px;}
+.qk-cap b{color:var(--ct-deep);}
+.tl-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;margin-top:12px;}
+.tl-label{font-size:12px;font-weight:800;color:var(--sub);}
+.tl-track{height:14px;border-radius:8px;background:rgba(0,0,0,.06);overflow:hidden;}
+.tl-fill{height:100%;width:0;border-radius:8px;background:var(--ct);}
+.tl-fill.dim{background:#94a3b8;}
+.tl-mark{grid-column:2;font-size:11.5px;font-weight:700;color:var(--ct-deep);opacity:0;transition:opacity .3s;}
+.tl-mark.show{opacity:1;}
+.fb-stage{grid-column:2;font-size:11.5px;font-weight:700;color:var(--ct-deep);min-height:17px;}
+.qk-ask{display:none;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;font-size:13px;font-weight:700;color:var(--text);}
+.qk-ask.show{display:flex;animation:psy-slide-up .3s ease;}
+.qk-ask button{padding:7px 15px;border-radius:999px;border:1.5px solid var(--border);background:transparent;font-size:12.5px;font-weight:800;color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s;}
+.qk-ask button:hover:not(:disabled){border-color:var(--ct);color:var(--ct-deep);}
+.qk-ask button:disabled{cursor:default;opacity:.5;}
+.qk-verdict{display:none;margin-top:12px;padding:12px 16px;border-radius:10px;background:var(--ct-soft);border:1px solid var(--ct-line);font-size:13px;line-height:1.8;color:var(--sub);}
+.qk-verdict.show{display:block;animation:psy-pop .3s ease;}
+.qk-verdict b{color:var(--ct-deep);}
+.q3-quote{margin-top:14px;padding:13px 17px;border-radius:10px;background:rgba(0,0,0,.035);font-size:13px;color:var(--text);line-height:1.75;font-style:italic;}
+
+/* ── 全章地图翻卡 ── */
+.map-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.map-card{position:relative;aspect-ratio:1.06;cursor:pointer;perspective:600px;}
+.map-inner{position:absolute;inset:0;transition:transform .5s;transform-style:preserve-3d;}
+.map-card.flip .map-inner{transform:rotateY(180deg);}
+.map-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:12px;border:1.5px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;text-align:center;}
+.map-front{background:var(--card);box-shadow:var(--shadow-card);}
+.map-front .mp-icon{font-size:22px;}
+.map-front .mp-name{font-size:12.5px;font-weight:800;color:var(--text);line-height:1.4;}
+.map-front .mp-hint{font-size:10px;font-weight:700;color:var(--ct);}
+.map-back{background:var(--ct-soft);border-color:var(--ct-line);transform:rotateY(180deg);}
+.map-back .mp-ai{font-size:11px;font-weight:800;color:var(--ct-deep);line-height:1.55;}
+.map-back .mp-tag{font-size:10px;font-weight:800;color:var(--sub);letter-spacing:.5px;}
+
+@media (max-width:768px){
+  .race-grid{grid-template-columns:1fr;}
+  .sw-wrap{grid-template-columns:1fr;}
+  .tf-wrap{grid-template-columns:1fr;}
+  .map-grid{grid-template-columns:repeat(2,1fr);}
+  .tl-row{grid-template-columns:76px 1fr;}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Engineering metrics pass. Why do users still call it slow?","name":"Engineering metrics pass. Why do users still call it slow?","url":"https://xueai.app/slides/psy-1.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Perceived Performance","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"AI Product Psychology lesson 1: the server's stopwatch and the user's stopwatch don't tick the same. Four playable experiments: the same 5-second request races blank freeze, spinner, streaming, and visible steps side by side—pick the worst one; feel out 8 seconds and see how much no-feedback waiting gets overestimated; drag the TTFT slider to replay typing and watch first-token time trade for feel score; three timing quirks, one tier at a time. Perceived performance is what users score you on.","datePublished":"2026-08-11","dateModified":"2026-08-17"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">AI Product Psychology</div>
+    <h1>Engineering metrics pass. Why do users still call it slow?</h1>
+    <p class="subtitle">Earlier chapters taught you to cut latency, squeeze cost, and drive hallucination rates down. This chapter swaps the stopwatch: <b>the one in the user's head</b>. It ticks differently from the server's. Ratings, renewals, and uninstalls all follow it. Lesson one runs an experiment, then unpacks this watch's timing quirks one by one.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Same 5-second request races blank freeze, spinner, streaming, and visible steps side by side—feel how identical wall-clock time can differ 3× in feel; then meet three timing quirks of the user's stopwatch</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">Experiment 1 · Same 5 seconds, four ways to live</div>
+    <p class="desc">The four panels below share <b>one request</b>: same question, same 5 seconds to a full answer. The only difference: what you show the user during those 5 seconds. Hit the button to start all four at once, and notice how each feels.</p>
+    <div class="toy" id="raceToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+        <span class="toy-t">Four options, side by side</span>
+        <span class="toy-badge" id="raceBadge">Start the race</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">When they finish, tap the panel that felt worst.</div>
+        <div class="race-grid" id="raceGrid">
+          <div class="race-box" data-mode="freeze">
+            <div class="race-head"><h4>Option A · Blank freeze</h4><span class="race-tag">Give nothing</span></div>
+            <div class="race-stage" id="stFreeze"><span class="rs-hint">Tap the button below to start</span></div>
+            <div class="race-foot"><span class="rf-time" id="tFreeze">0.0s</span><span class="rf-feel" id="fFreeze"></span></div>
+          </div>
+          <div class="race-box" data-mode="spinner">
+            <div class="race-head"><h4>Option B · Spinner wait</h4><span class="race-tag">Shows it's alive</span></div>
+            <div class="race-stage" id="stSpinner"><span class="rs-hint">Tap the button below to start</span></div>
+            <div class="race-foot"><span class="rf-time" id="tSpinner">0.0s</span><span class="rf-feel" id="fSpinner"></span></div>
+          </div>
+          <div class="race-box" data-mode="stream">
+            <div class="race-head"><h4>Option C · Streaming</h4><span class="race-tag">Give part first</span></div>
+            <div class="race-stage" id="stStream"><span class="rs-hint">Tap the button below to start</span></div>
+            <div class="race-foot"><span class="rf-time" id="tStream">0.0s</span><span class="rf-feel" id="fStream"></span></div>
+          </div>
+          <div class="race-box" data-mode="steps">
+            <div class="race-head"><h4>Option D · Visible steps</h4><span class="race-tag">Show what it's doing</span></div>
+            <div class="race-stage" id="stSteps"><span class="rs-hint">Tap the button below to start</span></div>
+            <div class="race-foot"><span class="rf-time" id="tSteps">0.0s</span><span class="rf-feel" id="fSteps"></span></div>
+          </div>
+        </div>
+        <div class="race-controls">
+          <button class="btn-ct" id="btnRace">Start all four</button>
+          <span class="race-status" id="raceStatus">Wall-clock time identical: all 5 seconds</span>
+        </div>
+        <div class="race-verdict" id="raceVerdict"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Experiment 2 · Calibrate your body stopwatch</div>
+    <p class="desc">Most people found the blank panel worst. Blank isn't just unpleasant—it has a hidden cost: <b>it inflates your estimate of how long you waited</b>. Perceived-time research calls timing while you attend to time itself prospective timing: the more attention you park on time, the more subjective duration balloons, and anxiety stretches it further. Zakay and Block's attentional-gate model is the most-cited account. Here's the conclusion up front—measuring it yourself is more convincing.</p>
+    <div class="toy" id="swToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="2" x2="14" y2="2"/><circle cx="12" cy="14" r="8"/><path d="M12 14l3-3"/></svg></span>
+        <span class="toy-t">Feel out 8 seconds</span>
+        <span class="toy-badge" id="swBadge">Not started</span>
+      </div>
+      <div class="toy-body">
+        <div class="sw-wrap">
+          <div class="sw-panel" id="swPanel">(Ready? Tap Start on the right)</div>
+          <div class="sw-side">
+            <p>After you tap Start, the left panel enters a wait with <b>no progress, no spinner, no copy</b>. Stop when it feels like 8 seconds. Try not to count beats in your head—that's cheating.</p>
+            <button class="btn-ct" id="swBtn">Start</button>
+            <div class="sw-result" id="swResult">
+              <div class="sw-nums">
+                <div class="sw-num"><i>You thought</i><b>8.0s</b></div>
+                <div class="sw-num"><i>Actually elapsed</i><b id="swActual">0.0s</b></div>
+                <div class="sw-num"><i>Error</i><b id="swDelta">0%</b></div>
+              </div>
+              <div class="sw-verdict" id="swVerdict"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:14px;">That's the bill blank freeze runs that never shows in the backend: the server logs 5 seconds, the user logs six and a half. <b>Overestimation on no-feedback waits—20–30% is common in experiments</b>. Your product's “felt latency” is worse than the P99 on the monitoring panel, and the gap is decided by the UI.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Experiment 3 · How long a lever is time to first token</div>
+    <p class="desc">If the stopwatch runs in the user's head, spend the engineering budget on the interval they time. Below, this chatbot's <b>total duration is locked at 5 seconds</b>; you move one knob only: TTFT—time to first token (from send to seeing the first character). Drag the slider, hit Replay; the right side replays the typing stream at that TTFT, and the feel score moves with it.</p>
+    <div class="toy" id="tfToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg></span>
+        <span class="toy-t">TTFT slider · total duration fixed</span>
+        <span class="toy-badge" id="tfBadge">Drag, then replay</span>
+      </div>
+      <div class="toy-body">
+        <div class="tf-wrap">
+          <div>
+            <div class="sl-row">
+              <label>Time to first token</label>
+              <input type="range" id="tfSlider" min="0.2" max="5" step="0.1" value="2.4">
+              <span class="sl-val" id="tfVal">2.4s</span>
+            </div>
+            <div class="tf-ctrl">
+              <button class="btn-ct" id="tfBtn">Replay</button>
+              <span class="race-status" id="tfStatus">Total fixed at 5.0s—only first token moves</span>
+            </div>
+            <div class="psy-meter">
+              <span class="pm-label">Feel score</span>
+              <div class="pm-track"><div class="pm-fill" id="tfFill" style="width:64%"></div></div>
+              <span class="pm-num" id="tfNum">64</span>
+            </div>
+            <div class="tf-kv" id="tfKv"></div>
+          </div>
+          <div class="tf-chat mock">
+            <div class="tf-msg user">Summarize this meeting note into three to-dos</div>
+            <div class="tf-msg ai"><span id="tfAi">Tap Replay to feel this TTFT tier</span></div>
+          </div>
+        </div>
+        <div class="tf-note"><b>Why engineering pushes TTFT first:</b> Cut first token from 5s to 0.5s and you save zero seconds of total time—yet the feel score jumps 2–3×. Leave TTFT alone and cut total from 5s to 4s, and this stopwatch barely moves. Streaming, outline-first, chunked returns all beat buying bigger machines on cost-effectiveness.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Experiment 4 · Three timing quirks of the user's stopwatch</div>
+    <p class="desc">Package the feel above into three reusable rules. Each tier has a mini demo—<b>switch through all three</b>.</p>
+    <div class="toy" id="qkToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+        <span class="toy-t">Three timing quirks</span>
+        <span class="toy-badge" id="qkBadge">1 / 3 tiers</span>
+      </div>
+      <div class="toy-body">
+        <div class="seg" id="qkSeg">
+          <button class="on" data-k="0">① Starts at first token</button>
+          <button data-k="1">② Feedback makes it fly</button>
+          <button data-k="2">③ Bad endings feel longer</button>
+        </div>
+
+        <div class="qk-pane on" data-k="0">
+          <button class="btn-ct" id="q1Play" style="margin-top:14px;">Play both timelines</button>
+          <div class="tl-row"><span class="tl-label">User's stopwatch</span><div class="tl-track"><div class="tl-fill" id="q1UserFill"></div></div><span class="tl-mark" id="q1UserMark">0.6s · first character seen, stopwatch stops</span></div>
+          <div class="tl-row"><span class="tl-label">Server's stopwatch</span><div class="tl-track"><div class="tl-fill dim" id="q1SrvFill"></div></div><span class="tl-mark" id="q1SrvMark">5.0s · full answer lands</span></div>
+          <p class="qk-cap">The user's clock starts on Send and stops at the first character. After that, attention goes to reading—tokens arriving while they read barely enter the waiting ledger. Engineering watches total-duration P99; users only remember first token. <b>When the two watches disagree, bad reviews slip through the crack</b>. How long the TTFT lever is in Experiment 3 comes from this quirk.</p>
+        </div>
+
+        <div class="qk-pane" data-k="1">
+          <button class="btn-ct" id="q2Play" style="margin-top:14px;">Two same-speed bars—go</button>
+          <div class="tl-row"><span class="tl-label">Bare</span><div class="tl-track"><div class="tl-fill dim" id="q2AFill"></div></div></div>
+          <div class="tl-row"><span class="tl-label">With updates</span><div class="tl-track"><div class="tl-fill" id="q2BFill"></div></div><span class="fb-stage" id="q2Stage"></span></div>
+          <div class="qk-ask" id="q2Ask"><span>Same 6 seconds—which felt worse?</span><button data-v="a">The bare one</button><button data-v="b">The one with updates</button></div>
+          <div class="qk-verdict" id="q2Verdict"></div>
+        </div>
+
+        <div class="qk-pane" data-k="2">
+          <p class="qk-cap" style="margin-top:14px;">Same wait: answer lands at 5 seconds. Flip the two endings and watch remembered duration change.</p>
+          <div class="seg" id="q3Seg" style="margin-top:10px;">
+            <button class="on" data-k="0">Good result · answer lands</button>
+            <button data-k="1">Bad result · misses the point</button>
+          </div>
+          <div class="q3-quote" id="q3Quote">“Came back in a moment, answer was on point—this tool works.”</div>
+          <div class="psy-meter">
+            <span class="pm-label">Remembered duration</span>
+            <div class="pm-track"><div class="pm-fill" id="q3Fill" style="width:42%"></div></div>
+            <span class="pm-num" id="q3Num">~4 sec</span>
+          </div>
+          <p class="qk-cap">Physically it's the same 5 seconds. <b>Retrospective time is rebuilt after the fact—the worse the mood, the longer the reconstructed wait</b>. So latency and hallucination often share one bad-review sentence: slow and dumb. Answer quality gets blamed onto speed; conversely, a good answer can cover for some of the slowness. Lesson 4 on the peak-end rule puts this into ending design.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Thesis · Users score you on the perceived stopwatch</div>
+    <p class="desc">AI products have three native flaws: <b>slow</b> (inference takes time), <b>wrong</b> (hallucination never fully dies), <b>opaque</b> (users can't see what it's doing). Engineering can only ease these in the short run, but ratings come from perception—and perception can be designed. Streaming, model routing, semantic cache, Agent progress reports from earlier chapters each also have a psychology-switch identity. This chapter teaches when to flip them for psychological effect.</p>
+    <div class="quote-card"><b>Perceived performance ≠ actual performance.</b> The server's 5 seconds is a physical fact; the user's 5 seconds is a psychological event. Ratings, renewals, uninstalls all happen in that second 5 seconds.</div>
+    <div class="toy" id="vqToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+        <span class="toy-t">Exit quiz · budget for one cut only</span>
+        <span class="toy-badge">Pick one</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">Users call your AI assistant slow. Measured total is 5s, first token 4.2s. Sprint capacity for one change—which cut first?</div>
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>Upgrade the inference cluster—cut total from 5s to 4s</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>Add streaming—first token to 0.5s, total unchanged</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>Ship a fancier loading animation—spinner upgrades to particles</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>Pop a tip explaining the model is thinking deeply</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Chapter map · how the sixteen lessons continue</div>
+    <p class="desc">Slow, wrong, opaque—each flaw has lessons behind it; later come relationships and money. <b>Tap a card to flip</b> and see which user complaint each lesson targets.</p>
+    <div class="toy" id="mapToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15"/><path d="M15 6v15"/></svg></span>
+        <span class="toy-t">Sixteen lessons, one map</span>
+        <span class="toy-badge" id="mapBadge">0 / 16 flipped</span>
+      </div>
+      <div class="toy-body">
+        <div class="map-grid" id="mapGrid"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="src-note">
+    <b>Sources and further reading:</b> The attentional-gate model of perceived time is in Zakay and Block's series (from the 1990s); overestimation under no feedback and high arousal keeps showing up in prospective-timing experiments. The classic survey of waiting experience is David Maister, The Psychology of Waiting Lines (1985)—“occupied time feels shorter; unexplained waits feel longer” comes from there. The 0.1 / 1 / 10 second tiers for UI response are in Nielsen, Usability Engineering (1993). Experiments showing progress indicators raise preference and patience: Myers (1985). The mechanism by which emotion rewrites time memory shares a root with Lesson 4's peak-end rule (Kahneman et al.).
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ What this lesson wants to share</h3>
+    <ul>
+      <li><b>Watch both stopwatches</b>: the server times wall-clock duration; the user times from send to first token—give TTFT its own line in the scorecard</li>
+      <li><b>Don't leave the UI blank</b>: no-feedback waits inflate 20–30%; past 1 second give feedback, past 3 seconds give progress</li>
+      <li><b>Budget first-token first</b>: streaming, outline-first, chunked returns all schedule ahead of bigger machines</li>
+      <li><b>Catch errors in the moment</b>: time memory follows mood—missing the point writes “slow” into the bad review too</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 实验一：四方案并排跑 ──
+   四个面板共用一条 5 秒时间线，差异只在呈现层：冻结无输出、转圈、
+   流式（TTFT 0.6s 后逐字出）、步骤外显（四步逐条亮再流式收尾）。
+   跑完让用户投最难受的一票，按票给判词，再揭示物理时长相同。 */
+const ANSWER = 'Based on 2025 Q4 data, refund requests cluster in shipping damage (41%) and size mismatch (27%). Prioritize a photo-to-claim lane for damaged items—expected to cut manual review volume by about 30%, and median support response from 4 hours to 20 minutes.';
+const RACE_MS = 5000;
+const $ = id => document.getElementById(id);
+const stages = { freeze: $('stFreeze'), spinner: $('stSpinner'), stream: $('stStream'), steps: $('stSteps') };
+const clocks = { freeze: $('tFreeze'), spinner: $('tSpinner'), stream: $('tStream'), steps: $('tSteps') };
+const feels  = { freeze: $('fFreeze'), spinner: $('fSpinner'), stream: $('fStream'), steps: $('fSteps') };
+const FEEL_TEXT = { freeze: 'Feels longest—most people think over 8 seconds', spinner: 'Knows it isn\'t frozen, but still just waiting', stream: 'Reading starts at 0.6s—waiting barely registers', steps: 'Waiting got translated into progress' };
+const VOTE_OPEN = {
+  freeze: '<b>Same pick as most people.</b> Blank freeze won\'t even answer “is it dead?”, so the brain gets no cues and defaults to worst-case anxiety.',
+  spinner: '<b>Plenty pick the spinner too.</b> It answers “still alive,” but not “how much longer”—every idle second still hits the stopwatch.',
+  stream: '<b>You picked differently from most.</b> Streaming pain often comes from the tease: first token is fast, then it sputters—expectation keeps getting yanked.',
+  steps: '<b>You picked differently from most.</b> Visible steps sometimes flop by over-acting: when step copy and real work diverge, the feel gets worse. Lesson 3 unpacks that line.',
+};
+const btnRace = $('btnRace');
+const raceStatus = $('raceStatus');
+const raceVerdict = $('raceVerdict');
+const raceBadge = $('raceBadge');
+let racing = false, raceDone = false, voted = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function runClocks(){
+  const t0 = performance.now();
+  const timer = setInterval(() => {
+    const s = Math.min(RACE_MS, performance.now() - t0) / 1000;
+    Object.values(clocks).forEach(c => c.textContent = s.toFixed(1) + 's');
+    if (s >= RACE_MS / 1000) clearInterval(timer);
+  }, 100);
+}
+
+async function runFreeze(){
+  stages.freeze.innerHTML = '<span class="rs-hint">(Page completely still)</span>';
+  await sleep(RACE_MS);
+  stages.freeze.innerHTML = '<span class="rs-answer">' + ANSWER + '</span>';
+}
+
+async function runSpinner(){
+  stages.spinner.innerHTML = '<div class="race-spinner"></div><span class="rs-hint">Generating…</span>';
+  await sleep(RACE_MS);
+  stages.spinner.innerHTML = '<span class="rs-answer">' + ANSWER + '</span>';
+}
+
+async function runStream(){
+  stages.stream.innerHTML = '<span class="rs-hint">Connecting…</span>';
+  await sleep(600);
+  stages.stream.innerHTML = '<span class="rs-answer"></span>';
+  const el = stages.stream.querySelector('.rs-answer');
+  const step = (RACE_MS - 600) / ANSWER.length;
+  for (let i = 0; i < ANSWER.length; i++){
+    el.textContent += ANSWER[i];
+    await sleep(step);
+  }
+}
+
+async function runSteps(){
+  const STEPS = [
+    { label: 'Understanding: optimize the refund flow', at: 300 },
+    { label: 'Searching knowledge base: 12 tickets hit', at: 1100 },
+    { label: 'Comparing 3 candidate plans', at: 2200 },
+    { label: 'Writing the answer', at: 3200 },
+  ];
+  stages.steps.innerHTML = '<div class="race-steps">' + STEPS.map(s =>
+    '<div class="race-step"><span class="st-dot"></span>' + s.label + '</div>').join('') + '</div>';
+  const rows = [...stages.steps.querySelectorAll('.race-step')];
+  STEPS.forEach((s, i) => setTimeout(() => {
+    rows.forEach(r => r.classList.remove('doing'));
+    rows[i].classList.add('on', 'doing');
+  }, s.at));
+  await sleep(3600);
+  stages.steps.innerHTML = '<span class="rs-answer"></span>';
+  const el = stages.steps.querySelector('.rs-answer');
+  const step = (RACE_MS - 3600) / ANSWER.length;
+  for (let i = 0; i < ANSWER.length; i++){
+    el.textContent += ANSWER[i];
+    await sleep(step);
+  }
+}
+
+btnRace.addEventListener('click', async () => {
+  if (racing) return;
+  racing = true; raceDone = false; voted = false;
+  raceVerdict.classList.remove('show');
+  Object.values(feels).forEach(f => { f.textContent = ''; f.classList.remove('show'); });
+  document.querySelectorAll('.race-box').forEach(b => b.classList.remove('voted'));
+  btnRace.disabled = true;
+  btnRace.textContent = '5 seconds—running…';
+  raceBadge.textContent = 'Running…';
+  raceStatus.textContent = 'Watch the feel: which panel\'s 5 seconds drag longest?';
+  runClocks();
+  await Promise.all([runFreeze(), runSpinner(), runStream(), runSteps()]);
+  raceDone = true; racing = false;
+  btnRace.disabled = false;
+  btnRace.textContent = 'Run again';
+  raceBadge.textContent = 'Cast a vote';
+  raceStatus.textContent = 'Done. Tap the panel that felt worst ↑';
+});
+
+document.querySelectorAll('.race-box').forEach(box => {
+  box.addEventListener('click', () => {
+    if (!raceDone || voted) return;
+    voted = true;
+    box.classList.add('voted');
+    Object.keys(feels).forEach(k => { feels[k].textContent = FEEL_TEXT[k]; feels[k].classList.add('show'); });
+    raceVerdict.innerHTML = VOTE_OPEN[box.dataset.mode] + ' But on the server side all four panels are identical—full answer in 5 seconds. The only difference is what those 5 seconds show the user. Option C rewrites “wait 5 seconds” as “wait 0.6 seconds, then read as it arrives”; Option D translates “waiting” into “progress.” <b>Perceived performance is part of product performance—and the only part users can touch.</b>';
+    raceVerdict.classList.add('show');
+    raceBadge.textContent = '✓ Revealed';
+    raceBadge.classList.add('solved');
+    raceStatus.textContent = 'Wall-clock time identical: all 5 seconds';
+  });
+});
+
+/* ── 实验二：秒表估时游戏 ──
+   无反馈等待下凭体感掐 8 秒。计时过程不给一丝提示，
+   揭晓时算高估/低估比例，按方向给判词。 */
+const swBtn = $('swBtn'), swPanel = $('swPanel'), swBadge = $('swBadge');
+const swResult = $('swResult'), swVerdict = $('swVerdict');
+let swState = 'idle', swT0 = 0;
+
+swBtn.addEventListener('click', () => {
+  if (swState === 'idle' || swState === 'done'){
+    swState = 'run';
+    swT0 = performance.now();
+    swResult.classList.remove('show');
+    swPanel.classList.add('run');
+    swPanel.textContent = '(UI completely still)';
+    swBtn.textContent = 'Felt like 8s? Stop';
+    swBadge.textContent = 'Timing…';
+    swBadge.classList.remove('solved');
+    return;
+  }
+  const e = (performance.now() - swT0) / 1000;
+  if (e < 2){
+    swPanel.textContent = '(That felt like a mis-tap—try again)';
+    swState = 'idle';
+    swBtn.textContent = 'Start';
+    swBadge.textContent = 'Not started';
+    return;
+  }
+  swState = 'done';
+  swPanel.classList.remove('run');
+  swPanel.textContent = '(Wait over)';
+  swBtn.textContent = 'Try again';
+  const over = Math.round((8 / e - 1) * 100);
+  $('swActual').textContent = e.toFixed(1) + 's';
+  $('swDelta').textContent = over > 0 ? 'Over by ' + over + '%' : over < 0 ? 'Under by ' + (-over) + '%' : 'Spot on';
+  let v;
+  if (over >= 10){
+    v = 'At <b>' + e.toFixed(1) + ' seconds</b> you already felt 8 were up—this no-feedback wait inflated about <b>' + over + '%</b> in your body. Misread is normal: when attention fills with time itself, most people overestimate; 20–30% error is common in experiments.';
+  } else if (over <= -10){
+    v = 'You waited until <b>' + e.toFixed(1) + ' seconds</b> to stop—you under-logged duration, a minority. Guess: you counted beats, attention went to counting, and subjective time shrank—exactly the attentional-gate story from the other direction.';
+  } else {
+    v = 'Actual <b>' + e.toFixed(1) + ' seconds</b>, under 10% error—your body stopwatch is steady, sharper than most subjects. Carry that feel into user data: they\'re less steady; 5 blank seconds often get logged as six and a half.';
+  }
+  swVerdict.innerHTML = v;
+  swResult.classList.add('show');
+  swBadge.textContent = '✓ Revealed';
+  swBadge.classList.add('solved');
+});
+
+/* ── 实验三：TTFT 滑块 + 聊天重放 ──
+   总时长锁 5 秒，滑块只动首字时间；体感分随滑块即时变化，
+   重放按所选 TTFT 真实演一遍等待与打字流。 */
+const TF_ANSWER = 'Three to-dos: ① Send the budget sheet to finance for review by Wednesday; ② Have Yang revise the support script to v2 for Friday review; ③ Book the vendor Monday morning to confirm ship dates. Want me to drop calendar reminders too?';
+const tfSlider = $('tfSlider'), tfAi = $('tfAi'), tfBtn = $('tfBtn'), tfBadge = $('tfBadge');
+let tfPlaying = false, tfRun = 0;
+
+function tfScore(t){ return Math.round(97 - (t - 0.2) * 15); }
+
+function tfPaint(){
+  const t = +tfSlider.value;
+  const sc = tfScore(t);
+  $('tfVal').textContent = t.toFixed(1) + 's';
+  const fill = $('tfFill');
+  fill.style.width = sc + '%';
+  fill.className = 'pm-fill ' + (sc < 40 ? 'hot' : sc < 70 ? 'warm' : '');
+  $('tfNum').textContent = sc;
+  let kv;
+  if (t <= 0.8){
+    kv = 'First token ' + t.toFixed(1) + 's: <b>stopwatch barely starts before it stops</b>. The remaining ' + (5 - t).toFixed(1) + 's are spent reading—almost never booked as waiting.';
+  } else if (t <= 2.5){
+    kv = 'First token ' + t.toFixed(1) + 's: tolerable, but the stopwatch really ran ' + t.toFixed(1) + 's. <b>Push under 1s—every 0.5s cut pays off clearly</b>.';
+  } else {
+    kv = 'First token ' + t.toFixed(1) + 's: the first ' + t.toFixed(1) + 's feel like blank freeze—<b>streaming\'s upside got shoved to the tail</b>.';
+  }
+  $('tfKv').innerHTML = kv;
+}
+tfSlider.addEventListener('input', tfPaint);
+tfPaint();
+
+tfBtn.addEventListener('click', async () => {
+  if (tfPlaying) return;
+  tfPlaying = true;
+  const my = ++tfRun;
+  const t = +tfSlider.value;
+  tfBtn.disabled = true;
+  tfBtn.textContent = 'Replaying…';
+  $('tfStatus').textContent = 'This replay: first token ' + t.toFixed(1) + 's · total 5.0s';
+  tfAi.textContent = '';
+  tfAi.classList.add('tf-wait');
+  await sleep(t * 1000);
+  if (my !== tfRun) return;
+  tfAi.classList.remove('tf-wait');
+  const delay = Math.max(0, (5 - t) * 1000 / TF_ANSWER.length);
+  if (delay === 0){
+    tfAi.textContent = TF_ANSWER;
+  } else {
+    for (let i = 0; i < TF_ANSWER.length; i++){
+      tfAi.textContent += TF_ANSWER[i];
+      await sleep(delay);
+      if (my !== tfRun) return;
+    }
+  }
+  tfPlaying = false;
+  tfBtn.disabled = false;
+  tfBtn.textContent = 'Replay';
+  tfBadge.textContent = '✓ Tried it';
+  tfBadge.classList.add('solved');
+});
+
+/* ── 实验四：三个走时怪癖 ── */
+const qkSeg = $('qkSeg'), qkBadge = $('qkBadge');
+const qkSeen = new Set([0]);
+qkSeg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const k = +b.dataset.k;
+  [...qkSeg.children].forEach(x => x.classList.toggle('on', +x.dataset.k === k));
+  document.querySelectorAll('.qk-pane').forEach(p => p.classList.toggle('on', +p.dataset.k === k));
+  qkSeen.add(k);
+  if (qkSeen.size === 3){
+    qkBadge.textContent = '✓ All three seen';
+    qkBadge.classList.add('solved');
+  } else {
+    qkBadge.textContent = qkSeen.size + ' / 3 tiers';
+  }
+});
+
+/* 怪癖①：两条时间线，一条 0.6s 停表，一条 5s 走完 */
+const q1Play = $('q1Play');
+q1Play.addEventListener('click', () => {
+  const uf = $('q1UserFill'), sf = $('q1SrvFill');
+  const um = $('q1UserMark'), sm = $('q1SrvMark');
+  q1Play.disabled = true;
+  [uf, sf].forEach(el => { el.style.transition = 'none'; el.style.width = '0'; });
+  [um, sm].forEach(el => el.classList.remove('show'));
+  void uf.offsetWidth;
+  uf.style.transition = 'width .6s linear';
+  uf.style.width = '12%';
+  sf.style.transition = 'width 5s linear';
+  sf.style.width = '100%';
+  setTimeout(() => um.classList.add('show'), 650);
+  setTimeout(() => {
+    sm.classList.add('show');
+    q1Play.disabled = false;
+    q1Play.textContent = 'Play again';
+  }, 5050);
+});
+
+/* 怪癖②：两根同速进度条，一根裸奔一根带播报，跑完投票 */
+const q2Play = $('q2Play'), q2Ask = $('q2Ask'), q2Verdict = $('q2Verdict'), q2Stage = $('q2Stage');
+const Q2_STAGES = ['Understanding the question', 'Searching knowledge base: 12 hits', 'Comparing 3 candidate plans', 'Organizing wording—almost there'];
+const Q2_V = {
+  a: '<b>Matches most people\'s feel.</b> Same speed—the bare bar only lacks information: how far along, which step, how much left—brain has to invent it. Maister puts this first in The Psychology of Waiting Lines: occupied time feels shorter; unexplained waits feel longer. Lesson 2 unpacks the three laws of waiting; Lesson 3 covers the labor illusion of showing effort.',
+  b: '<b>Minority pick—also fair.</b> Some people nitpick the status copy and get pulled back into waiting itself. Large samples still hold: waits with feedback are remembered shorter. Maister ranks it first in The Psychology of Waiting Lines. Lesson 2 unpacks the three laws of waiting; Lesson 3 covers labor illusion.',
+};
+q2Play.addEventListener('click', () => {
+  const af = $('q2AFill'), bf = $('q2BFill');
+  q2Play.disabled = true;
+  q2Ask.classList.remove('show');
+  q2Verdict.classList.remove('show');
+  [...q2Ask.querySelectorAll('button')].forEach(b => b.disabled = false);
+  [af, bf].forEach(el => { el.style.transition = 'none'; el.style.width = '0'; });
+  q2Stage.textContent = '';
+  void af.offsetWidth;
+  [af, bf].forEach(el => { el.style.transition = 'width 6s linear'; el.style.width = '100%'; });
+  Q2_STAGES.forEach((s, i) => setTimeout(() => { q2Stage.textContent = s; }, i * 1500 + 100));
+  setTimeout(() => {
+    q2Stage.textContent = 'Done';
+    q2Ask.classList.add('show');
+    q2Play.disabled = false;
+    q2Play.textContent = 'Run again';
+  }, 6100);
+});
+q2Ask.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  [...q2Ask.querySelectorAll('button')].forEach(x => x.disabled = true);
+  q2Verdict.innerHTML = Q2_V[b.dataset.v];
+  q2Verdict.classList.add('show');
+});
+
+/* 怪癖③：同一次 5 秒等待，结局好坏改写时间记忆 */
+const Q3 = [
+  { quote: '“Came back in a moment, answer was on point—this tool works.”', w: 42, n: '~4 sec', hot: false },
+  { quote: '“Hung forever, then missed the point—refund me.”', w: 88, n: '~9 sec', hot: true },
+];
+const q3Seg = $('q3Seg');
+q3Seg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const k = +b.dataset.k;
+  [...q3Seg.children].forEach(x => x.classList.toggle('on', +x.dataset.k === k));
+  const d = Q3[k];
+  $('q3Quote').textContent = d.quote;
+  const fill = $('q3Fill');
+  fill.style.width = d.w + '%';
+  fill.className = 'pm-fill' + (d.hot ? ' hot' : '');
+  $('q3Num').textContent = d.n;
+});
+
+/* ── 出门考：tasteQuiz 在 taste.js 加载后初始化 ── */
+document.addEventListener('DOMContentLoaded', () => {
+  tasteQuiz('vqToy', {
+    answer: 1,
+    why: [
+      'Money went to an interval the user doesn\'t time: first token still stuck at 4.2s, waiting feel untouched—the second you saved lands while they\'re already reading.',
+      'User stopwatch stops at 0.5s; the remaining 4.5s are spent reading. Machine cost flat, feel shifts a gear—exactly the lever Experiment 3 measured.',
+      'A fancier spinner is still a spinner: answers “it\'s alive,” not “how much longer”—the 4.2s blank window didn\'t shrink a second.',
+      'Explanation is the right direction, but a tip popup interrupts reading and parks attention back on time. How to stage process for credit is Lesson 3\'s labor illusion.',
+    ],
+  });
+});
+
+/* ── 全章地图翻卡 ── */
+const MAP = [
+  { icon: '⏱', name: 'Perceived Performance', ai: 'Two stopwatches tick differently—perception can be designed', tag: 'Lesson 1 · You are here' },
+  { icon: '⏳', name: 'The Psychology of Waiting', ai: 'How painful waiting feels is decided by presentation—three presentation decisions', tag: 'Lesson 2' },
+  { icon: '🔍', name: 'Labor Illusion', ai: 'Let AI show its effort—a bit slower can feel more trustworthy', tag: 'Lesson 3' },
+  { icon: '🎢', name: 'Peak-End Rule', ai: 'Experience is remembered for peaks and endings—clear where budget should land', tag: 'Lesson 4' },
+  { icon: '⚖️', name: 'Trust Calibration', ai: 'Blind trust causes accidents; no trust wastes the purchase—tune to healthy skepticism', tag: 'Lesson 5' },
+  { icon: '🤖', name: 'Algorithm Aversion', ai: 'Same mistake hurts more when AI makes it than when a human does', tag: 'Lesson 6' },
+  { icon: '🛡', name: 'Defensiveness', ai: 'Users won\'t upload data or hit confirm—sense of control to the rescue', tag: 'Lesson 7' },
+  { icon: '📖', name: 'Mental Model', ai: 'Users grab the wrong manual and treat AI like a search engine', tag: 'Lesson 8' },
+  { icon: '🎭', name: 'Anthropomorphism & Apology', ai: 'How human to act—and how to apologize when it fails', tag: 'Lesson 9' },
+  { icon: '🌉', name: 'Honeymoon Cliff', ai: 'After novelty fades, what keeps people', tag: 'Lesson 10' },
+  { icon: '🏷', name: 'AI Label Discount', ai: 'Same content drops in value once labeled AI', tag: 'Lesson 11' },
+  { icon: '🧠', name: 'Cognitive Offloading', ai: 'Users think less the more they use it—catch or block?', tag: 'Lesson 12' },
+  { icon: '💞', name: 'Emotional Attachment', ai: 'When users bond with AI, where to draw the line', tag: 'Lesson 13' },
+  { icon: '💳', name: 'The Psychology of Paying', ai: 'Love using it, won\'t pay—where\'s the stuck point', tag: 'Lesson 14' },
+  { icon: '🧾', name: 'Pricing', ai: 'Subscribe, metered, or buyout—price is psychology design too', tag: 'Lesson 15' },
+  { icon: '📮', name: 'The Psychology of Feedback', ai: 'Why users skip thumbs-down—and how bad news can be heard', tag: 'Lesson 16' },
+];
+const mapGrid = $('mapGrid');
+const mapBadge = $('mapBadge');
+const mapFlipped = new Set();
+mapGrid.innerHTML = MAP.map(m => `
+  <div class="map-card">
+    <div class="map-inner">
+      <div class="map-face map-front">
+        <div class="mp-icon">${m.icon}</div>
+        <div class="mp-name">${m.name}</div>
+        <div class="mp-hint">Tap to flip</div>
+      </div>
+      <div class="map-face map-back">
+        <div class="mp-ai">${m.ai}</div>
+        <div class="mp-tag">${m.tag}</div>
+      </div>
+    </div>
+  </div>`).join('');
+[...mapGrid.children].forEach((card, i) => {
+  card.addEventListener('click', () => {
+    card.classList.toggle('flip');
+    mapFlipped.add(i);
+    if (mapFlipped.size === 16){
+      mapBadge.textContent = '✓ All sixteen flipped';
+      mapBadge.classList.add('solved');
+    } else {
+      mapBadge.textContent = mapFlipped.size + ' / 16 flipped';
+    }
+  });
+});
+</script>
+<script src="taste.js?v=20260810a"></script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vocabulary & Trie: How Tokenizers Cut Words | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="You saw tokenization in the LLM fundamentals part—now the underbelly: how a prefix tree recognizes “五花肉” (streaky pork) as one chunk. Walk a Trie and tokenize by hand.">
+<meta name="keywords" content="Trie prefix tree,Tokenizer tokenization,vocabulary,BPE,token,longest match,LLM tokenization internals">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-9.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ds-9.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ds-9.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ds-9.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ds-9.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Vocabulary & Trie: How Tokenizers Cut Words">
+<meta property="og:description" content="How does a prefix tree recognize “五花肉” as one chunk? Walk a Trie once and see greedy longest-match.">
+<meta property="og:url" content="https://xueai.app/slides/ds-9.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/ds-9.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vocabulary & Trie: How Tokenizers Cut Words">
+<meta name="twitter:description" content="How does a prefix tree recognize “五花肉” as one chunk? Walk a Trie once and see greedy longest-match.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── Trie 分词演示 ── */
+.trie-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.trie-head{padding:14px 22px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.trie-head-label{font-size:12px;font-weight:800;color:var(--sub)}
+.sent-chip{border:1.5px solid var(--border);background:var(--card);border-radius:999px;padding:6px 16px;font-size:13.5px;font-weight:700;color:var(--text);cursor:pointer;transition:all .15s;font-family:inherit}
+.sent-chip:hover{border-color:rgba(2,132,199,.4)}
+.sent-chip.active{background:var(--ds);border-color:var(--ds);color:#fff}
+.trie-sentence{padding:16px 22px 6px;text-align:center}
+.trie-sentence .sc{display:inline-block;font-size:22px;font-weight:800;padding:5px 9px;margin:0 2px;border-radius:9px;color:var(--text);transition:background .25s,color .25s,opacity .25s}
+.trie-sentence .sc.probe{background:var(--ds);color:#fff}
+.trie-sentence .sc.eaten{background:var(--ds-soft);color:var(--ds-deep);opacity:.65}
+.trie-stage{padding:4px 12px;display:flex;justify-content:center}
+.trie-stage svg{width:100%;max-width:640px;height:auto;display:block}
+.tr-edge{stroke:rgba(0,0,0,.16);stroke-width:1.8;transition:stroke .25s,stroke-width .25s}
+.tr-edge.path{stroke:var(--ds);stroke-width:3}
+.tr-node circle.tr-dot{fill:#fff;stroke:rgba(0,0,0,.22);stroke-width:1.6;transition:fill .25s,stroke .25s}
+.tr-node text.tr-char{fill:var(--text);font-size:15px;font-weight:800;pointer-events:none}
+.tr-node.cur circle.tr-dot{fill:var(--ds);stroke:var(--ds)}
+.tr-node.cur text.tr-char{fill:#fff}
+.tr-node.path circle.tr-dot{fill:var(--ds-soft);stroke:var(--ds)}
+.tr-node.cut circle.tr-dot{fill:#dcfce7;stroke:var(--success)}
+.tr-end{fill:#16a34a;font-size:11px;font-weight:900}
+.tr-root-label{fill:var(--sub);font-size:11px;font-weight:700}
+.trie-narr{margin:6px 22px;padding:13px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.8;color:var(--sub);min-height:58px}
+.trie-narr b{color:var(--ds-deep)}
+.trie-narr .bad{color:var(--danger);font-weight:800}
+.trie-narr .ok{color:var(--success);font-weight:800}
+.trie-result{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 22px 8px;min-height:44px}
+.trie-result-label{font-size:12px;font-weight:800;color:var(--sub)}
+.tok-chip{background:var(--ds);color:#fff;font-size:14px;font-weight:800;padding:5px 14px;border-radius:9px;animation:tokPop .35s ease}
+@keyframes tokPop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+.trie-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 22px 16px;border-top:1px solid var(--border)}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.trie-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── BPE 说明卡 ── */
+.bpe-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow-card)}
+.bpe-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:10px}
+.bpe-card p{font-size:13.5px;color:var(--sub);line-height:1.85;margin-bottom:10px}
+.bpe-card p:last-child{margin-bottom:0}
+.bpe-card b{color:var(--ds-deep)}
+.bpe-demo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(0,0,0,.03);border-radius:var(--radius-sm);padding:12px 14px;margin:12px 0;font-size:13px}
+.bpe-tok{padding:3px 10px;border-radius:7px;font-weight:800}
+.bpe-tok.big{background:var(--ds-soft);color:var(--ds-deep);border:1.5px solid var(--ds-line)}
+.bpe-tok.frag{background:rgba(220,38,38,.08);color:var(--danger);border:1.5px dashed rgba(220,38,38,.35)}
+.bpe-arrow{color:var(--sub);font-weight:800}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .trie-sentence .sc{font-size:18px;padding:4px 6px}
+  .trie-narr{margin-left:14px;margin-right:14px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Vocabulary & Trie: How Tokenizers Cut Words","name":"Vocabulary & Trie: How Tokenizers Cut Words","url":"https://xueai.app/slides/ds-9.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Data Structures Inside the LLM","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"You saw tokenization in the LLM fundamentals part—now the underbelly: how a prefix tree recognizes “五花肉” (streaky pork) as one chunk. Walk a Trie and tokenize by hand.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Data Structures Inside the LLM</div>
+    <h1>Vocabulary & Trie: How Tokenizers Cut Words</h1>
+    <p class="subtitle">Remember that detail from LLM fundamentals—the tokenizer cuts “五花肉” into <b>one whole token</b>, not three characters. We said “common combos stay whole”; now the underbelly: how does a tokenizer spot, among tens of thousands of words, that “五花肉” should leave as one chunk? The answer is a way of organizing called a <b>Trie (prefix tree)</b>—hang the vocabulary by shared prefixes into a tree.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>You saw tokenization in the LLM fundamentals part—now the underbelly: how a prefix tree recognizes “五花肉” (streaky pork) as one chunk. Walk a Trie and tokenize by hand</p></aside><!--seo:end-->  <div class="sec-label">First, the organizing · how a vocabulary hangs as a tree</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Suppose the vocabulary has: <code>五</code>, <code>五月</code>, <code>五花肉</code>, <code>今天</code>, <code>天</code>, <code>天气</code>, <code>吃</code>, <code>花</code>, <code>好</code>. Hang them by first character, then second… shared prefixes share branches—“五月” and “五花肉” crowd the same “五” branch. <b style="color:var(--text)">A green ✓ means “a complete word ends here”</b>; note “五→花” has no ✓—it’s only a waypoint (“五花” isn’t a word).</p>
+
+  <div class="trie-box">
+    <div class="trie-head">
+      <span class="trie-head-label">Pick a sentence:</span>
+      <button class="sent-chip active" data-s="今天吃五花肉">今天吃五花肉</button>
+      <button class="sent-chip" data-s="五月天气好">五月天气好</button>
+      <button class="sent-chip" data-s="今天吃五花">今天吃五花</button>
+    </div>
+    <div class="trie-sentence" id="trieSentence"></div>
+    <div class="trie-stage">
+      <svg id="trieSvg" viewBox="0 0 640 310" aria-label="Prefix-tree tokenization demo"></svg>
+    </div>
+    <div class="trie-narr" id="trieNarr">Hit “Start tokenizing”—the cursor <b>walks the tree character by character</b>. Watch two things: at a ✓ it <b>doesn’t cut yet</b> (greedy—try going longer); when stuck it <b>backs up to the nearest ✓ and cuts</b>.</div>
+    <div class="trie-result">
+      <span class="trie-result-label">Tokens:</span>
+      <span id="trieTokens"></span>
+    </div>
+    <div class="trie-foot">
+      <button class="btn-ds" id="btnTrie">Start tokenizing ▶</button>
+      <span class="trie-status" id="trieStatus">About 15 seconds, with narration each step</span>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked xa-peek" style="margin-top:18px;">
+    <b>This walk is “greedy longest match”: go as deep as you can; when stuck, back up to the nearest word end and cut.</b> Why greedy? Cutting “五花肉” as one chunk beats “五 / 花 / 肉” on tokens and meaning. Trie’s trick: each step only asks “does this node have a branch for this character?”—<b>no need to rescan the whole vocabulary</b>. Tens of thousands of words, one lookup per step. Again: organize well, look up fast.
+  </div>
+
+  <div class="sec-label paywall-locked">Under the hood · real LLMs use BPE—same idea</div>
+
+  <div class="bpe-card paywall-locked">
+    <h4>🧩 BPE: repeatedly merge the “most co-occurring character pairs” into chunks</h4>
+    <p>Real tokenizers (GPT and DeepSeek both use <b>BPE</b>) build vocabularies more wildly: shatter text into tiny fragments, count <b>which two fragments sit next to each other most</b>, glue them into the vocab; count again, glue again, tens of thousands of times. Common combos “grow” into big tokens—same idea as Trie’s “common words stored whole.”</p>
+    <div class="bpe-demo">
+      <span class="bpe-tok big">的</span>
+      <span class="bpe-tok big">，</span>
+      <span class="bpe-tok big">五花肉</span>
+      <span class="bpe-arrow">→ high frequency, each a whole chunk</span>
+    </div>
+    <div class="bpe-demo">
+      <span>“饕餮”</span>
+      <span class="bpe-arrow">→</span>
+      <span class="bpe-tok frag">饕(frag1)</span>
+      <span class="bpe-tok frag">饕(frag2)</span>
+      <span class="bpe-tok frag">餮(frag1)</span>
+      <span class="bpe-tok frag">餮(frag2)</span>
+      <span class="bpe-arrow">→ rare, shattered into byte fragments</span>
+    </div>
+    <p>So the phenomena you’ve seen make sense: “的” and “，” always cost one token; rare characters get split into several. That’s also why <b>Chinese usually costs more tokens than English</b>—most vocabularies train on English-heavy corpora, so English common words earn whole tokens while Chinese gets fewer, forcing more cuts. Same sentence, Chinese bill often higher—roots in who that “dictionary” vocabulary organized.</p>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>What this lesson wants to share</h3>
+    <ul>
+      <li><b>A vocabulary is a dictionary</b>: it organizes all tokens; tokenization is “look up the dict and cut the sentence into chunks”</li>
+      <li><b>Trie organizes by shared prefixes</b>: longest-match becomes one lookup per step—no backtracking the whole list</li>
+      <li><b>Greedy longest match</b>: go as deep as you can; when stuck, back up to the nearest word end and cut</li>
+      <li><b>BPE shares the same idea</b>: repeatedly merge the most co-occurring pairs into chunks—common stays cheap, rare gets shattered</li>
+      <li><b>Why Chinese costs more tokens</b>: English-leaning vocabularies, fewer whole Chinese tokens, so more cuts</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── Trie 结构与布局 ──
+   节点手工排版（SVG 坐标），分词步骤由 tokenize() 按贪婪最长匹配现算，
+   保证动画和算法逻辑严格一致，不靠手写脚本。 */
+const TRIE = {
+  id:'root', end:false, children:{
+    '五':{ id:'n5', end:true, children:{
+      '花':{ id:'n5h', end:false, children:{
+        '肉':{ id:'n5hr', end:true, children:{} },
+      }},
+      '月':{ id:'n5y', end:true, children:{} },
+    }},
+    '今':{ id:'nj', end:false, children:{
+      '天':{ id:'njt', end:true, children:{} },
+    }},
+    '天':{ id:'nt', end:true, children:{
+      '气':{ id:'ntq', end:true, children:{} },
+    }},
+    '吃':{ id:'nc', end:true, children:{} },
+    '花':{ id:'nf', end:true, children:{} },
+    '好':{ id:'nh', end:true, children:{} },
+  },
+};
+const TRIE_POS = {
+  root:{ x:320, y:38,  label:'vocab' },
+  n5:  { x:100, y:118, label:'五' },
+  nj:  { x:222, y:118, label:'今' },
+  nt:  { x:344, y:118, label:'天' },
+  nc:  { x:446, y:118, label:'吃' },
+  nf:  { x:528, y:118, label:'花' },
+  nh:  { x:602, y:118, label:'好' },
+  n5h: { x:52,  y:200, label:'花' },
+  n5y: { x:148, y:200, label:'月' },
+  njt: { x:222, y:200, label:'天' },
+  ntq: { x:344, y:200, label:'气' },
+  n5hr:{ x:52,  y:278, label:'肉' },
+};
+const TRIE_EDGES = [
+  ['root','n5'],['root','nj'],['root','nt'],['root','nc'],['root','nf'],['root','nh'],
+  ['n5','n5h'],['n5','n5y'],['nj','njt'],['nt','ntq'],['n5h','n5hr'],
+];
+const TRIE_ENDS = { n5:'五', n5y:'五月', n5hr:'五花肉', njt:'今天', nt:'天', ntq:'天气', nc:'吃', nf:'花', nh:'好' };
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const trieSvg = document.getElementById('trieSvg');
+function svgEl(tag, attrs){
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+/* 画边 */
+const trieEdgeEls = {};
+TRIE_EDGES.forEach(([a, b]) => {
+  const p1 = TRIE_POS[a], p2 = TRIE_POS[b];
+  const l = svgEl('line', { class:'tr-edge', x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y });
+  trieSvg.appendChild(l);
+  trieEdgeEls[b] = l;   // 每个非根节点唯一一条入边
+});
+/* 画节点 */
+const trieNodeEls = {};
+Object.entries(TRIE_POS).forEach(([id, p]) => {
+  const g = svgEl('g', { class:'tr-node', 'data-id':id });
+  g.appendChild(svgEl('circle', { class:'tr-dot', cx:p.x, cy:p.y, r: id === 'root' ? 24 : 20 }));
+  const t = svgEl('text', { class:'tr-char', x:p.x, y:p.y + 5.5, 'text-anchor':'middle' });
+  t.textContent = id === 'root' ? 'root' : p.label;
+  g.appendChild(t);
+  if (TRIE_ENDS[id]){
+    const badge = svgEl('text', { class:'tr-end', x:p.x + 16, y:p.y - 13 });
+    badge.textContent = '✓';
+    g.appendChild(badge);
+  }
+  trieSvg.appendChild(g);
+  trieNodeEls[id] = g;
+});
+const rootHint = svgEl('text', { class:'tr-root-label', x:TRIE_POS.root.x + 34, y:TRIE_POS.root.y + 4 });
+rootHint.textContent = '← every word starts here';
+trieSvg.appendChild(rootHint);
+
+/* ── 贪婪最长匹配：生成步骤脚本 ── */
+function tokenize(s){
+  const steps = [];
+  let i = 0;
+  while (i < s.length){
+    steps.push({ type:'start', i, ch:s[i] });
+    let node = TRIE, j = i, lastEnd = -1, lastEndId = null;
+    const path = [];
+    while (j < s.length && node.children[s[j]]){
+      node = node.children[s[j]];
+      j++;
+      path.push(node.id);
+      if (node.end){ lastEnd = j; lastEndId = node.id; }
+      steps.push({ type:'visit', id:node.id, word:s.slice(i, j), end:node.end,
+                   canGo: j < s.length && !!node.children[s[j]], nextCh:s[j] || '', path:[...path], i, j });
+    }
+    if (lastEnd > i){
+      steps.push({ type:'cut', word:s.slice(i, lastEnd), endId:lastEndId,
+                   backed: path.length > 0 && path[path.length - 1] !== lastEndId,
+                   fromWord:s.slice(i, j) });
+      i = lastEnd;
+    } else {
+      steps.push({ type:'unk', ch:s[i] });
+      i++;
+    }
+  }
+  steps.push({ type:'done' });
+  return steps;
+}
+
+/* ── 动画驱动 ── */
+const trieSentence = document.getElementById('trieSentence');
+const trieNarr = document.getElementById('trieNarr');
+const trieTokens = document.getElementById('trieTokens');
+const trieStatus = document.getElementById('trieStatus');
+const btnTrie = document.getElementById('btnTrie');
+let curSentence = '今天吃五花肉';
+let trieBusy = false;
+
+function renderSentence(){
+  trieSentence.innerHTML = [...curSentence].map((c, k) => `<span class="sc" data-k="${k}">${c}</span>`).join('');
+}
+function markSentence(from, to, cls){
+  trieSentence.querySelectorAll('.sc').forEach(el => {
+    const k = +el.dataset.k;
+    if (k >= from && k < to) el.classList.add(cls);
+  });
+}
+function clearProbe(){
+  trieSentence.querySelectorAll('.sc.probe').forEach(el => el.classList.remove('probe'));
+}
+function trieClearHl(){
+  Object.values(trieNodeEls).forEach(g => g.classList.remove('cur','path','cut'));
+  Object.values(trieEdgeEls).forEach(l => l.classList.remove('path'));
+}
+function trieSleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+document.querySelectorAll('.sent-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    if (trieBusy) return;
+    document.querySelectorAll('.sent-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    curSentence = chip.dataset.s;
+    renderSentence();
+    trieTokens.innerHTML = '';
+    trieClearHl();
+    trieNarr.innerHTML = `Switched to: “${curSentence}”. Hit “Start tokenizing” to see the cuts.`;
+    btnTrie.textContent = 'Start tokenizing ▶';
+  });
+});
+renderSentence();
+
+btnTrie.addEventListener('click', async () => {
+  if (trieBusy) return;
+  trieBusy = true;
+  btnTrie.disabled = true;
+  trieTokens.innerHTML = '';
+  renderSentence();
+  trieClearHl();
+  const steps = tokenize(curSentence);
+  for (const st of steps){
+    if (st.type === 'start'){
+      trieClearHl();
+      clearProbe();
+      trieNodeEls.root.classList.add('cur');
+      trieNarr.innerHTML = `Start a new chunk at “<b>${st.ch}</b>”—back to the <b>root</b>, empty-handed.`;
+      await trieSleep(1000);
+    } else if (st.type === 'visit'){
+      trieClearHl();
+      st.path.forEach(id => { trieNodeEls[id].classList.add('path'); trieEdgeEls[id].classList.add('path'); });
+      trieNodeEls[st.path[st.path.length - 1]].classList.add('cur');
+      clearProbe();
+      markSentence(st.i, st.j, 'probe');
+      let msg = `Reached “<b>${st.word}</b>”`;
+      if (st.end && st.canGo){
+        msg += ` — <span class="ok">word end ✓</span>, jot it down. But <b>greedy</b>: there’s still a “${st.nextCh}” branch—keep going deeper!`;
+      } else if (st.end && !st.canGo){
+        msg += ` — <span class="ok">word end ✓</span>, and ${st.j >= curSentence.length ? 'the sentence ends here' : `next char “${st.nextCh}” <span class="bad">has no branch</span>`}—no need to probe further.`;
+      } else if (!st.end && st.canGo){
+        msg += ` — <b>no ✓</b> here, just a waypoint (“${st.word}” isn’t a word), but the path continues—keep going.`;
+      } else {
+        msg += ` — no ✓, ${st.j >= curSentence.length ? 'and the sentence ends' : `want “${st.nextCh}” but <span class="bad">no such branch—dead end</span>`}.`;
+      }
+      trieNarr.innerHTML = msg;
+      await trieSleep(1400);
+    } else if (st.type === 'cut'){
+      trieClearHl();
+      trieNodeEls[st.endId].classList.add('cut');
+      clearProbe();
+      const cutMsg = st.backed
+        ? `<span class="bad">Back up!</span> Stuck after “${st.fromWord}”, retreat to the nearest jot “<b>${st.word}</b>”—<b>snip!</b>`
+        : `Right on a word end—<b>snip: “${st.word}”</b> in the bag.`;
+      trieNarr.innerHTML = cutMsg;
+      const chip = document.createElement('span');
+      chip.className = 'tok-chip';
+      chip.textContent = st.word;
+      trieTokens.appendChild(chip);
+      /* 已消费的前缀 = 结果区所有词元的总长度 */
+      let consumed = 0;
+      trieTokens.querySelectorAll('.tok-chip').forEach(c => { consumed += c.textContent.length; });
+      trieSentence.querySelectorAll('.sc').forEach(el => {
+        el.classList.toggle('eaten', +el.dataset.k < consumed);
+      });
+      await trieSleep(1300);
+    } else if (st.type === 'unk'){
+      trieNarr.innerHTML = `“${st.ch}” isn’t in the vocabulary—must stand alone as an unknown (real tokenizers fall back to byte fragments).`;
+      const chip = document.createElement('span');
+      chip.className = 'tok-chip';
+      chip.textContent = st.ch;
+      trieTokens.appendChild(chip);
+      await trieSleep(1100);
+    } else if (st.type === 'done'){
+      trieClearHl();
+      clearProbe();
+      const tokArr = [...trieTokens.querySelectorAll('.tok-chip')].map(c => c.textContent);
+      let tail = '';
+      if (tokArr.includes('五花肉')) tail = 'Notice “五花肉” entered as one chunk—that’s the underbelly answer to the tease in LLM fundamentals.';
+      else if (curSentence === '今天吃五花') tail = 'Neat: this time “五花” has no “肉” after it, so we back up and split into “五” and “花”—same characters, different teammates, different cuts.';
+      else tail = 'Every cut lands on a word-end ✓—zero wasted backtracks.';
+      trieNarr.innerHTML = `<b>✅ Done:</b> ${tokArr.map(t => `“${t}”`).join(' ')} — ${tokArr.length} tokens. ${tail}`;
+    }
+  }
+  trieStatus.textContent = 'Try another sentence?';
+  btnTrie.disabled = false;
+  btnTrie.textContent = 'Tokenize again ↻';
+  trieBusy = false;
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  lessonOnView(trieSvg, () => { trieStatus.textContent = '👆 Hit “Start tokenizing” to watch the cursor walk'; });
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Binary Search: The Optimal Number-Guessing Game | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Play a 1-to-100 number-guessing round and feel the range cut in half each guess; a billion items found in 30 tries—how fast log n really is. Binary search's ticket in: sort first.">
+<meta name="keywords" content="binary search,O(log n),number guessing game,search algorithm,beginner algorithms">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-3.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/algo-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/algo-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/algo-3.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/algo-3.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Binary Search: The Optimal Number-Guessing Game">
+<meta property="og:description" content="Random guesses take dozens of tries; binary search needs at most 7; a billion items still only 30. Feel the power of cutting in half by playing one round.">
+<meta property="og:url" content="https://xueai.app/slides/algo-3.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/algo-3.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Binary Search: The Optimal Number-Guessing Game">
+<meta name="twitter:description" content="Random guesses take dozens of tries; binary search needs at most 7; a billion items still only 30. Feel the power of cutting in half by playing one round.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+.btn-al{background:var(--al);color:#fff;border:none;padding:10px 24px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-ghost{background:var(--card);color:var(--sub);border:1.5px solid var(--border);padding:9px 20px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s}
+.btn-ghost:hover{border-color:var(--al-line);color:var(--al)}
+
+/* ── 猜数字游戏 ── */
+.guess-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.guess-strip{display:grid;grid-template-columns:repeat(20,1fr);gap:4px;margin-bottom:16px}
+.g-cell{aspect-ratio:1;border-radius:5px;background:rgba(219,39,119,.1);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:var(--al-deep);cursor:pointer;transition:background .2s,opacity .3s,transform .15s;-webkit-user-select:none;user-select:none;font-variant-numeric:tabular-nums}
+.g-cell:hover{transform:scale(1.15);background:rgba(219,39,119,.25)}
+.g-cell.dead{background:rgba(0,0,0,.05);color:#c4c8cf;opacity:.5;cursor:default}
+.g-cell.dead:hover{transform:none}
+.g-cell.tried{box-shadow:0 0 0 2px var(--amber) inset}
+.g-cell.hit{background:var(--success);color:#fff;transform:scale(1.2);box-shadow:0 0 0 3px rgba(22,163,74,.35)}
+.g-cell.hit:hover{transform:scale(1.2)}
+.g-cell.probing{background:var(--al);color:#fff;transform:scale(1.2)}
+.guess-status{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.guess-msg{flex:1;min-width:200px;font-size:14px;font-weight:700;color:var(--text)}
+.guess-msg b{color:var(--al)}
+.guess-count{font-size:12.5px;font-weight:700;color:var(--sub);flex-shrink:0}
+.guess-count b{font-size:22px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;margin-right:2px}
+.guess-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.guess-verdict{margin-top:14px;padding:14px 18px;background:var(--al-soft);border:1.5px dashed var(--al-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;color:var(--sub);display:none}
+.guess-verdict.show{display:block}
+.guess-verdict b{color:var(--al-deep)}
+
+/* ── 十亿条数据 ── */
+.log-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.log-btns{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px}
+.log-btn{border:1.5px solid var(--border);background:var(--card);border-radius:999px;padding:8px 20px;font-size:13.5px;font-weight:800;color:var(--text);cursor:pointer;font-family:inherit;transition:all .15s}
+.log-btn:hover{border-color:var(--al-line)}
+.log-btn.active{background:var(--al);border-color:var(--al);color:#fff}
+.log-display{display:flex;align-items:baseline;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.log-display .ld-text{font-size:14px;color:var(--sub);font-weight:700}
+.log-display .ld-num{font-size:38px;font-weight:900;color:var(--al);font-variant-numeric:tabular-nums;line-height:1}
+.fold-track{position:relative;height:34px;background:rgba(0,0,0,.05);border-radius:8px;overflow:hidden;margin-bottom:8px}
+.fold-fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--al),#f472b6);border-radius:8px;transition:width .22s cubic-bezier(.25,1,.5,1);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;min-width:3px}
+.fold-fill span{font-size:11px;font-weight:800;color:#fff;white-space:nowrap}
+.fold-caption{font-size:12.5px;color:var(--sub);font-weight:700;min-height:20px;font-variant-numeric:tabular-nums}
+.fold-caption b{color:var(--al-deep)}
+
+/* ── 前提卡 ── */
+.premise-card{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a;border-radius:var(--radius);padding:20px 24px;margin-top:24px}
+.premise-card h4{font-size:15px;font-weight:800;color:#92400e;margin-bottom:8px}
+.premise-card p{font-size:13.5px;color:#78350f;line-height:1.85}
+.premise-card p b{color:#b45309}
+
+/* ── 日常真身 ── */
+.irl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.irl-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:16px 18px}
+.irl-card .irl-icon{font-size:24px;margin-bottom:8px}
+.irl-card h4{font-size:14px;font-weight:800;color:var(--text);margin-bottom:5px}
+.irl-card p{font-size:12.5px;color:var(--sub);line-height:1.7}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .guess-strip{grid-template-columns:repeat(10,1fr)}
+  .g-cell{font-size:10px}
+  .irl-grid{grid-template-columns:1fr}
+  .log-display .ld-num{font-size:30px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Binary Search: The Optimal Number-Guessing Game","name":"Binary Search: The Optimal Number-Guessing Game","url":"https://xueai.app/slides/algo-3.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Search and Sorting","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"Play a 1-to-100 number-guessing round and feel the range cut in half each guess; a billion items found in 30 tries—how fast log n really is. Binary search's ticket in: sort first.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Search and Sorting</div>
+    <h1>Binary Search: The Optimal Number-Guessing Game</h1>
+    <p class="subtitle">That easy green line O(log n) from last lesson—today we unmask it. Did you play “I'm thinking of a number from 1 to 100, you guess” as a kid? <b>The optimal strategy for guessing numbers is one of the classic algorithms in computer science</b>—binary search. Play first, then talk theory.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Play a 1-to-100 number-guessing round and feel the range cut in half each guess; a billion items found in 30 tries—how fast log n really is</p></aside><!--seo:end-->  <div class="sec-label">Interactive 1 · Number-guessing game</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">The system has already picked a number from 1 to 100. The strip below is every candidate: <b style="color:var(--text)">tap any number to guess</b>—I'll tell you too high or too low, and eliminated numbers gray out. First guess randomly by instinct and note the count, then hit “Guess by binary search” for the textbook answer. <b style="color:var(--text)">Watch: each binary guess cuts the lit region exactly in half.</b></p>
+
+  <div class="guess-box">
+    <div class="guess-strip" id="guessStrip"></div>
+    <div class="guess-status">
+      <span class="guess-msg" id="guessMsg">Tap any number on the strip to start guessing →</span>
+      <span class="guess-count" id="guessCount"><b>0</b> tries</span>
+    </div>
+    <div class="guess-controls">
+      <button class="btn-al" id="btnBisect">Guess by binary search (auto demo)</button>
+      <button class="btn-ghost" id="btnNewGame">New number, restart ↻</button>
+    </div>
+    <div class="guess-verdict" id="guessVerdict"></div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>Why at most 7 tries?</b> 100 candidates → cut to 50, then 25, 12, 6, 3, 1… seven cuts leave exactly one. Random guessing can take dozens on a bad day, and even luck isn't stable; binary search doesn't rely on luck—<b>it gives a worst-case guarantee</b>—exactly what engineers care about most.
+  </div>
+
+  <div class="sec-label">Interactive 2 · A billion items in only 30 tries</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked xa-peek">The power of “cut in half” really shows when data gets big. Tap a data size below, see how many binary guesses you need at most, then watch the “fold in half” animation. <b style="color:var(--text)">Watch: data ×10,000, and the try count only climbs from 7 to a bit over 20.</b></p>
+
+  <div class="log-box paywall-locked">
+    <div class="log-btns" id="logBtns"></div>
+    <div class="log-display">
+      <span class="ld-text">At most</span>
+      <span class="ld-num" id="logTimes">7</span>
+      <span class="ld-text">tries (ceil of log₂ n)</span>
+    </div>
+    <div class="fold-track"><div class="fold-fill" id="foldFill" style="width:100%"><span id="foldLabel">100 items</span></div></div>
+    <div class="fold-caption" id="foldCaption">Pink bar = candidates not yet eliminated. Tap a data-size button above and watch it fold in half repeatedly.</div>
+  </div>
+
+  <div class="premise-card paywall-locked">
+    <h4>⚠️ Important premise: binary search's ticket in is “sort first”</h4>
+    <p>The guessing game works because numbers have a natural order—“too high” only means something then. Swap in a <b>dictionary with shuffled page numbers</b>, flip to the middle and see “cat,” and you have no idea whether “dog” is left or right—binary search dies on the spot. <b>So to enjoy O(log n) search, you pay the sorting cost first</b>—how sorting works and how expensive it is is exactly next lesson's star.</p>
+  </div>
+
+  <div class="sec-label paywall-locked">Everyday form · You've been using binary search all along</div>
+
+  <div class="irl-grid paywall-locked">
+    <div class="irl-card">
+      <div class="irl-icon">📖</div>
+      <h4>Flip a dictionary / phone book</h4>
+      <p>Looking up “Wang” you don't start at page one: flip to the middle, compare the spelling, toss half—the motion in your hands is binary search.</p>
+    </div>
+    <div class="irl-card">
+      <div class="irl-icon">🔍</div>
+      <h4>git bisect finds the bad commit</h4>
+      <p>One of 1000 commits introduced a bug? git jumps to the middle commit for you to test, keep the bad half / drop the good half, lock the culprit within 10 tries.</p>
+    </div>
+    <div class="irl-card">
+      <div class="irl-icon">🎯</div>
+      <h4>Guess the price / tune a parameter</h4>
+      <p>“How much is this bottle?”“Too high.”“Too low.”—TV price-guess segments: the pros are doing binary search in their heads. Manual hyperparameter search is the same move.</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>What this lesson wants to share</h3>
+    <ul>
+      <li><b>Power of cutting in half</b>: 100 candidates → 7 tries; a billion candidates still only 30—that's O(log n)</li>
+      <li><b>Not luck—a guarantee</b>: binary search gives a worst-case upper bound; engineering wants determinism</li>
+      <li><b>Order is the premise</b>: a shuffled dictionary can't be flipped; to use binary search, pay for sorting first (next lesson)</li>
+      <li><b>Everyday form</b>: dictionaries, git bisect for bad commits, price guessing—all binary search</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ═══ 交互一：猜数字游戏 ═══
+   状态：secret 目标数，low/high 是当前还可能的区间（由用户的反馈推出）。
+   用户点数字 = 一次猜测；「按二分猜」从当前剩余区间接着自动演示。 */
+const N_MAX = 100;
+let secret, low, high, tries, finished, autoRunning;
+
+const strip = document.getElementById('guessStrip');
+strip.innerHTML = Array.from({length:N_MAX}, (_,i) => `<div class="g-cell" data-v="${i+1}">${i+1}</div>`).join('');
+const cells = [...strip.children];
+
+const guessMsg = document.getElementById('guessMsg');
+const guessCount = document.getElementById('guessCount');
+const guessVerdict = document.getElementById('guessVerdict');
+const btnBisect = document.getElementById('btnBisect');
+const btnNewGame = document.getElementById('btnNewGame');
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function newGame(){
+  secret = 1 + Math.floor(Math.random() * N_MAX);
+  low = 1; high = N_MAX; tries = 0; finished = false; autoRunning = false;
+  cells.forEach(c => c.className = 'g-cell');
+  guessMsg.innerHTML = 'Tap any number on the strip to start guessing →';
+  guessCount.innerHTML = '<b>0</b> tries';
+  guessVerdict.classList.remove('show');
+  btnBisect.disabled = false;
+}
+
+function paintDead(){
+  cells.forEach(c => {
+    const v = +c.dataset.v;
+    c.classList.toggle('dead', v < low || v > high);
+  });
+}
+
+/* 处理一次猜测，返回 'hit' | 'high' | 'low' */
+function applyGuess(v){
+  tries++;
+  guessCount.innerHTML = `<b>${tries}</b> tries`;
+  const cell = cells[v-1];
+  if (v === secret){
+    cell.classList.add('hit');
+    finished = true;
+    guessMsg.innerHTML = `🎉 It's <b>${v}</b>! Took <b>${tries}</b> tries`;
+    showVerdict();
+    return 'hit';
+  }
+  cell.classList.add('tried');
+  if (v > secret){
+    high = Math.min(high, v - 1);
+    guessMsg.innerHTML = `<b>${v}</b>? Too high ↓ (remaining ${low} ~ ${high}, ${high-low+1} left)`;
+  } else {
+    low = Math.max(low, v + 1);
+    guessMsg.innerHTML = `<b>${v}</b>? Too low ↑ (remaining ${low} ~ ${high}, ${high-low+1} left)`;
+  }
+  paintDead();
+  return v > secret ? 'high' : 'low';
+}
+
+function showVerdict(){
+  const optimal = Math.ceil(Math.log2(N_MAX));
+  let text;
+  if (tries <= optimal){
+    text = `<b>${tries} tries—already binary-search level.</b> For 100 candidates, binary search guarantees at most ${optimal}—because seven half-cuts leave exactly 1. Random guessing can get lucky, but engineering wants a “guarantee,” not luck.`;
+  } else {
+    text = `<b>Found in ${tries} tries.</b> For comparison: binary search guarantees at most ${optimal} for 100 candidates. Hit “New number, restart” and play again—this time always tap the midpoint of what's left, and feel “cut in half each guess.”`;
+  }
+  guessVerdict.innerHTML = text;
+  guessVerdict.classList.add('show');
+}
+
+strip.addEventListener('click', e => {
+  const cell = e.target.closest('.g-cell');
+  if (!cell || finished || autoRunning) return;
+  const v = +cell.dataset.v;
+  if (v < low || v > high){
+    guessMsg.innerHTML = `${v} is already out—it can't be the answer; don't waste a try 😉`;
+    return;
+  }
+  applyGuess(v);
+});
+
+btnBisect.addEventListener('click', async () => {
+  if (finished || autoRunning) return;
+  autoRunning = true;
+  btnBisect.disabled = true;
+  while (!finished){
+    const mid = Math.floor((low + high) / 2);
+    const cell = cells[mid-1];
+    cell.classList.add('probing');
+    guessMsg.innerHTML = `Binary search plays: guess the midpoint of what's left <b>${mid}</b> ……`;
+    await sleep(650);
+    cell.classList.remove('probing');
+    applyGuess(mid);
+    await sleep(550);
+  }
+  autoRunning = false;
+});
+
+btnNewGame.addEventListener('click', () => { if (!autoRunning) newGame(); });
+newGame();
+
+/* ═══ 交互二：十亿条数据只要 30 次 ═══
+   点数据量按钮 → 显示 ceil(log2 n)，并播放「连续对折」动画：
+   宽度每 220ms 砍半，配文案报出当前剩余条数。 */
+const LOG_OPTS = [
+  { label:'100 items',    n:100 },
+  { label:'10k items',    n:10000 },
+  { label:'1M items',  n:1000000 },
+  { label:'1B items',   n:1000000000 },
+];
+const logBtns = document.getElementById('logBtns');
+const logTimes = document.getElementById('logTimes');
+const foldFill = document.getElementById('foldFill');
+const foldLabel = document.getElementById('foldLabel');
+const foldCaption = document.getElementById('foldCaption');
+
+logBtns.innerHTML = LOG_OPTS.map((o,i) => `<button class="log-btn${i===0?' active':''}" data-i="${i}">${o.label}</button>`).join('');
+
+function fmtBig(n){
+  if (n >= 1000000000) return (n/1000000000).toLocaleString('en-US') + 'B';
+  if (n >= 1000000) return (n/1000000).toLocaleString('en-US') + 'M';
+  if (n >= 1000) return (n/1000).toLocaleString('en-US') + 'k';
+  return n.toLocaleString('en-US');
+}
+
+let foldToken = 0;
+async function playFold(n){
+  const my = ++foldToken;
+  const steps = Math.ceil(Math.log2(n));
+  logTimes.textContent = steps;
+  let remain = n;
+  foldFill.style.transition = 'none';
+  foldFill.style.width = '100%';
+  foldLabel.textContent = fmtBig(n) + ' items';
+  foldCaption.innerHTML = 'Start folding……';
+  await sleep(60);
+  foldFill.style.transition = 'width .22s cubic-bezier(.25,1,.5,1)';
+  for (let k = 1; k <= steps; k++){
+    await sleep(k <= 8 ? 320 : 120);           // 前几折慢慢看，后面加速免得等
+    if (my !== foldToken) return;              // 中途切了别的数据量就作废
+    remain = Math.ceil(remain / 2);
+    /* 宽度按剩余比例算，但视觉上给个 0.6% 下限，免得直接消失 */
+    const pct = Math.max(remain / n * 100, 0.6);
+    foldFill.style.width = pct + '%';
+    foldLabel.textContent = remain >= 1000 ? fmtBig(remain) + ' items' : remain.toLocaleString('en-US') + ' items';
+    foldCaption.innerHTML = `Fold <b>${k}</b>: <b>${remain.toLocaleString('en-US')}</b> candidates left`;
+  }
+  if (my !== foldToken) return;
+  foldCaption.innerHTML = `✅ Folded <b>${steps}</b> times—${fmtBig(n)} items down to the last 1. That's what log₂ means.`;
+}
+
+logBtns.addEventListener('click', e => {
+  const btn = e.target.closest('.log-btn');
+  if (!btn) return;
+  [...logBtns.children].forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  playFold(LOG_OPTS[+btn.dataset.i].n);
+});
+playFold(100);
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

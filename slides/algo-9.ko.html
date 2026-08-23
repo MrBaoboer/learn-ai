@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>탐욕과 샘플링: AI가 단어를 고를 때의 두 성격 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="매 스텝 최댓값을 고르는 게 탐욕 디코딩, 확률로 주사위를 던지는 게 샘플링—Temperature 뒤의 알고리즘학. 같은 시작을 세 번: 탐욕은 전부 같고, 샘플링은 매번 다르며, 온도가 높을수록 거칠어집니다.">
+<meta name="keywords" content="탐욕 알고리즘,샘플링,temperature,탐욕 디코딩,LLM 디코딩,top-p,AI 단어 선택">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-9.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/algo-9.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/algo-9.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/algo-9.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/algo-9.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="탐욕과 샘플링: AI가 단어를 고를 때의 두 성격">
+<meta property="og:description" content="temperature=0이 곧 탐욕 디코딩, 온도가 높을수록 비주류 단어를 고릅니다. 같은 시작을 세 번 누르면 두 성격이 한눈에 보여요.">
+<meta property="og:url" content="https://xueai.app/slides/algo-9.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/algo-9.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="탐욕과 샘플링: AI가 단어를 고를 때의 두 성격">
+<meta name="twitter:description" content="매 스텝 최댓값 = 탐욕, 확률 주사위 = 샘플링. Temperature 뒤의 알고리즘학, 한 번 해 보면 알아요.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── 生成器（两台共用） ── */
+.gen-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden;margin-bottom:20px}
+.gen-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:13px 18px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.gen-head h4{font-size:15px;font-weight:800;color:var(--text)}
+.gen-badge{font-size:11px;font-weight:800;padding:3px 12px;border-radius:99px}
+.gen-badge.cold{background:rgba(2,132,199,.1);color:#0369a1}
+.gen-badge.hot{background:rgba(219,39,119,.1);color:var(--al-deep)}
+.temp-row{margin-left:auto;display:flex;align-items:center;gap:9px}
+.temp-row .tp-label{font-size:12px;font-weight:800;color:var(--sub)}
+.temp-seg{display:flex;border:1.5px solid var(--al-line);border-radius:99px;overflow:hidden}
+.temp-seg button{border:none;background:transparent;padding:5px 15px;font-size:12.5px;font-weight:800;color:var(--al);cursor:pointer;font-family:inherit;transition:background .15s,color .15s}
+.temp-seg button.active{background:var(--al);color:#fff}
+.gen-body{padding:18px 20px;min-height:120px}
+.gen-text{font-size:16.5px;line-height:1.9;color:var(--text);word-break:break-all;margin-bottom:4px}
+.gen-text .starter-part{color:var(--sub)}
+.gen-text .ai-part{font-weight:600}
+.gen-text .caret{display:inline-block;width:2px;height:1.1em;background:var(--al);vertical-align:text-bottom;margin-left:1px;animation:blink .85s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.cand-pop{margin-top:12px;padding:12px 14px;background:var(--al-soft);border:1.5px dashed var(--al-line);border-radius:var(--radius-sm);opacity:0;transform:translateY(5px);transition:opacity .25s,transform .25s}
+.cand-pop.show{opacity:1;transform:translateY(0)}
+.cand-title{font-size:11.5px;font-weight:800;color:var(--al-deep);margin-bottom:8px}
+.cand-list{display:flex;flex-direction:column;gap:6px}
+.cand-row{display:flex;align-items:center;gap:9px}
+.cand-word{min-width:104px;text-align:center;padding:2px 10px;font-size:13px;font-weight:800;border-radius:7px;background:rgba(0,0,0,.05);color:var(--sub);transition:background .13s,color .13s,transform .13s}
+.cand-row.picked .cand-word{background:var(--al);color:#fff;transform:scale(1.05)}
+.cand-track{flex:1;height:13px;background:rgba(0,0,0,.05);border-radius:5px;overflow:hidden}
+.cand-fill{height:100%;border-radius:5px;background:rgba(0,0,0,.16);width:0;transition:width .3s cubic-bezier(.25,1,.5,1)}
+.cand-row.picked .cand-fill{background:var(--al)}
+.cand-pct{width:46px;font-size:12px;font-weight:800;color:var(--sub);flex-shrink:0;font-variant-numeric:tabular-nums}
+.cand-row.picked .cand-pct{color:var(--al)}
+.gen-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 18px;border-top:1px solid var(--border)}
+.btn-al{background:var(--al);color:#fff;border:none;padding:9px 24px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.gen-status{font-size:12px;color:var(--sub);font-weight:600}
+.run-list{border-top:1px dashed var(--border);padding:12px 18px;display:flex;flex-direction:column;gap:6px}
+.run-item{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text);line-height:1.6}
+.run-item .rn{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.06);color:var(--sub);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.run-item .rt-temp{flex-shrink:0;font-size:10.5px;font-weight:800;color:var(--al);background:var(--al-soft);padding:1px 8px;border-radius:99px}
+.run-same-badge{align-self:flex-start;font-size:12px;font-weight:800;color:#0369a1;background:rgba(2,132,199,.1);padding:3px 14px;border-radius:99px;margin-top:2px}
+.run-diff-badge{align-self:flex-start;font-size:12px;font-weight:800;color:var(--al-deep);background:rgba(219,39,119,.1);padding:3px 14px;border-radius:99px;margin-top:2px}
+
+/* ── 概念卡 ── */
+.duo-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.duo-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.duo-card h4{font-size:15px;font-weight:800;margin-bottom:6px}
+.duo-card.greedy h4{color:#0369a1}
+.duo-card.sample h4{color:var(--al-deep)}
+.duo-card p{font-size:13px;color:var(--sub);line-height:1.8}
+.duo-card p b{color:var(--text)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .duo-grid{grid-template-columns:1fr}
+  .cand-word{min-width:84px;font-size:12px}
+  .temp-row{margin-left:0;width:100%}
+  .gen-text{font-size:15px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"탐욕과 샘플링: AI가 단어를 고를 때의 두 성격","name":"탐욕과 샘플링: AI가 단어를 고를 때의 두 성격","url":"https://xueai.app/slides/algo-9.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 탐색과 의사결정","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"매 스텝 최댓값을 고르는 게 탐욕 디코딩, 확률로 주사위를 던지는 게 샘플링—Temperature 뒤의 알고리즘학. 같은 시작을 세 번: 탐욕은 전부 같고, 샘플링은 매번 다르며, 온도가 높을수록 거칠어집니다.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">프로그래밍 기초편 · 탐색과 의사결정</div>
+    <h1>탐욕과 샘플링: AI가 단어를 고를 때의 두 성격</h1>
+    <p class="subtitle">LLM 원리편에서 AI가 토큰마다 이어 쓸 때 머릿속 후보 확률 막대를 봤고, Temperature 노브도 돌려 봤어요. 그때는 “체감”, 이번 강의는 알고리즘 이름을 붙입니다: <b>매 스텝 최댓값은 탐욕, 확률로 주사위는 샘플링</b>. 같은 시작으로 두 성격이 세 번씩—차이가 한눈에 보여요.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>매 스텝 최댓값이 탐욕 디코딩, 확률 주사위가 샘플링—Temperature 뒤의 알고리즘학. 두 전략이 만든 문장을 직접 비교하세요</p></aside><!--seo:end-->  <div class="sec-label">같은 시작 · 두 성격</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">시작은 고정: “주말 계획은”. <b style="color:var(--text)">위쪽 머신부터</b>: 탐욕 모드(temperature=0), 매 스텝 확률 막대 중 제일 긴 것. <b style="color:var(--text)">「다시 생성」을 세 번</b> 누르고 아래 결과 목록을 보세요—글자 하나라도 다른가요?</p>
+
+  <div class="gen-box">
+    <div class="gen-head">
+      <h4>😤 탐욕 모드</h4><span class="gen-badge cold">temperature = 0</span>
+    </div>
+    <div class="gen-body">
+      <div class="gen-text" id="gText"><span class="starter-part">주말 계획은 </span><span class="ai-part" id="gAi"></span><span class="caret"></span></div>
+      <div class="cand-pop" id="gPop">
+        <div class="cand-title">매 스텝 후보—늘 제일 긴 막대를 집어요</div>
+        <div class="cand-list" id="gCands"></div>
+      </div>
+    </div>
+    <div class="gen-foot">
+      <button class="btn-al" id="gBtn">다시 생성 →</button>
+      <span class="gen-status" id="gStatus">주사위도 서스펜스도 없음: 확률 최대가 승리</span>
+    </div>
+    <div class="run-list" id="gRuns" style="display:none"></div>
+  </div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;"><b style="color:var(--text)">아래 머신</b>: 샘플링 모드—매 스텝 확률로 <b style="color:var(--text)">가중 주사위</b>. 먼저 0.7에서 세 번, 결과가 다른지 보고 1.2로—<b style="color:var(--text)">막대 모양 변화</b>에 주목: 온도가 높을수록 막대가 비슷해져 비주류 단어가 뜰 기회가 커져요.</p>
+
+  <div class="gen-box">
+    <div class="gen-head">
+      <h4>🎲 샘플링 모드</h4><span class="gen-badge hot">확률로 주사위</span>
+      <div class="temp-row">
+        <span class="tp-label">temperature</span>
+        <div class="temp-seg" id="tempSeg">
+          <button data-t="0.2">0.2</button>
+          <button data-t="0.7" class="active">0.7</button>
+          <button data-t="1.2">1.2</button>
+        </div>
+      </div>
+    </div>
+    <div class="gen-body">
+      <div class="gen-text" id="sText"><span class="starter-part">주말 계획은 </span><span class="ai-part" id="sAi"></span><span class="caret"></span></div>
+      <div class="cand-pop" id="sPop">
+        <div class="cand-title" id="sPopTitle">온도 조정 후 확률—주사위는 이걸로</div>
+        <div class="cand-list" id="sCands"></div>
+      </div>
+    </div>
+    <div class="gen-foot">
+      <button class="btn-al" id="sBtn">다시 생성 →</button>
+      <span class="gen-status" id="sStatus">같은 후보표, 주사위로 고름—매번 다른 갈림길일 수 있어요</span>
+    </div>
+    <div class="run-list" id="sRuns" style="display:none"></div>
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">개념 카드 · 두 성격의 장부</div>
+
+  <div class="duo-grid paywall-locked">
+    <div class="duo-card greedy">
+      <h4>😤 탐욕: 매 스텝 눈앞의 최댓값</h4>
+      <p><b>빠르고, 안정적이고, 재현 가능</b>—만 번을 돌려도 같은 문장. 치명적 맹점: <b>스텝마다 국소 최적이 모여도 전역 최적이 아닐 수 있어요</b>. 첫 단어를 제일 자연스럽게 고르면 문장 전체가 막다른 골목에. 해법은? <b>다음 강의 Beam Search가 해독제</b>—일단 여운만.</p>
+    </div>
+    <div class="duo-card sample">
+      <h4>🎲 샘플링: 무작위에 구멍을 남기기</h4>
+      <p><b>확실성을 다양성과 맞바꿉니다</b>. 확률 주사위라 고확률 단어가 자주 뽑히고(그래서 자연스럽고), 저확률은 가끔 떠(그래서 놀랍고). 온도는 「놀라움」 예산: <b>T가 높을수록 분포가 평평해져 비주류 단어가 더 과감해져요</b>.</p>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>면접 한 줄 정답:</b> temperature = 0이면 탐욕 디코딩—출력이 완전 확정; T가 높을수록 softmax가 평평해져 저확률 단어를 더 고르고, 다양성과 「헛짓」 위험이 함께 올라가요. LLM 원리편에서 돌리던 노브가 바로 탐욕과 샘플링 사이 위치입니다.
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:14px;background:rgba(217,119,6,.05);border-color:rgba(217,119,6,.3);">
+    <b style="color:var(--amber)">생활 속 탐욕파:</b> 뷔페마다 지금 제일 비싼 접시만—연어, 스테이크, 킹크랩—배 부르면 시그니처 와규는 한 입도 못 먹어요. <b style="color:var(--amber)">스텝 최적 ≠ 전체 최적</b>, 위장은 유한하고 컨텍스트 윈도우도 그래요.
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>이 강의가 전하고 싶은 것</h3>
+    <ul>
+      <li><b>탐욕 = 매 스텝 확률 최댓값</b>: 세 번이 글자 하나 차이 없음—빠르고 재현 가능, 하지만 전체 더 나을 길을 놓칠 수 있어요</li>
+      <li><b>샘플링 = 확률 주사위</b>: 세 번 세 가지—확실성을 다양성과 맞바꿉니다</li>
+      <li><b>Temperature는 둘 사이의 노브</b>: T=0이 탐욕; T가 높을수록 분포가 평평, 비주류 단어를 더 고름</li>
+      <li><b>고르는 법은 과제에 따라</b>: 실험 재현·코드·데이터 추출은 T=0; 브레인스토밍·카피는 T를 올려요</li>
+      <li><b>탐욕의 함정은 다음 강의에서</b>: Beam Search—몇 수 더 보고 고르기</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 数据 ──
+   贪心用固定步骤表（每步 3 候选，首位最大）；
+   采样用「槽位」表：精心挑过词，任意组合读起来都通顺，
+   所以骰子怎么掷都不会掷出病句——这是演示能放心随机的前提。
+   概率是凭语感标的示意值，不是真实模型输出。 */
+const GREEDY_STEPS = [
+  ['먼저 ',42,'가서 ',31,'그냥 ',15],
+  ['늦잠',48,'정리',26,'청소',14],
+  ['을 ',71,'까지 ',16,'을 ',8],
+  ['자요',83,'잘 자요',10,'낮잠',5],
+  [', ',76,'.',14,' 그리고',6],
+  [' 그리고 ',44,' 그다음 ',28,' 오후에 ',17],
+  ['봐요',39,'쉬어요',33,'짜요',18],
+  ['.',85,'!',9,'?',4],
+];
+
+const SLOTS = [
+  [['먼저 ',50],['그냥 ',30],['계획으로는 ',20]],
+  [['늦잠 자기',55],['등산 가기',30],['영화 보기',15]],
+  [[', 그다음 ',45],[', 그리고 ',35],[', 이어서 ',20]],
+  [['시장 구경하기',40],['방 정리하기',35],['소파에서 정주행',25]],
+  [[', 저녁엔 ',50],[', 집에 와서 ',30],[', 피곤하면 ',20]],
+  [['훠궈 먹기',45],['일찍 쉬기',35],['부모님께 전화',20]],
+  [['.',70],[' 그러면 충분해요.',20],['!',10]],
+];
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* 候选条渲染：pop 容器 + 三行复用（重建会闪，见 zero-1 的同款处理） */
+function buildRows(listEl){
+  listEl.innerHTML = [0,1,2].map(() => `
+    <div class="cand-row">
+      <div class="cand-word"></div>
+      <div class="cand-track"><div class="cand-fill"></div></div>
+      <div class="cand-pct"></div>
+    </div>`).join('');
+  return [...listEl.children].map(row => ({
+    row,
+    word: row.querySelector('.cand-word'),
+    fill: row.querySelector('.cand-fill'),
+    pct:  row.querySelector('.cand-pct'),
+  }));
+}
+
+function renderCands(rows, cands){
+  /* cands: [[word,pct],...] 已按显示顺序排好 */
+  rows.forEach((r, k) => {
+    r.row.classList.remove('picked');
+    r.word.textContent = cands[k][0];
+    r.pct.textContent = cands[k][1].toFixed(0) + '%';
+    r.fill.style.width = Math.max(cands[k][1], 2) + '%';
+  });
+}
+
+function pushRun(listEl, n, text, tempLabel){
+  listEl.style.display = 'flex';
+  const item = document.createElement('div');
+  item.className = 'run-item';
+  item.innerHTML = `<span class="rn">${n}</span>` +
+    (tempLabel ? `<span class="rt-temp">T=${tempLabel}</span>` : '') +
+    `<span>주말 계획은 ${text}</span>`;
+  listEl.appendChild(item);
+}
+
+/* ══ 贪心生成器 ══ */
+const gAi = document.getElementById('gAi');
+const gBtn = document.getElementById('gBtn');
+const gStatus = document.getElementById('gStatus');
+const gPop = document.getElementById('gPop');
+const gRows = buildRows(document.getElementById('gCands'));
+const gRuns = document.getElementById('gRuns');
+let gRunning = false, gResults = [];
+
+async function runGreedy(){
+  if (gRunning) return;
+  gRunning = true;
+  gBtn.disabled = true;
+  gAi.textContent = '';
+  gPop.classList.add('show');
+  gStatus.textContent = '매 스텝: 후보를 보여 주고 → 제일 긴 막대, 망설임 없음';
+  for (const step of GREEDY_STEPS){
+    renderCands(gRows, [[step[0],step[1]],[step[2],step[3]],[step[4],step[5]]]);
+    await sleep(460);
+    gRows[0].row.classList.add('picked');
+    await sleep(300);
+    gAi.textContent += step[0];
+  }
+  const text = GREEDY_STEPS.map(s => s[0]).join('');
+  gResults.push(text);
+  pushRun(gRuns, gResults.length, text, null);
+  if (gResults.length >= 3 && gResults.every(t => t === gResults[0]) && !gRuns.querySelector('.run-same-badge')){
+    const badge = document.createElement('div');
+    badge.className = 'run-same-badge';
+    badge.textContent = '🔁 세 번 전부 동일—temperature=0엔 주사위가 없어 만 번을 돌려도 이 문장';
+    gRuns.appendChild(badge);
+  }
+  gStatus.textContent = gResults.length < 3
+    ? `${gResults.length}번째 생성 완료—다시 눌러 달라지는지 보세요`
+    : '보이죠? 탐욕은 앵무새예요. 아래로 샘플링이 어떻게 깨는지';
+  gBtn.disabled = false;
+  gBtn.textContent = '다시 생성 ↻';
+  gRunning = false;
+}
+gBtn.addEventListener('click', runGreedy);
+
+/* ══ 采样生成器 ══ */
+const sAi = document.getElementById('sAi');
+const sBtn = document.getElementById('sBtn');
+const sStatus = document.getElementById('sStatus');
+const sPop = document.getElementById('sPop');
+const sPopTitle = document.getElementById('sPopTitle');
+const sRows = buildRows(document.getElementById('sCands'));
+const sRuns = document.getElementById('sRuns');
+let sRunning = false, sResults = [];
+let temperature = 0.7;
+
+document.querySelectorAll('#tempSeg button').forEach(b => {
+  b.addEventListener('click', () => {
+    if (sRunning) return;
+    document.querySelectorAll('#tempSeg button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    temperature = +b.dataset.t;
+    sStatus.textContent = temperature >= 1.2
+      ? 'T=1.2: 분포가 평평해져 비주류에도 기회가—한 번 생성해 보세요'
+      : temperature <= 0.2
+        ? 'T=0.2: 분포가 뾰족해져 거의 1순위만—탐욕에 가까워요'
+        : 'T=0.7: 일상 채팅 기본—자연스러움과 다양성의 절충';
+  });
+});
+
+/* 温度变换：q_i ∝ p_i^(1/T)，再归一化。
+   这正是真实 softmax 里除以 T 的效果：T<1 分布变尖，T>1 变平。
+   演示里直接对标注概率做变换，学员能亲眼看到条形随温度改变形状。 */
+function applyTemp(cands, T){
+  const powed = cands.map(([w, p]) => [w, Math.pow(p, 1 / T)]);
+  const sum = powed.reduce((a, [, q]) => a + q, 0);
+  return powed.map(([w, q]) => [w, q / sum * 100]);
+}
+
+function samplePick(adjusted){
+  let roll = Math.random() * 100;
+  for (let i = 0; i < adjusted.length; i++){
+    roll -= adjusted[i][1];
+    if (roll <= 0) return i;
+  }
+  return adjusted.length - 1;
+}
+
+async function runSample(){
+  if (sRunning) return;
+  sRunning = true;
+  sBtn.disabled = true;
+  sAi.textContent = '';
+  sPop.classList.add('show');
+  sPopTitle.textContent = `T=${temperature} 조정 후 확률—주사위는 이걸로`;
+  let coldPicks = 0;
+  const picked = [];
+  for (const slot of SLOTS){
+    const adjusted = applyTemp(slot, temperature);
+    renderCands(sRows, adjusted);
+    await sleep(500);
+    const k = samplePick(adjusted);
+    sRows[k].row.classList.add('picked');
+    if (k === 2) coldPicks++;
+    await sleep(k > 0 ? 480 : 280);   // 掷中非首选时多停一拍，让人看清分叉
+    sAi.textContent += slot[k][0];
+    picked.push(slot[k][0]);
+  }
+  const text = picked.join('');
+  sResults.push({ text, T: temperature });
+  pushRun(sRuns, sResults.length, text, temperature);
+  if (sResults.length >= 3 && !sRuns.querySelector('.run-diff-badge')){
+    const distinct = new Set(sResults.map(r => r.text)).size;
+    const badge = document.createElement('div');
+    badge.className = 'run-diff-badge';
+    badge.textContent = distinct > 1
+      ? `🎲 ${sResults.length}번 → ${distinct}가지 결과—주사위 덕분`
+      : '🎲 우연히 같은 문장—낮은 T에서 흔해요, 온도를 올리고 다시';
+    sRuns.appendChild(badge);
+  }
+  sStatus.textContent = coldPicks > 0
+    ? `이번엔 ${coldPicks}스텝이 비주류—문장이 샛길로, 그래도 자연스러워요`
+    : '이번엔 고확률에만 떨어졌어요—다음엔 다를 수 있어요';
+  sBtn.disabled = false;
+  sBtn.textContent = '다시 생성 ↻';
+  sRunning = false;
+}
+sBtn.addEventListener('click', runSample);
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

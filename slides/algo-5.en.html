@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sorting's Real Face in AI: Rerank | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Passages RAG retrieves can’t go in as-is: coarse ranking first, then fine ranking. Tweak the weights yourself and watch candidates reshuffle—feeds and search results work the same way. Sorting’s real face in LLM engineering.">
+<meta name="keywords" content="Rerank,re-ranking,RAG,coarse ranking,fine ranking,two-stage retrieval,recommendation ranking,vector search">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-5.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/algo-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/algo-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/algo-5.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/algo-5.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Sorting's Real Face in AI: Rerank">
+<meta property="og:description" content="Play Rerank yourself: drag three weight sliders, watch candidates reshuffle live, and see how an outdated policy gets pushed down by the right clause.">
+<meta property="og:url" content="https://xueai.app/slides/algo-5.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/algo-5.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sorting's Real Face in AI: Rerank">
+<meta name="twitter:description" content="Play Rerank yourself: drag three weight sliders, watch candidates reshuffle live, and see how an outdated policy gets pushed down by the right clause.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── Rerank 操作台 ── */
+.rr-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.rr-query{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.03);border-radius:var(--radius-sm);padding:11px 16px;margin-bottom:18px}
+.rr-query .rq-icon{font-size:17px}
+.rr-query .rq-text{font-size:14px;font-weight:800;color:var(--text)}
+.rr-query .rq-tag{margin-left:auto;font-size:10.5px;font-weight:800;color:var(--al);background:var(--al-soft);padding:2px 10px;border-radius:99px;white-space:nowrap}
+.rr-weights{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.rr-w{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px}
+.rr-w label{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;font-weight:800;color:var(--text);margin-bottom:6px}
+.rr-w label b{font-size:15px;font-weight:900;color:var(--al);font-variant-numeric:tabular-nums}
+.rr-w input[type=range]{width:100%;accent-color:var(--al)}
+.rr-list{position:relative}
+.rr-item{position:absolute;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:12px;transition:top .45s cubic-bezier(.25,1,.5,1),border-color .3s,background .3s;height:74px;overflow:hidden}
+.rr-item.top1{border-color:rgba(22,163,74,.45);background:rgba(22,163,74,.04)}
+.rr-item.top1.trap{border-color:rgba(220,38,38,.45);background:rgba(220,38,38,.04)}
+.rr-rank{width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.06);color:var(--sub);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:900;flex-shrink:0;transition:background .3s,color .3s}
+.rr-item.top1 .rr-rank{background:var(--success);color:#fff}
+.rr-item.top1.trap .rr-rank{background:var(--danger);color:#fff}
+.rr-main{flex:1;min-width:0}
+.rr-title{font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rr-title .rt-tag{font-size:10px;font-weight:800;padding:1px 8px;border-radius:99px;margin-left:6px;vertical-align:1px}
+.rt-tag.good{background:rgba(22,163,74,.12);color:var(--success)}
+.rt-tag.bad{background:rgba(220,38,38,.12);color:var(--danger)}
+.rr-bars{display:flex;gap:10px;margin-top:6px}
+.rr-b{flex:1;display:flex;align-items:center;gap:5px}
+.rr-b .rb-name{font-size:9.5px;font-weight:800;color:var(--sub);flex-shrink:0;width:36px}
+.rr-b .rb-track{flex:1;height:6px;border-radius:3px;background:rgba(0,0,0,.06);overflow:hidden}
+.rr-b .rb-fill{height:100%;border-radius:3px}
+.rb-fill.sim{background:#2563eb}
+.rb-fill.kw{background:#d97706}
+.rb-fill.fresh{background:#16a34a}
+.rr-score{flex-shrink:0;text-align:right;width:56px}
+.rr-score .rs-num{font-size:18px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.2}
+.rr-score .rs-label{font-size:9.5px;font-weight:800;color:var(--sub)}
+.rr-note{margin-top:14px;padding:13px 16px;border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;transition:background .3s,border-color .3s}
+.rr-note.warn{background:rgba(220,38,38,.05);border:1.5px dashed rgba(220,38,38,.35);color:#7f1d1d}
+.rr-note.ok{background:rgba(22,163,74,.05);border:1.5px dashed rgba(22,163,74,.35);color:#14532d}
+.rr-note b{font-weight:800}
+
+/* ── 漏斗 ── */
+.funnel-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:24px}
+.funnel{display:flex;flex-direction:column;align-items:center;gap:0}
+.fn-stage{border-radius:10px;padding:13px 18px;text-align:center;color:#fff;transition:transform .5s,opacity .5s;opacity:0;transform:translateY(10px)}
+.fn-stage.show{opacity:1;transform:translateY(0)}
+.fn-stage .fs-num{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.2}
+.fn-stage .fs-name{font-size:11.5px;font-weight:800;opacity:.92;margin-top:2px}
+.fn-s1{width:100%;background:linear-gradient(135deg,#f472b6,#db2777)}
+.fn-s2{width:62%;background:linear-gradient(135deg,#db2777,#be185d)}
+.fn-s3{width:32%;background:linear-gradient(135deg,#be185d,#9d174d)}
+.fn-arrow{display:flex;flex-direction:column;align-items:center;padding:6px 0;opacity:0;transition:opacity .5s}
+.fn-arrow.show{opacity:1}
+.fn-arrow .fa-glyph{font-size:15px;color:var(--al)}
+.fn-arrow .fa-label{font-size:11.5px;font-weight:800;color:var(--al-deep);background:var(--al-soft);padding:3px 14px;border-radius:99px;margin-top:2px;white-space:nowrap}
+.funnel-qa{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+.fq-card{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px}
+.fq-card h5{font-size:13px;font-weight:800;color:var(--text);margin-bottom:5px}
+.fq-card p{font-size:12.5px;color:var(--sub);line-height:1.75}
+.fq-card p b{color:var(--al-deep)}
+
+/* ── AI 关联 ── */
+.same-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.same-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:16px 18px}
+.same-card .sc-icon{font-size:24px;margin-bottom:8px}
+.same-card h4{font-size:14px;font-weight:800;color:var(--text);margin-bottom:5px}
+.same-card p{font-size:12.5px;color:var(--sub);line-height:1.7}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .rr-weights{grid-template-columns:1fr}
+  .rr-item{height:96px;flex-wrap:wrap;padding:9px 12px}
+  .rr-bars{gap:6px}
+  .funnel-qa{grid-template-columns:1fr}
+  .same-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Sorting's Real Face in AI: Rerank","name":"Sorting's Real Face in AI: Rerank","url":"https://xueai.app/slides/algo-5.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Search and Sorting","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"Passages RAG retrieves can’t go in as-is: coarse ranking first, then fine ranking. Tweak the weights yourself and watch candidates reshuffle—feeds and search results work the same way. Sorting’s real face in LLM engineering.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Search and Sorting</div>
+    <h1>Sorting's Real Face in AI: Rerank</h1>
+    <p class="subtitle">Last lesson’s sort compared number size; in the AI world we rank “relevance”: RAG scoops a pile of passages from the knowledge base, and <b>whoever ranks first squeezes into context</b>—rank wrong, and the model will solemnly cite the wrong material. That “score + re-rank” step is Rerank. Today you’re on the job: play Rerank yourself.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Passages RAG retrieves can’t go in as-is: coarse ranking first, then fine ranking. Tweak the weights yourself and watch candidates reshuffle—feeds and search results work the same way</p></aside><!--seo:end-->  <div class="sec-label">Interactive · Play Rerank yourself</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Scenario: a user asks the support bot “What’s your return policy?”, and coarse ranking scoops 5 candidate passages from the knowledge base. Each has three scores: <b style="color:#2563eb">vector similarity</b> (close in meaning), <b style="color:#d97706">keyword hit</b> (literal match), <b style="color:#16a34a">freshness</b> (how new the doc is). You’ve got three weight sliders; total = weighted average of the three. <b style="color:var(--text)">Watch: at first only similarity is heavy, so #1 is actually the 2023 outdated policy—crank up “freshness” and see the right clause climb to the top.</b></p>
+
+  <div class="rr-box">
+    <div class="rr-query">
+      <span class="rq-icon">💬</span>
+      <span class="rq-text">What’s your return policy?</span>
+      <span class="rq-tag">Coarse ranking recalled 5 candidates</span>
+    </div>
+    <div class="rr-weights">
+      <div class="rr-w">
+        <label><span style="color:#2563eb">Vector similarity weight</span><b id="wvSim">10</b></label>
+        <input type="range" id="wSim" min="0" max="10" value="10">
+      </div>
+      <div class="rr-w">
+        <label><span style="color:#d97706">Keyword hit weight</span><b id="wvKw">3</b></label>
+        <input type="range" id="wKw" min="0" max="10" value="3">
+      </div>
+      <div class="rr-w">
+        <label><span style="color:#16a34a">Freshness weight</span><b id="wvFresh">0</b></label>
+        <input type="range" id="wFresh" min="0" max="10" value="0">
+      </div>
+    </div>
+    <div class="rr-list" id="rrList"></div>
+    <div class="rr-note warn" id="rrNote"></div>
+  </div>
+
+  <div class="sec-label">Core idea · Two-stage funnel</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">What you just did is “fine ranking” in a real system—the last layer of the funnel. The full flow looks like this (auto-plays when you scroll here):</p>
+
+  <div class="funnel-box paywall-locked xa-peek">
+    <div class="funnel" id="funnel">
+      <div class="fn-stage fn-s1"><div class="fs-num" id="fnNum1">0</div><div class="fs-name">All docs in the knowledge base</div></div>
+      <div class="fn-arrow"><span class="fa-glyph">▼</span><span class="fa-label">Coarse ranking: vector neighbors, fast and rough</span></div>
+      <div class="fn-stage fn-s2"><div class="fs-num" id="fnNum2">0</div><div class="fs-name"> candidate passages</div></div>
+      <div class="fn-arrow"><span class="fa-glyph">▼</span><span class="fa-label">Fine ranking Rerank: read one by one, costly and precise</span></div>
+      <div class="fn-stage fn-s3"><div class="fs-num" id="fnNum3">0</div><div class="fs-name"> finally stuffed into context</div></div>
+    </div>
+    <div class="funnel-qa">
+      <div class="fq-card">
+        <h5>Why not fine-rank everything?</h5>
+        <p><b>Expensive.</b> Fine ranking feeds “question + passage” pairs into a model one by one. Do that for a million rows and you’ll wait an hour and burn a budget. So cheap coarse ranking cuts a million down to 50 first.</p>
+      </div>
+      <div class="fq-card">
+        <h5>Why not coarse-rank everything?</h5>
+        <p><b>Inaccurate.</b> Coarse ranking only sees vector distance—it can’t tell “current policy” from “old policy,” as you just watched. So the last 50 need the costly model to gatekeep one by one.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>Engineering = spend the right money at each funnel layer.</b>Fast-and-rough algorithms run the open casting; costly-and-precise models run the finals—each stage does its job so total cost and total quality can both hit the mark. You’ll see this “spend by layer” idea again in caches, recommenders, and review systems.
+  </div>
+
+  <div class="sec-label paywall-locked">Same pattern, more places · all “retrieve first, rank second”</div>
+
+  <div class="same-grid paywall-locked">
+    <div class="same-card">
+      <div class="sc-icon">🔍</div>
+      <h4>Search result ranking</h4>
+      <p>Search engines coarse-recall from trillions of pages, then fine-rank by relevance, authority, and freshness—the first page you see is Rerank’s output.</p>
+    </div>
+    <div class="same-card">
+      <div class="sc-icon">📱</div>
+      <h4>Recommendation feed</h4>
+      <p>Short video first coarse-filters thousands of candidates, then a fine-rank model scores “will you finish watching?” one by one. Your home feed order gets re-ranked dozens of times a day.</p>
+    </div>
+    <div class="same-card">
+      <div class="sc-icon">📚</div>
+      <h4>RAG retrieval</h4>
+      <p>Today’s home field: vector neighbors for a coarse scoop, Rerank for the fine pick—only the last few earn precious context. Remember last chapter’s O(n²) bill?</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>What this lesson wants to share</h3>
+    <ul>
+      <li><b>Sorting’s real face in the AI era is score + re-rank</b>: it’s not number size—it’s relevance score</li>
+      <li><b>Weights are values</b>: similarity alone floats old material; multi-dimensional scoring is what you can trust</li>
+      <li><b>Two-stage funnel</b>: coarse ranking is fast and rough for casting; fine ranking is costly and precise for the finals</li>
+      <li><b>Layering the funnel is the art of saving money</b>: search, recommenders, and RAG are all “retrieve first, rank second”</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ═══ 亲手当一次 Rerank 模型 ═══
+   总分 = (wS·相似度 + wK·关键词 + wF·新鲜度) / (wS+wK+wF)，×100 显示。
+   列表用绝对定位 + top 过渡做平滑换位：每次重算只改 top，浏览器自己补动画。 */
+const DOCS = [
+  { id:'new',    title:'Return Policy (2026 current)',   tag:'Correct answer', tagCls:'good', sim:.92, kw:.95, fresh:.96 },
+  { id:'old',    title:'Return Policy (2023 old)',     tag:'Expired',   tagCls:'bad',  sim:.95, kw:.96, fresh:.12 },
+  { id:'exch',   title:'Exchange Policy',                  tag:'',         tagCls:'',     sim:.86, kw:.58, fresh:.90 },
+  { id:'ship',   title:'Shipping Timeline Notes',              tag:'',         tagCls:'',     sim:.62, kw:.32, fresh:.88 },
+  { id:'review', title:'User review: “Returns went smoothly…”',   tag:'',         tagCls:'',     sim:.74, kw:.78, fresh:.55 },
+];
+
+const rrList = document.getElementById('rrList');
+rrList.innerHTML = DOCS.map(d => `
+  <div class="rr-item" id="rr-${d.id}">
+    <div class="rr-rank">-</div>
+    <div class="rr-main">
+      <div class="rr-title">${d.title}${d.tag ? `<span class="rt-tag ${d.tagCls}">${d.tag}</span>` : ''}</div>
+      <div class="rr-bars">
+        <div class="rr-b"><span class="rb-name">Sim</span><div class="rb-track"><div class="rb-fill sim" style="width:${d.sim*100}%"></div></div></div>
+        <div class="rr-b"><span class="rb-name">Keyword</span><div class="rb-track"><div class="rb-fill kw" style="width:${d.kw*100}%"></div></div></div>
+        <div class="rr-b"><span class="rb-name">Fresh</span><div class="rb-track"><div class="rb-fill fresh" style="width:${d.fresh*100}%"></div></div></div>
+      </div>
+    </div>
+    <div class="rr-score"><div class="rs-num">-</div><div class="rs-label">Total</div></div>
+  </div>`).join('');
+
+const sliders = {
+  sim:   { input: document.getElementById('wSim'),   label: document.getElementById('wvSim') },
+  kw:    { input: document.getElementById('wKw'),    label: document.getElementById('wvKw') },
+  fresh: { input: document.getElementById('wFresh'), label: document.getElementById('wvFresh') },
+};
+const rrNote = document.getElementById('rrNote');
+const GAP = 10;
+
+function itemHeight(){
+  return rrList.firstElementChild.offsetHeight + GAP;
+}
+
+function rerank(){
+  const wS = +sliders.sim.input.value;
+  const wK = +sliders.kw.input.value;
+  const wF = +sliders.fresh.input.value;
+  sliders.sim.label.textContent = wS;
+  sliders.kw.label.textContent = wK;
+  sliders.fresh.label.textContent = wF;
+  const wSum = wS + wK + wF;
+
+  const scored = DOCS.map(d => ({
+    ...d,
+    score: wSum === 0 ? 0 : (wS*d.sim + wK*d.kw + wF*d.fresh) / wSum
+  }));
+  scored.sort((a,b) => b.score - a.score);
+
+  const h = itemHeight();
+  rrList.style.height = (DOCS.length * h - GAP) + 'px';
+  scored.forEach((d, rank) => {
+    const el = document.getElementById('rr-' + d.id);
+    el.style.top = (rank * h) + 'px';
+    el.querySelector('.rr-rank').textContent = rank + 1;
+    el.querySelector('.rs-num').textContent = Math.round(d.score * 100);
+    el.classList.toggle('top1', rank === 0);
+    el.classList.toggle('trap', rank === 0 && d.id === 'old');
+  });
+
+  const top = scored[0];
+  if (wSum === 0){
+    rrNote.className = 'rr-note warn';
+    rrNote.innerHTML = '<b>All weights are 0—the model shrugs.</b> Give at least one weight so ranking has a basis.';
+  } else if (top.id === 'old'){
+    rrNote.className = 'rr-note warn';
+    rrNote.innerHTML = '<b>⚠️ Danger: #1 is the 2023 outdated policy.</b> Its vector similarity and keyword scores are both highest—on the surface it “looks” most like the answer. But it’s expired; if the model cites it, it answers wrong. <b>Try cranking up the “freshness” weight.</b>';
+  } else if (top.id === 'new'){
+    rrNote.className = 'rr-note ok';
+    rrNote.innerHTML = '<b>✅ The right clause is on top.</b> Add the freshness dimension and the old policy gets pushed down. That’s Rerank’s value: <b>a single dimension lies; multi-dimensional scoring gets closer to “truly relevant”</b>—real Rerank models learn how to weigh these dimensions.';
+  } else {
+    rrNote.className = 'rr-note warn';
+    rrNote.innerHTML = `<b>Now #1 is “${top.title}”.</b> It can’t answer the return-policy question—the weight mix isn’t right yet. Keep tuning: similarity and freshness both need some share.`;
+  }
+}
+
+Object.values(sliders).forEach(s => s.input.addEventListener('input', rerank));
+window.addEventListener('resize', rerank);
+rerank();
+
+/* ═══ 两阶段漏斗：进入视口后逐层点亮 + 数字滚动 ═══ */
+const funnel = document.getElementById('funnel');
+const fnStages = [...funnel.querySelectorAll('.fn-stage')];
+const fnArrows = [...funnel.querySelectorAll('.fn-arrow')];
+
+function countUp(el, target, suffix, dur){
+  const t0 = performance.now();
+  function tick(now){
+    const p = Math.min((now - t0) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * eased).toLocaleString('en-US') + suffix;
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+let funnelPlayed = false;
+async function playFunnel(){
+  if (funnelPlayed) return;
+  funnelPlayed = true;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  fnStages[0].classList.add('show');
+  countUp(document.getElementById('fnNum1'), 1000000, ' docs', 900);
+  await sleep(700);
+  fnArrows[0].classList.add('show');
+  await sleep(400);
+  fnStages[1].classList.add('show');
+  countUp(document.getElementById('fnNum2'), 50, '', 700);
+  await sleep(700);
+  fnArrows[1].classList.add('show');
+  await sleep(400);
+  fnStages[2].classList.add('show');
+  countUp(document.getElementById('fnNum3'), 3, '', 500);
+}
+
+window.addEventListener('load', () => {
+  if (typeof lessonOnView === 'function') lessonOnView(funnel, playFunnel);
+  else playFunnel();
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

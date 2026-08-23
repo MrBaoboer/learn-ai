@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vectors: RAG Retrieval Is Finding Nearest Neighbors | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Embedding turns meaning into coordinates; similarity is distance. Drag the query point on a plane to watch nearest neighbors change, then see why HNSW finds answers instantly among hundreds of millions of vectors.">
+<meta name="keywords" content="vector database,Embedding,RAG retrieval,nearest-neighbor search,HNSW,semantic search,vector retrieval">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-10.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ds-10.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ds-10.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ds-10.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ds-10.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Vectors: RAG Retrieval Is Finding Nearest Neighbors">
+<meta property="og:description" content="Meaning becomes coordinates, similarity becomes distance, retrieval becomes finding neighbors. Drag the query on a semantic map, then compare brute-force scan with HNSW layered hops.">
+<meta property="og:url" content="https://xueai.app/slides/ds-10.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/ds-10.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vectors: RAG Retrieval Is Finding Nearest Neighbors">
+<meta name="twitter:description" content="Meaning becomes coordinates, similarity becomes distance, retrieval becomes finding neighbors. Drag the query on a semantic map, then compare brute-force scan with HNSW layered hops.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── 语义地图 ── */
+.map-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.map-stage{padding:8px;display:flex;justify-content:center}
+.map-stage svg{width:100%;max-width:640px;height:auto;display:block;touch-action:none}
+.sem-word circle{stroke:#fff;stroke-width:2}
+.sem-word text{fill:var(--text);font-size:12.5px;font-weight:800;pointer-events:none}
+.sem-halo-label{font-size:12px;font-weight:800;opacity:.55}
+.sem-line{stroke:var(--ds);stroke-width:1.5;stroke-dasharray:5 4;opacity:.75}
+.sem-line.first{stroke-width:2.5;stroke-dasharray:none;opacity:1}
+.sem-dist{fill:var(--ds-deep);font-size:11px;font-weight:800;paint-order:stroke;stroke:#fff;stroke-width:3}
+.sem-query{cursor:grab}
+.sem-query:active{cursor:grabbing}
+.sem-query circle{fill:#1c1c1e;stroke:#fff;stroke-width:2.5}
+.sem-query text{fill:#fff;font-size:13px;font-weight:900;pointer-events:none}
+.sem-crown{font-size:16px;pointer-events:none}
+.map-narr{margin:4px 22px 18px;padding:13px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.8;color:var(--sub);min-height:52px}
+.map-narr b{color:var(--ds-deep)}
+
+/* ── 暴力 vs HNSW ── */
+.race-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.race-stage{padding:8px;display:flex;justify-content:center}
+.race-stage svg{width:100%;max-width:640px;height:auto;display:block}
+.race-pt{fill:rgba(0,0,0,.28);transition:fill .1s,r .1s}
+.race-pt.flash{fill:var(--danger)}
+.race-pt.visited{fill:rgba(220,38,38,.35)}
+.race-pt.hop{fill:var(--ds)}
+.race-pt.answer{fill:var(--success)}
+.race-target{fill:var(--amber)}
+.race-jump{stroke:var(--ds);stroke-width:2;fill:none;opacity:0;transition:opacity .3s}
+.race-jump.on{opacity:.85}
+.race-jump.high{stroke-width:3;stroke-dasharray:2 6;stroke-linecap:round}
+.race-jump.mid{stroke-width:2.2;stroke-dasharray:5 4}
+.race-jump.low{stroke-width:1.8}
+.race-layer-tag{fill:var(--ds-deep);font-size:11.5px;font-weight:800;opacity:0;transition:opacity .3s}
+.race-layer-tag.on{opacity:1}
+.race-panel{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--border)}
+.race-cell{padding:14px 20px;text-align:center}
+.race-cell + .race-cell{border-left:1px solid var(--border)}
+.race-cell .rc-name{font-size:12px;font-weight:800;color:var(--sub)}
+.race-cell .rc-num{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--text)}
+.race-cell.brute .rc-num.hot{color:var(--danger)}
+.race-cell.hnsw .rc-num.hot{color:var(--ds)}
+.race-cell .rc-sub{font-size:11.5px;color:var(--sub)}
+.race-narr{margin:12px 22px 0;padding:13px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.8;color:var(--sub);min-height:52px}
+.race-narr b{color:var(--ds-deep)}
+.race-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 22px}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-ds.alt{background:var(--danger)}
+.race-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── AI 关联卡 ── */
+.nn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.nn-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.nn-card .nn-icon{font-size:24px;margin-bottom:8px}
+.nn-card h4{font-size:14.5px;font-weight:800;color:var(--text);margin-bottom:6px}
+.nn-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.nn-card p b{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .nn-grid{grid-template-columns:1fr}
+  .map-narr,.race-narr{margin-left:14px;margin-right:14px}
+  .race-cell .rc-num{font-size:24px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Vectors: RAG Retrieval Is Finding Nearest Neighbors","name":"Vectors: RAG Retrieval Is Finding Nearest Neighbors","url":"https://xueai.app/slides/ds-10.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Data Structures Inside the LLM","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Embedding turns meaning into coordinates; similarity is distance. Drag the query point on a plane to watch nearest neighbors change, then see why HNSW finds answers instantly among hundreds of millions of vectors.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Data Structures Inside the LLM</div>
+    <h1>Vectors: RAG Retrieval Is Finding Nearest Neighbors</h1>
+    <p class="subtitle">When we learned RAG, we said Embedding turns a passage into a string of numbers. What are those numbers, really? The answer is almost too simple—<b>coordinates</b>. Each sentence gets a spot on a “semantic map”: closer in meaning means closer in place. So “retrieving documents” becomes a game every kid knows: <b>find the neighbors closest to you on the map</b>.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Embedding turns meaning into coordinates; similarity is distance. Drag the query point on a plane to watch nearest neighbors change, then see why HNSW finds answers instantly among hundreds of millions of vectors</p></aside><!--seo:end-->  <div class="sec-label">Play the map first · nearby meaning = nearby coordinates</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Below is a mini semantic map: 12 words already seated by Embedding, naturally clustering into three “districts.” <b style="color:var(--text)">Drag the black ❓ query point</b> (or click anywhere on the map to place it). Watch for: the lines always point to the <b style="color:var(--text)">3 nearest words</b>, distances update live, and the closest one wears 👑. Drag ❓ between two districts and see the neighbors swap.</p>
+
+  <div class="map-box">
+    <div class="map-stage">
+      <svg id="semSvg" viewBox="0 0 640 400" aria-label="Semantic map"></svg>
+    </div>
+    <div class="map-narr" id="semNarr">Try dragging ❓ into the “Food district,” then over to the “Tech district.”</div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>That’s the entire principle of RAG retrieval.</b> Every passage in your knowledge base gets a coordinate from Embedding (in the real world it’s 1536 dimensions, not 2—but the idea is the same); when you ask, the question gets a coordinate too; then you <b>find the passages closest to the question</b> and stuff them into context for the LLM. The secret behind “semantic search is smarter than keyword search” is that “milk tea” and “mango pomelo sago” share zero characters, yet sit right next to each other on the map.
+  </div>
+
+  <div class="sec-label">Then speed · brute-force vs building highways</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked xa-peek">The dumbest way to find nearest neighbors is to measure distance to every point. Sixty points are fine—but RAG knowledge bases often hit millions of chunks, and recommenders hit billions. Below, the same map scatters 60 points; 🌟 is your query. <b style="color:var(--text)">Click “Brute-force” first and count the steps, then “HNSW layered hops” to compare</b>—watch how the blue jump lines “big hop first, then small hops.”</p>
+
+  <div class="race-box paywall-locked">
+    <div class="race-stage">
+      <svg id="raceSvg" viewBox="0 0 640 360" aria-label="Brute-force vs HNSW comparison"></svg>
+    </div>
+    <div class="race-panel">
+      <div class="race-cell brute">
+        <div class="rc-name">🐢 Brute-force (full scan)</div>
+        <div class="rc-num" id="bruteNum">—</div>
+        <div class="rc-sub">distance calculations</div>
+      </div>
+      <div class="race-cell hnsw">
+        <div class="rc-name">🚀 HNSW layered hops</div>
+        <div class="rc-num" id="hnswNum">—</div>
+        <div class="rc-sub">distance calculations</div>
+      </div>
+    </div>
+    <div class="race-narr" id="raceNarr">HNSW intuition: <b>build the highways first</b>. Besides the full map at the bottom, store a few increasingly sparse “shortcut graphs”—queries start from the sparsest top layer, lock onto a region in a few big hops, then descend layer by layer with finer jumps. Another case of <b>trading space for time</b>.</div>
+    <div class="race-foot">
+      <button class="btn-ds alt" id="btnBrute">🐢 Brute-force</button>
+      <button class="btn-ds" id="btnHnsw">🚀 HNSW layered hops</button>
+      <span class="race-status" id="raceStatus"></span>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>With 60 points it’s 60 vs 8; at hundreds of millions, that’s “wait a few minutes” vs “milliseconds.”</b> Brute-force cost grows one-for-one with data size; HNSW chops huge search regions with a few hops per layer, so even hundred-million-scale vectors need only dozens of steps. What vector databases (Milvus, Pinecone, FAISS—names you’ll meet sooner or later) really sell is building and maintaining those “shortcut graphs.”
+  </div>
+
+  <div class="sec-label paywall-locked">What does this have to do with AI?</div>
+
+  <div class="nn-grid paywall-locked">
+    <div class="nn-card">
+      <div class="nn-icon">📚</div>
+      <h4>RAG retrieval</h4>
+      <p>Questions and documents both become coordinates; <b>find the nearest passages</b> and feed them to the LLM—the “answer from a knowledge base” you use every day is exactly these two animations under the hood.</p>
+    </div>
+    <div class="nn-card">
+      <div class="nn-icon">🖼</div>
+      <h4>Image search</h4>
+      <p>Images can be Embedded into coordinates too. Snap a photo of a sofa to find matches—that’s <b>finding your photo’s neighbors</b> on a semantic map of hundreds of millions of images.</p>
+    </div>
+    <div class="nn-card">
+      <div class="nn-icon">🎯</div>
+      <h4>You might also like</h4>
+      <p>Your taste is a coordinate; every song and show is one too. What recommenders do all day: <b>find the content closest to you</b> and serve it up.</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ What this lesson wants to share</h3>
+    <ul>
+      <li><b>Meaning → coordinates</b>: Embedding gives every sentence and image a spot on a high-dimensional map</li>
+      <li><b>Similarity → distance</b>: closer in meaning means closer in place—the whole idea behind “semantic search”</li>
+      <li><b>Retrieval → find neighbors</b>: RAG, image search, and recommendations are all the same nearest-neighbor search problem</li>
+      <li><b>Speed from layered shortcuts</b>: HNSW stores a few sparse “highway” layers so hundred-million-scale data arrives in dozens of steps</li>
+      <li><b>Space for time, again</b>: spend storage on shortcut graphs to drop retrieval from minutes to milliseconds</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 语义地图 ──
+   12 个词分三簇，❓ 可拖动/点击放置，实时连线最近 3 个词。 */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs){
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+const SEM_CLUSTERS = [
+  { name:'Food district', color:'#d97706', cx:145, cy:125, r:100 },
+  { name:'Tech district', color:'#0284c7', cx:480, cy:120, r:95 },
+  { name:'Mood district', color:'#7c3aed', cx:285, cy:315, r:90 },
+];
+const SEM_WORDS = [
+  { w:'hotpot', c:0, x:120, y:115 }, { w:'milk tea', c:0, x:190, y:68  },
+  { w:'BBQ', c:0, x:85,  y:180 }, { w:'sushi', c:0, x:200, y:155 },
+  { w:'phone', c:1, x:445, y:95  }, { w:'chip', c:1, x:520, y:155 },
+  { w:'code', c:1, x:425, y:175 }, { w:'AI',   c:1, x:510, y:72  },
+  { w:'happy', c:2, x:250, y:295 }, { w:'sad', c:2, x:330, y:345 },
+  { w:'angry', c:2, x:222, y:352 }, { w:'wow', c:2, x:322, y:280 },
+];
+
+const semSvg = document.getElementById('semSvg');
+const semNarr = document.getElementById('semNarr');
+
+/* 街区晕染 */
+SEM_CLUSTERS.forEach(c => {
+  semSvg.appendChild(svgEl('circle', { cx:c.cx, cy:c.cy, r:c.r, fill:c.color, opacity:.07 }));
+  const t = svgEl('text', { class:'sem-halo-label', x:c.cx, y:c.cy - c.r + 16, 'text-anchor':'middle', fill:c.color });
+  t.textContent = c.name;
+  semSvg.appendChild(t);
+});
+/* 连线层（在词点下面） */
+const semLineLayer = svgEl('g', {});
+semSvg.appendChild(semLineLayer);
+/* 词点 */
+SEM_WORDS.forEach(p => {
+  const g = svgEl('g', { class:'sem-word' });
+  g.appendChild(svgEl('circle', { cx:p.x, cy:p.y, r:8, fill:SEM_CLUSTERS[p.c].color }));
+  const t = svgEl('text', { x:p.x, y:p.y - 14, 'text-anchor':'middle' });
+  t.textContent = p.w;
+  g.appendChild(t);
+  semSvg.appendChild(g);
+});
+/* 皇冠 */
+const crown = svgEl('text', { class:'sem-crown', x:0, y:0, 'text-anchor':'middle' });
+crown.textContent = '👑';
+semSvg.appendChild(crown);
+/* 查询点 */
+const query = { x:300, y:205 };
+const queryG = svgEl('g', { class:'sem-query' });
+queryG.appendChild(svgEl('circle', { r:13 }));
+const qt = svgEl('text', { y:5, 'text-anchor':'middle' });
+qt.textContent = '?';
+queryG.appendChild(qt);
+semSvg.appendChild(queryG);
+
+function semUpdate(){
+  queryG.setAttribute('transform', `translate(${query.x},${query.y})`);
+  const ranked = SEM_WORDS
+    .map(p => ({ p, d: Math.hypot(p.x - query.x, p.y - query.y) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 3);
+  semLineLayer.innerHTML = '';
+  ranked.forEach(({ p, d }, i) => {
+    semLineLayer.appendChild(svgEl('line', {
+      class:'sem-line' + (i === 0 ? ' first' : ''),
+      x1:query.x, y1:query.y, x2:p.x, y2:p.y,
+    }));
+    const mid = svgEl('text', { class:'sem-dist', x:(query.x + p.x) / 2, y:(query.y + p.y) / 2 - 4, 'text-anchor':'middle' });
+    mid.textContent = Math.round(d);
+    semLineLayer.appendChild(mid);
+  });
+  const best = ranked[0].p;
+  crown.setAttribute('x', best.x);
+  crown.setAttribute('y', best.y - 26);
+  const zone = SEM_CLUSTERS[best.c].name;
+  semNarr.innerHTML = `The 3 nearest neighbors to ❓: ${ranked.map(({p}, i) => (i === 0 ? `<b>“${p.w}” 👑</b>` : `“${p.w}”`)).join(', ')} (❓ is near <b>${zone}</b>). If ❓ is your question, RAG would hand the “${best.w}” passage to the LLM first.`;
+}
+
+/* 拖动 + 点击放置 */
+function svgPoint(evt){
+  const pt = semSvg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  const p = pt.matrixTransform(semSvg.getScreenCTM().inverse());
+  return { x: Math.max(16, Math.min(624, p.x)), y: Math.max(16, Math.min(384, p.y)) };
+}
+let dragging = false;
+queryG.addEventListener('pointerdown', e => { dragging = true; queryG.setPointerCapture(e.pointerId); e.preventDefault(); });
+queryG.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const p = svgPoint(e);
+  query.x = p.x; query.y = p.y;
+  semUpdate();
+});
+queryG.addEventListener('pointerup', () => { dragging = false; });
+semSvg.addEventListener('click', e => {
+  if (e.target.closest('.sem-query')) return;
+  const p = svgPoint(e);
+  query.x = p.x; query.y = p.y;
+  semUpdate();
+});
+semUpdate();
+
+/* ── 暴力 vs HNSW ──
+   固定种子的伪随机撒 60 个点，保证每次打开布局一致。
+   HNSW 路径按「距目标由远到近」取样模拟：高层 3 跳、中层 2 跳、底层 3 跳，共 8 次计算。 */
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20260810);
+const RACE_PTS = [];
+for (let i = 0; i < 60; i++){
+  RACE_PTS.push({ x: 30 + rand() * 580, y: 30 + rand() * 300 });
+}
+const TARGET = { x: 455, y: 110 };
+
+const raceSvg = document.getElementById('raceSvg');
+const raceNarr = document.getElementById('raceNarr');
+const raceStatus = document.getElementById('raceStatus');
+const bruteNum = document.getElementById('bruteNum');
+const hnswNum = document.getElementById('hnswNum');
+const btnBrute = document.getElementById('btnBrute');
+const btnHnsw = document.getElementById('btnHnsw');
+
+const jumpLayer = svgEl('g', {});
+raceSvg.appendChild(jumpLayer);
+const racePtEls = RACE_PTS.map(p => {
+  const c = svgEl('circle', { class:'race-pt', cx:p.x, cy:p.y, r:5 });
+  raceSvg.appendChild(c);
+  return c;
+});
+const targetEl = svgEl('text', { class:'race-target', x:TARGET.x, y:TARGET.y + 7, 'text-anchor':'middle', 'font-size':'22' });
+targetEl.textContent = '🌟';
+raceSvg.appendChild(targetEl);
+const layerTag = svgEl('text', { class:'race-layer-tag', x:18, y:26 });
+raceSvg.appendChild(layerTag);
+
+/* 按距目标远近排序的索引 */
+const byDist = RACE_PTS
+  .map((p, i) => ({ i, d: Math.hypot(p.x - TARGET.x, p.y - TARGET.y) }))
+  .sort((a, b) => a.d - b.d)
+  .map(o => o.i);
+const NEAREST = byDist[0];
+
+let raceBusy = false;
+function raceSleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+function raceReset(){
+  racePtEls.forEach(c => c.classList.remove('flash','visited','hop','answer'));
+  racePtEls.forEach(c => c.setAttribute('r', 5));
+  jumpLayer.innerHTML = '';
+  layerTag.classList.remove('on');
+}
+
+btnBrute.addEventListener('click', async () => {
+  if (raceBusy) return;
+  raceBusy = true;
+  btnBrute.disabled = true; btnHnsw.disabled = true;
+  raceReset();
+  bruteNum.textContent = '0';
+  bruteNum.classList.remove('hot');
+  raceNarr.innerHTML = '<b>Brute-force:</b> No shortcuts—measure distance to all 60 points, every single one. Until you finish, you can’t claim who’s nearest.';
+  for (let k = 0; k < RACE_PTS.length; k++){
+    racePtEls[k].classList.add('flash');
+    bruteNum.textContent = String(k + 1);
+    await raceSleep(55);
+    racePtEls[k].classList.remove('flash');
+    racePtEls[k].classList.add('visited');
+  }
+  bruteNum.classList.add('hot');
+  racePtEls[NEAREST].classList.remove('visited');
+  racePtEls[NEAREST].classList.add('answer');
+  racePtEls[NEAREST].setAttribute('r', 8);
+  raceNarr.innerHTML = '<b>After 60 measurements</b>, we can finally say the green point is the nearest neighbor. Double the data, double the work—at 100 million points, that’s 100 million calculations.';
+  raceStatus.textContent = 'Now click “HNSW layered hops” to compare →';
+  btnBrute.disabled = false; btnHnsw.disabled = false;
+  raceBusy = false;
+});
+
+btnHnsw.addEventListener('click', async () => {
+  if (raceBusy) return;
+  raceBusy = true;
+  btnBrute.disabled = true; btnHnsw.disabled = true;
+  raceReset();
+  hnswNum.textContent = '0';
+  hnswNum.classList.remove('hot');
+  /* 路径：入口取最远点，然后按名次递减取样，模拟逐层逼近 */
+  const path = [byDist[59], byDist[38], byDist[22], byDist[11], byDist[6], byDist[3], byDist[1], byDist[0]];
+  const layers = [
+    { name:'⛰ Top layer: sparse shortcuts, big hops', cls:'high', hops:[0,1,2] },
+    { name:'🏔 Mid layer: denser shortcuts, smaller steps', cls:'mid',  hops:[3,4] },
+    { name:'🏡 Bottom: full map, precise to the door', cls:'low',  hops:[5,6,7] },
+  ];
+  let count = 0;
+  for (const layer of layers){
+    layerTag.textContent = layer.name;
+    layerTag.classList.add('on');
+    raceNarr.innerHTML = `<b>${layer.name}</b>—each hop only compares distance to a few nearby “signposts,” and you know which way to go.`;
+    for (const h of layer.hops){
+      const idx = path[h];
+      racePtEls[idx].classList.add('hop');
+      racePtEls[idx].setAttribute('r', 7);
+      count++;
+      hnswNum.textContent = String(count);
+      if (h > 0){
+        const a = RACE_PTS[path[h-1]], b = RACE_PTS[idx];
+        const line = svgEl('line', { class:`race-jump ${layer.cls}`, x1:a.x, y1:a.y, x2:b.x, y2:b.y });
+        jumpLayer.appendChild(line);
+        requestAnimationFrame(() => line.classList.add('on'));
+      }
+      await raceSleep(620);
+    }
+  }
+  hnswNum.classList.add('hot');
+  racePtEls[NEAREST].classList.remove('hop');
+  racePtEls[NEAREST].classList.add('answer');
+  racePtEls[NEAREST].setAttribute('r', 8);
+  layerTag.classList.remove('on');
+  raceNarr.innerHTML = `<b>8 calculations reach the same green point</b> (brute-force needs 60). The key: even at 100 million points, HNSW only adds a dozen or so hops—each big hop cuts away a huge region. That’s how vector DBs hit “hundreds of millions in milliseconds.”`;
+  raceStatus.textContent = '60 vs 8 — the gap grows exponentially with data size';
+  btnBrute.disabled = false; btnHnsw.disabled = false;
+  raceBusy = false;
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  lessonOnView(raceSvg, () => { raceStatus.textContent = '👆 Try “Brute-force” first, then “layered hops”'; });
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.en.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

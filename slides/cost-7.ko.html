@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>입력 주도: 62:1 I/O Ratio | Token 비용 엔지니어링</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Chatbot은 일문일답이고, Agent는 루프 실행입니다. 매 턴 Input에 전체 히스토리가 들어가서 턴이 늘수록 비용이 누적·팽창합니다. Excel 분석 작업을 턴별로 쪼개 보며 I/O Ratio가 어떻게 62:1이 되는지 확인하세요.">
+<meta name="keywords" content="Agent 비용,I/O Ratio,ReAct 루프,입력 주도,Token 팽창,SWE-bench">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-7.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/cost-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/cost-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/cost-7.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/cost-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="입력 주도: 62:1 I/O Ratio">
+<meta property="og:description" content="270글자 결과를 위해 16,790글자 ‘읽기 요금’을 냈습니다.">
+<meta property="og:url" content="https://xueai.app/slides/cost-7.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/cost-7.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="입력 주도: 62:1 I/O Ratio">
+<meta name="twitter:description" content="270글자 결과를 위해 16,790글자 ‘읽기 요금’을 냈습니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl td.hi{color:var(--warn);font-weight:800}
+.tbl-wrap{overflow-x:auto}
+
+/* 逐轮播放器 */
+.rp{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.rp-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.rp-title{font-size:14.5px;font-weight:800;color:var(--text)}
+.rp-btn{padding:9px 24px;border-radius:999px;border:none;background:var(--ct);color:#fff;font-family:inherit;font-size:13.5px;font-weight:800;cursor:pointer}
+.rp-btn:disabled{background:#c4c8cf;cursor:not-allowed}
+.rp-rounds{display:flex;flex-direction:column;gap:9px}
+.rr{display:flex;gap:12px;align-items:flex-start;border:1.5px solid var(--border);border-radius:11px;padding:12px 14px;opacity:.32;transition:opacity .3s,border-color .3s}
+.rr.show{opacity:1;border-color:var(--ct-line)}
+.rr-num{width:26px;height:26px;border-radius:8px;background:var(--ct-soft);color:var(--ct-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;flex-shrink:0;margin-top:2px}
+.rr-body{flex:1;min-width:0}
+.rr-act{font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:6px}
+.rr-bar{height:20px;background:rgba(0,0,0,.045);border-radius:6px;overflow:hidden;margin-bottom:5px}
+.rr-fill{height:100%;background:var(--warn);border-radius:6px;width:0;transition:width .5s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:7px;font-size:11px;font-weight:800;color:#fff;min-width:34px}
+.rr-meta{font-size:12px;color:var(--sub)}
+.rr-meta b{color:var(--ct-deep)}
+.rp-sum{margin-top:14px;background:rgba(0,0,0,.03);border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.8;color:var(--text);display:none}
+.rp-sum b{color:var(--warn)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"입력 주도: 62:1 I/O Ratio","name":"입력 주도: 62:1 I/O Ratio","url":"https://xueai.app/slides/cost-7.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · Agent 청구서","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Chatbot은 일문일답이고, Agent는 루프 실행입니다. 매 턴 Input에 전체 히스토리가 들어가서 턴이 늘수록 비용이 누적·팽창합니다. Excel 분석 작업을 턴별로 쪼개 보며 I/O Ratio가 어떻게 62:1이 되는지 확인하세요.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 비용 엔지니어링 · 7 / 13</div>
+    <h1>입력 주도: 62:1 I/O Ratio</h1>
+    <p class="subtitle">일반 Chatbot은 일문일답이고, Agent는 「생각 → 행동 → 관찰 → 다시 생각」 루프예요. 핵심 인식: 매 턴 Input에 전체 히스토리가 들어갑니다—턴이 늘수록 Input이 길어지고 비용이 누적·팽창해요.</p>
+    <div class="chips"><span class="chip">ReAct 루프</span><span class="chip">입력 주도</span><span class="chip">I/O Ratio</span><span class="chip">누적 팽창</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>Agent는 매 턴 전체 히스토리를 다시 읽어요. Excel 작업을 턴별로 열어 보면 Input이 어떻게 31,460 Token까지 불어나는지 보여요</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">Chatbot vs Agent: 과금 구조가 완전히 달라요</div>
+    <p class="desc">일반 Chatbot이 「농담 하나 해줘」(10 Token)라고 물으면 답은 150 Token—<b>I/O Ratio ≈ 1:15, 출력 주도</b>예요. 반면 Agent가 코드 수정 작업을 하면 System Prompt·도구 반환·과거 출력을 매 턴 다시 읽어요. 세 턴이면 총 Input 16,790, 총 Output 270—<b>I/O Ratio 62:1, 입력 주도</b>예요.</p>
+    <div class="quote-card" style="margin-top:12px">
+      270글자 결과를 위해 <b>16,790글자 「읽기 요금」</b>을 냈습니다. 이게 Agent의 입력 주도 특성이에요.
+    </div>
+    <div class="fig-wrap">
+      <img src="images/cost/chatbot-vs-agent.webp" alt="일반 Chatbot 일문일답과 Agent 루프 실행 비교" loading="lazy">
+      <div class="fig-cap">Chatbot은 한 턴으로 끝나고, Agent는 매 턴 입구에 전체 히스토리를 들고 들어가 Input이 누적·팽창해요. (그림: 저자 공유 원본)</div>
+    </div>
+    <div class="fig-wrap">
+      <img src="images/cost/io-ratio.webp" alt="I/O Ratio: Agent의 입력 주도 특성" loading="lazy">
+      <div class="fig-cap">코드 수정 작업 세 턴 분해: 총 Input 16,790, 총 Output 270, I/O Ratio 62:1. (그림: 저자 공유 원본)</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">인터랙티브 데모 · 「간단한」 작업의 실제 청구서</div>
+    <p class="desc">작업: 「이 Excel 표를 분석해서 매출 1위 제품을 찾고, 차트를 만들어 줘.」 「다음 턴」을 눌러 매 턴 누적 Input이 어떻게 불어나는지 보세요.</p>
+    <div class="rp" id="rp">
+      <div class="rp-head">
+        <span class="rp-title">Excel 분석 작업 · 5턴 실행</span>
+        <button class="rp-btn" id="rpBtn" type="button">실행 시작 ▶</button>
+      </div>
+      <div class="rp-rounds" id="rpRounds"></div>
+      <div class="rp-sum" id="rpSum"></div>
+    </div>
+    <div class="fig-wrap">
+      <img src="images/cost/excel-bill.webp" alt="Excel 작업의 턴별 분해와 실제 청구서" loading="lazy">
+      <div class="fig-cap">다섯 턴 누적 Input 31,460, Output 450, 합계 약 0.014–0.026위안. 주의: 이건 한 번 성공한 실행일 뿐이고, 실패 재시도·디버깅·반복의 숨은 비용이 더 있어요. (그림: 저자 공유 원본)</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">팽창의 수학: 왜 제곱급인가</div>
+    <p class="desc">작업이 N턴에 끝나고 System Prompt 길이가 S, 매 턴 추가(출력 + 도구 반환)가 약 Δ라고 하면, N번째 턴 Input ≈ S + Q + Δ×(N-1)이고 <b>총 Input은 모든 턴의 합</b>—안에 1+2+3+…+(N-1) 등차수열이 숨어 있어요. 매 턴 500 Token이 늘면 5턴 루프의 총 Input만 15,000+; 턴이 두 배가 되면 비용은 거의 네 배가 돼요.</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>Agent 프레임워크 (SWE-bench 실측)</th><th>평균 I/O Ratio</th><th>설명</th></tr>
+      <tr><td>단순 RAG Agent</td><td>10:1 ~ 20:1</td><td>검색 + 답변</td></tr>
+      <tr><td>OpenHands</td><td>20:1 ~ 50:1</td><td>코드 수정 작업</td></tr>
+      <tr><td>AutoGPT 계열</td><td class="hi">30:1 ~ 100:1</td><td>개방형 작업, 루프 많음</td></tr>
+    </table></div>
+    <p class="desc" style="margin-top:12px">그래서 <b>KV Cache(11절)가 Agent에게 결정적</b>이에요: 매 턴 같은 접두사를 다시 읽으니, 캐시 히트 여부가 곧 5배 가격 차예요. I/O Ratio를 모니터링해야 하는 이유도 같아요—<b>비율이 50:1을 넘으면 Agent가 「공회전」하는 경우가 많아</b>, 흐름을 고치거나 작업을 다운그레이드해야 해요.</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">핵심 요점</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Agent는 입력 주도예요:</b> 매 턴 Input에 전체 히스토리가 들어가고, 총량은 턴 수의 제곱급으로 팽창해요.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>한 번 실행은 싸 보여도, 규모에서 본색이 드러나요:</b> 0.02위안 작업 × 실패 재시도 × 백만 호출이면 청구서 질식 순간이에요.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>I/O Ratio를 건강 지표로 모니터하세요:</b> &gt;50:1이면 Agent가 공회전 중—절약보다 먼저 흐름을 점검하세요.</p></div>
+    </div>
+    <p class="src-note">
+      <b>출처:</b> 저자 팀 내부 공유 《AI Token 비용 엔지니어링 전략 공유》 「Agentic 앱의 과금 메커니즘」에서 정리했어요. 업계 데이터는 SWE-bench Agent Token 소비 실증 연구를 참고(마무리 절 읽기 자료). Agent 루프 원리는 <a href="7-3.html">실전편</a>을 보세요.
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<script>
+/* ── 逐轮账单播放器 ── */
+var ROUNDS = [
+  {act:'작업 이해, 「Excel 읽기」 도구 호출', add:'S+Q = 2,100', cum:2100, out:70},
+  {act:'Excel 읽기 결과 5,000행 반환', add:'+5,070', cum:7170, out:100},
+  {act:'데이터 분석, Top 제품 찾기', add:'+100', cum:7270, out:150},
+  {act:'차트 도구 호출', add:'+150', cum:7420, out:80},
+  {act:'차트 생성 완료, 결과 반환', add:'+80', cum:7500, out:50}
+];
+var MAXC = 7500, rpI = 0;
+var wrap = document.getElementById('rpRounds');
+ROUNDS.forEach(function(r,i){
+  var d = document.createElement('div');
+  d.className = 'rr'; d.id = 'rr'+i;
+  d.innerHTML = '<span class="rr-num">'+(i+1)+'</span><div class="rr-body">'
+    + '<div class="rr-act">'+r.act+'</div>'
+    + '<div class="rr-bar"><div class="rr-fill" id="rrF'+i+'"></div></div>'
+    + '<div class="rr-meta">신규 Input: '+r.add+' ｜ 이번 턴 누적 Input: <b>'+r.cum.toLocaleString()+'</b> ｜ Output: '+r.out+'</div></div>';
+  wrap.appendChild(d);
+});
+var btn = document.getElementById('rpBtn');
+btn.onclick = function(){
+  if (rpI >= ROUNDS.length) return;
+  var r = ROUNDS[rpI];
+  var el = document.getElementById('rr'+rpI);
+  el.classList.add('show');
+  var f = document.getElementById('rrF'+rpI);
+  requestAnimationFrame(function(){
+    f.style.width = Math.max(8, Math.round(r.cum/MAXC*100)) + '%';
+    f.textContent = r.cum.toLocaleString();
+  });
+  rpI++;
+  if (rpI >= ROUNDS.length) {
+    btn.disabled = true; btn.textContent = '실행 완료';
+    var sum = document.getElementById('rpSum');
+    sum.style.display = 'block';
+    sum.innerHTML = '총 Input: <b>31,460 Tokens</b>（2,100+7,170+7,270+7,420+7,500）｜총 Output: 450 Tokens<br>'
+      + '청구서（Qwen-Plus 비사고）: Input ¥0.013~0.025 + Output ¥0.00045 ≈ <b>¥0.014 ~ 0.026</b><br>'
+      + '주의: 빨간 막대가 거의 매 턴 길어져요—같은 System Prompt와 히스토리에 다섯 번 요금을 냈어요. 그게 KV Cache 캐시 요금이 있는 이유예요（11절）.';
+  } else {
+    btn.textContent = '다음 턴 ▶（' + (rpI+1) + '/5）';
+  }
+};
+lessonOnView(document.getElementById('rp'), function(){});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

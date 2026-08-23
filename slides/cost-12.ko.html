@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>출력 계층: 모델의 입을 단속해요 | Token 비용 엔지니어링</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="출력 Token은 입력보다 몇 배 비싸요. 모델의 입을 단속하는 세 수: 명확한 네거티브 제약(No yapping)으로 잡담 약 30% 절감, 윤문은 Diff로 하고 전문 재작성 금지, 정지 시퀀스로 물리 절단. Token도 시간도 아끼고 모델이 횡설수설할 걱정도 줄어요.">
+<meta name="keywords" content="출력 최적화,네거티브 제약,No yapping,Diff 출력,정지 시퀀스,stop sequence,Token 절감">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-12.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/cost-12.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/cost-12.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/cost-12.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/cost-12.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="출력 계층: 모델의 입을 단속해요">
+<meta property="og:description" content="네거티브 제약, Diff 윤문, 정지 시퀀스: 출력단의 세 수.">
+<meta property="og:url" content="https://xueai.app/slides/cost-12.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/cost-12.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="출력 계층: 모델의 입을 단속해요">
+<meta name="twitter:description" content="네거티브 제약, Diff 윤문, 정지 시퀀스: 출력단의 세 수.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.codebox{margin-top:12px;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px 18px;font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.codebox .g{color:#4ade80}
+.codebox .r{color:#f87171}
+.code-tag{display:inline-block;margin-top:14px;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:800}
+.code-tag.bad{background:var(--warn-soft);color:var(--warn)}
+.code-tag.good{background:var(--ct-soft);color:var(--ct-deep)}
+.l-cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+
+/* 停止序列演示 */
+.stp{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.stp-tabs{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:14px}
+.stp-btn{padding:9px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;color:var(--text);transition:all .18s;min-height:40px}
+.stp-btn.on{border-color:var(--ct);background:var(--ct-soft);color:var(--ct-deep)}
+.stp-out{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px 18px;font-size:13px;line-height:1.8;font-family:"SF Mono","Fira Code",Menlo,monospace;white-space:pre-wrap;min-height:140px}
+.stp-out .cut{color:#f87171;text-decoration:line-through;opacity:.55}
+.stp-out .stopmark{display:inline-block;background:var(--warn);color:#fff;border-radius:5px;padding:0 7px;font-size:11px;font-weight:800;margin:0 3px}
+.stp-note{margin-top:12px;font-size:14px;line-height:1.75;color:var(--text);background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px}
+.stp-note b{color:var(--ct-deep)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+@media (max-width:768px){.l-cols2{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"출력 계층: 모델의 입을 단속해요","name":"출력 계층: 모델의 입을 단속해요","url":"https://xueai.app/slides/cost-12.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~심화","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 4계층 실전 최적화","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"출력 Token은 입력보다 몇 배 비싸요. 모델의 입을 단속하는 세 수: 명확한 네거티브 제약(No yapping)으로 잡담 약 30% 절감, 윤문은 Diff로 하고 전문 재작성 금지, 정지 시퀀스로 물리 절단. Token도 시간도 아끼고 모델이 횡설수설할 걱정도 줄어요.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 비용 엔지니어링 · 12 / 13</div>
+    <h1>출력 계층: 모델의 입을 단속해요</h1>
+    <p class="subtitle">실전 4계층의 마지막. 출력 Token은 입력보다 몇 배 비싸요(3절 요금표 다시 보기), 그리고 API 반환 속도를 직접 정해요. 모델의 입을 단속하는 적합한 조작은 세 종류: 지시 계층, 코드 계층, 엔지니어링 계층.</p>
+    <div class="chips"><span class="chip">네거티브 제약</span><span class="chip">Diff 출력</span><span class="chip">정지 시퀀스</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>명확한 네거티브 제약으로 잡담 약 30% 절감; 윤문은 Diff로, 전문 재작성 금지; 정지 시퀀스로 물리 절단</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">지시 계층 · 명확한 네거티브 제약을 쓰세요</div>
+    <p class="desc">많은 사람이 「간결하게 답해 주세요」를 알지만, 문제가 있어요—<b>「간결」은 모델에게 너무 추상적이라, 얼마나 간결해야 하는지 몰라요</b>. 효과적인 쓰기는 「하지 말 것」을 분명히 적는 거예요:</p>
+    <div class="l-cols2">
+      <div>
+        <span class="code-tag bad">✗ 모호한 제약</span>
+        <div class="codebox">간결하게 답해 주세요.
+
+<span class="r">→ 「물론이죠, 요청하신 코드입니다. 간단한
+기능을 구현했어요…… 도움이 되길 바라요.」</span></div>
+      </div>
+      <div>
+        <span class="code-tag good">✓ 명확한 네거티브 제약</span>
+        <div class="codebox">인사말·요약·겸양 금지,
+결과만 바로 출력.
+(English: No yapping. No preamble,
+no postscript.)
+
+<span class="g">→ def function():
+      return True</span></div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:12px">실측으로 <b>Agentic 시나리오에서 잡담 약 30%를 자를 수 있어요</b>. 쉽게 말하면: 쓸데없는 건 하지 말고, 결과만 내놓으라고 말하는 거예요.</p>
+    <div class="fig-wrap">
+      <img src="images/cost/no-yapping.webp" alt="Be concise와 No yapping 출력 비교" loading="lazy">
+      <div class="fig-cap">「Be concise」는 신비주의, 「No preamble, no postscript」는 지시: 코드 생성 태스크에서 잡담 Token이 평균 30% 줄어요. (도: 저자 공유 원본)</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">코드 계층 · Diff로 다듬고, 전문을 다시 쓰지 마세요</div>
+    <p class="desc">글 윤문에서 가장 큰 비용 함정: 사용자가 「이 문장 좀 자연스럽게」라고 하면, 모델이 2,000자 글을 처음부터 다시 출력해요. 그 단락만 출력하라고 해도 Token은 계속 타요.</p>
+    <p class="desc" style="margin-top:10px">다른 접근: <b>모델이 바뀐 부분만 출력하게</b>—Diff로 「원문→수정」을 표시하거나, 정규식/치환 명령을 반환해 프로그램이 적용해요. 두세 단어만 건드리면 1초: <b>비용은 수십 배 차이, UX는 더 좋아요</b>—빠르고, 사용자가 어디가 바뀌었는지 바로 보여요.</p>
+    <div class="codebox"><span class="r">- 우리 제품은 시장에서 매우 경쟁력 있는 존재예요</span>
+<span class="g">+ 우리 제품은 시장 경쟁력이 높아요</span>
+
+<span class="g">또는 치환 명령 반환: {"find": "시장에서 매우 경쟁력 있는 존재예요", "replace": "시장 경쟁력이 높아요"}</span></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">엔지니어링 계층 · 정지 시퀀스로 물리 절단</div>
+    <p class="desc">Prompt에 「3항만 출력」이라고 써도 모델이 들을지는 신비주의—3항일 수도, 5항에 요약까지일 수도. 하지만 <b>정지 시퀀스(stop sequence)는 물리 절단이라, 모델이 「말을 듣는지」와 무관해요</b>: API가 지정 문자열을 감지하면 생성 스트림을 바로 끊고, 잘린 부분은 과금되지 않으며 히스토리 컨텍스트에도 안 들어가요.</p>
+    <div class="stp" id="stp">
+      <div class="stp-tabs" id="stpTabs"></div>
+      <div class="stp-out" id="stpOut"></div>
+      <div class="stp-note" id="stpNote"></div>
+    </div>
+    <p class="desc" style="margin-top:12px">단순하고 거칠지만 잘 먹혀요. <b>출력을 효과적으로 통제하는 것이 곧 비용과 UX를 통제하는 거예요.</b></p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">핵심 요점</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>네거티브 제약은 구체적이어야 해요:</b> 「인사·요약·겸양 금지」가 「간결하게」보다 훨씬 효과적, Agentic 시나리오에서 잡담 약 30% 절감.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>윤문 출력은 Diff나 치환 명령으로,</b> 전문 재작성을 시키지 마세요: 비용은 수십 배 차이, UX는 오히려 더 좋아요.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>정지 시퀀스는 물리 스위치:</b> 목록은 「4.」에서, 한 줄 답은 줄바꿈에서, JSON은 「}」에서, 자문자답은 「사용자:」에서 끊어요.</p></div>
+    </div>
+    <p class="src-note">
+      <b>출처:</b> 저자 팀 내부 공유 《AI Token 비용 엔지니어링 전략 공유》 실전편 「04｜출력」에서 정리했어요. 정지 시퀀스 파라미터는 각사 API 문서 참고(OpenAI 호환 인터페이스는 <code>stop</code> 필드, 최대 4개 시퀀스).
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<script>
+/* ── 停止序列演示 ── */
+var STP = [
+  {tab:'목록은 앞 3항만', stop:'"4."',
+   keep:'원인 분석:\n1. 공급망 비용 상승\n2. 경쟁사 가격 인하 압박\n3. 채널 재고 적체\n',
+   cut:'4. 환율 변동 영향\n5. 마케팅 투입 부족\n종합하면, 다음 측면에서 시작하는 것을 권합니다……',
+   note:'<b>「4.」를 정지 시퀀스로</b> 두면: 모델이 4항을 쓰려는 순간 API가 생성 스트림을 끊어요. 뒤의 장황한 요약은 한 글자도 안 나오고, 과금도 안 돼요.'},
+  {tab:'첫 답만', stop:'"\\n"(줄바꿈)',
+   keep:'파리',
+   cut:'\n\n보충: 프랑스의 수도는 파리이며, 동시에 프랑스 최대 도시로……',
+   note:'한 줄 답 시나리오에서는 <b>줄바꿈을 정지 시퀀스로</b>: 답을 받는 즉시 멈춰요. 분류·판단·빈칸 채우기 백엔드 태스크에 적합해요.'},
+  {tab:'JSON은 끝에서 멈춤', stop:'"}"',
+   keep:'{"sentiment":"positive","score":0.92}',
+   cut:'\n\n이상이 분석 결과입니다. 다른 도움이 필요하면 말씀해 주세요!',
+   note:'JSON 뒤 모델이 겸양 한 마디를 덧붙이기 좋아해요. <b>「}」를 정지 시퀀스로</b>(Minified JSON 제약과 함께) 닫는 괄호에서 물리적으로 봉인하세요.'},
+  {tab:'자문자답 방지', stop:'"사용자:" / "Human:"',
+   keep:'상담원: 주문은 긴급 배송으로 잡혔고, 내일 도착 예정입니다.',
+   cut:'\n사용자: 내일 안 오면 어떻게 하죠?\n상담원: 내일 도착하지 않으면……',
+   note:'완성형 모델이 가끔 사용자 다음 턴을 「지어내요」. <b>「사용자:」「Human:」를 정지 시퀀스로</b> 두면, 연기를 시작하는 순간 끊어요.'}
+];
+var stpCur = -1;
+function stpRender(){
+  var t=document.getElementById('stpTabs'); t.innerHTML='';
+  STP.forEach(function(s,i){
+    var b=document.createElement('button'); b.className='stp-btn'+(i===stpCur?' on':''); b.type='button';
+    b.textContent=s.tab; b.onclick=function(){stpPick(i);}; t.appendChild(b);
+  });
+}
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function stpPick(i){
+  stpCur=i; var s=STP[i];
+  document.getElementById('stpOut').innerHTML = esc(s.keep) + '<span class="stopmark">STOP ' + esc(s.stop) + '</span><span class="cut">' + esc(s.cut) + '</span>';
+  document.getElementById('stpNote').innerHTML = s.note + ' 취소선 부분은 생성·과금·컨텍스트 진입이 없어요.';
+  stpRender();
+}
+stpRender();
+lessonOnView(document.getElementById('stp'), function(){ if(stpCur<0) stpPick(0); });
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

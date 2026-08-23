@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KV Cache Is an Interface | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson .sec-label{margin:56px 0 20px}
+.lesson p.reveal{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.doc-quote{background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:20px 22px;margin:12px 0 20px;font-size:14px;line-height:1.9;color:var(--text)}
+.doc-quote .q-src{display:block;margin-top:8px;font-size:12px;color:var(--sub)}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eef1ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+
+/* ── 前缀稳定性显微镜 ── */
+#demo-kvcache{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:12px}
+.kv-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.kv-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(77,107,254,.4);background:var(--accent-soft);color:var(--accent-deep);border-radius:11px;padding:12px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px}
+.kv-btn svg{flex:0 0 auto}
+.kv-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.kv-mode{display:flex;gap:0;border:1px solid rgba(77,107,254,.35);border-radius:11px;overflow:hidden;margin-left:auto}
+.kv-mode button{border:none;background:var(--card);color:var(--sub);padding:12px 14px;font:700 12.5px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;min-height:48px}
+.kv-mode button.active{background:var(--accent);color:#fff}
+.kv-stage{display:grid;grid-template-columns:1fr 250px;gap:14px;align-items:start}
+.kv-ribbon-wrap{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px}
+.kv-ribbon-title{font-size:12px;font-weight:800;color:var(--sub);margin-bottom:10px}
+.kv-ribbon{display:flex;gap:2px;height:52px;border-radius:8px;overflow:hidden}
+.kv-seg{position:relative;display:grid;place-items:center;font:700 9.5px/1.2 ui-monospace,Menlo,monospace;color:#fff;text-align:center;overflow:hidden;transition:background .35s,flex-basis .45s;min-width:0;padding:0 2px}
+.kv-seg span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.kv-seg.s-id{background:#3450d4}
+.kv-seg.s-persona{background:#7c3aed}
+.kv-seg.s-tool{background:#0891b2}
+.kv-seg.s-tool.alt{background:#0aa5c9}
+.kv-seg.s-ctx{background:#d97706}
+.kv-seg.s-hist{background:#9ca3af}
+.kv-seg.hit{filter:saturate(.35) brightness(1.28)}
+.kv-seg.hit:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--success)}
+.kv-seg.miss{filter:none}
+.kv-seg.miss:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--danger)}
+.kv-seg.pulse{animation:kvpulse .6s ease}
+@keyframes kvpulse{50%{transform:translateY(-4px)}}
+.kv-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:11.5px;color:var(--sub)}
+.kv-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.kv-hitline{margin-top:10px;font:700 12px/1.6 ui-monospace,Menlo,monospace;color:var(--text);min-height:20px}
+.kv-hitline b.ok{color:var(--success)}
+.kv-hitline b.bad{color:var(--danger)}
+.kv-meter{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px}
+.kv-meter-title{font-size:12px;font-weight:800;color:var(--sub);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.kv-meter-title svg{color:var(--accent)}
+.kv-meter-num{font:800 30px/1.1 ui-monospace,Menlo,monospace;color:var(--danger)}
+.kv-meter-num.pop{animation:kvpop .45s ease}
+@keyframes kvpop{50%{transform:scale(1.22)}}
+.kv-meter-sub{font-size:11.5px;color:var(--sub);line-height:1.6;margin-top:6px}
+.kv-meter-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--text);margin-top:10px;padding-top:10px;box-shadow:0 -1px 0 var(--border)}
+.kv-meter-row b{font-family:ui-monospace,Menlo,monospace}
+.kv-caption{display:flex;gap:9px;align-items:flex-start;margin-top:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.8;color:var(--text);min-height:64px}
+.kv-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}
+  .kv-stage{grid-template-columns:1fr}
+  .kv-mode{margin-left:0;width:100%}
+  .kv-mode button{flex:1}
+  .source-head{flex-direction:column}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .kv-btn{flex:1 1 auto;justify-content:center}
+  .kv-ribbon{height:44px}
+}
+</style>
+<meta name="description" content="DSH treats system-prompt prefix stability as a compatibility promise: 215 package docs carry a fixed KV Cache effect section, tool order is normalized by a central list, and interpolation format errors throw instead of shipping a bad prompt.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"KV Cache Is an Interface","name":"KV Cache Is an Interface","url":"https://xueai.app/slides/dsh-28.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Engineering Methodology","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"DSH treats system-prompt prefix stability as a compatibility promise: 215 package docs carry a fixed KV Cache effect section, tool order is normalized by a central list, and interpolation format errors throw instead of shipping a bad prompt.","datePublished":"2026-08-13","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="KV Cache Is an Interface"><meta property="og:description" content="DSH treats system-prompt prefix stability as a compatibility promise: 215 package docs carry a fixed KV Cache effect section, tool order is normalized by a central list, and interpolation format errors throw instead of shipping a bad prompt."><meta property="og:url" content="https://xueai.app/slides/dsh-28.en.html"><meta property="og:image" content="https://xueai.app/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.app/slides/dsh-28.en.html">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:locale" content="en_US">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/dsh-28.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/dsh-28.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/dsh-28.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/dsh-28.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · Engineering Methodology</div>
+    <h1>KV Cache Is an Interface</h1>
+    <p class="subtitle">Treat prompt prefix stability as a compatibility promise.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Treat prompt prefix stability as a compatibility promise</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>Course goal</b>After this lesson you can explain three things: why changing one character in a prompt prefix invalidates every later token’s cache; which three practices let DSH treat prefix stability as a compatibility promise (doc discipline, a central tool-order list, strict interpolation); and how Claude Code’s 10.2% real-money lesson proved the same point.</span>
+  </div>
+
+  <div class="sec-label">Interactive demo · Prefix-stability microscope</div>
+  <p class="reveal">Play first, then the lecture. The ribbon below is a token sequence of system prompt plus tool schemas (numbers are teaching abstractions). Hit Play and the demo walks through common moves: resend unchanged, change one persona word, add a tool, append conversation, and jitter plugin load order. Each step marks from which token the cache breaks; the meter on the right accumulates the recompute tokens you overpay. Top-right switches DSH mode vs control mode — the jitter step diverges completely.</p>
+  <div id="demo-kvcache" class="reveal">
+    <div class="kv-toolbar">
+      <button class="kv-btn primary" id="kvPlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>Play</button>
+      <button class="kv-btn" id="kvStep"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>Step</button>
+      <button class="kv-btn" id="kvReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
+      <div class="kv-mode">
+        <button id="kvModeDsh" class="active" type="button">DSH · central list</button>
+        <button id="kvModeReg" type="button">Control · registration order</button>
+      </div>
+    </div>
+    <div class="kv-stage">
+      <div class="kv-ribbon-wrap">
+        <div class="kv-ribbon-title">Request prefix sent to the model (one segment per cell; width by token count)</div>
+        <div class="kv-ribbon" id="kvRibbon"></div>
+        <div class="kv-legend">
+          <span><i style="background:#3450d4"></i>harness identity</span>
+          <span><i style="background:#7c3aed"></i>persona</span>
+          <span><i style="background:#0891b2"></i>tool schema</span>
+          <span><i style="background:#d97706"></i>dynamic context</span>
+          <span><i style="background:#9ca3af"></i>conversation history</span>
+        </div>
+        <div class="kv-hitline" id="kvHitline">No request sent yet.</div>
+      </div>
+      <div class="kv-meter">
+        <div class="kv-meter-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Invalidation cost meter</div>
+        <div class="kv-meter-num" id="kvCost">0</div>
+        <div class="kv-meter-sub">Tokens that should have been cache hits but were forced to recompute. Cache-hit input is usually an order of magnitude cheaper than a miss — this number multiplies straight onto the bill.</div>
+        <div class="kv-meter-row"><span>Hit rate this request</span><b id="kvHitPct">–</b></div>
+        <div class="kv-meter-row"><span>Request count</span><b id="kvReqN">0</b></div>
+      </div>
+    </div>
+    <div class="kv-caption">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      <span id="kvCaptionText">Hit Play to start. KV Cache (key-value cache): the model can reuse prior attention work for an identical token prefix — only if that prefix matches character for character.</span>
+    </div>
+  </div>
+
+  <div class="sec-label">How it works · Why one character can kill an entire cache</div>
+  <p class="reveal">KV Cache in plain talk. While handling a request, the model caches intermediate results (keys and values) per token. On the next request, if the leading token sequence matches the previous one character for character, that prefix’s work can be reused and the provider discounts the hit. On DeepSeek’s public pricing, cache-hit input tokens are about an order of magnitude cheaper than misses (exact multiplier per the official price page).</p>
+  <p class="reveal">The key is “character for character.” Cache matches by prefix: from the first differing token onward, everything is invalid. What’s at the front of an agent request? System prompt plus tool schemas — often thousands of tokens, on every request. Change one persona word, reshuffle tool order, or stuff the current time at the front, and the cache breaks there; every later request recomputes at full price.</p>
+  <p class="reveal">So DSH’s conclusion: the prompt prefix is the interface of the model-as-API; its stability is a compatibility promise, maintained like a public API. In engineering terms, three practices.</p>
+  <p class="reveal"><b>First: bake it into doc discipline.</b> In the local snapshot, of 268 package READMEs under packages, 215 carry a fixed <code>#### KV Cache effect</code> section. Anything that can appear in a model request must document three parts: what the model sees (What the model sees), token cost (Token effect), and cache impact (KV Cache effect). Take the tool-schema section of <code>packages/core/tools/README.md</code>, line 145:</p>
+  <div class="doc-quote reveal">
+    Prefix-stable while visible definitions and their order are unchanged. Registration, disposal, or scoped restriction may invalidate reuse from the first changed schema token.<br>(As long as visible tool definitions and their order stay unchanged, the prefix stays stable. Registration, disposal, or scoped restriction may invalidate reuse from the first changed schema token.)
+    <span class="q-src">Source: deepseek-harness-master repo <code>packages/core/tools/README.md</code> line 145, verified on 2026-08-13</span>
+  </div>
+  <p class="reveal">The same file, lines 186–188, states the inverse: tool-call history and results are append-only; new content trails the reusable prefix and does not break existing cache. What hurts the cache and what doesn’t is written as lookup-ready doc entries.</p>
+  <p class="reveal"><b>Second: normalize tool order with a central list.</b> Tool schemas dominate the prefix; their order used to follow plugin registration. Plugins load concurrently, so registration order jitters with the environment — DSH saw divergent request headers in CI (Agent Note <code>2026-07-06-explicit-tool-order</code>, problem section). Order changes request bytes; bytes change cache — so it must be governed explicitly: a config <code>toolOrder</code> list sets a single order, the list must contain exactly one <code>&lt;unlisted-tools&gt;</code> rest marker, and without a list it falls back to lexicographic order. Normalization runs inside <code>assemble()</code>, before the waterfall; registration order no longer appears anywhere observable.</p>
+  <p class="reveal paywall-locked xa-peek"><b>Third: strict interpolation — throw rather than ship a bad prompt.</b> Persona is a template; variable groups like <code>{{model}}</code> are interpreted strictly against the registry: unknown variables, missing values this assemble, or malformed brace groups all throw. The turn fails immediately; no request is sent. The reason is direct: silent tolerance means sending a quietly mutated prefix, quietly invalidating cache, and possibly quietly changing behavior. Loud failure is cheaper.</p>
+  <div class="facts paywall-locked">
+    <div class="fact reveal"><code>Order is interface too</code><p>Two tool-schema sets with identical content but different order are two different prefixes to the cache. So tool order cannot be left to load timing — environmental noise.</p></div>
+    <div class="fact reveal"><code>Invalidation starts at the first changed token</code><p>Cache matches by prefix — the earlier the content, the less you should touch it. Put volatile bits (time, dynamic state) later; put never-changing identity and schemas earlier.</p></div>
+    <div class="fact reveal"><code>Append does not hurt the cache</code><p>Conversation history grows append-only; the old prefix stays intact and you only pay full price for the new part. That’s the billing dividend of append-only session logs.</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked">Key evidence · Source for the central list and strict interpolation</div>
+  <p class="reveal paywall-locked">Below is the core tool-ordering logic. At the top of the function (lines 165–168) a reserved-name check: if a tool provider uses the reserved name <code>&lt;unlisted-tools&gt;</code>, it throws immediately. Then the sort itself — watch two failure branches: no list → lexicographic fallback; <code>toolOrder</code> names an unregistered tool → throw. Throws happen at assemble time, before any request is sent.</p>
+  <div class="source reveal paywall-locked">
+    <div class="source-head"><span>packages/core/system-prompt/src/index.ts</span><span>lines 169–178</span></div>
+    <pre><code>  <span class="kw">if</span> (toolOrder === <span class="kw">undefined</span>) <span class="kw">return</span> tools.<span class="fn">sort</span>(compareToolNames)
+  <span class="kw">const</span> unknown = toolOrder.<span class="fn">filter</span>(name =&gt; name !== TOOL_ORDER_REST &amp;&amp; !knownNames.<span class="fn">has</span>(name))
+  <span class="kw">if</span> (unknown.length &gt; <span class="kw">0</span>) {
+    <span class="kw">throw new</span> <span class="ty">Error</span>(<span class="str">`toolOrder lists unregistered tool${unknown.length &gt; 1 ? 's' : ''} ${unknown.map(name =&gt; `"${name}"`).join(', ')}; known tools: ${[...knownNames].sort().join(', ') || '(none)'}`</span>)
+  }
+  <span class="kw">const</span> listed = <span class="kw">new</span> <span class="ty">Set</span>(toolOrder)
+  <span class="kw">const</span> rest = tools.<span class="fn">filter</span>(tool =&gt; !listed.<span class="fn">has</span>(tool.name)).<span class="fn">sort</span>(compareToolNames)
+  <span class="kw">return</span> toolOrder.<span class="fn">flatMap</span>(name =&gt;
+    name === TOOL_ORDER_REST ? rest : tools.<span class="fn">filter</span>(tool =&gt; tool.name === name))
+}</code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>Source snapshot note:</b> Based on the local deepseek-harness-master repo; verified against <code>packages/core/system-prompt/src/index.ts</code>, verified on 2026-08-13. Code blocks keep the original source text.</div>
+  <p class="reveal paywall-locked">Two edge cases worth remembering — both from Agent Note <code>2026-07-06-explicit-tool-order</code>. After a hot reload, registration order changes — does tool order change? No: the central list normalizes before the waterfall; registration order is nowhere observable. What if <code>toolOrder</code> has a misspelled tool name? The Note’s consequences section is precise: the turn fails at assemble — no steps opened, no request headers logged, no adapter call; every turn fails the same way until config is fixed; the process itself keeps running.</p>
+  <p class="reveal paywall-locked">Strict interpolation is three consecutive throw branches — none let anything through. First, format: if the variable name fails the naming regex, throw “malformed prompt variable reference”; even empty names like <code>{{}}</code> are called out in comments and take this format-error path. Second, registry: if the name isn’t registered, throw “unknown prompt variable”, listing every registered name. Third, values: registered but no value this assemble — throw. All three catch the same thing: a quietly mutated prefix.</p>
+  <p class="src-note reveal paywall-locked">Source: interpolation branches in <code>packages/core/system-prompt/src/index.ts</code> lines 277–290, verified on 2026-08-13.</p>
+  <p class="reveal paywall-locked">Line 283’s <code>Object.hasOwn</code> has a deliberate twist: ordinary property access on <code>{{constructor}}</code> would walk the prototype chain to Object builtins and mistake them for registered variables. Own-property checks treat prototype-chain names as unregistered. That’s how you stop a quietly allowed bad prompt.</p>
+
+  <div class="sec-label paywall-locked">Side-by-side · A 10.2% lesson and a static path</div>
+  <p class="reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg><b>Claude Code</b>: Comments in restored source <code>restored-src/src/tools/AgentTool/prompt.ts</code> lines 57–64 record a real incident. The subagent list used to be nested in the tool description; async MCP connect, plugin reload, and permission-mode switches all mutated that list — one description change invalidated the entire tool-schema cache. That single issue was 10.2% of fleet-wide cache_creation tokens. The fix converges with DSH’s idea: move the volatile list out of the static prefix into a separate attachment message, keep the tool description cacheable (source: claude-code-sourcemap-main/study/chapters/05-multi-agent.md lines 106–121). Timing differs: Claude Code fixed it after seeing 10.2% on the bill; DSH governed order at the CI-jitter stage and spread the discipline across 215 docs.</p>
+  <p class="reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg><b>Grok Build</b>: takes the static-template path. The system prompt is decrypted and rendered from a pregenerated template (<code>crates/codegen/xai-grok-agent/src/prompt/template.rs</code>), then AGENTS.md and skills are appended (module split in same-dir <code>mod.rs</code>). Templates are compile-time fixed, so the prefix is naturally stabler than dynamic assembly — the static path’s built-in advantage. The cost is flexibility: DSH’s model where plugins contribute segments, variables, and tools on the fly doesn’t exist here. Whether Grok has equivalent per-package cache-impact docs: not seen in the verified local snapshot; based on public evidence this stays unknown.</p>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>Find the cache killers in your prompt</h3><p>Suppose your agent writes “current time: 2026-08-13 22:04:35” on line 2 of the system prompt — changing every second. Work it out: from which segment does each request’s cache break? How many recompute tokens do you overpay for 1000 requests a day? Give two fixes and compare: move time into dynamic context at the end of the prompt, or drop precision to the day. Hint: which fix still breaks the cache once at the day boundary?</p></div>
+  </div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">02</div>
+    <div><h3>Write a KV Cache effect template for your team</h3><p>Copy DSH’s three-part form (what the model sees / token cost / cache impact). List everything in your project that “enters a model request”: system prompt, tool schemas, dynamically injected context, RAG results. For each, write the cache impact and mark what’s in the wrong place. You’ll likely find at least one issue in the same family as Claude Code’s 10.2%.</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway:</b> KV Cache matches prefixes character for character; from the first changed token onward everything is invalid — so prompt-prefix stability is a compatibility promise you maintain. DSH’s trio: a fixed KV Cache effect section in 215 docs, a toolOrder central list that kills order jitter, and throwing on interpolation format errors. Moving volatile content after the prefix tail is a money-saving move every harness can use.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  var demo = document.getElementById('demo-kvcache');
+  var ribbon = document.getElementById('kvRibbon');
+  var hitline = document.getElementById('kvHitline');
+  var caption = document.getElementById('kvCaptionText');
+  var costEl = document.getElementById('kvCost');
+  var hitPctEl = document.getElementById('kvHitPct');
+  var reqNEl = document.getElementById('kvReqN');
+  var mode = 'dsh';
+  var idx = 0, timer = null, playing = false, runId = 0;
+  var cost = 0, reqN = 0;
+  var segs = [];
+
+  function baseSegs() {
+    return [
+      { id: 'id', label: 'id 20', tok: 20, cls: 's-id' },
+      { id: 'persona', label: 'persona 50', tok: 50, cls: 's-persona' },
+      { id: 't-bash', label: 'bash 180', tok: 180, cls: 's-tool' },
+      { id: 't-edit', label: 'edit 180', tok: 180, cls: 's-tool alt' },
+      { id: 't-grep', label: 'grep 180', tok: 180, cls: 's-tool' },
+      { id: 't-read', label: 'read 180', tok: 180, cls: 's-tool alt' },
+      { id: 'ctx', label: 'ctx 60', tok: 60, cls: 's-ctx' },
+      { id: 'hist', label: 'hist 150', tok: 150, cls: 's-hist' }
+    ];
+  }
+  function total() { return segs.reduce(function (s, x) { return s + x.tok; }, 0); }
+  function render(states) {
+    // states: map id -> 'hit'|'miss'|'' ; 未给的为中性
+    var t = total();
+    ribbon.innerHTML = '';
+    segs.forEach(function (s) {
+      var d = document.createElement('div');
+      d.className = 'kv-seg ' + s.cls + (states && states[s.id] ? ' ' + states[s.id] : '');
+      d.style.flex = (s.tok / t * 100) + ' 1 0';
+      d.innerHTML = '<span>' + s.label + '</span>';
+      ribbon.appendChild(d);
+    });
+  }
+  function pulse(id) {
+    var i = segs.findIndex(function (s) { return s.id === id; });
+    var el = ribbon.children[i];
+    if (el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+  }
+  function statesUpTo(missFromId) {
+    // missFromId 之前全 hit，之后（含自己）全 miss；null 表示全 hit
+    var st = {}, missing = false;
+    segs.forEach(function (s) {
+      if (missFromId !== null && s.id === missFromId) missing = true;
+      st[s.id] = missing ? 'miss' : 'hit';
+    });
+    return st;
+  }
+  function missTokens(missFromId) {
+    if (missFromId === null) return 0;
+    var m = 0, missing = false;
+    segs.forEach(function (s) {
+      if (s.id === missFromId) missing = true;
+      if (missing) m += s.tok;
+    });
+    return m;
+  }
+  function hitPrefix(missFromId) {
+    if (missFromId === null) return total();
+    var h = 0;
+    for (var i = 0; i < segs.length; i++) {
+      if (segs[i].id === missFromId) break;
+      h += segs[i].tok;
+    }
+    return h;
+  }
+  function request(missFromId, newTok) {
+    reqN++;
+    reqNEl.textContent = String(reqN);
+    var hit = hitPrefix(missFromId);
+    var miss = missTokens(missFromId);
+    render(statesUpTo(missFromId));
+    var t = total();
+    if (missFromId === null) {
+      hitline.innerHTML = 'Cache hit through token <b class="ok">' + t + '</b> / ' + t + (newTok ? ' (new ' + newTok + ' tokens billed normally)' : ', full prefix reused');
+      hitPctEl.textContent = '100%';
+    } else {
+      hitline.innerHTML = 'Cache hit through token <b class="ok">' + hit + '</b>; invalid from <b class="bad">' + (hit + 1) + '</b>; recompute <b class="bad">' + miss + '</b> tokens';
+      hitPctEl.textContent = Math.round(hit / t * 100) + '%';
+      cost += miss;
+      costEl.textContent = String(cost);
+      costEl.classList.remove('pop'); void costEl.offsetWidth; costEl.classList.add('pop');
+    }
+  }
+
+  function buildSteps() {
+    return [
+      { cap: 'First request. Cache is empty — all ' + '1000' + ' tokens are computed for real. You can’t skip this bill; you save on every request after.', run: function () {
+        segs = baseSegs();
+        reqN++; reqNEl.textContent = String(reqN);
+        render(null);
+        hitline.innerHTML = 'First request: no cache available; full compute of ' + total() + ' tokens.';
+        hitPctEl.textContent = '0% (first)';
+      } },
+      { cap: 'Resend unchanged (e.g. the model replied and you follow up). Prefix matches character for character — full hit; input is nearly at discount. Ideal state.', run: function () { request(null, 0); } },
+      { cap: 'Someone changed helpful to careful in the persona. One word. Cache breaks from the first changed persona token; tool schemas, context, and history after all recompute.', run: function () { segs[1].label = 'persona* 50'; request('persona'); pulse('persona'); } },
+      { cap: 'Add a tool fetch. DSH inserts by toolOrder or lexicographic order — here between edit and grep: hits before the insert point, invalid after. Later insert = less damage.', run: function () { segs.splice(4, 0, { id: 't-fetch', label: 'fetch+ 170', tok: 170, cls: 's-tool' }); request('t-fetch'); pulse('t-fetch'); } },
+      { cap: 'Normal conversation advances; history appends a new message. Append-only: old prefix stays a full hit; you only pay full price for new tokens. Append does not hurt the cache.', run: function () { segs[segs.length - 1].tok += 90; segs[segs.length - 1].label = 'hist ' + segs[segs.length - 1].tok; request(null, 90); pulse('hist'); } },
+      { cap: '', run: function () {
+        if (mode === 'dsh') {
+          caption.textContent = 'Process restart; plugins load concurrently; registration order is scrambled this time. DSH mode: the central list normalizes at assemble — tool order unchanged, prefix intact, full hit. Jitter is killed by mechanism.';
+          request(null, 0);
+        } else {
+          caption.textContent = 'Process restart; plugins load concurrently; registration order is scrambled this time. Control mode (order follows registration): tool schemas fully reshuffle; invalid from the first schema token. Content unchanged — only order changed — and you still pay.';
+          var a = segs[2]; segs[2] = segs[5]; segs[5] = a;
+          request('t-bash');
+        }
+      } },
+      { cap: 'Done. Switch the top-right mode and replay to compare step 6; or hit Step frame by frame. The meter number is the cash value of those words: prefix stability.', run: function () {} }
+    ];
+  }
+
+  var steps = [];
+  function reset() {
+    runId++;
+    playing = false;
+    clearTimeout(timer);
+    idx = 0;
+    cost = 0; reqN = 0;
+    costEl.textContent = '0';
+    reqNEl.textContent = '0';
+    hitPctEl.textContent = '–';
+    segs = baseSegs();
+    render(null);
+    hitline.textContent = 'No request sent yet.';
+    caption.textContent = 'Reset. Mode is' + (mode === 'dsh' ? ' DSH central list' : ' control · registration order') + '. Hit Play to run.';
+    steps = buildSteps();
+  }
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.cap) caption.textContent = s.cap;
+    if (s.run) s.run();
+    if (playing) {
+      var rid = runId;
+      timer = setTimeout(function () { if (rid === runId) doStep(); }, 2800);
+    }
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true;
+    doStep();
+  }
+  function stepOnce() {
+    playing = false;
+    clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+  document.getElementById('kvPlay').addEventListener('click', play);
+  document.getElementById('kvStep').addEventListener('click', stepOnce);
+  document.getElementById('kvReset').addEventListener('click', reset);
+  document.getElementById('kvModeDsh').addEventListener('click', function () {
+    mode = 'dsh';
+    this.classList.add('active');
+    document.getElementById('kvModeReg').classList.remove('active');
+    reset();
+  });
+  document.getElementById('kvModeReg').addEventListener('click', function () {
+    mode = 'reg';
+    this.classList.add('active');
+    document.getElementById('kvModeDsh').classList.remove('active');
+    reset();
+  });
+
+  reset();
+  if (typeof window.lessonOnView === 'function') {
+    window.lessonOnView(demo, function () { if (!playing && idx === 0) play(); });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

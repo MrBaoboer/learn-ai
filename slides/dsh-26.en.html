@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Testing a Nondeterministic System | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.doc-quote{background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:20px 22px;margin:12px 0 20px;font-size:14px;line-height:1.9;color:var(--text)}
+.doc-quote .q-src{display:block;margin-top:8px;font-size:12px;color:var(--sub)}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:var(--shadow-card);margin-top:12px}
+.cmp-card h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;color:var(--text)}
+.cmp-card h3 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eef1ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+
+/* ── 交互演示：故障注入与回放实验室 ── */
+#demo-testing{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:12px}
+.d-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.d-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(77,107,254,.4);background:var(--accent-soft);color:var(--accent-deep);border-radius:11px;padding:12px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px}
+.d-btn svg{flex:0 0 auto}
+.d-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.d-btn.scn{padding:10px 14px;font-size:13px;min-height:44px}
+.d-btn.scn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.tst-stage{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tst-pane{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;min-width:0}
+.tst-pane-title{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--accent-deep);margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.tst-pane-title svg{color:var(--accent)}
+.beh{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);transition:opacity .35s,border-color .3s,background .3s,transform .35s}
+.beh .bn{font-weight:800;color:var(--amber)}
+.beh.good .bn{color:var(--success)}
+.beh.armed{border-color:var(--accent);box-shadow:0 0 0 2px rgba(77,107,254,.16)}
+.beh.used{opacity:.35;transform:translateX(-6px)}
+.beh .sub{color:var(--sub);font-size:10.5px}
+.tlog{display:flex;gap:8px;align-items:baseline;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:5px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s}
+.tlog.in{opacity:1;transform:translateY(0)}
+.tlog .et{font-weight:800;color:var(--sub);flex:0 0 auto}
+.tlog.bad{border-color:rgba(220,38,38,.45);background:rgba(220,38,38,.05);color:var(--text)}
+.tlog.bad .et{color:var(--danger)}
+.tlog.retry{border-color:rgba(217,119,6,.5);background:rgba(217,119,6,.06);color:var(--text)}
+.tlog.retry .et{color:var(--amber)}
+.tlog.ok{border-color:rgba(22,163,74,.5);background:rgba(22,163,74,.05);color:var(--text)}
+.tlog.ok .et{color:var(--success)}
+.tlog.msg{border-color:rgba(77,107,254,.45);background:var(--accent-soft);color:var(--text)}
+.tlog.msg .et{color:var(--accent-deep)}
+.diffrow{display:flex;gap:8px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:5px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s,border-color .3s,background .3s}
+.diffrow.in{opacity:1;transform:translateY(0)}
+.diffrow .mark{flex:0 0 auto;width:16px;height:16px;display:grid;place-items:center;color:var(--success)}
+.diffrow.diverged{border-color:rgba(220,38,38,.5);background:rgba(220,38,38,.06)}
+.diffrow.diverged .mark{color:var(--danger)}
+.tst-empty{font-size:12px;color:var(--sub);padding:4px 2px}
+.seed{font:800 11px/1 ui-monospace,Menlo,monospace;color:var(--accent);background:var(--accent-soft);border:1px solid rgba(77,107,254,.3);border-radius:7px;padding:5px 8px}
+.d-caption{display:flex;gap:9px;align-items:flex-start;margin-top:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.8;color:var(--text)}
+.d-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}
+  .tst-stage{grid-template-columns:1fr}
+  .source-head{flex-direction:column}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .d-btn{flex:1 1 auto;justify-content:center}
+}
+</style>
+<meta name="description" content="Agent behavior depends on model output — how do you get reproducible tests? DSH’s answer: deterministic replay turns logs into test assets, property-based testing sweeps interleaved sequences, and a fault server built to trick LLM clients rehearses every way a connection can die.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Testing a Nondeterministic System","name":"Testing a Nondeterministic System","url":"https://xueai.app/slides/dsh-26.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Models & External Integration","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Agent behavior depends on model output — how do you get reproducible tests? DSH’s answer: deterministic replay turns logs into test assets, property-based testing sweeps interleaved sequences, and a fault server built to trick LLM clients rehearses every way a connection can die.","datePublished":"2026-08-13","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Testing a Nondeterministic System"><meta property="og:description" content="Agent behavior depends on model output — how do you get reproducible tests? DSH’s answer: deterministic replay turns logs into test assets, property-based testing sweeps interleaved sequences, and a fault server built to trick LLM clients rehearses every way a connection can die."><meta property="og:url" content="https://xueai.app/slides/dsh-26.en.html"><meta property="og:image" content="https://xueai.app/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.app/slides/dsh-26.en.html">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:locale" content="en_US">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/dsh-26.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/dsh-26.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/dsh-26.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/dsh-26.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · Models & External Integration</div>
+    <h1>Testing a Nondeterministic System</h1>
+    <p class="subtitle">Deterministic replay, property-based testing, and a fault server built to trick LLM clients. Core materials: <code>docs/testing.zh.md</code> and <code>packages/test-support/</code>.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Deterministic replay, property-based testing, and a fault server built to trick LLM clients</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>Course goal</b>Agent behavior depends on model output, and model output is different every time — how do you test that system? After this lesson you can name DSH’s three weapons: deterministic replay that turns real session logs into replay scripts, so nondeterminism lives only in the recording; a scriptable fault server that manufactures disconnects, half-packets, and rate limits for LLM clients; and property-based testing that sweeps protocol code with random interleaved sequences — it caught a real bug on its first run.</span>
+  </div>
+
+  <div class="sec-label">Interactive demo · Fault-injection &amp; replay lab</div>
+  <p class="reveal body">Play first, then talk. Scenario A is a real HTTP fault server: behaviors queue up, each request consumes one, watch how the client responds. Scenario B is deterministic replay: take a real session log, derive a replay script in one shot and re-run it, then tamper with one line and watch the diff testify on the spot.</p>
+  <div id="demo-testing" class="reveal">
+    <div class="d-toolbar">
+      <button class="d-btn scn active" data-scn="A">Scenario A · Fault server</button>
+      <button class="d-btn scn" data-scn="B">Scenario B · Deterministic replay</button>
+    </div>
+    <div class="d-toolbar">
+      <button class="d-btn primary" id="tPlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>Play</button>
+      <button class="d-btn" id="tStep"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>Step</button>
+      <button class="d-btn" id="tReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
+    </div>
+    <div class="tst-stage">
+      <div class="tst-pane">
+        <div class="tst-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="7" rx="2"/><rect x="2" y="13" width="20" height="7" rx="2"/><path d="M6 7.5h.01M6 16.5h.01"/></svg><span id="tLeftTitle">Fault server · behavior script queue</span><span class="seed" id="tSeed">seed 0x5A3C</span></div>
+        <div id="tLeft"><div class="tst-empty">(empty)</div></div>
+      </div>
+      <div class="tst-pane">
+        <div class="tst-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span id="tRightTitle">Client side · classify / retry / log</span></div>
+        <div id="tRight"><div class="tst-empty">(empty)</div></div>
+      </div>
+    </div>
+    <div class="d-caption">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      <span id="tCaption">Pick a scenario and hit Play, or scroll here to auto-play Scenario A.</span>
+    </div>
+  </div>
+
+  <div class="sec-label">How it works · Nail the foundation first</div>
+  <p class="reveal body">There’s only one way to test a nondeterministic system: fence off the uncertain parts and make everything else deterministic. DSH’s test layers (<code>docs/testing.zh.md</code>) are built around that idea. Unit tests hunt edge cases, error paths, event ordering, and concurrency races; CI’s coverage gate demands 100% per file under <code>packages/*/*/src</code> (<code>AGENTS.md</code> line 65, Commands section). The docs also say it flat: line coverage is necessary, never sufficient — unrun lines are usually dead code to delete, not tests to add.</p>
+  <p class="reveal body">Real API tests with keys are another layer. Here’s a line with real identity:</p>
+  <div class="doc-quote reveal">
+    “We are DeepSeek — don’t skimp on real API tests. Keyless tests only prove the lower pathways; only keyed runs prove the agent can talk to a real model and work.”
+    <span class="q-src">Source: <code>docs/testing.zh.md</code>, “keyed strategy” section, verified on 2026-08-13</span>
+  </div>
+  <p class="reveal body">Inference is cheap for us, so smoke tests go real: boot a real example, send a prompt, check the outside world. Assertions matter too: e2e should re-read files and re-run commands to verify results — keyword sniffing on the agent’s own output lets a cheating agent pass. Environments without keys skip automatically and block nobody.</p>
+
+  <div class="sec-label">How it works · Logs as test assets</div>
+  <p class="reveal body">The main act is replay. Last lesson covered this (see <a href="dsh-22.html">LLM Adapter Layer</a>): every streaming chunk lands as an <code>assistant/chunk</code> event in the session log as-is. The <code>dsh-llm-replay</code> plugin flips that around: take a recorded <code>session.jsonl</code>, group chunk events by (turn, step), and each group is the full chunk sequence from one model call back then. In tests the real agent runs as usual — only the model end is swapped for a replay adapter that emits the recorded chunks frame by frame. Nondeterminism lives only in that one recording; every re-run is byte-identical afterward, no API Key needed.</p>
+  <p class="reveal body">That’s what “logs as test assets” means: fixtures aren’t hand-written mocks — they’re production-format session logs themselves. Snapshot tests pin the whole assembled behavior with them; change one line of code and fork the behavior, and the diff lights up red on the spot. A neat detail sits in fork (forked sessions): a child session’s log starts by inheriting the parent’s seed events, so when deriving the replay script you must slice after the <code>seedLength</code> boundary — otherwise the parent’s chunks get replayed as if they were the child’s calls:</p>
+  <div class="source reveal">
+    <div class="source-head"><span>packages/test-support/llm-replay/src/index.ts</span><span>lines 532–542</span></div>
+    <pre><code>    <span class="kw">const</span> text = <span class="fn">readFileSync</span>(childFile, <span class="str">'utf8'</span>)
+    <span class="kw">const</span> header = <span class="fn">parseSessionHeader</span>(text)
+    <span class="cm">// Derive the child's script from its own events only — events AT OR after the seed</span>
+    <span class="cm">// boundary.</span>
+    <span class="kw">const</span> ownEvents = <span class="fn">parseSessionLog</span>(text).<span class="fn">slice</span>(header.seedLength)
+    children.<span class="fn">push</span>({
+      recordedId: header.id,
+      createdAt: header.createdAt,
+      entries: <span class="fn">deriveReplayScript</span>(ownEvents),
+      primary: <span class="kw">false</span>,
+    })</code></pre>
+  </div>
+  <div class="snapshot"><b>Source snapshot note:</b> Based on the local deepseek-harness-master repo; verified against <code>packages/test-support/llm-replay/src/index.ts</code>, verified on 2026-08-13. Code blocks keep the original source text.</div>
+  <p class="reveal body paywall-locked xa-peek">Cross-platform discipline follows from here too: checked-in fixtures must replay on both macOS and Linux; if a recorded snapshot fails on either platform, fix the fixture itself. The exact words on <code>AGENTS.md</code> line 123 are “fix fixtures, not normalizers”: fix the fixture, don’t write a normalizer. Normalizers pad cotton between tests and reality — pad enough and you stop testing reality.</p>
+
+  <div class="sec-label paywall-locked">How it works · A server built to trick LLM clients</div>
+  <p class="reveal body paywall-locked">Replay tests that behavior stays put — one piece still missing: the transport layer’s creative ways to die. Connection refused, socket reset mid-send, clean close without <code>[DONE]</code>, rate limit with Retry-After, or just hanging still — each looks different to the adapter and recovery layers. In-process mocks miss them all, because mocks bypass real boundaries like fetch, SSE framing, socket teardown, and idle watchdogs. So DSH built <code>dsh-llm-mock-server</code>: a real Node HTTP server speaking OpenAI dialect, behaviors fully script-controlled, one behavior consumed per request, explicit error when the script runs out (design motive in Agent Note <code>2026-07-25-scriptable-llm-wire-fault-server.zh.md</code>). Developers who want to reproduce faults by hand just point any app at a new base URL and key.</p>
+  <p class="reveal body paywall-locked">It also has a random mode that draws faults by weight for stress testing, with a public reproducible seed. The default weight table is itself a checklist of what LLM clients meet in the wild: plain success 48, slow success 10, mid-stream cut (partial_disconnect) 10, then 5 each for connection reset, disconnect, empty reply, and rate limit, server error 4, hit max_tokens / hang / 503 at 2 each, and the two meanest at 1 each: partial_eof (stream ends cleanly but unfinished) and malformed_json (bad JSON). Source comments remind you: this is tunable test pressure, not an estimate of production incident rates.</p>
+  <p class="src-note reveal paywall-locked">Source: DEFAULT_MOCK_LLM_RANDOM_WEIGHTS in <code>packages/test-support/llm-mock-server/src/index.ts</code> lines 56–70, verified on 2026-08-13.</p>
+  <p class="reveal body paywall-locked">The server’s discipline is restrained: it only reports protocol-layer facts, never whether to retry — policy belongs to the harness. Real combination tests send requests through the DeepSeek adapter, agent loop, and retry plugin in order, and check concrete things: exact request counts, numbered retry steps, failed half-chunks never leaking into history, and half-output with clean EOF classified as <code>STREAM_CLOSED</code> with no retry by default.</p>
+
+  <div class="sec-label paywall-locked">How it works · Property-based testing, blood on the first shot</div>
+  <p class="reveal body paywall-locked">The last weapon fights interleavings nobody thought of. Protocol-shaped code (chunk streams, event logs, inbox scheduling) has a combinatorially exploding input space; example tests can only pin cases you already imagined. DSH gives every protocol-shaped package a fast-check–driven property test: generators build realistic but adversarial inputs (duplicate indexes, lagging chunks, malformed streams missing block-start), and assertions target invariants, not concrete outputs — e.g. assembled block count can’t exceed distinct indexes seen, and repeated calls must be stable. Failures automatically print a reproducible seed.</p>
+  <p class="reveal body paywall-locked">Its track record opens the Agent Note’s first line:</p>
+  <div class="doc-quote reveal paywall-locked">
+    “The property-test suite found a real BlockAssembler duplicate <code>block-end</code> bug on its first run.” A repeated block-end at the same index rewrites an already-finished block — and that bug survived under 100% happy-path line coverage.
+    <span class="q-src">Source: <code>.agents/notes/implemented/testing/2026-06-11-property-based-testing.zh.md</code>, verified on 2026-08-13. The post-fix “first close wins” defense is in the source panel of the <a href="dsh-22.html">LLM Adapter Layer</a> lesson.</span>
+  </div>
+  <p class="reveal body paywall-locked">This infrastructure has a side product: the official benchmark path in <code>BENCHMARK.md</code> is the Python SDK plus the minimal variant, each task in its own workspace. Once the test system is solid, running evals is just swapping the input.</p>
+  <div class="facts paywall-locked">
+    <div class="fact reveal"><code>Coverage is necessary, not sufficient</code><p>100% per file is a CI gate, but it only proves lines ran. Real bugs hide in interleaved sequences — property testing’s turf — or at transport boundaries — the fault server’s turf.</p></div>
+    <div class="fact reveal"><code>Fixtures are session logs</code><p>Replay fixtures aren’t hand-crafted mocks — they’re production-format <code>session.jsonl</code> itself. Record once, replay everywhere; it must pass cross-platform. If it fails, fix fixtures, not normalizers.</p></div>
+    <div class="fact reveal"><code>The fault server does no policy</code><p>It only honestly cuts, rate-limits, and hangs by script; whether to retry is the harness’s job. Keep test infrastructure neutral so it can testify for the adapter, loop, and retry layer at once.</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked">Side-by-side · How others test</div>
+  <div class="cmp-card reveal paywall-locked">
+    <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build: scriptable mocks too, but stops at the HTTP layer</h3>
+    <p>Grok Build’s <code>xai-grok-test-support</code> ships a <code>MockInferenceServer</code> (<code>crates/codegen/xai-grok-test-support/src/mock_server.rs</code>): default echo mode echoes the last user message; it supports path-queued scripted responses (exact status, body, and SSE events); one server serves chat-completions, responses, and messages dialects at once; every request is fully logged with headers for assertions. The idea shares DNA with DSH’s fault server. The gap is coverage: from verified source, it scripts at the HTTP response layer; DSH’s fault server goes one layer deeper — socket reset, mid-send cut, hang — all enter the behavior vocabulary, plus a reproducible weighted random mode. On replay, Grok uses <code>xai-sqlite-journal</code> for persistence, but on public evidence there’s no equivalent that derives a replay script straight from production logs.</p>
+  </div>
+  <div class="cmp-card reveal paywall-locked">
+    <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code: a closed-source testing black box</h3>
+    <p>Visible test traces in restored-src are limited — which fits restoration: what you reverse from artifacts is product code; test code was never shipped with the artifact. So only one conclusion holds: on public evidence, outsiders can’t assess what Claude Code’s test system looks like. That contrasts an open-source harness value: DSH’s test strategy, coverage gates, and fixture discipline all live in the repo — the test infrastructure itself is a deliverable you can learn from and reuse.</p>
+  </div>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>Design an invariant of your own</h3><p>Suppose you’re adding another property test for <code>BlockAssembler</code>. The generator randomly emits interleaved legal and malformed chunk streams (duplicate block-end, missing block-start, lagging delta). Using this lesson’s assembled-block-count invariant as a reference, write two more invariants you think are worth asserting, and say which real failure class each one guards. Then reason through: a recorded snapshot fixture passes on macOS but fails on Linux because of path-separator diffs — under “fix fixtures, not normalizers,” what do you change, and why don’t you normalize paths away inside the comparator?</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway:</b> The way to test a nondeterministic system is to pin nondeterminism at the moment of recording: session logs derive replay scripts directly, and fixtures are production-format logs themselves. Transport deaths get rehearsed one by one on a real HTTP fault server; interleaving space is swept by property-based testing, which caught a real bug the coverage gate had passed on its first fight. Coverage proves code ran; only these three weapons prove the code is right.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  var demo = document.getElementById('demo-testing');
+  var left = document.getElementById('tLeft');
+  var right = document.getElementById('tRight');
+  var leftTitle = document.getElementById('tLeftTitle');
+  var rightTitle = document.getElementById('tRightTitle');
+  var seedEl = document.getElementById('tSeed');
+  var caption = document.getElementById('tCaption');
+  var idx = 0, timer = null, playing = false, cur = 'A', runId = 0;
+  var steps = [];
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function clearEmpty(box) {
+    var e = box.querySelector('.tst-empty');
+    if (e) box.removeChild(e);
+  }
+  function addLog(type, body, cls) {
+    clearEmpty(right);
+    var d = document.createElement('div');
+    d.className = 'tlog' + (cls ? ' ' + cls : '');
+    d.innerHTML = '<span class="et">' + esc(type) + '</span><span>' + esc(body || '') + '</span>';
+    right.appendChild(d);
+    void d.offsetWidth;
+    d.classList.add('in');
+    return d;
+  }
+
+  /* ── 情景 A：故障服务器 ── */
+  var behs = [];
+  function setupA() {
+    leftTitle.textContent = 'Fault server · behavior script queue';
+    rightTitle.textContent = 'Client side · classify / retry / log';
+    seedEl.style.display = '';
+    left.innerHTML = '';
+    behs = [];
+    [
+      ['rate_limit', '429 + Retry-After: 2', ''],
+      ['partial_disconnect', 'emit half, then cut the socket', ''],
+      ['success', 'full streaming response', 'good']
+    ].forEach(function (b) {
+      var d = document.createElement('div');
+      d.className = 'beh' + (b[2] ? ' ' + b[2] : '');
+      d.innerHTML = '<span class="bn">' + esc(b[0]) + '</span><span class="sub">' + esc(b[1]) + '</span>';
+      left.appendChild(d);
+      behs.push(d);
+    });
+  }
+  function arm(i) {
+    behs.forEach(function (b) { b.classList.remove('armed'); });
+    if (behs[i]) behs[i].classList.add('armed');
+  }
+  function consume(i) {
+    if (behs[i]) { behs[i].classList.remove('armed'); behs[i].classList.add('used'); }
+  }
+
+  function buildA() {
+    return [
+      { cap: 'This is a real Node HTTP server speaking OpenAI dialect. Behaviors queue up: each request consumes one; when the script runs out it errors explicitly. Tests are fully deterministic.', dur: 3000, run: setupA },
+      { cap: 'Client fires request #1. Head of queue is rate_limit: server returns 429 with Retry-After: 2.', dur: 2500,
+        run: function () { arm(0); addLog('request #1', 'POST /v1/chat/completions'); } },
+      { cap: 'The adapter normalizes it to RATE_LIMIT. The retry plugin knows that code, and a valid provider delay replaces local backoff. An llm/retry event lands; wait 2 seconds.', dur: 3000,
+        run: function () {
+          consume(0);
+          addLog('failure', 'RATE_LIMIT · status 429', 'bad');
+          addLog('llm/retry', 'r1 · delay 2000ms (Retry-After takes effect)', 'retry');
+        } },
+      { cap: 'Request #2 goes out. This time partial_disconnect: server emits two chunks, then cuts the socket cold.', dur: 2700,
+        run: function () { arm(1); addLog('request #2', 'connection reset after 2 chunks'); } },
+      { cap: 'Classified as TRANSPORT. Note two things: half-chunks stay in the chunk stream as evidence but never enter derived history; retry count advances to #2.', dur: 3000,
+        run: function () {
+          consume(1);
+          addLog('failure', 'TRANSPORT · half-chunks archived, not in history', 'bad');
+          addLog('llm/retry', 'r2 · delay 512ms (local backoff)', 'retry');
+        } },
+      { cap: 'Request #3 goes out; head of queue is success: a full stream arrives cleanly.', dur: 2300,
+        run: function () { arm(2); addLog('request #3', 'full stream · finish stop'); } },
+      { cap: 'assistant/message is derived and logged; retry count resets. Across the whole drill the server does one job: execute the script honestly. Whether to retry is the harness’s call end to end.', dur: 3200,
+        run: function () {
+          consume(2);
+          addLog('assistant/message', 'final message · clean write', 'msg');
+          addLog('verdict', '3 requests, 2 explicit retries — all accounted for', 'ok');
+        } },
+      { cap: 'There’s also a random mode: draw faults by weight for stress testing, seed public and reproducible. Change the seed — a new storm, still replayable.', dur: 2800 }
+    ];
+  }
+
+  /* ── 情景 B：确定性回放 ── */
+  var fixRows = [];
+  function setupB() {
+    leftTitle.textContent = 'Recorded session.jsonl (fixture)';
+    rightTitle.textContent = 'Re-run transcript · line-by-line diff vs original';
+    seedEl.style.display = 'none';
+    left.innerHTML = '';
+    fixRows = [];
+    [
+      ['user/message', '“Help me fix this test”'],
+      ['assistant/chunk', 'turn1 step1 · text-delta “I’ll look”'],
+      ['assistant/chunk', 'turn1 step1 · text-delta “at the snapshot”'],
+      ['assistant/chunk', 'turn1 step1 · finish stop'],
+      ['assistant/message', '“I’ll look at the snapshot first”']
+    ].forEach(function (r) {
+      var d = document.createElement('div');
+      d.className = 'beh';
+      d.innerHTML = '<span class="bn" style="color:var(--accent-deep)">' + esc(r[0]) + '</span><span class="sub">' + esc(r[1]) + '</span>';
+      left.appendChild(d);
+      fixRows.push(d);
+    });
+  }
+  function addDiff(text, diverged) {
+    clearEmpty(right);
+    var d = document.createElement('div');
+    d.className = 'diffrow' + (diverged ? ' diverged' : '');
+    d.innerHTML = '<span class="mark">' + (diverged
+      ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+      : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>')
+      + '</span><span>' + esc(text) + '</span>';
+    right.appendChild(d);
+    void d.offsetWidth;
+    d.classList.add('in');
+  }
+
+  function buildB() {
+    return [
+      { cap: 'Left: a real session-log fixture. Notice those three assistant/chunk lines — every chunk the model emitted back then sits there as-is.', dur: 2900, run: setupB },
+      { cap: 'Derive: group chunk events by (turn, step); each group becomes the replay script for one model call. No hand-written mock — the log is the script.', dur: 3000,
+        run: function () { fixRows[1].classList.add('armed'); fixRows[2].classList.add('armed'); fixRows[3].classList.add('armed'); } },
+      { cap: 'Re-run: real agent starts; model end is a replay adapter emitting recorded chunks frame by frame. No API Key, no network requests.', dur: 2900,
+        run: function () { addLog('replay', 'real loop + replay adapter running…'); } },
+      { cap: 'diff: re-run output vs original, line by line — all checkmarks. Run it ten thousand times: same result. Nondeterminism is locked in that one recording.', dur: 2900,
+        run: function () {
+          addDiff('user/message match');
+          addDiff('assistant/chunk ×3 match');
+          addDiff('assistant/message match');
+        } },
+      { cap: 'Now play the villain: change that text-delta “at the snapshot” in the replay script to “delete it”, simulate a behavior change, and re-run.', dur: 2800,
+        run: function () {
+          fixRows[2].querySelector('.sub').textContent = 'turn1 step1 · text-delta “delete it” (tampered)';
+          fixRows[2].style.borderColor = 'rgba(220,38,38,.5)';
+        } },
+      { cap: 'The diff lights red at the fork. That’s logs as test assets: no behavior change escapes a fixed log. Want it green? Revert the code, or deliberately re-record the fixture and take review.', dur: 3400,
+        run: function () {
+          addDiff('user/message match');
+          addDiff('assistant/chunk #2 diverged: “at the snapshot” ≠ “delete it”', true);
+          addLog('verdict', 'behavior fork witnessed by fixture — nowhere to hide', 'bad');
+        } }
+    ];
+  }
+
+  function build(k) { return k === 'A' ? buildA() : buildB(); }
+
+  function reset() {
+    runId++; playing = false; clearTimeout(timer); idx = 0;
+    left.innerHTML = '<div class="tst-empty">(empty)</div>';
+    right.innerHTML = '<div class="tst-empty">(empty)</div>';
+    if (cur === 'A') { setupA(); } else { setupB(); }
+    right.innerHTML = '<div class="tst-empty">(empty)</div>';
+    caption.textContent = 'Reset. Hit Play to run scenario ' + cur + ', or hit Step to advance frame by frame.';
+    steps = build(cur);
+  }
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.cap) caption.textContent = s.cap;
+    if (s.run) s.run();
+    if (playing) timer = setTimeout(doStep, s.dur || 1200);
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true; doStep();
+  }
+  function stepOnce() {
+    playing = false; clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-testing .scn'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-testing .scn'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  document.getElementById('tPlay').addEventListener('click', play);
+  document.getElementById('tStep').addEventListener('click', stepOnce);
+  document.getElementById('tReset').addEventListener('click', reset);
+  reset();
+  if (typeof window.lessonOnView === 'function') {
+    window.lessonOnView(demo, function () { if (idx === 0 && !playing) play(); });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

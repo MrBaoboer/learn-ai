@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Arrays: Every Message You Chat Lies in One | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="A message list is just an array: how numbered cells hold every line you and the AI exchange, why the Context Window “cuts the head, keeps the tail,” and why long chats forget. Then insert into the middle of an array yourself and count how many elements on the right must move — and you'll see why chat history only grows backward.">
+<meta name="keywords" content="what is an array,message list,Context Window,context truncation,array insert,append-only,data structures array,beginner data structures">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-2.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ds-2.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ds-2.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ds-2.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ds-2.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Arrays: Every Message You Chat Lies in One">
+<meta property="og:description" content="A message list is just an array: why the Context Window “cuts the head, keeps the tail,” and why long chats forget. Then see how expensive inserting into the middle of an array is.">
+<meta property="og:url" content="https://xueai.app/slides/ds-2.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/ds-2.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Arrays: Every Message You Chat Lies in One">
+<meta name="twitter:description" content="A message list is just an array: why the Context Window “cuts the head, keeps the tail,” and why long chats forget. Then see how expensive inserting into the middle of an array is.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── 对话数组 ── */
+.chatarr-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.chatarr-legend{display:flex;gap:16px;flex-wrap:wrap;padding:11px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015);font-size:12px;font-weight:700;color:var(--sub)}
+.lg-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.chatarr-strip{display:flex;gap:10px;padding:18px 16px 16px;overflow-x:auto;align-items:stretch;scroll-behavior:smooth}
+.arr-cell{flex:0 0 112px;display:flex;flex-direction:column;gap:5px;transition:opacity .5s,filter .5s}
+.arr-idx{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:11.5px;font-weight:800;color:var(--sub);text-align:center}
+.arr-bubble{flex:1;border-radius:10px;padding:8px 10px;font-size:11.5px;line-height:1.55;border:1.5px solid transparent;min-height:66px;font-weight:600}
+.arr-cell.system .arr-bubble{background:rgba(100,116,139,.12);color:#475569;border-color:rgba(100,116,139,.3)}
+.arr-cell.user .arr-bubble{background:rgba(2,132,199,.1);color:var(--ds-deep);border-color:rgba(2,132,199,.28)}
+.arr-cell.assistant .arr-bubble{background:rgba(22,163,74,.09);color:#166534;border-color:rgba(22,163,74,.26)}
+.arr-role{font-size:10px;font-weight:800;text-align:center;color:var(--sub);letter-spacing:.4px}
+.arr-winbar{height:4px;border-radius:2px;background:transparent;transition:background .4s}
+.arr-cell.inwin .arr-winbar{background:var(--ds)}
+.arr-cell.evicted{opacity:.32;filter:grayscale(.9)}
+@keyframes cellIn{from{opacity:0;transform:translateY(14px) scale(.85)}to{opacity:1;transform:none}}
+.arr-cell.fresh{animation:cellIn .45s cubic-bezier(.25,1,.5,1)}
+.chatarr-foot{padding:14px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px}
+.chatarr-controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-ghost{background:var(--card);color:var(--sub);border:1.5px solid var(--border);padding:9px 22px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s}
+.btn-ghost:hover{border-color:var(--ds-line);color:var(--ds-deep)}
+.win-slider{display:flex;align-items:center;gap:10px;flex:1;min-width:220px}
+.win-slider label{font-size:13px;font-weight:800;color:var(--text);flex-shrink:0}
+.win-slider input[type=range]{flex:1;min-width:100px;accent-color:var(--ds)}
+.win-k{font-size:15px;font-weight:900;color:var(--ds);font-variant-numeric:tabular-nums;min-width:56px}
+.chat-status{font-size:12.5px;color:var(--sub);font-weight:600;line-height:1.7}
+.chat-status b{color:var(--ds-deep);font-variant-numeric:tabular-nums}
+
+/* ── 中间插入实验 ── */
+.ins-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 20px}
+.ins-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.ins-hint{font-size:13px;color:var(--sub);font-weight:600}
+.ins-counter{font-size:12.5px;font-weight:700;color:var(--sub)}
+.ins-counter b{font-size:22px;font-weight:900;color:var(--amber);font-variant-numeric:tabular-nums;margin:0 3px}
+.ins-strip{display:flex;gap:8px;flex-wrap:wrap;min-height:84px}
+.ins-cell{width:54px;cursor:pointer}
+.ins-val{height:52px;border-radius:10px;background:rgba(0,0,0,.045);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:var(--text);border:1.5px solid transparent;transition:transform .16s,background .16s,border-color .16s}
+.ins-cell:hover .ins-val{border-color:var(--ds-line);background:var(--ds-soft)}
+.ins-cell.shifting .ins-val{transform:translateX(26px);background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.5)}
+.ins-cell.fresh .ins-val{animation:cellIn .4s cubic-bezier(.25,1,.5,1);background:var(--ds-soft);border-color:var(--ds-line);color:var(--ds-deep)}
+.ins-idx{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:10.5px;font-weight:800;color:var(--sub);text-align:center;margin-top:4px}
+.ins-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;border-top:1px dashed var(--border);padding-top:14px}
+.ins-log{font-size:13px;color:var(--sub);font-weight:600;line-height:1.7}
+.ins-log b{color:var(--amber)}
+.ins-log .ok{color:var(--success);font-weight:800}
+
+/* ── 知识卡 ── */
+.know-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.know-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.know-card .kc-icon{font-size:24px;margin-bottom:8px}
+.know-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.know-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.know-card p b{color:var(--text)}
+.know-card code{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .arr-cell{flex:0 0 96px}
+  .ins-cell{width:46px}
+  .ins-val{height:46px;font-size:15px}
+  .know-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Arrays: Every Message You Chat Lies in One","name":"Arrays: Every Message You Chat Lies in One","url":"https://xueai.app/slides/ds-2.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Linear Structures: You Use Them Every Day","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"A message list is just an array: how numbered cells hold every line you and the AI exchange, why the Context Window “cuts the head, keeps the tail,” and why long chats forget. Then insert into the middle of an array yourself and count how many elements on the right must move — and you'll see why chat history only grows backward.","datePublished":"2026-08-10","dateModified":"2026-08-17"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Linear Structures: You Use Them Every Day</div>
+    <h1>Arrays: Every Message You Chat Lies in One</h1>
+    <p class="subtitle">Last lesson we locked it in: a data structure = a way of organizing. The first way of organizing is one you feed data into every day — every exchange you have with an AI is, to a program, a <b>message list</b>, and a message list's real form is the plainest way of organizing: <b>a row of numbered cells, called an array</b>. This lesson spreads your chat out on the table, then casually answers an old question: why does it forget when you've talked for a while.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>A message list is just an array: how chat history lines up, why context truncation cuts the head and keeps the tail; plus how expensive inserting one item into the middle of an array is</p></aside><!--seo:end-->  <div class="sec-label">Play first · your chat is lying in a row of cells</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Below is a message list: each message owns a cell, and above the cell is its <b style="color:var(--text)">index</b> (the number, counting from 0 — a programmer habit). Tap <b style="color:var(--text)">“Send a message”</b> and watch where the new one lands; then drag the <b style="color:var(--text)">“Context Window” slider</b> and notice which cells go gray — and which one never does.</p>
+
+  <div class="chatarr-box">
+    <div class="chatarr-legend">
+      <span><span class="lg-dot" style="background:rgba(100,116,139,.5)"></span>system（📌 pinned）</span>
+      <span><span class="lg-dot" style="background:rgba(2,132,199,.5)"></span>user（you）</span>
+      <span><span class="lg-dot" style="background:rgba(22,163,74,.5)"></span>assistant（AI）</span>
+      <span><span class="lg-dot" style="background:var(--ds)"></span>Blue bar underneath = inside the Context Window</span>
+    </div>
+    <div class="chatarr-strip" id="chatStrip"></div>
+    <div class="chatarr-foot">
+      <div class="chatarr-controls">
+        <button class="btn-ds" id="btnSend">Send a message →</button>
+        <div class="win-slider">
+          <label>Context Window</label>
+          <input type="range" id="winRange" min="2" max="8" value="4">
+          <span class="win-k" id="winK">4 msgs</span>
+        </div>
+      </div>
+      <div class="chat-status" id="chatStatus"></div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>That's the whole truth behind “it forgets when chats get long.”</b> A model can only read so much at once (the Context Window); when it doesn't fit, something has to go. Which end? <b>Cut the head, keep the tail</b> — drop the oldest small talk first; the latest few lines must stay, or it won't even know what you just said. Only the system prompt in cell <code>[0]</code> is <b>pinned</b>: it's the persona and the rules (“You're a thoughtful assistant”). Toss that, and the AI forgets who it is. So “forgetting” isn't mysticism — it's an <b>array slice</b>: keep system + the latest K messages; everything else never reaches the model.
+  </div>
+
+  <div class="sec-label">Round two · how expensive is inserting in the middle?</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">An array's cells sit <b style="color:var(--text)">tightly packed</b> in memory — no gaps allowed in the middle. That brings a headache: to squeeze a new element into the middle, every element to its right has to <b style="color:var(--text)">shift one slot right</b> to make room. <b style="color:var(--text)">Tap any cell</b> to insert a ⭐ there, watch “Moves”; then tap “Append at the end” and compare.</p>
+
+  <div class="ins-box">
+    <div class="ins-head">
+      <span class="ins-hint">👇 Tap a cell = insert ⭐ at that spot (further left → more neighbors on the right have to move)</span>
+      <span class="ins-counter">Moves <b id="moveN">0</b></span>
+    </div>
+    <div class="ins-strip" id="insStrip"></div>
+    <div class="ins-foot">
+      <button class="btn-ds" id="btnAppend">Append ⭐ at the end</button>
+      <button class="btn-ghost" id="btnResetIns">Reset ↻</button>
+      <span class="ins-log" id="insLog">Try tapping a cell on the left first, like [1]</span>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>See the pattern?</b> Appending at the end is always 1 step; inserting in the middle moves a whole stretch — more cells, and further forward you insert, the worse the move. That's why chat history is designed to <b>only grow backward</b> (append-only): every new message is pushed to the end, nobody relocates, fast and cheap. You've never seen a chat app let you “slip a line into ten minutes ago” — not because PMs never thought of it, but because doing that is genuinely expensive.
+  </div>
+
+  <div class="sec-label">An array's signature move (and its soft spot)</div>
+
+  <div class="know-grid">
+    <div class="know-card">
+      <div class="kc-icon">🎯</div>
+      <h4>Signature move: jump straight by index</h4>
+      <p>Want message #3? <code>messages[3]</code> — <b>no counting from the start</b>, one hop. Because cells sit packed, the index is the address — that's O(1), or in plain words “<b>no matter how long the array is, the cost is the same</b>.” For fetch-by-position, the array is the fastest way of organizing, full stop.</p>
+    </div>
+    <div class="know-card">
+      <div class="kc-icon">⚖️</div>
+      <h4>Soft spot: middle inserts are expensive</h4>
+      <p>You just moved things yourself. Meet a relative while you're at it: the <b>linked list</b> — middle inserts are cheap (tweak two “who's next” pointers), but you lose jump-by-index; finding the 100th means walking from the head one by one. <b>There's no all-purpose way of organizing, only trade-offs</b>. For chat — “append only, often read in chunks” — arrays win, so the message list uses one.</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ What this lesson wants to share</h3>
+    <ul>
+      <li><b>A message list is an array</b>: a row of numbered cells, one message per cell, index from 0</li>
+      <li><b>Index jump O(1)</b>: for fetch-by-position, the array is the fastest way of organizing</li>
+      <li><b>Context truncation = array slice</b>: keep system + the latest K messages, “cut the head, keep the tail” — that's why long chats forget</li>
+      <li><b>Middle insert is expensive, end append is cheap</b>: so chat history only grows backward (append-only)</li>
+      <li><b>Every way of organizing is a trade-off</b>: linked lists insert fast in the middle but lose the jump — the scenario picks the structure</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* ── 交互一：对话就是数组 ──
+   窗口规则：钉住 [0] 的 system，再留最近 K 条 user/assistant。
+   初始 3 条 + 默认 K=4 时怎么发都不溢出，所以 FEED 备了 12 条轮换，
+   发到第 5 条左右学员第一次看到「变灰」，正好在滑块玩腻之前。 */
+const msgs = [
+  { role:'system',    text:'You\'re a thoughtful lifestyle assistant' },
+  { role:'user',      text:'Help me pick a weekend outing' },
+  { role:'assistant', text:'Hike outside the city, or catch a new exhibit?' },
+];
+const FEED = [
+  { role:'user',      text:'Somewhere quieter, please' },
+  { role:'assistant', text:'Then try the botanical garden or an art museum' },
+  { role:'user',      text:'How do I get to the botanical garden?' },
+  { role:'assistant', text:'Take subway line 3 all the way to the end' },
+  { role:'user',      text:'Is the ticket expensive?' },
+  { role:'assistant', text:'¥20, half price for kids' },
+  { role:'user',      text:'Is it kid-friendly?' },
+  { role:'assistant', text:'There\'s a family zone and a little train' },
+  { role:'user',      text:'What about lunch?' },
+  { role:'assistant', text:'The noodle place by the east gate is solid' },
+  { role:'user',      text:'What if it rains?' },
+  { role:'assistant', text:'Switch to the indoor art museum' },
+];
+let feedIdx = 0;
+let K = 4;
+
+const strip      = document.getElementById('chatStrip');
+const winRange   = document.getElementById('winRange');
+const winK       = document.getElementById('winK');
+const chatStatus = document.getElementById('chatStatus');
+const btnSend    = document.getElementById('btnSend');
+
+function renderChat(freshIdx){
+  strip.innerHTML = msgs.map((m, i) => {
+    const win = i === 0 || i >= msgs.length - K;
+    return `
+    <div class="arr-cell ${m.role}${win ? ' inwin' : ' evicted'}${i === freshIdx ? ' fresh' : ''}">
+      <div class="arr-idx">[${i}]</div>
+      <div class="arr-bubble">${m.role === 'system' ? '📌 ' : ''}${m.text}</div>
+      <div class="arr-role">${m.role === 'system' ? 'system · pinned' : m.role}</div>
+      <div class="arr-winbar"></div>
+    </div>`;
+  }).join('');
+  const evicted = Math.max(0, msgs.length - 1 - K);
+  if (evicted === 0) {
+    chatStatus.innerHTML = `Array length <b>${msgs.length}</b> — the window still fits the whole chat. Keep sending messages and watch when it can't`;
+  } else {
+    chatStatus.innerHTML = `Array length <b>${msgs.length}</b>: the oldest <b>${evicted}</b> messages were pushed out of the window (grayed out — the model can't see them) — but the system prompt at [0] stays pinned in the window`;
+  }
+}
+
+btnSend.addEventListener('click', () => {
+  msgs.push(FEED[feedIdx % FEED.length]);
+  feedIdx++;
+  renderChat(msgs.length - 1);
+  strip.scrollTo({ left: strip.scrollWidth, behavior: 'smooth' });
+});
+
+winRange.addEventListener('input', () => {
+  K = +winRange.value;
+  winK.textContent = K + ' msgs';
+  renderChat(-1);
+});
+
+renderChat(-1);
+
+/* ── 交互二：中间插入有多贵 ──
+   动画只做「右移预告」：被搬的格子先橙色右滑（此时还没真插入），
+   停一拍再重排 DOM 落位。真同步移动需要 FLIP 动画，成本高且学员
+   要看的其实是「搬了几次」这个数，不是像素级的位移。 */
+const INS_INIT = ['A','B','C','D','E','F','G','H','I','J'];
+let arr = INS_INIT.slice();
+let insBusy = false;
+
+const insStrip    = document.getElementById('insStrip');
+const moveN       = document.getElementById('moveN');
+const insLog      = document.getElementById('insLog');
+const btnAppend   = document.getElementById('btnAppend');
+const btnResetIns = document.getElementById('btnResetIns');
+
+function renderIns(freshIdx){
+  insStrip.innerHTML = arr.map((v, i) => `
+    <div class="ins-cell${i === freshIdx ? ' fresh' : ''}" data-i="${i}">
+      <div class="ins-val">${v}</div>
+      <div class="ins-idx">[${i}]</div>
+    </div>`).join('');
+}
+
+async function insertAt(i){
+  if (insBusy) return;
+  if (arr.length >= 16) {
+    insLog.innerHTML = 'Enough cells — tap “Reset ↻” for another round';
+    return;
+  }
+  insBusy = true;
+  let moves = 0;
+  moveN.textContent = '0';
+  const cells = [...insStrip.children];
+  for (let j = arr.length - 1; j >= i; j--) {
+    cells[j].classList.add('shifting');
+    moves++;
+    moveN.textContent = moves;
+    await sleep(150);
+  }
+  await sleep(300);
+  arr.splice(i, 0, '⭐');
+  renderIns(i);
+  insLog.innerHTML = `Insert at [${i}]: <b>${moves}</b> elements on the right all shift over, plus 1 write. The further left you insert, the more moves`;
+  insBusy = false;
+}
+
+insStrip.addEventListener('click', e => {
+  const cell = e.target.closest('.ins-cell');
+  if (cell) insertAt(+cell.dataset.i);
+});
+
+btnAppend.addEventListener('click', () => {
+  if (insBusy) return;
+  if (arr.length >= 16) {
+    insLog.innerHTML = 'Enough cells — tap “Reset ↻” for another round';
+    return;
+  }
+  arr.push('⭐');
+  moveN.textContent = '0';
+  renderIns(arr.length - 1);
+  insLog.innerHTML = 'Append at the end: <b>0</b> moves + 1 write, <span class="ok">done in 1 step</span> — that\'s why chat history goes append-only';
+});
+
+btnResetIns.addEventListener('click', () => {
+  if (insBusy) return;
+  arr = INS_INIT.slice();
+  moveN.textContent = '0';
+  renderIns(-1);
+  insLog.textContent = 'Reset done — try a cell on the left again';
+});
+
+renderIns(-1);
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

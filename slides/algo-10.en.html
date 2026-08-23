@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beam Search: Look a Few Steps Ahead Before Choosing | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="One greedy misstep cascades. Beam Search keeps several candidate paths and explores ahead. On a 4-step word lattice: greedy scores 0.072, Beam=2 finds 0.098, Beam=3 finds 0.101—at roughly 2–3× compute. Feel where “think first, then answer” comes from.">
+<meta name="keywords" content="Beam Search,beam search,decoding strategy,greedy decoding,machine translation decoding,speech recognition,reasoning model intuition">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-10.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/algo-10.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/algo-10.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/algo-10.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/algo-10.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Beam Search: Look a Few Steps Ahead Before Choosing">
+<meta property="og:description" content="One greedy misstep cascades. Beam Search keeps several candidate paths, finishes, then compares total scores. One run on the word lattice and it clicks.">
+<meta property="og:url" content="https://xueai.app/slides/algo-10.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/algo-10.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Beam Search: Look a Few Steps Ahead Before Choosing">
+<meta name="twitter:description" content="Don’t put all your eggs in one basket: explore several paths, then compare total scores. Beam width = the compute-for-quality knob.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── 词格 ── */
+.lat-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.lat-stage{background:linear-gradient(to bottom,#fdf6fa,#fcf1f7);padding:10px 6px 4px}
+.lat-stage svg{display:block;width:100%;height:auto}
+.lat-node rect{fill:#fff;stroke:rgba(0,0,0,.14);stroke-width:1.5;rx:9;transition:fill .3s,stroke .3s}
+.lat-node text{font-size:14px;font-weight:800;fill:#1c1c1e;font-family:inherit}
+.lat-node .score-tag{font-size:10px;font-weight:800;fill:#6b7280;opacity:0;transition:opacity .3s}
+.lat-node.lit-red rect{stroke:#dc2626;stroke-width:2.5;fill:#fef2f2}
+.lat-node.lit-blue rect{stroke:#2563eb;stroke-width:2.5;fill:#eff6ff}
+.lat-node.lit-win rect{stroke:#1d4ed8;stroke-width:3;fill:#dbeafe}
+.lat-node.dimmed rect{stroke:rgba(0,0,0,.08);fill:#f4f4f5}
+.lat-node.dimmed text{fill:#a1a1aa}
+.lat-node .score-tag.show{opacity:1}
+.lat-edge{stroke:#000;stroke-opacity:.07;stroke-width:1.5;fill:none;transition:stroke .3s,stroke-opacity .3s,stroke-width .3s}
+.lat-edge.lit-red{stroke:#dc2626;stroke-opacity:.9;stroke-width:3}
+.lat-edge.lit-blue{stroke:#2563eb;stroke-opacity:.85;stroke-width:3}
+.lat-edge.lit-win{stroke:#1d4ed8;stroke-opacity:1;stroke-width:4.5}
+.lat-edge.lit-gray{stroke:#9ca3af;stroke-opacity:.5;stroke-width:2;stroke-dasharray:5 4}
+.lat-edge.lit-red-dash{stroke:#dc2626;stroke-opacity:.55;stroke-width:2.5;stroke-dasharray:6 5}
+.lat-collabel{font-size:10.5px;font-weight:800;fill:#9d174d;opacity:.65}
+.lat-plabel{font-size:10.5px;font-weight:800;fill:#6b7280}
+
+.lat-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 18px;border-top:1px solid var(--border)}
+.btn-al{background:var(--al);color:#fff;border:none;padding:9px 20px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-al.red{background:#dc2626}
+.btn-al.blue{background:#2563eb}
+.btn-al.ghost{background:transparent;color:var(--al);border:1.5px solid var(--al-line)}
+.btn-al.ghost:hover:not(:disabled){background:var(--al-soft);filter:none}
+.lat-status{font-size:12.5px;color:var(--sub);font-weight:600;flex-basis:100%;margin-top:2px}
+
+.lat-panel{border-top:1px dashed var(--border);padding:14px 18px;display:flex;flex-direction:column;gap:6px;min-height:70px}
+.lp-title{font-size:11.5px;font-weight:800;color:var(--sub);letter-spacing:.4px}
+.lp-row{display:flex;align-items:center;gap:9px;font-size:13px;line-height:1.6}
+.lp-row .lp-sent{color:var(--text);font-weight:600}
+.lp-row .lp-score{font-variant-numeric:tabular-nums;font-weight:900;font-size:13px;margin-left:auto;flex-shrink:0}
+.lp-row.kept .lp-score{color:#2563eb}
+.lp-row.pruned{opacity:.5}
+.lp-row.pruned .lp-sent{text-decoration:line-through;color:var(--sub);font-weight:500}
+.lp-row.pruned .lp-score{color:#9ca3af}
+.lp-row.winner .lp-score{color:#1d4ed8;font-size:15px}
+.lp-row.winner .lp-sent{color:#1d4ed8;font-weight:800}
+.lp-row .lp-mark{flex-shrink:0;font-size:11px;font-weight:800;padding:1px 8px;border-radius:99px}
+.lp-row.winner .lp-mark{background:#dbeafe;color:#1d4ed8}
+.lp-row.greedy-mark .lp-mark{background:#fef2f2;color:#dc2626}
+
+.lat-meters{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0 18px 16px}
+.meter-card{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px}
+.meter-card h5{font-size:11.5px;font-weight:800;color:var(--sub);margin-bottom:4px}
+.meter-card .m-nums{display:flex;align-items:baseline;gap:12px}
+.meter-card .m-score{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--text)}
+.meter-card .m-evals{font-size:11.5px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.meter-card.done-red .m-score{color:#dc2626}
+.meter-card.done-blue .m-score{color:#2563eb}
+.meter-card.done-win .m-score{color:#1d4ed8}
+
+/* ── 概念卡 ── */
+.bs-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.bs-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.bs-card .bsc-icon{font-size:24px;margin-bottom:8px}
+.bs-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.bs-card p{font-size:13px;color:var(--sub);line-height:1.8}
+.bs-card p b{color:var(--text)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .bs-grid{grid-template-columns:1fr}
+  .lat-meters{grid-template-columns:1fr}
+  .lp-row{font-size:12px;flex-wrap:wrap}
+  .lp-row .lp-score{margin-left:0}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Beam Search: Look a Few Steps Ahead Before Choosing","name":"Beam Search: Look a Few Steps Ahead Before Choosing","url":"https://xueai.app/slides/algo-10.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Search and Decision","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"One greedy misstep cascades. Beam Search keeps several candidate paths and explores ahead. On a 4-step word lattice: greedy scores 0.072, Beam=2 finds 0.098, Beam=3 finds 0.101—at roughly 2–3× compute. Feel where “think first, then answer” comes from.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Search and Decision</div>
+    <h1>Beam Search: Look a Few Steps Ahead Before Choosing</h1>
+    <p class="subtitle">Last lesson left a trap: greedy always grabs the biggest option in front of it, so one misstep can ruin the whole path. The fix is almost cutely simple—<b>don’t lock in yet; keep several candidate paths walking forward together, then compare total scores at the end</b>. That’s Beam Search. The word lattice below puts three strategies on the same stage.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>One greedy misstep cascades; Beam Search keeps several candidate paths and explores ahead. Compare the sentences each strategy produces, and feel where “think first, then answer” comes from</p></aside><!--seo:end-->  <div class="sec-label">Three paths on the word lattice</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">The start is fixed as “This spot's”, then 4 steps right, 3 candidate words each step.<b style="color:var(--text)"> Click the three buttons in order</b>, and watch three things: greedy (red) grabs probability-0.5 “food” on step one, but the path narrows after; Beam=2 (blue) keeps two paths alive and greys out the pruned ones; Beam=3 even keeps step-one’s 0.2 “decor”—<b style="color:var(--text)">whose cumulative score wins? And how far apart are the compute counters at the bottom right?</b></p>
+
+  <div class="lat-box">
+    <div class="lat-stage">
+      <svg id="latSvg" viewBox="0 0 780 400" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="lat-controls">
+      <button class="btn-al red" id="btnGreedy">① Go greedy</button>
+      <button class="btn-al blue" id="btnBeam2">② Beam = 2</button>
+      <button class="btn-al blue" id="btnBeam3">③ Beam = 3</button>
+      <button class="btn-al ghost" id="btnLatReset">Clear ↻</button>
+      <span class="lat-status" id="latStatus">Click “Go greedy” first—watch the red line lock in step by step</span>
+    </div>
+    <div class="lat-panel">
+      <div class="lp-title" id="lpTitle">Path scoreboard</div>
+      <div id="lpRows"></div>
+    </div>
+    <div class="lat-meters">
+      <div class="meter-card" id="mGreedy"><h5>😤 Greedy · Cumulative</h5><div class="m-nums"><span class="m-score">–</span><span class="m-evals">Candidates scored: –</span></div></div>
+      <div class="meter-card" id="mBeam2"><h5>🔦 Beam=2 · Cumulative</h5><div class="m-nums"><span class="m-score">–</span><span class="m-evals">Candidates scored: –</span></div></div>
+      <div class="meter-card" id="mBeam3"><h5>🔦🔦 Beam=3 · Cumulative</h5><div class="m-nums"><span class="m-score">–</span><span class="m-evals">Candidates scored: –</span></div></div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>Three cumulative scores lined up: 0.072 &lt; 0.098 &lt; 0.101.</b> Greedy was baited by step-one “food” (0.5) into a path that ran out of steam; Beam=2 kept an extra path so step-one’s 0.3 “value” laughed last; Beam=3 was fiercer still, kept even 0.2 “decor,” and dug up the global best. But watch compute:<b> 12 → 21 → 30 candidates, nearly 3×</b>—beam width is a “trade compute for quality” knob; how far you twist it depends on the power bill you can afford.
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">Concept card · Don’t put all your eggs in one basket</div>
+
+  <div class="bs-grid paywall-locked">
+    <div class="bs-card">
+      <div class="bsc-icon">🧺</div>
+      <h4>The whole idea of Beam Search</h4>
+      <p>At each step you <b>don’t pick one path—you keep the top-k highest-scoring paths</b> (k = beam width) and walk them all forward; at the finish you compare cumulative totals and hand in the winner. When k=1 it collapses to greedy; when k is infinite it’s exhaustive search of every path—<b>Beam Search is the slider between greedy and exhaustive search</b>.</p>
+    </div>
+    <div class="bs-card">
+      <div class="bsc-icon">🎛</div>
+      <h4>Width = the compute-for-quality knob</h4>
+      <p>Each +1 on k means a whole extra row of candidates every step. Translation systems often use k=4~10: beyond that, <b>quality gains shrink while the bill rises linearly</b>. The engineering question was never “can we be more optimal?”—it’s “is this bit of optimality worth the compute?” The BFS/DFS fight in the maze lesson is the same choice in different clothes.</p>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">AI connection · Where you’ve seen it</div>
+
+  <div class="l-card paywall-locked" style="margin-bottom:14px;">
+    <p style="font-size:13.5px;color:var(--sub);line-height:1.9;"><b style="color:var(--text)">🌍 The classic decoder for machine translation and speech recognition.</b> When translating a sentence, picking “The” vs “A” for the first word can sway how fluent the whole line feels—greedy often produces sentences where every word is “right” but the glue feels off. Beam Search keeps several openings alive, then picks the highest whole-sentence probability; it was the default in the neural-MT era. Speech recognition is the same: keep near-homophone candidates first, and let later context split “facts” from “fax.”</p>
+  </div>
+  <div class="l-card paywall-locked">
+    <p style="font-size:13.5px;color:var(--sub);line-height:1.9;"><b style="color:var(--text)">🧠 Same intuition as “reasoning models think first, then answer.”</b> The Absolute Beginner Part covered deep-thinking models: before answering they generate a long thinking trace, try a few lines of thought, self-reject, then pick the best reply. That philosophy lines up with Beam Search—<b style="color:var(--text)">explore a few more paths before you “put pen to paper,” trading extra compute for a better final answer</b>. The difference is reasoning models explore in natural language and are far more flexible—but the “compute for quality” ledger is the same one as those three counters on the lattice.</p>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>What this lesson wants to share</h3>
+    <ul>
+      <li><b>One greedy misstep cascades</b>: step-one’s 0.5 “food” looked tasty; the whole path only scored 0.072</li>
+      <li><b>Beam Search = keep several candidate paths, compare totals at the end</b>: k=1 is greedy, k=∞ is exhaustive search</li>
+      <li><b>Wider is more accurate—and more expensive</b>: 0.072 → 0.098 → 0.101, compute 12 → 21 → 30</li>
+      <li><b>Classic decoder for translation and speech recognition</b>; reasoning models’ “think first, then answer” is the modern version of the same philosophy</li>
+      <li><b>The real engineering question</b>: not “can we be more optimal?” but “is this bit of optimality worth the compute?”</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 词格数据 ──
+   数值是精心配平的：
+   贪心路   菜(0.5)→确实(0.6)→相当(0.5)→不错。(0.48)             = 0.072
+   Beam=2  性价比(0.3)→真的(0.8)→挺(0.72)→能打。(0.57)          = 0.098
+   Beam=3  装修(0.2)→可以说(0.9)→出乎意料地(0.8)→令人惊喜。(0.7) = 0.101
+   即：第一步概率越低的开头，后劲反而越足——贪心必然错过，
+   beam 越宽捞回来的越多。EDGES[层][来源][去向] 是条件概率。 */
+const START_WORD = "This spot's";
+const COLS = [
+  [' food', ' value', ' decor'],
+  [' is indeed', ' is truly', ' feels'],
+  [' quite', ' pretty', ' surprisingly'],
+  [' good.', ' solid.', ' amazing.'],
+];
+const P1 = [0.5, 0.3, 0.2];
+const EDGES = [
+  [ [0.60, 0.25, 0.15],   // 从 菜
+    [0.15, 0.80, 0.05],   // 从 性价比
+    [0.06, 0.04, 0.90] ], // 从 装修
+  [ [0.50, 0.30, 0.20],   // 从 确实
+    [0.18, 0.72, 0.10],   // 从 真的
+    [0.12, 0.08, 0.80] ], // 从 可以说
+  [ [0.48, 0.32, 0.20],   // 从 相当
+    [0.30, 0.57, 0.13],   // 从 挺
+    [0.10, 0.20, 0.70] ], // 从 出乎意料地
+];
+
+/* ── SVG 搭建 ── */
+const svg = document.getElementById('latSvg');
+const SVGNS = 'http://www.w3.org/2000/svg';
+const COL_X = [200, 345, 505, 672];
+const ROW_Y = [88, 200, 312];
+const START_POS = { x: 62, y: 200 };
+
+function el(tag, attrs){
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function nodeW(word){ return 26 + word.length * 15; }
+
+const edgeEls = {};   // key: `${layer}-${from}-${to}`，layer -1 表示起点→第一列
+const nodeEls = {};   // key: `${col}-${idx}`
+
+/* 先画边（垫底），再画节点 */
+for (let i = 0; i < 3; i++){
+  const w = nodeW(COLS[0][i]);
+  const e = el('line', { x1: START_POS.x + nodeW(START_WORD)/2, y1: START_POS.y,
+                         x2: COL_X[0] - w/2, y2: ROW_Y[i], class: 'lat-edge' });
+  edgeEls[`-1-0-${i}`] = e;
+  svg.appendChild(e);
+  /* 起点三条边带概率标签——这是整个故事的引子 */
+  const mx = (START_POS.x + nodeW(START_WORD)/2 + COL_X[0] - w/2) / 2;
+  const my = (START_POS.y + ROW_Y[i]) / 2 + (i === 1 ? -6 : (i === 0 ? -4 : 12));
+  const t = el('text', { x: mx, y: my, 'text-anchor': 'middle', class: 'lat-plabel' });
+  t.textContent = P1[i].toFixed(1);
+  svg.appendChild(t);
+}
+for (let layer = 0; layer < 3; layer++){
+  for (let f = 0; f < 3; f++){
+    for (let to = 0; to < 3; to++){
+      const wf = nodeW(COLS[layer][f]), wt = nodeW(COLS[layer+1][to]);
+      const e = el('line', { x1: COL_X[layer] + wf/2, y1: ROW_Y[f],
+                             x2: COL_X[layer+1] - wt/2, y2: ROW_Y[to], class: 'lat-edge' });
+      edgeEls[`${layer}-${f}-${to}`] = e;
+      svg.appendChild(e);
+    }
+  }
+}
+
+/* 起点节点 */
+(function(){
+  const w = nodeW(START_WORD);
+  const g = el('g', { class: 'lat-node' });
+  g.appendChild(el('rect', { x: START_POS.x - w/2, y: START_POS.y - 20, width: w, height: 40, rx: 9 }));
+  const t = el('text', { x: START_POS.x, y: START_POS.y + 5, 'text-anchor': 'middle' });
+  t.textContent = START_WORD;
+  g.appendChild(t);
+  svg.appendChild(g);
+})();
+
+/* 列标题 */
+['Step 1','Step 2','Step 3','Step 4'].forEach((s, c) => {
+  const t = el('text', { x: COL_X[c], y: 26, 'text-anchor': 'middle', class: 'lat-collabel' });
+  t.textContent = s;
+  svg.appendChild(t);
+});
+
+for (let c = 0; c < 4; c++){
+  for (let i = 0; i < 3; i++){
+    const word = COLS[c][i], w = nodeW(word);
+    const g = el('g', { class: 'lat-node' });
+    g.appendChild(el('rect', { x: COL_X[c] - w/2, y: ROW_Y[i] - 20, width: w, height: 40, rx: 9 }));
+    const t = el('text', { x: COL_X[c], y: ROW_Y[i] + 5, 'text-anchor': 'middle' });
+    t.textContent = word;
+    g.appendChild(t);
+    const st = el('text', { x: COL_X[c], y: ROW_Y[i] + 34, 'text-anchor': 'middle', class: 'score-tag' });
+    g.appendChild(st);
+    nodeEls[`${c}-${i}`] = { g, scoreTag: st };
+    svg.appendChild(g);
+  }
+}
+
+/* ── 工具 ── */
+const latStatus = document.getElementById('latStatus');
+const lpRows = document.getElementById('lpRows');
+const lpTitle = document.getElementById('lpTitle');
+const btns = ['btnGreedy','btnBeam2','btnBeam3','btnLatReset'].map(id => document.getElementById(id));
+const meters = { 1: document.getElementById('mGreedy'), 2: document.getElementById('mBeam2'), 3: document.getElementById('mBeam3') };
+let latRunning = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+function pathEdgeKeys(path){
+  const keys = [`-1-0-${path[0]}`];
+  for (let i = 1; i < path.length; i++) keys.push(`${i-1}-${path[i-1]}-${path[i]}`);
+  return keys;
+}
+function pathSentence(path){
+  return START_WORD + path.map((idx, c) => COLS[c][idx]).join('');
+}
+function clearLattice(){
+  Object.values(edgeEls).forEach(e => e.setAttribute('class', 'lat-edge'));
+  Object.values(nodeEls).forEach(n => { n.g.setAttribute('class', 'lat-node'); n.scoreTag.classList.remove('show'); n.scoreTag.textContent = ''; });
+  lpRows.innerHTML = '';
+}
+function litPath(path, cls, uptoCol){
+  const keys = pathEdgeKeys(path);
+  for (let i = 0; i < path.length && i <= (uptoCol ?? 99); i++){
+    edgeEls[keys[i]].setAttribute('class', 'lat-edge ' + cls.edge);
+    const n = nodeEls[`${i}-${path[i]}`];
+    if (!n.g.classList.contains('lit-win')) n.g.setAttribute('class', 'lat-node ' + cls.node);
+  }
+}
+function fmt(x){ return x.toFixed(x >= 0.01 ? 3 : 4); }
+function setMeter(width, score, evals, cls){
+  const m = meters[width];
+  m.querySelector('.m-score').textContent = score;
+  m.querySelector('.m-evals').textContent = 'Candidates scored: ' + evals;
+  if (cls) m.classList.add(cls);
+}
+function panelRow(sentence, score, cls, mark){
+  const div = document.createElement('div');
+  div.className = 'lp-row ' + (cls || '');
+  div.innerHTML = (mark ? `<span class="lp-mark">${mark}</span>` : '') +
+    `<span class="lp-sent">${sentence}</span><span class="lp-score">${fmt(score)}</span>`;
+  lpRows.appendChild(div);
+  return div;
+}
+
+/* ── 贪心 ── */
+let greedyDone = false;
+async function runGreedy(){
+  clearLattice();
+  lpTitle.textContent = 'Greedy · each step only looks ahead, then locks in';
+  latStatus.textContent = 'Red line advancing: every step grabs the highest-probability word';
+  const path = [];
+  let score = 1, evals = 0;
+  for (let c = 0; c < 4; c++){
+    const probs = c === 0 ? P1 : EDGES[c-1][path[c-1]];
+    evals += 3;
+    let best = 0;
+    for (let i = 1; i < 3; i++) if (probs[i] > probs[best]) best = i;
+    path.push(best);
+    score *= probs[best];
+    litPath(path, { edge: 'lit-red', node: 'lit-red' }, c);
+    const n = nodeEls[`${c}-${best}`];
+    n.scoreTag.textContent = 'cumul. ' + fmt(score);
+    n.scoreTag.classList.add('show');
+    setMeter(1, fmt(score), evals, '');
+    await sleep(850);
+  }
+  panelRow(pathSentence(path), score, 'greedy-mark', 'Greedy');
+  setMeter(1, fmt(score), evals, 'done-red');
+  latStatus.textContent = `Greedy done: “${pathSentence(path)}” cumulative ${fmt(score)}. Step-one’s 0.5 “food” looked tasty, but later steps stayed weak—now try Beam=2`;
+  greedyDone = true;
+  return path;
+}
+
+/* ── Beam Search（运行时真算，不是放动画） ── */
+function beamStates(width){
+  let all = P1.map((p, i) => ({ path: [i], score: p })).sort((a, b) => b.score - a.score);
+  let evals = 3;
+  const states = [{ all, kept: all.slice(0, width), evals }];
+  let beams = all.slice(0, width);
+  for (let layer = 0; layer < 3; layer++){
+    const cands = [];
+    for (const b of beams){
+      const from = b.path[b.path.length - 1];
+      EDGES[layer][from].forEach((p, to) => cands.push({ path: [...b.path, to], score: b.score * p }));
+      evals += 3;
+    }
+    cands.sort((a, b) => b.score - a.score);
+    beams = cands.slice(0, width);
+    states.push({ all: cands, kept: beams, evals });
+  }
+  return states;
+}
+
+async function runBeam(width){
+  clearLattice();
+  lpTitle.textContent = `Beam=${width} · keep top ${width} paths each step; prune the rest (struck through)`;
+  latStatus.textContent = `Blue lines in parallel: keep ${width} paths alive, compare totals at the end`;
+  const states = beamStates(width);
+  for (let s = 0; s < states.length; s++){
+    const st = states[s];
+    /* 面板：本步所有候选，保留的正常、淘汰的划掉 */
+    lpRows.innerHTML = '';
+    const keptSet = new Set(st.kept.map(b => b.path.join(',')));
+    st.all.forEach(b => {
+      panelRow(pathSentence(b.path) + '…'.repeat(b.path.length < 4 ? 1 : 0),
+               b.score, keptSet.has(b.path.join(',')) ? 'kept' : 'pruned');
+    });
+    /* 图上：全部先回到底色，再点亮保留的路；被探过但淘汰的边留灰 */
+    Object.values(edgeEls).forEach(e => { if (e.getAttribute('class').includes('lit-blue')) e.setAttribute('class', 'lat-edge lit-gray'); });
+    Object.values(nodeEls).forEach(n => { if (n.g.getAttribute('class').includes('lit-blue')) n.g.setAttribute('class', 'lat-node dimmed'); });
+    st.kept.forEach(b => litPath(b.path, { edge: 'lit-blue', node: 'lit-blue' }));
+    st.kept.forEach(b => {
+      const c = b.path.length - 1;
+      const n = nodeEls[`${c}-${b.path[c]}`];
+      n.scoreTag.textContent = 'cumul. ' + fmt(b.score);
+      n.scoreTag.classList.add('show');
+    });
+    setMeter(width, fmt(st.kept[0].score), st.evals, '');
+    latStatus.textContent = s === 0
+      ? `Step 1: keep the ${width} highest-probability openings${width < 3 ? '; the rest are pruned (see struck lines on the scoreboard)' : '—all three kept'}`
+      : `Step ${s + 1}: each of ${width} paths sprouts 3 candidates (${width * 3} total); keep only the top ${width} by total score`;
+    await sleep(1600);
+  }
+  /* 收官：冠军路加粗，贪心路虚线对照 */
+  const winner = states[states.length - 1].kept[0];
+  litPath(winner.path, { edge: 'lit-win', node: 'lit-win' });
+  const greedyPath = [0, 0, 0, 0];
+  if (greedyDone && winner.path.join() !== greedyPath.join()){
+    pathEdgeKeys(greedyPath).forEach(k => {
+      if (!edgeEls[k].getAttribute('class').includes('lit-win')) edgeEls[k].setAttribute('class', 'lat-edge lit-red-dash');
+    });
+  }
+  lpRows.innerHTML = '';
+  states[states.length - 1].all.forEach(b => {
+    const isWin = b.path.join(',') === winner.path.join(',');
+    panelRow(pathSentence(b.path), b.score, isWin ? 'winner' : 'pruned', isWin ? '🏆 Champ' : '');
+  });
+  if (greedyDone) panelRow(pathSentence(greedyPath), 0.072, 'greedy-mark', 'Greedy control');
+  setMeter(width, fmt(winner.score), states[states.length - 1].evals, width === 3 ? 'done-win' : 'done-blue');
+  latStatus.textContent = width === 2
+    ? `Beam=2 champ: “${pathSentence(winner.path)}” cumulative ${fmt(winner.score)}, beating greedy’s 0.072—but step-one’s 0.2 “decor” was pruned on step 1; try Beam=3`
+    : `Beam=3 dug up the global best: “${pathSentence(winner.path)}” cumulative ${fmt(winner.score)}. Cost is on the counter—30 candidates scored, 2.5× greedy’s 12`;
+}
+
+async function guard(fn){
+  if (latRunning) return;
+  latRunning = true;
+  btns.forEach(b => b.disabled = true);
+  await fn();
+  btns.forEach(b => b.disabled = false);
+  latRunning = false;
+}
+document.getElementById('btnGreedy').addEventListener('click', () => guard(runGreedy));
+document.getElementById('btnBeam2').addEventListener('click', () => guard(() => runBeam(2)));
+document.getElementById('btnBeam3').addEventListener('click', () => guard(() => runBeam(3)));
+document.getElementById('btnLatReset').addEventListener('click', () => {
+  if (latRunning) return;
+  clearLattice();
+  greedyDone = false;
+  lpTitle.textContent = 'Path scoreboard';
+  latStatus.textContent = 'Click “Go greedy” first—watch the red line lock in step by step';
+  Object.entries(meters).forEach(([, m]) => {
+    m.querySelector('.m-score').textContent = '–';
+    m.querySelector('.m-evals').textContent = 'Candidates scored: –';
+    m.className = 'meter-card';
+  });
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

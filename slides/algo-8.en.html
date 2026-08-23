@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BFS and DFS: How an Agent Finds Files in a Codebase | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Watch two search personalities in a maze animation: BFS sweeps layer by layer; DFS goes all the way down one path. Coding Agent grep, web crawlers, and mutual-friend recommendations are variants. Cells visited and path length settle it in one run.">
+<meta name="keywords" content="BFS,DFS,breadth-first search,depth-first search,graph search,maze algorithm,Coding Agent retrieval,beginner algorithms">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-8.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/algo-8.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/algo-8.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/algo-8.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/algo-8.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="BFS and DFS: How an Agent Finds Files in a Codebase">
+<meta property="og:description" content="One maze, two personalities: BFS ripples layer by layer; DFS goes all the way down one path. One run and you’ll get how Coding Agents hunt code.">
+<meta property="og:url" content="https://xueai.app/slides/algo-8.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/algo-8.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BFS and DFS: How an Agent Finds Files in a Codebase">
+<meta name="twitter:description" content="One maze, two personalities: BFS finds shortest paths but costs memory; DFS goes deep, saves memory, but may detour.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── 迷宫 ── */
+.maze-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.maze-wrap{padding:18px;display:flex;justify-content:center;background:linear-gradient(to bottom,#fdf6fa,#fcf1f7)}
+.maze-grid{display:grid;grid-template-columns:repeat(11,1fr);gap:3px;width:100%;max-width:440px}
+.mz-cell{aspect-ratio:1;border-radius:5px;background:#fff;border:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;font-size:14px;transition:background .25s,box-shadow .25s,opacity .3s;position:relative}
+.mz-cell.wall{background:#3f3f46;border-color:#3f3f46}
+.mz-cell.head{box-shadow:0 0 0 2.5px var(--al-deep);z-index:2}
+.mz-cell.backtracked{opacity:.4}
+.mz-cell.path{background:rgba(22,163,74,.55)!important;box-shadow:0 0 0 1.5px rgba(22,163,74,.7);opacity:1}
+.maze-foot{padding:14px 18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px}
+.maze-btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn-al{background:var(--al);color:#fff;border:none;padding:10px 22px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-al.ghost{background:transparent;color:var(--al);border:1.5px solid var(--al-line)}
+.btn-al.ghost:hover:not(:disabled){background:var(--al-soft);filter:none}
+.maze-status{font-size:12.5px;color:var(--sub);font-weight:600}
+.maze-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat-card{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px}
+.stat-card h5{font-size:12.5px;font-weight:800;color:var(--sub);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.stat-card h5 .dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.stat-nums{display:flex;gap:20px}
+.stat-nums .sn{display:flex;flex-direction:column}
+.stat-nums .sn-label{font-size:10.5px;font-weight:700;color:var(--sub)}
+.stat-nums .sn-val{font-size:21px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums}
+.stat-nums .sn-val.good{color:var(--success)}
+.stat-nums .sn-val.bad{color:var(--danger)}
+.maze-verdict{margin:0 18px 16px;padding:14px 18px;background:var(--al-soft);border:1.5px dashed var(--al-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.85;color:var(--sub);opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.maze-verdict.show{opacity:1;transform:translateY(0)}
+.maze-verdict b{color:var(--al-deep)}
+
+/* ── AI 关联卡 ── */
+.ai-link-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.ai-link-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.ai-link-card .alc-icon{font-size:24px;margin-bottom:8px}
+.ai-link-card h4{font-size:14.5px;font-weight:800;color:var(--text);margin-bottom:6px}
+.ai-link-card p{font-size:12.5px;color:var(--sub);line-height:1.75}
+.ai-link-card p b{color:var(--text)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .ai-link-grid{grid-template-columns:1fr}
+  .maze-stats{grid-template-columns:1fr}
+  .mz-cell{font-size:11px;border-radius:4px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"BFS and DFS: How an Agent Finds Files in a Codebase","name":"BFS and DFS: How an Agent Finds Files in a Codebase","url":"https://xueai.app/slides/algo-8.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Search and Decision","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Watch two search personalities in a maze animation: BFS sweeps layer by layer; DFS goes all the way down one path. Coding Agent grep, web crawlers, and mutual-friend recommendations are variants. Cells visited and path length settle it in one run.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Search and Decision</div>
+    <h1>BFS and DFS: How an Agent Finds Files in a Codebase</h1>
+    <p class="subtitle">In the Engineering Advanced Part, a Coding Agent asked to “find why login fails” rummages through hundreds of folders. Where first—finish this layer then go deeper, or grab one clue and drill all the way? Two very different personalities: <b>BFS (breadth-first) and DFS (depth-first)</b>. This lesson sends each through the same maze—you’ll see the personality at a glance.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Watch two search personalities in a maze: layer-by-layer sweep vs going all the way down one path; Coding Agent grep and web crawlers are variants</p></aside><!--seo:end-->  <div class="sec-label">Maze personality test · one map, two ways</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">🏁 is the start, 🎯 the goal, dark gray the walls. Each button is a personality—<b style="color:var(--text)">watch three things</b>: the <b style="color:var(--text)">shape</b> of the paint (BFS ripples in rings; DFS is a snake); the two <b style="color:var(--text)">counters</b> below; and the final green path—<b style="color:var(--text)">whose is shorter? Who visited more cells?</b></p>
+
+  <div class="maze-box">
+    <div class="maze-wrap"><div class="maze-grid" id="mazeGrid"></div></div>
+    <div class="maze-foot">
+      <div class="maze-btns">
+        <button class="btn-al" id="btnBFS">🌊 BFS layer sweep</button>
+        <button class="btn-al" id="btnDFS">🐍 DFS go all the way down one path</button>
+        <button class="btn-al ghost" id="btnReset">Clear ↻</button>
+        <span class="maze-status" id="mazeStatus">Run BFS first—watch the ripple spread</span>
+      </div>
+      <div class="maze-stats">
+        <div class="stat-card">
+          <h5><span class="dot" style="background:#db2777"></span>BFS · ripple layer sweep</h5>
+          <div class="stat-nums">
+            <div class="sn"><span class="sn-label">cells visited</span><span class="sn-val" id="bfsVisited">–</span></div>
+            <div class="sn"><span class="sn-label">final path length</span><span class="sn-val" id="bfsPath">–</span></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <h5><span class="dot" style="background:#7c3aed"></span>DFS · single-head snake dive</h5>
+          <div class="stat-nums">
+            <div class="sn"><span class="sn-label">cells visited</span><span class="sn-val" id="dfsVisited">–</span></div>
+            <div class="sn"><span class="sn-label">final path length</span><span class="sn-val" id="dfsPath">–</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="maze-verdict" id="mazeVerdict"></div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>Two numbers teach the whole theory.</b> BFS visits 77 cells before hitting the goal—it floods every cell at distance 1, 2, 3… from the start, so that whole sheet must live in memory; but because it advances by distance, <b>the path that first hits the goal is always shortest (23 cells)</b>. DFS reaches it after only 44 visits, keeping just the current path in memory; yet its path is 37 cells—<b>more than half longer than shortest</b>—and unlucky runs dive into dead ends and back out (faded cells are backtracking).
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">What does this have to do with AI?</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">Swap maze cells for folders and web pages—and both personalities show up next to you:</p>
+
+  <div class="ai-link-grid paywall-locked">
+    <div class="ai-link-card">
+      <div class="alc-icon">🤖</div>
+      <h4>Coding Agent hunting code</h4>
+      <p>First <code>ls</code> the top level—that’s a <b>BFS one-layer sweep</b> for a quick global map; then <code>auth/</code> looks fishy, so it dives layer by layer—switching to <b>DFS</b>. Real Agents use a <b>hybrid</b>: breadth first, then depth, plus grep jumps.</p>
+    </div>
+    <div class="ai-link-card">
+      <div class="alc-icon">🕷</div>
+      <h4>Web crawlers</h4>
+      <p>From the home page, fetch every linked page first, then “links of links”—classic <b>BFS</b>, so near-home important pages land first. DFS might follow one chain into forum page 999 and never come back.</p>
+    </div>
+    <div class="ai-link-card">
+      <div class="alc-icon">👥</div>
+      <h4>“Mutual friends” recommendations</h4>
+      <p>“People you may know” = <b>BFS two layers</b> from you: layer 1 is friends; layer 2 is friends-of-friends. Someone 2 steps away ranks above someone 5 steps—depth itself is closeness.</p>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>Neither wins everywhere—only fit to the scene.</b> Need “shortest / nearest / most relevant”? BFS, pay the memory. Need “any usable answer fast, memory tight”? DFS, accept detours. Next lesson’s greedy and sampling, then Beam Search, are also picking spots on this “search-strategy spectrum.”
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>What this lesson wants to share</h3>
+    <ul>
+      <li><b>BFS layer sweep</b>: flood by distance ring by ring—what you find is always shortest, at the cost of a big sheet in memory</li>
+      <li><b>DFS go all the way down one path</b>: saves memory, often hits a solution sooner, but paths aren’t guaranteed short—and it backtracks</li>
+      <li><b>Visits vs path length</b>: 77/23 vs 44/37—two number pairs are the full ledger of both personalities</li>
+      <li><b>Real systems mix them</b>: Agents ls one layer (BFS) then dive into a suspicious folder (DFS)</li>
+      <li><b>Crawlers and mutual-friend recs</b> are graph search—the maze is just the most intuitive graph</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 迷宫数据 ──
+   布局是程序搜出来的（不是随手画）：要求 BFS 最短路 23、访问 77 格；
+   DFS 按「右→下→左→上」的固定顺序走出 37 格长的路、访问 44 格、回溯 7 次。
+   这样两组计数器的反差足够大，且 DFS 有肉眼可见的回溯（变浅的格子）。 */
+const MAZE = [
+  'S...##.#.#.',
+  '.##.#.#....',
+  '#........##',
+  '...##......',
+  '...#..#....',
+  '#..##..#...',
+  '....##..#.#',
+  '#.#..#.#..#',
+  '.#.....#..#',
+  '..#...#.##.',
+  '#.##......G',
+];
+const N = 11;
+const START = [0, 0], GOAL = [10, 10];
+const wall = MAZE.map(r => [...r].map(c => c === '#'));
+
+const grid = document.getElementById('mazeGrid');
+grid.innerHTML = '';
+const cells = [];
+for (let r = 0; r < N; r++){
+  cells.push([]);
+  for (let c = 0; c < N; c++){
+    const d = document.createElement('div');
+    d.className = 'mz-cell' + (wall[r][c] ? ' wall' : '');
+    if (r === START[0] && c === START[1]) d.textContent = '🏁';
+    if (r === GOAL[0] && c === GOAL[1]) d.textContent = '🎯';
+    grid.appendChild(d);
+    cells[r].push(d);
+  }
+}
+
+const btnBFS = document.getElementById('btnBFS');
+const btnDFS = document.getElementById('btnDFS');
+const btnReset = document.getElementById('btnReset');
+const mazeStatus = document.getElementById('mazeStatus');
+const mazeVerdict = document.getElementById('mazeVerdict');
+const statEls = {
+  bfs: { v: document.getElementById('bfsVisited'), p: document.getElementById('bfsPath') },
+  dfs: { v: document.getElementById('dfsVisited'), p: document.getElementById('dfsPath') },
+};
+let runningMaze = false;
+let ranBFS = false, ranDFS = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+function key(r, c){ return r * N + c; }
+function inBoard(r, c){ return r >= 0 && r < N && c >= 0 && c < N && !wall[r][c]; }
+
+function clearColors(){
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++){
+    if (wall[r][c]) continue;
+    const el = cells[r][c];
+    el.style.background = '';
+    el.classList.remove('head', 'backtracked', 'path');
+  }
+}
+
+/* BFS：一次点亮一整层（波纹感来自「同层同时染色」），层色由浅到深 */
+async function runBFS(){
+  clearColors();
+  mazeStatus.textContent = 'BFS: paint a whole ripple ring at once; deeper rings get darker';
+  const prev = new Map([[key(...START), null]]);
+  let layer = [START];
+  let visited = 1, depth = 0, found = false;
+  statEls.bfs.v.textContent = '1';
+  const MAXD = 24;   // 最短路 23，染色深度用它归一化
+  while (layer.length && !found){
+    const light = 94 - Math.min(1, depth / MAXD) * 36;   // 亮度 94% → 58%
+    for (const [r, c] of layer) cells[r][c].style.background = `hsl(332,72%,${light}%)`;
+    statEls.bfs.v.textContent = visited;
+    await sleep(200);
+    const next = [];
+    for (const [r, c] of layer){
+      for (const [dr, dc] of [[1,0],[0,1],[-1,0],[0,-1]]){
+        const nr = r + dr, nc = c + dc;
+        if (!inBoard(nr, nc) || prev.has(key(nr, nc))) continue;
+        prev.set(key(nr, nc), [r, c]);
+        next.push([nr, nc]);
+        visited++;
+        if (nr === GOAL[0] && nc === GOAL[1]) found = true;
+      }
+    }
+    layer = next;
+    depth++;
+  }
+  /* 终点所在的最后一层也染上色，不然计数和画面对不上 */
+  const lastLight = 94 - Math.min(1, depth / MAXD) * 36;
+  for (const [r, c] of layer) cells[r][c].style.background = `hsl(332,72%,${lastLight}%)`;
+  statEls.bfs.v.textContent = visited;
+  await sleep(200);
+  /* 回溯最短路 */
+  mazeStatus.textContent = 'Hit the goal! Walk back along “who found whom”—that’s the shortest path';
+  const path = [];
+  let cur = GOAL;
+  while (cur){ path.push(cur); cur = prev.get(key(...cur)); }
+  path.reverse();
+  for (let i = 0; i < path.length; i++){
+    cells[path[i][0]][path[i][1]].classList.add('path');
+    statEls.bfs.p.textContent = i + 1;
+    await sleep(55);
+  }
+  statEls.bfs.p.classList.add('good');
+  ranBFS = true;
+  return { visited, pathLen: path.length };
+}
+
+/* DFS：固定「右→下→左→上」的探索顺序（和迷宫设计时一致），
+   头部单格深入，撞死胡同弹栈——弹掉的格子变浅，回溯肉眼可见 */
+async function runDFS(){
+  clearColors();
+  mazeStatus.textContent = 'DFS: a snake drills deep; faded cells = backed out of a dead end';
+  const visitedSet = new Set([key(...START)]);
+  const stack = [START];
+  let visited = 1, prevHead = null;
+  statEls.dfs.v.textContent = '1';
+  cells[START[0]][START[1]].style.background = 'hsl(262,60%,80%)';
+  while (stack.length){
+    const cur = stack[stack.length - 1];
+    if (prevHead) cells[prevHead[0]][prevHead[1]].classList.remove('head');
+    cells[cur[0]][cur[1]].classList.add('head');
+    prevHead = cur;
+    if (cur[0] === GOAL[0] && cur[1] === GOAL[1]) break;
+    let moved = false;
+    for (const [dr, dc] of [[0,1],[1,0],[0,-1],[-1,0]]){
+      const nr = cur[0] + dr, nc = cur[1] + dc;
+      if (!inBoard(nr, nc) || visitedSet.has(key(nr, nc))) continue;
+      visitedSet.add(key(nr, nc));
+      stack.push([nr, nc]);
+      visited++;
+      statEls.dfs.v.textContent = visited;
+      cells[nr][nc].style.background = 'hsl(262,60%,80%)';
+      moved = true;
+      break;
+    }
+    if (!moved){
+      const dead = stack.pop();
+      cells[dead[0]][dead[1]].classList.add('backtracked');
+    }
+    await sleep(95);
+  }
+  if (prevHead) cells[prevHead[0]][prevHead[1]].classList.remove('head');
+  /* 栈里剩下的就是它走出的那条路 */
+  mazeStatus.textContent = 'Arrived! Highlight the path “kept on the stack”—clearly longer than BFS';
+  for (let i = 0; i < stack.length; i++){
+    cells[stack[i][0]][stack[i][1]].classList.add('path');
+    statEls.dfs.p.textContent = i + 1;
+    await sleep(55);
+  }
+  statEls.dfs.p.classList.add('bad');
+  ranDFS = true;
+  return { visited, pathLen: stack.length };
+}
+
+function showVerdict(){
+  if (!(ranBFS && ranDFS)) return;
+  mazeVerdict.innerHTML = '<b>Compare:</b> BFS visits <b>77</b> cells, path <b>23</b>—what it finds is <b>always shortest</b>, but it floods a whole ripple sheet into memory; DFS visits only <b>44</b>, keeps just the current path—much cheaper—yet walks <b>37</b> cells, <b>no short guarantee</b>, with 7 backtracks. <b>Stable or thrifty—pick one.</b>';
+  mazeVerdict.classList.add('show');
+}
+
+async function guard(fn){
+  if (runningMaze) return;
+  runningMaze = true;
+  btnBFS.disabled = btnDFS.disabled = btnReset.disabled = true;
+  await fn();
+  showVerdict();
+  btnBFS.disabled = btnDFS.disabled = btnReset.disabled = false;
+  runningMaze = false;
+}
+
+btnBFS.addEventListener('click', () => guard(runBFS));
+btnDFS.addEventListener('click', () => guard(runDFS));
+btnReset.addEventListener('click', () => {
+  if (runningMaze) return;
+  clearColors();
+  ranBFS = ranDFS = false;
+  mazeVerdict.classList.remove('show');
+  ['bfs','dfs'].forEach(k => {
+    statEls[k].v.textContent = '–';
+    statEls[k].p.textContent = '–';
+    statEls[k].p.classList.remove('good','bad');
+  });
+  mazeStatus.textContent = 'Run BFS first—watch the ripple spread';
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

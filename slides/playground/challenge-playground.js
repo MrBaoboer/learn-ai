@@ -156,7 +156,8 @@
     ['进行中 · 今日未完成', 'ch-entry--progress', coinImg + '<span>Day 3 · 今日 2/5</span>'],
     ['进行中 · 可领取（金光+红点）', 'ch-entry--claimable', coinImg + '<span>可领 250</span>'],
     ['今日已领 · 静默', 'ch-entry--done', coinImg + '<span>Day 3 ✓</span>'],
-    ['已结算 · 战报入口（看完即收起）', 'ch-entry--claimable', coinImg + '<span>伴学战报</span>'],
+    ['已结算 · 战报未看（红点）', 'ch-entry--report ch-entry--unread', coinImg + '<span>伴学战报</span>'],
+    ['已结算 · 战报看过（无红点）', 'ch-entry--report', coinImg + '<span>伴学战报</span>'],
   ];
   document.getElementById('demoEntries').innerHTML = entries.map(function (e) {
     return '<div class="pg-entry-demo">' +

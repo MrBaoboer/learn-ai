@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>벡터: RAG 검색은 「가장 가까운 이웃 찾기」예요 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Embedding은 의미를 좌표로 바꾸고, 유사도는 거리예요. 평면에서 쿼리 점을 끌어 최근접 이웃이 어떻게 바뀌는지 보고, HNSW가 억 단위 벡터에서도 순식간에 찾는 이유를 살펴보세요.">
+<meta name="keywords" content="벡터 데이터베이스,Embedding,RAG 검색,최근접 이웃 검색,HNSW,시맨틱 검색,벡터 검색">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-10.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ds-10.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ds-10.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ds-10.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ds-10.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="벡터: RAG 검색은 「가장 가까운 이웃 찾기」예요">
+<meta property="og:description" content="의미→좌표, 유사→거리, 검색→이웃 찾기. 쿼리 점을 끌어 시맨틱 지도를 쓰고, 브루트포스와 HNSW 계층 점프를 비교하세요.">
+<meta property="og:url" content="https://xueai.app/slides/ds-10.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/ds-10.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="벡터: RAG 검색은 「가장 가까운 이웃 찾기」예요">
+<meta name="twitter:description" content="의미→좌표, 유사→거리, 검색→이웃 찾기. 쿼리 점을 끌어 시맨틱 지도를 쓰고, 브루트포스와 HNSW 계층 점프를 비교하세요.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── 语义地图 ── */
+.map-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.map-stage{padding:8px;display:flex;justify-content:center}
+.map-stage svg{width:100%;max-width:640px;height:auto;display:block;touch-action:none}
+.sem-word circle{stroke:#fff;stroke-width:2}
+.sem-word text{fill:var(--text);font-size:12.5px;font-weight:800;pointer-events:none}
+.sem-halo-label{font-size:12px;font-weight:800;opacity:.55}
+.sem-line{stroke:var(--ds);stroke-width:1.5;stroke-dasharray:5 4;opacity:.75}
+.sem-line.first{stroke-width:2.5;stroke-dasharray:none;opacity:1}
+.sem-dist{fill:var(--ds-deep);font-size:11px;font-weight:800;paint-order:stroke;stroke:#fff;stroke-width:3}
+.sem-query{cursor:grab}
+.sem-query:active{cursor:grabbing}
+.sem-query circle{fill:#1c1c1e;stroke:#fff;stroke-width:2.5}
+.sem-query text{fill:#fff;font-size:13px;font-weight:900;pointer-events:none}
+.sem-crown{font-size:16px;pointer-events:none}
+.map-narr{margin:4px 22px 18px;padding:13px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.8;color:var(--sub);min-height:52px}
+.map-narr b{color:var(--ds-deep)}
+
+/* ── 暴力 vs HNSW ── */
+.race-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.race-stage{padding:8px;display:flex;justify-content:center}
+.race-stage svg{width:100%;max-width:640px;height:auto;display:block}
+.race-pt{fill:rgba(0,0,0,.28);transition:fill .1s,r .1s}
+.race-pt.flash{fill:var(--danger)}
+.race-pt.visited{fill:rgba(220,38,38,.35)}
+.race-pt.hop{fill:var(--ds)}
+.race-pt.answer{fill:var(--success)}
+.race-target{fill:var(--amber)}
+.race-jump{stroke:var(--ds);stroke-width:2;fill:none;opacity:0;transition:opacity .3s}
+.race-jump.on{opacity:.85}
+.race-jump.high{stroke-width:3;stroke-dasharray:2 6;stroke-linecap:round}
+.race-jump.mid{stroke-width:2.2;stroke-dasharray:5 4}
+.race-jump.low{stroke-width:1.8}
+.race-layer-tag{fill:var(--ds-deep);font-size:11.5px;font-weight:800;opacity:0;transition:opacity .3s}
+.race-layer-tag.on{opacity:1}
+.race-panel{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--border)}
+.race-cell{padding:14px 20px;text-align:center}
+.race-cell + .race-cell{border-left:1px solid var(--border)}
+.race-cell .rc-name{font-size:12px;font-weight:800;color:var(--sub)}
+.race-cell .rc-num{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--text)}
+.race-cell.brute .rc-num.hot{color:var(--danger)}
+.race-cell.hnsw .rc-num.hot{color:var(--ds)}
+.race-cell .rc-sub{font-size:11.5px;color:var(--sub)}
+.race-narr{margin:12px 22px 0;padding:13px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.8;color:var(--sub);min-height:52px}
+.race-narr b{color:var(--ds-deep)}
+.race-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 22px}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-ds.alt{background:var(--danger)}
+.race-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── AI 关联卡 ── */
+.nn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.nn-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.nn-card .nn-icon{font-size:24px;margin-bottom:8px}
+.nn-card h4{font-size:14.5px;font-weight:800;color:var(--text);margin-bottom:6px}
+.nn-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.nn-card p b{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .nn-grid{grid-template-columns:1fr}
+  .map-narr,.race-narr{margin-left:14px;margin-right:14px}
+  .race-cell .rc-num{font-size:24px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"벡터: RAG 검색은 「가장 가까운 이웃 찾기」예요","name":"벡터: RAG 검색은 「가장 가까운 이웃 찾기」예요","url":"https://xueai.app/slides/ds-10.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문~심화","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 대규모 모델 속의 자료구조","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Embedding은 의미를 좌표로 바꾸고, 유사도는 거리예요. 평면에서 쿼리 점을 끌어 최근접 이웃이 어떻게 바뀌는지 보고, HNSW가 억 단위 벡터에서도 순식간에 찾는 이유를 살펴보세요.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">프로그래밍 기초 · 대규모 모델 속의 자료구조</div>
+    <h1>벡터: RAG 검색은 「가장 가까운 이웃 찾기」예요</h1>
+    <p class="subtitle">RAG를 배울 때 말했죠. Embedding은 한 구절을 숫자 나열로 바꿉니다. 그 숫자는 대체 뭘까요? 답이 놀라울 만큼 단순해요—<b>좌표</b>예요. 문장마다 「시맨틱 지도」 위 자리를 주고주고, 뜻이 가까울수록 위치도 가까워집니다. 그래서 「자료 검색」은 초등학생도 아는 게임이 돼요: <b>지도에서 가장 가까운 이웃을 찾기</b>.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>Embedding은 의미를 좌표로 바꾸고, 유사도는 거리예요. 평면에서 쿼리 점을 끌어 최근접 이웃이 어떻게 바뀌는지 보고, HNSW가 억 단위 벡터에서도 순식간에 찾는 이유를 살펴보세요</p></aside><!--seo:end-->  <div class="sec-label">먼저 지도 놀기 · 의미가 가까우면 = 좌표도 가깝다</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">아래는 미니 시맨틱 지도예요. 12개 단어가 Embedding으로 자리를 받아 자연스럽게 세 「구역」으로 모입니다. <b style="color:var(--text)">검은 ❓ 쿼리 점을 끌어</b> 보세요(또는 지도 아무 데나 클릭해 놓기). 눈여겨보세요: 선은 언제나 <b style="color:var(--text)">가장 가까운 단어 3개</b>를 가리키고, 거리는 실시간으로 바뀌며, 제일 가까운 쪽은 👑를 씁니다. ❓를 두 구역 사이로 끌어 이웃이 어떻게 바뀌는지 보세요.</p>
+
+  <div class="map-box">
+    <div class="map-stage">
+      <svg id="semSvg" viewBox="0 0 640 400" aria-label="시맨틱 지도"></svg>
+    </div>
+    <div class="map-narr" id="semNarr">❓를 「미식 구역」으로 끌어 본 다음, 「테크 구역」으로도 끌어 보세요.</div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>이게 RAG 검색의 전부예요.</b> 지식 베이스의 자료마다 Embedding이 좌표를 주고(실제로는 1536차원이지 2차원이 아니지만 원리는 같아요); 질문할 때도 질문에 좌표가 생기고; 그다음 <b>질문과 가장 가까운 자료 몇 단락</b>을 찾아 컨텍스트에 넣어 LLM에 넘깁니다. 「시맨틱 검색이 키워드 검색보다 똑똑한」 비밀은, 「밀크티」와 「양지감로」가 글자는 하나도 안 겹쳐도 좌표는 아주 가깝다는 점이에요.
+  </div>
+
+  <div class="sec-label">이어서 속도 · 하나씩 계산 vs 고속도로 깔기</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked xa-peek">가장 가까운 이웃을 찾는 제일 둔한 방법은 점마다 거리를 재는 거예요. 60개면 괜찮지만, RAG 지식 베이스는 흔히 백만 단락, 추천 시스템은 십억 건이에요. 아래 같은 지도에 점 60개를 뿌렸고, 🌟이 쿼리예요. <b style="color:var(--text)">먼저 「하나씩 계산」을 눌러 몇 번인지 세고, 이어서 「HNSW 계층 점프」로 비교</b>하세요—파란 점프 선이 「먼저 크게, 그다음 작게」 뛰는 방식을 눈여겨보세요.</p>
+
+  <div class="race-box paywall-locked">
+    <div class="race-stage">
+      <svg id="raceSvg" viewBox="0 0 640 360" aria-label="브루트포스와 HNSW 비교"></svg>
+    </div>
+    <div class="race-panel">
+      <div class="race-cell brute">
+        <div class="rc-name">🐢 하나씩 계산（브루트포스）</div>
+        <div class="rc-num" id="bruteNum">—</div>
+        <div class="rc-sub">거리 계산 횟수</div>
+      </div>
+      <div class="race-cell hnsw">
+        <div class="rc-name">🚀 HNSW 계층 점프</div>
+        <div class="rc-num" id="hnswNum">—</div>
+        <div class="rc-sub">거리 계산 횟수</div>
+      </div>
+    </div>
+    <div class="race-narr" id="raceNarr">HNSW 직관: <b>먼저 고속도로를 깔아요</b>. 맨 아래 전체 지도 외에, 점점 더 성긴 「지름길 지도」를 몇 층 더 저장합니다—쿼리는 가장 성긴 윗층에서 시작해 큰 점프 몇 번으로 구역을 잡고, 층을 내려가며 점점 촘촘히 뜁니다. 또 한 번의 <b>공간으로 시간을 사다</b>예요.</div>
+    <div class="race-foot">
+      <button class="btn-ds alt" id="btnBrute">🐢 하나씩 계산</button>
+      <button class="btn-ds" id="btnHnsw">🚀 HNSW 계층 점프</button>
+      <span class="race-status" id="raceStatus"></span>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>점 60개면 60번 vs 8번이고, 억 단위면 「몇 분 기다리기」와 「밀리초」의 차이예요.</b> 브루트포스 횟수는 데이터량과 1:1로 늘고; HNSW는 층마다 몇 점프로 큰 검색 범위를 잘라, 억 단위 벡터도 수십 걸이면 됩니다. 벡터 데이터베이스(Milvus, Pinecone, FAISS—언젠가 만나게 될 이름들)가 파는 핵심 실력은 이 「지름길 지도」를 잘 만들고 유지하는 거예요.
+  </div>
+
+  <div class="sec-label paywall-locked">이게 AI랑 무슨 상관인가요?</div>
+
+  <div class="nn-grid paywall-locked">
+    <div class="nn-card">
+      <div class="nn-icon">📚</div>
+      <h4>RAG 검색</h4>
+      <p>질문과 자료가 모두 좌표가 되고, <b>가장 가까운 자료 몇 단락</b>을 LLM에 넣습니다—매일 쓰는 「지식 베이스 기반 답변」의 밑바닥이 바로 이 페이지의 두 애니메이션이에요.</p>
+    </div>
+    <div class="nn-card">
+      <div class="nn-icon">🖼</div>
+      <h4>이미지로 이미지 찾기</h4>
+      <p>이미지도 Embedding으로 좌표가 됩니다. 소파 사진을 찍어 같은 제품을 찾는 건, 수억 장 이미지의 시맨틱 지도에서 <b>당신 사진의 이웃을 찾는</b> 일이에요.</p>
+    </div>
+    <div class="nn-card">
+      <div class="nn-icon">🎯</div>
+      <h4>취향 추천</h4>
+      <p>당신 취향도 좌표, 노래와 드라마도 좌표예요. 추천 시스템이 매일 하는 일: <b>당신과 가장 가까운 콘텐츠</b>를 찾아 내놓는 거죠.</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 이 강의가 전하고 싶은 것</h3>
+    <ul>
+      <li><b>의미 → 좌표</b>: Embedding이 문장·이미지마다 고차원 지도 위 자리를 줍니다</li>
+      <li><b>유사 → 거리</b>: 뜻이 가까울수록 좌표도 가깝다—「시맨틱 검색」의 전부예요</li>
+      <li><b>검색 → 이웃 찾기</b>: RAG, 이미지 검색, 추천은 모두 같은 「최근접 이웃 검색」 문제</li>
+      <li><b>속도는 계층 지름길</b>: HNSW가 성긴 「고속도로」를 몇 층 더 저장해 억 단위도 수십 걸음</li>
+      <li><b>또 공간으로 시간</b>: 저장을 더 써서 지름길 지도를 만들고, 검색을 분 단위에서 밀리초로</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 语义地图 ──
+   12 个词分三簇，❓ 可拖动/点击放置，实时连线最近 3 个词。 */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs){
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+const SEM_CLUSTERS = [
+  { name:'미식 구역', color:'#d97706', cx:145, cy:125, r:100 },
+  { name:'테크 구역', color:'#0284c7', cx:480, cy:120, r:95 },
+  { name:'감정 구역', color:'#7c3aed', cx:285, cy:315, r:90 },
+];
+const SEM_WORDS = [
+  { w:'훠궈', c:0, x:120, y:115 }, { w:'밀크티', c:0, x:190, y:68  },
+  { w:'BBQ', c:0, x:85,  y:180 }, { w:'스시', c:0, x:200, y:155 },
+  { w:'폰', c:1, x:445, y:95  }, { w:'칩', c:1, x:520, y:155 },
+  { w:'코드', c:1, x:425, y:175 }, { w:'AI',   c:1, x:510, y:72  },
+  { w:'기쁨', c:2, x:250, y:295 }, { w:'슬픔', c:2, x:330, y:345 },
+  { w:'화남', c:2, x:222, y:352 }, { w:'놀람', c:2, x:322, y:280 },
+];
+
+const semSvg = document.getElementById('semSvg');
+const semNarr = document.getElementById('semNarr');
+
+/* 街区晕染 */
+SEM_CLUSTERS.forEach(c => {
+  semSvg.appendChild(svgEl('circle', { cx:c.cx, cy:c.cy, r:c.r, fill:c.color, opacity:.07 }));
+  const t = svgEl('text', { class:'sem-halo-label', x:c.cx, y:c.cy - c.r + 16, 'text-anchor':'middle', fill:c.color });
+  t.textContent = c.name;
+  semSvg.appendChild(t);
+});
+/* 连线层（在词点下面） */
+const semLineLayer = svgEl('g', {});
+semSvg.appendChild(semLineLayer);
+/* 词点 */
+SEM_WORDS.forEach(p => {
+  const g = svgEl('g', { class:'sem-word' });
+  g.appendChild(svgEl('circle', { cx:p.x, cy:p.y, r:8, fill:SEM_CLUSTERS[p.c].color }));
+  const t = svgEl('text', { x:p.x, y:p.y - 14, 'text-anchor':'middle' });
+  t.textContent = p.w;
+  g.appendChild(t);
+  semSvg.appendChild(g);
+});
+/* 皇冠 */
+const crown = svgEl('text', { class:'sem-crown', x:0, y:0, 'text-anchor':'middle' });
+crown.textContent = '👑';
+semSvg.appendChild(crown);
+/* 查询点 */
+const query = { x:300, y:205 };
+const queryG = svgEl('g', { class:'sem-query' });
+queryG.appendChild(svgEl('circle', { r:13 }));
+const qt = svgEl('text', { y:5, 'text-anchor':'middle' });
+qt.textContent = '?';
+queryG.appendChild(qt);
+semSvg.appendChild(queryG);
+
+function semUpdate(){
+  queryG.setAttribute('transform', `translate(${query.x},${query.y})`);
+  const ranked = SEM_WORDS
+    .map(p => ({ p, d: Math.hypot(p.x - query.x, p.y - query.y) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 3);
+  semLineLayer.innerHTML = '';
+  ranked.forEach(({ p, d }, i) => {
+    semLineLayer.appendChild(svgEl('line', {
+      class:'sem-line' + (i === 0 ? ' first' : ''),
+      x1:query.x, y1:query.y, x2:p.x, y2:p.y,
+    }));
+    const mid = svgEl('text', { class:'sem-dist', x:(query.x + p.x) / 2, y:(query.y + p.y) / 2 - 4, 'text-anchor':'middle' });
+    mid.textContent = Math.round(d);
+    semLineLayer.appendChild(mid);
+  });
+  const best = ranked[0].p;
+  crown.setAttribute('x', best.x);
+  crown.setAttribute('y', best.y - 26);
+  const zone = SEM_CLUSTERS[best.c].name;
+  semNarr.innerHTML = `❓와 가장 가까운 이웃 3개: ${ranked.map(({p}, i) => (i === 0 ? `<b>「${p.w}」👑</b>` : `「${p.w}」`)).join(', ')} (❓는 지금 <b>${zone}</b> 근처). ❓가 질문이라면, RAG는 먼저 「${best.w}」 자료를 LLM에 건넵니다.`;
+}
+
+/* 拖动 + 点击放置 */
+function svgPoint(evt){
+  const pt = semSvg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  const p = pt.matrixTransform(semSvg.getScreenCTM().inverse());
+  return { x: Math.max(16, Math.min(624, p.x)), y: Math.max(16, Math.min(384, p.y)) };
+}
+let dragging = false;
+queryG.addEventListener('pointerdown', e => { dragging = true; queryG.setPointerCapture(e.pointerId); e.preventDefault(); });
+queryG.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const p = svgPoint(e);
+  query.x = p.x; query.y = p.y;
+  semUpdate();
+});
+queryG.addEventListener('pointerup', () => { dragging = false; });
+semSvg.addEventListener('click', e => {
+  if (e.target.closest('.sem-query')) return;
+  const p = svgPoint(e);
+  query.x = p.x; query.y = p.y;
+  semUpdate();
+});
+semUpdate();
+
+/* ── 暴力 vs HNSW ──
+   固定种子的伪随机撒 60 个点，保证每次打开布局一致。
+   HNSW 路径按「距目标由远到近」取样模拟：高层 3 跳、中层 2 跳、底层 3 跳，共 8 次计算。 */
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20260810);
+const RACE_PTS = [];
+for (let i = 0; i < 60; i++){
+  RACE_PTS.push({ x: 30 + rand() * 580, y: 30 + rand() * 300 });
+}
+const TARGET = { x: 455, y: 110 };
+
+const raceSvg = document.getElementById('raceSvg');
+const raceNarr = document.getElementById('raceNarr');
+const raceStatus = document.getElementById('raceStatus');
+const bruteNum = document.getElementById('bruteNum');
+const hnswNum = document.getElementById('hnswNum');
+const btnBrute = document.getElementById('btnBrute');
+const btnHnsw = document.getElementById('btnHnsw');
+
+const jumpLayer = svgEl('g', {});
+raceSvg.appendChild(jumpLayer);
+const racePtEls = RACE_PTS.map(p => {
+  const c = svgEl('circle', { class:'race-pt', cx:p.x, cy:p.y, r:5 });
+  raceSvg.appendChild(c);
+  return c;
+});
+const targetEl = svgEl('text', { class:'race-target', x:TARGET.x, y:TARGET.y + 7, 'text-anchor':'middle', 'font-size':'22' });
+targetEl.textContent = '🌟';
+raceSvg.appendChild(targetEl);
+const layerTag = svgEl('text', { class:'race-layer-tag', x:18, y:26 });
+raceSvg.appendChild(layerTag);
+
+/* 按距目标远近排序的索引 */
+const byDist = RACE_PTS
+  .map((p, i) => ({ i, d: Math.hypot(p.x - TARGET.x, p.y - TARGET.y) }))
+  .sort((a, b) => a.d - b.d)
+  .map(o => o.i);
+const NEAREST = byDist[0];
+
+let raceBusy = false;
+function raceSleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+function raceReset(){
+  racePtEls.forEach(c => c.classList.remove('flash','visited','hop','answer'));
+  racePtEls.forEach(c => c.setAttribute('r', 5));
+  jumpLayer.innerHTML = '';
+  layerTag.classList.remove('on');
+}
+
+btnBrute.addEventListener('click', async () => {
+  if (raceBusy) return;
+  raceBusy = true;
+  btnBrute.disabled = true; btnHnsw.disabled = true;
+  raceReset();
+  bruteNum.textContent = '0';
+  bruteNum.classList.remove('hot');
+  raceNarr.innerHTML = '<b>하나씩 계산:</b> 따지지 않고 점 60개마다 거리를 재요. 하나도 빼먹으면 안 됩니다—다 재기 전에는 누가 가장 가까운지 말할 수 없거든요.';
+  for (let k = 0; k < RACE_PTS.length; k++){
+    racePtEls[k].classList.add('flash');
+    bruteNum.textContent = String(k + 1);
+    await raceSleep(55);
+    racePtEls[k].classList.remove('flash');
+    racePtEls[k].classList.add('visited');
+  }
+  bruteNum.classList.add('hot');
+  racePtEls[NEAREST].classList.remove('visited');
+  racePtEls[NEAREST].classList.add('answer');
+  racePtEls[NEAREST].setAttribute('r', 8);
+  raceNarr.innerHTML = '<b>60번을 다 잰 뒤에야</b> 초록 점이 최근접 이웃이라고 말할 수 있어요. 데이터가 두 배면 횟수도 두 배—점 1억 개면 계산 1억 번입니다.';
+  raceStatus.textContent = '이어서 「HNSW 계층 점프」로 비교 →';
+  btnBrute.disabled = false; btnHnsw.disabled = false;
+  raceBusy = false;
+});
+
+btnHnsw.addEventListener('click', async () => {
+  if (raceBusy) return;
+  raceBusy = true;
+  btnBrute.disabled = true; btnHnsw.disabled = true;
+  raceReset();
+  hnswNum.textContent = '0';
+  hnswNum.classList.remove('hot');
+  /* 路径：入口取最远点，然后按名次递减取样，模拟逐层逼近 */
+  const path = [byDist[59], byDist[38], byDist[22], byDist[11], byDist[6], byDist[3], byDist[1], byDist[0]];
+  const layers = [
+    { name:'⛰ 윗층: 성긴 지름길 지도, 큰 점프', cls:'high', hops:[0,1,2] },
+    { name:'🏔 중간층: 지름길이 촘촘, 보폭이 작아짐', cls:'mid',  hops:[3,4] },
+    { name:'🏡 바닥: 전체 지도, 집 앞까지 정밀', cls:'low',  hops:[5,6,7] },
+  ];
+  let count = 0;
+  for (const layer of layers){
+    layerTag.textContent = layer.name;
+    layerTag.classList.add('on');
+    raceNarr.innerHTML = `<b>${layer.name}</b>—한 점프마다 옆 「이정표」 몇 개와 거리만 비교하면 어느 쪽으로 갈지 알 수 있어요.`;
+    for (const h of layer.hops){
+      const idx = path[h];
+      racePtEls[idx].classList.add('hop');
+      racePtEls[idx].setAttribute('r', 7);
+      count++;
+      hnswNum.textContent = String(count);
+      if (h > 0){
+        const a = RACE_PTS[path[h-1]], b = RACE_PTS[idx];
+        const line = svgEl('line', { class:`race-jump ${layer.cls}`, x1:a.x, y1:a.y, x2:b.x, y2:b.y });
+        jumpLayer.appendChild(line);
+        requestAnimationFrame(() => line.classList.add('on'));
+      }
+      await raceSleep(620);
+    }
+  }
+  hnswNum.classList.add('hot');
+  racePtEls[NEAREST].classList.remove('hop');
+  racePtEls[NEAREST].classList.add('answer');
+  racePtEls[NEAREST].setAttribute('r', 8);
+  layerTag.classList.remove('on');
+  raceNarr.innerHTML = `<b>계산 8번으로 같은 초록 점에 도착</b>(브루트포스는 60번). 핵심: 데이터가 1억이 되어도 HNSW는 십여 점프만 더하면 됩니다—큰 점프마다 넓은 영역을 잘라 내거든요. 벡터 DB가 「억 단위 밀리초」를 내는 이유예요.`;
+  raceStatus.textContent = '60번 vs 8번, 격차는 데이터량에 따라 지수적으로 커져요';
+  btnBrute.disabled = false; btnHnsw.disabled = false;
+  raceBusy = false;
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  lessonOnView(raceSvg, () => { raceStatus.textContent = '👆 먼저 「하나씩 계산」, 그다음 「계층 점프」'; });
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.ko.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

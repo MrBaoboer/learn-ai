@@ -38,6 +38,8 @@
 .stats-bar{display:flex;gap:16px;margin-top:14px;padding:12px 16px;background:var(--bg);border-radius:var(--radius-sm);border:1.5px solid var(--border);flex-wrap:wrap}
 .stat-item{font-size:13px;color:var(--sub)}
 .stat-item b{font-weight:800}
+.stat-warn{flex-basis:100%;display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--danger);line-height:1.5}
+.stat-warn svg{flex-shrink:0}
 
 .takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
 .takeaway b{color:var(--accent)}
@@ -54,9 +56,9 @@
 <meta property="og:site_name" content="xueai.app · AI Product Manager Training">
 <meta property="og:title" content="Compression Is the Art of Trade-offs">
 <meta property="og:url" content="https://xueai.app/slides/9-12.en.html">
-<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image" content="https://xueai.app/slides/og/9-12.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta property="og:locale" content="en_US">
-<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Compression Is the Art of Trade-offs","name":"Compression Is the Art of Trade-offs","url":"https://xueai.app/slides/9-12.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI in Practice · Context Management","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Some can be deleted, some cannot, some require paid compression: context compression is about finding balance between information value and token cost.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<!--seo:begin--><script type="application/ld+json">{"datePublished":"2026-08-07","dateModified":"2026-08-18","@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Compression Is the Art of Trade-offs","name":"Compression Is the Art of Trade-offs","url":"https://xueai.app/slides/9-12.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI in Practice · Context Management","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Some can be deleted, some cannot, some require paid compression: context compression is about finding balance between information value and token cost.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><meta property="og:description" content="Some can be deleted, some cannot, some require paid compression: context compression is about finding balance between information value and token cost."><meta name="twitter:card" content="summary_large_image"><!--seo:end-->
 <link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
 </head>
 <body>
@@ -112,7 +114,7 @@
   </div>
 
 </article>
-<script src="i18n.js?v=20260816b"></script>
+<script src="i18n.js?v=20260823c"></script>
 <script src="lesson.js"></script>
 <script>
 var messages = [
@@ -127,17 +129,31 @@ var messages = [
   { role: 'user', type: 'role-user', text: 'Gora Kadan sounds great, book that one. Please compile the full itinerary.', tokens: 38 }
 ];
 
+// 三档有效策略按激进程度递增，各自踩的红线不同。「激进全压」连用户自己的发言一起压，
+// 而页面下方的决策框架把用户原始消息列为不能动，省得最多却把预算和偏好丢了，
+// 是留给学员的反面教材。
+// 约束：actions 下标与 messages 严格一一对应；三档的 actions 不得雷同
+// （历史上策略 C 曾与策略 B 完全相同）。
 var strategies = [
   { name: 'Original', actions: ['keep','keep','keep','keep','keep','keep','keep','keep','keep'] },
   { name: 'Delete old tools', actions: ['keep','keep','keep','delete','keep','keep','delete','keep','keep'] },
   { name: 'Compress AI output', actions: ['keep','keep','compress','delete','compress','keep','delete','compress','keep'] },
-  { name: 'Aggressive compression', actions: ['keep','keep','compress','delete','compress','keep','delete','compress','keep'] }
+  { name: 'Aggressive compression', actions: ['keep','compress','delete','delete','delete','compress','delete','compress','keep'] }
 ];
 
+// 下标 1、5 只在「激进全压」里被压缩，2、4 只在「压缩 AI 输出」里被压缩，互不冲突
 var compressedTexts = {
+  1: '[Summary] User wants a 7-day trip to Japan',
   2: '[Summary] Recommended: Tokyo 3 days + Hakone 2 days + Osaka 2 days',
   4: '[Summary] Recommend Air China CA925, ¥3200',
+  5: '[Summary] User confirmed the flight, moving on to hotels',
   7: '[Summary] Recommend Gora Kadan hot spring hotel in Hakone, ¥1200/night'
+};
+
+// 哪档策略碰了「不能动」这条线就要在结果里明说，否则学员只看节省比例，
+// 会把省得最多的一档当成最优解
+var RISKY_STRATEGY_NOTE = {
+  3: 'Saves the most, but the budget and preferences are gone, so the model will forget them'
 };
 
 function applyStrategy(idx) {
@@ -183,14 +199,16 @@ function applyStrategy(idx) {
 
   var statsBar = document.getElementById('statsBar');
   var savePct = totalTokens > 0 ? Math.round((savedTokens / totalTokens) * 100) : 0;
-  statsBar.innerHTML = '<span class="stat-item">原始: <b>' + totalTokens + '</b> tokens</span>'
-    + '<span class="stat-item">压缩后: <b style="color:var(--success)">' + keptTokens + '</b> tokens</span>'
-    + '<span class="stat-item">节省: <b style="color:var(--accent)">' + savePct + '%</b></span>';
+  var warn = RISKY_STRATEGY_NOTE[idx];
+  statsBar.innerHTML = '<span class="stat-item">Original: <b>' + totalTokens + '</b> tokens</span>'
+    + '<span class="stat-item">After: <b style="color:var(--success)">' + keptTokens + '</b> tokens</span>'
+    + '<span class="stat-item">Saved: <b style="color:var(--accent)">' + savePct + '%</b></span>'
+    + (warn ? '<span class="stat-warn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>' + warn + '</span>' : '');
 }
 
 applyStrategy(0);
 </script>
-<script src="nav-inject.js?v=20260816b"></script>
+<script src="nav-inject.js?v=20260823c"></script>
 <!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
 <script src="skill-data.en.js?v=20260817a"></script>
 <script src="skill-copy.js?v=20260817a"></script>

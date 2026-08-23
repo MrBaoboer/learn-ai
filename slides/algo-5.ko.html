@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI 속 정렬의 진짜 모습: Rerank | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="RAG가 가져온 문단은 그대로 쓸 수 없어요: 먼저 조검색, 그다음 정밀 랭킹. 가중치를 직접 조절하며 후보 문단이 어떻게 다시 섞이는지 보세요—추천 피드와 검색 결과도 마찬가지입니다. LLM 엔지니어링 속 정렬 사고의 진짜 모습.">
+<meta name="keywords" content="Rerank,재정렬,RAG,조검색,정밀 랭킹,2단계 검색,추천 시스템 정렬,벡터 검색">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-5.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/algo-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/algo-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/algo-5.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/algo-5.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="AI 속 정렬의 진짜 모습: Rerank">
+<meta property="og:description" content="Rerank 모델을 직접 해 보세요: 가중치 슬라이더 세 개를 드래그하며 후보 문단이 실시간으로 섞이고, 구버전 정책이 올바른 조항에 밀려 내려가는 모습을 봅니다.">
+<meta property="og:url" content="https://xueai.app/slides/algo-5.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/algo-5.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI 속 정렬의 진짜 모습: Rerank">
+<meta name="twitter:description" content="Rerank 모델을 직접 해 보세요: 가중치 슬라이더 세 개를 드래그하며 후보 문단이 실시간으로 섞이고, 구버전 정책이 올바른 조항에 밀려 내려가는 모습을 봅니다.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── Rerank 操作台 ── */
+.rr-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.rr-query{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.03);border-radius:var(--radius-sm);padding:11px 16px;margin-bottom:18px}
+.rr-query .rq-icon{font-size:17px}
+.rr-query .rq-text{font-size:14px;font-weight:800;color:var(--text)}
+.rr-query .rq-tag{margin-left:auto;font-size:10.5px;font-weight:800;color:var(--al);background:var(--al-soft);padding:2px 10px;border-radius:99px;white-space:nowrap}
+.rr-weights{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.rr-w{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px}
+.rr-w label{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;font-weight:800;color:var(--text);margin-bottom:6px}
+.rr-w label b{font-size:15px;font-weight:900;color:var(--al);font-variant-numeric:tabular-nums}
+.rr-w input[type=range]{width:100%;accent-color:var(--al)}
+.rr-list{position:relative}
+.rr-item{position:absolute;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:12px;transition:top .45s cubic-bezier(.25,1,.5,1),border-color .3s,background .3s;height:74px;overflow:hidden}
+.rr-item.top1{border-color:rgba(22,163,74,.45);background:rgba(22,163,74,.04)}
+.rr-item.top1.trap{border-color:rgba(220,38,38,.45);background:rgba(220,38,38,.04)}
+.rr-rank{width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.06);color:var(--sub);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:900;flex-shrink:0;transition:background .3s,color .3s}
+.rr-item.top1 .rr-rank{background:var(--success);color:#fff}
+.rr-item.top1.trap .rr-rank{background:var(--danger);color:#fff}
+.rr-main{flex:1;min-width:0}
+.rr-title{font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rr-title .rt-tag{font-size:10px;font-weight:800;padding:1px 8px;border-radius:99px;margin-left:6px;vertical-align:1px}
+.rt-tag.good{background:rgba(22,163,74,.12);color:var(--success)}
+.rt-tag.bad{background:rgba(220,38,38,.12);color:var(--danger)}
+.rr-bars{display:flex;gap:10px;margin-top:6px}
+.rr-b{flex:1;display:flex;align-items:center;gap:5px}
+.rr-b .rb-name{font-size:9.5px;font-weight:800;color:var(--sub);flex-shrink:0;width:36px}
+.rr-b .rb-track{flex:1;height:6px;border-radius:3px;background:rgba(0,0,0,.06);overflow:hidden}
+.rr-b .rb-fill{height:100%;border-radius:3px}
+.rb-fill.sim{background:#2563eb}
+.rb-fill.kw{background:#d97706}
+.rb-fill.fresh{background:#16a34a}
+.rr-score{flex-shrink:0;text-align:right;width:56px}
+.rr-score .rs-num{font-size:18px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.2}
+.rr-score .rs-label{font-size:9.5px;font-weight:800;color:var(--sub)}
+.rr-note{margin-top:14px;padding:13px 16px;border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;transition:background .3s,border-color .3s}
+.rr-note.warn{background:rgba(220,38,38,.05);border:1.5px dashed rgba(220,38,38,.35);color:#7f1d1d}
+.rr-note.ok{background:rgba(22,163,74,.05);border:1.5px dashed rgba(22,163,74,.35);color:#14532d}
+.rr-note b{font-weight:800}
+
+/* ── 漏斗 ── */
+.funnel-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:24px}
+.funnel{display:flex;flex-direction:column;align-items:center;gap:0}
+.fn-stage{border-radius:10px;padding:13px 18px;text-align:center;color:#fff;transition:transform .5s,opacity .5s;opacity:0;transform:translateY(10px)}
+.fn-stage.show{opacity:1;transform:translateY(0)}
+.fn-stage .fs-num{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.2}
+.fn-stage .fs-name{font-size:11.5px;font-weight:800;opacity:.92;margin-top:2px}
+.fn-s1{width:100%;background:linear-gradient(135deg,#f472b6,#db2777)}
+.fn-s2{width:62%;background:linear-gradient(135deg,#db2777,#be185d)}
+.fn-s3{width:32%;background:linear-gradient(135deg,#be185d,#9d174d)}
+.fn-arrow{display:flex;flex-direction:column;align-items:center;padding:6px 0;opacity:0;transition:opacity .5s}
+.fn-arrow.show{opacity:1}
+.fn-arrow .fa-glyph{font-size:15px;color:var(--al)}
+.fn-arrow .fa-label{font-size:11.5px;font-weight:800;color:var(--al-deep);background:var(--al-soft);padding:3px 14px;border-radius:99px;margin-top:2px;white-space:nowrap}
+.funnel-qa{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+.fq-card{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px}
+.fq-card h5{font-size:13px;font-weight:800;color:var(--text);margin-bottom:5px}
+.fq-card p{font-size:12.5px;color:var(--sub);line-height:1.75}
+.fq-card p b{color:var(--al-deep)}
+
+/* ── AI 关联 ── */
+.same-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.same-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:16px 18px}
+.same-card .sc-icon{font-size:24px;margin-bottom:8px}
+.same-card h4{font-size:14px;font-weight:800;color:var(--text);margin-bottom:5px}
+.same-card p{font-size:12.5px;color:var(--sub);line-height:1.7}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .rr-weights{grid-template-columns:1fr}
+  .rr-item{height:96px;flex-wrap:wrap;padding:9px 12px}
+  .rr-bars{gap:6px}
+  .funnel-qa{grid-template-columns:1fr}
+  .same-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"AI 속 정렬의 진짜 모습: Rerank","name":"AI 속 정렬의 진짜 모습: Rerank","url":"https://xueai.app/slides/algo-5.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 중급까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 탐색과 정렬","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"RAG가 가져온 문단은 그대로 쓸 수 없어요: 먼저 조검색, 그다음 정밀 랭킹. 가중치를 직접 조절하며 후보 문단이 어떻게 다시 섞이는지 보세요—추천 피드와 검색 결과도 마찬가지입니다. LLM 엔지니어링 속 정렬 사고의 진짜 모습.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">프로그래밍 기초편 · 탐색과 정렬</div>
+    <h1>AI 속 정렬의 진짜 모습: Rerank</h1>
+    <p class="subtitle">지난 강의의 정렬은 숫자 크기를 겨뤘지만, AI 세계에서는 “관련성”을 줄 세웁니다: RAG가 지식 베이스에서 문단을 잔뜩 건져 오면, <b>앞에 선 쪽이 컨텍스트에 끼어들 수 있어요</b>—줄이 틀리면 모델이 틀린 자료를 진지하게 인용합니다. 이 “점수 + 재정렬” 단계가 Rerank예요. 오늘은 직접 투입되어 Rerank 모델을 해 봅니다.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>RAG가 가져온 문단은 그대로 쓸 수 없어요: 먼저 조검색, 그다음 정밀 랭킹. 가중치를 직접 조절하며 후보 문단이 어떻게 다시 섞이는지 보세요—추천 피드와 검색 결과도 마찬가지</p></aside><!--seo:end-->  <div class="sec-label">인터랙티브 · Rerank 모델을 직접 해 보기</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">장면: 사용자가 고객센터 봇에 “반품 정책이 뭔가요?”라고 묻자, 조검색이 지식 베이스에서 후보 문단 5개를 건져 옵니다. 각 항목에 점수 세 가지: <b style="color:#2563eb">벡터 유사도</b>(뜻이 비슷함), <b style="color:#d97706">키워드 적중</b>(글자 그대로 맞춤), <b style="color:#16a34a">신선도</b>(문서가 얼마나 새것인지). 손에 가중치 슬라이더 세 개, 총점 = 세 점수의 가중 평균. <b style="color:var(--text)">주의: 처음엔 유사도만 무거워서 1위가 사실 2023년 구버전 정책입니다—“신선도” 가중치를 올려 올바른 조항이 어떻게 정상에 오르는지 보세요.</b></p>
+
+  <div class="rr-box">
+    <div class="rr-query">
+      <span class="rq-icon">💬</span>
+      <span class="rq-text">반품 정책이 뭔가요?</span>
+      <span class="rq-tag">조검색 리콜 후보 5개</span>
+    </div>
+    <div class="rr-weights">
+      <div class="rr-w">
+        <label><span style="color:#2563eb">벡터 유사도 가중치</span><b id="wvSim">10</b></label>
+        <input type="range" id="wSim" min="0" max="10" value="10">
+      </div>
+      <div class="rr-w">
+        <label><span style="color:#d97706">키워드 적중 가중치</span><b id="wvKw">3</b></label>
+        <input type="range" id="wKw" min="0" max="10" value="3">
+      </div>
+      <div class="rr-w">
+        <label><span style="color:#16a34a">신선도 가중치</span><b id="wvFresh">0</b></label>
+        <input type="range" id="wFresh" min="0" max="10" value="0">
+      </div>
+    </div>
+    <div class="rr-list" id="rrList"></div>
+    <div class="rr-note warn" id="rrNote"></div>
+  </div>
+
+  <div class="sec-label">핵심 개념 · 2단계 퍼널</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">방금 하신 일은 실제 시스템에선 “정밀 랭킹”—퍼널의 마지막 층입니다. 전체 흐름은 이렇게 생겼어요(여기로 스크롤하면 자동 재생):</p>
+
+  <div class="funnel-box paywall-locked xa-peek">
+    <div class="funnel" id="funnel">
+      <div class="fn-stage fn-s1"><div class="fs-num" id="fnNum1">0</div><div class="fs-name">지식 베이스 전체 문서</div></div>
+      <div class="fn-arrow"><span class="fa-glyph">▼</span><span class="fa-label">조검색: 벡터 이웃, 빠르고 거칠게</span></div>
+      <div class="fn-stage fn-s2"><div class="fs-num" id="fnNum2">0</div><div class="fs-name">개 후보 문단</div></div>
+      <div class="fn-arrow"><span class="fa-glyph">▼</span><span class="fa-label">정밀 랭킹 Rerank: 한 줄씩 자세히, 비싸지만 정확</span></div>
+      <div class="fn-stage fn-s3"><div class="fs-num" id="fnNum3">0</div><div class="fs-name">개 최종으로 컨텍스트에 넣음</div></div>
+    </div>
+    <div class="funnel-qa">
+      <div class="fq-card">
+        <h5>왜 전부 정밀 랭킹을 안 쓰나요?</h5>
+        <p><b>비싸요.</b> 정밀 랭킹은 “질문 + 문단” 쌍을 모델에 넣어 한 줄씩 읽습니다. 100만 건을 그렇게 하면 한 시간 기다리고 돈이 타요. 그래서 싼 조검색으로 100만을 먼저 50으로 줄입니다.</p>
+      </div>
+      <div class="fq-card">
+        <h5>왜 전부 조검색만 안 쓰나요?</h5>
+        <p><b>부정확해요.</b> 조검색은 벡터 거리만 봐서 “현행 정책”과 “구버전 정책”을 구분 못 합니다—방금 직접 보셨죠. 그래서 마지막 50개는 비싼 모델이 한 줄씩 게이트키핑합니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>엔지니어링 = 퍼널 각 층에 돈을 제대로 쓰기.</b>빠르고 거친 알고리즘이 오디션을, 비싸고 정확한 모델이 결승을 담당합니다—2단계가 각자 할 일을 해야 총비용과 총품질이 동시에 목표에 닿아요. 이 “층마다 돈 쓰기” 사고는 캐시·추천·검수 시스템에서도 반복해서 만납니다.
+  </div>
+
+  <div class="sec-label paywall-locked">다른 곳에서도 같은 패턴 · 전부 “먼저 건지고 나중에 줄 세우기”</div>
+
+  <div class="same-grid paywall-locked">
+    <div class="same-card">
+      <div class="sc-icon">🔍</div>
+      <h4>검색 결과 정렬</h4>
+      <p>검색 엔진은 먼저 수조 페이지에서 조검색으로 리콜한 뒤, 관련성·권위·신선도로 점수를 매겨 정밀 랭킹합니다—당신이 보는 첫 페이지가 Rerank의 산출물이에요.</p>
+    </div>
+    <div class="same-card">
+      <div class="sc-icon">📱</div>
+      <h4>추천 피드</h4>
+      <p>숏폼은 먼저 수천 후보를 거칠게 거른 뒤, 정밀 랭킹 모델이 “끝까지 볼까?”를 예측해 한 줄씩 점수를 매깁니다. 홈 피드 순서는 하루에 수십 번 재정렬됩니다.</p>
+    </div>
+    <div class="same-card">
+      <div class="sc-icon">📚</div>
+      <h4>RAG 검색</h4>
+      <p>오늘의 홈그라운드예요: 벡터 이웃으로 거칠게 건지고, Rerank로 정밀 선별—마지막 몇 개만 귀한 컨텍스트를 차지할 자격이 있어요. 지난 장의 O(n²) 청구서, 기억나죠?</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>이 강의가 전하고 싶은 것</h3>
+    <ul>
+      <li><b>AI 시대 정렬의 진짜 모습은 점수 + 재정렬</b>: 겨루는 건 숫자 크기가 아니라 관련성 점수예요</li>
+      <li><b>가중치가 곧 가치관</b>: 유사도만 보면 옛 자료가 올라오고, 다차원 점수가 있어야 믿을 만해요</li>
+      <li><b>2단계 퍼널</b>: 조검색은 빠르고 거칠게 오디션, 정밀 랭킹은 비싸지만 정확하게 결승</li>
+      <li><b>퍼널을 층으로 나누는 건 돈을 아끼는 예술</b>: 검색·추천·RAG 전부 “먼저 건지고 나중에 줄 세우기”예요</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ═══ 亲手当一次 Rerank 模型 ═══
+   总分 = (wS·相似度 + wK·关键词 + wF·新鲜度) / (wS+wK+wF)，×100 显示。
+   列表用绝对定位 + top 过渡做平滑换位：每次重算只改 top，浏览器自己补动画。 */
+const DOCS = [
+  { id:'new',    title:'반품 정책 (2026 현행)',   tag:'정답', tagCls:'good', sim:.92, kw:.95, fresh:.96 },
+  { id:'old',    title:'반품 정책 (2023 구버전)',     tag:'만료됨',   tagCls:'bad',  sim:.95, kw:.96, fresh:.12 },
+  { id:'exch',   title:'교환 정책',                  tag:'',         tagCls:'',     sim:.86, kw:.58, fresh:.90 },
+  { id:'ship',   title:'물류 소요 안내',              tag:'',         tagCls:'',     sim:.62, kw:.32, fresh:.88 },
+  { id:'review', title:'사용자 리뷰: “반품이 꽤 순조로웠어…”',   tag:'',         tagCls:'',     sim:.74, kw:.78, fresh:.55 },
+];
+
+const rrList = document.getElementById('rrList');
+rrList.innerHTML = DOCS.map(d => `
+  <div class="rr-item" id="rr-${d.id}">
+    <div class="rr-rank">-</div>
+    <div class="rr-main">
+      <div class="rr-title">${d.title}${d.tag ? `<span class="rt-tag ${d.tagCls}">${d.tag}</span>` : ''}</div>
+      <div class="rr-bars">
+        <div class="rr-b"><span class="rb-name">유사</span><div class="rb-track"><div class="rb-fill sim" style="width:${d.sim*100}%"></div></div></div>
+        <div class="rr-b"><span class="rb-name">키워드</span><div class="rb-track"><div class="rb-fill kw" style="width:${d.kw*100}%"></div></div></div>
+        <div class="rr-b"><span class="rb-name">신선</span><div class="rb-track"><div class="rb-fill fresh" style="width:${d.fresh*100}%"></div></div></div>
+      </div>
+    </div>
+    <div class="rr-score"><div class="rs-num">-</div><div class="rs-label">총점</div></div>
+  </div>`).join('');
+
+const sliders = {
+  sim:   { input: document.getElementById('wSim'),   label: document.getElementById('wvSim') },
+  kw:    { input: document.getElementById('wKw'),    label: document.getElementById('wvKw') },
+  fresh: { input: document.getElementById('wFresh'), label: document.getElementById('wvFresh') },
+};
+const rrNote = document.getElementById('rrNote');
+const GAP = 10;
+
+function itemHeight(){
+  return rrList.firstElementChild.offsetHeight + GAP;
+}
+
+function rerank(){
+  const wS = +sliders.sim.input.value;
+  const wK = +sliders.kw.input.value;
+  const wF = +sliders.fresh.input.value;
+  sliders.sim.label.textContent = wS;
+  sliders.kw.label.textContent = wK;
+  sliders.fresh.label.textContent = wF;
+  const wSum = wS + wK + wF;
+
+  const scored = DOCS.map(d => ({
+    ...d,
+    score: wSum === 0 ? 0 : (wS*d.sim + wK*d.kw + wF*d.fresh) / wSum
+  }));
+  scored.sort((a,b) => b.score - a.score);
+
+  const h = itemHeight();
+  rrList.style.height = (DOCS.length * h - GAP) + 'px';
+  scored.forEach((d, rank) => {
+    const el = document.getElementById('rr-' + d.id);
+    el.style.top = (rank * h) + 'px';
+    el.querySelector('.rr-rank').textContent = rank + 1;
+    el.querySelector('.rs-num').textContent = Math.round(d.score * 100);
+    el.classList.toggle('top1', rank === 0);
+    el.classList.toggle('trap', rank === 0 && d.id === 'old');
+  });
+
+  const top = scored[0];
+  if (wSum === 0){
+    rrNote.className = 'rr-note warn';
+    rrNote.innerHTML = '<b>가중치가 전부 0이라 모델이 손을 탁 놓아요.</b> 적어도 하나에 가중치를 줘야 정렬 근거가 생겨요.';
+  } else if (top.id === 'old'){
+    rrNote.className = 'rr-note warn';
+    rrNote.innerHTML = '<b>⚠️ 위험: 1위가 2023년 구버전 정책입니다.</b> 벡터 유사도와 키워드 점수가 둘 다 최고예요—겉으로는 답과 너무 “닮아” 보입니다. 하지만 이미 만료됐고, 모델이 인용하면 틀리게 답합니다. <b>“신선도” 가중치를 올려 보세요.</b>';
+  } else if (top.id === 'new'){
+    rrNote.className = 'rr-note ok';
+    rrNote.innerHTML = '<b>✅ 올바른 조항이 정상에 올랐어요.</b> 신선도라는 차원을 더하니 구버전 정책이 눌렸습니다. 이게 Rerank의 가치예요: <b>단일 차원은 속이고, 다차원 점수가 “진짜 관련”에 가깝습니다</b>—실제 Rerank 모델이 배우는 것도 이 차원들을 어떻게 저울질할지입니다.';
+  } else {
+    rrNote.className = 'rr-note warn';
+    rrNote.innerHTML = `<b>지금 1위는 “${top.title}”입니다.</b> 반품 정책 질문에는 답할 수 없어요—가중치 배합을 아직 못 맞췄으니 계속 조절해 보세요: 유사도와 신선도가 둘 다 어느 비중을 가져야 합니다.`;
+  }
+}
+
+Object.values(sliders).forEach(s => s.input.addEventListener('input', rerank));
+window.addEventListener('resize', rerank);
+rerank();
+
+/* ═══ 两阶段漏斗：进入视口后逐层点亮 + 数字滚动 ═══ */
+const funnel = document.getElementById('funnel');
+const fnStages = [...funnel.querySelectorAll('.fn-stage')];
+const fnArrows = [...funnel.querySelectorAll('.fn-arrow')];
+
+function countUp(el, target, suffix, dur){
+  const t0 = performance.now();
+  function tick(now){
+    const p = Math.min((now - t0) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * eased).toLocaleString('ko-KR') + suffix;
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+let funnelPlayed = false;
+async function playFunnel(){
+  if (funnelPlayed) return;
+  funnelPlayed = true;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  fnStages[0].classList.add('show');
+  countUp(document.getElementById('fnNum1'), 1000000, '건', 900);
+  await sleep(700);
+  fnArrows[0].classList.add('show');
+  await sleep(400);
+  fnStages[1].classList.add('show');
+  countUp(document.getElementById('fnNum2'), 50, '', 700);
+  await sleep(700);
+  fnArrows[1].classList.add('show');
+  await sleep(400);
+  fnStages[2].classList.add('show');
+  countUp(document.getElementById('fnNum3'), 3, '', 500);
+}
+
+window.addEventListener('load', () => {
+  if (typeof lessonOnView === 'function') lessonOnView(funnel, playFunnel);
+  else playFunnel();
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

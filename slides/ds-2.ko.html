@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>배열: 당신이 나눈 말 한마디가 그 안에 있어요 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="message list는 곧 배열이에요: 번호 달린 칸이 당신과 AI의 말 한마디를 어떻게 담는지, 컨텍스트 윈도우가 왜 「머리는 자르고 꼬리는 남긴다」인지, 오래 채팅하면 왜 까먹는지. 배열 가운데에 직접 데이터를 하나 꽂아 보고, 오른쪽이 몇 번 이사해야 하는지 세어 보세요——대화 이력이 왜 뒤로만 자라는지 바로 이해돼요.">
+<meta name="keywords" content="배열이란,message list,컨텍스트 윈도우,컨텍스트 절단,배열 삽입,append-only,자료구조 배열,입문 자료구조">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-2.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ds-2.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ds-2.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ds-2.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ds-2.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="배열: 당신이 나눈 말 한마디가 그 안에 있어요">
+<meta property="og:description" content="message list는 곧 배열이에요: 컨텍스트 윈도우가 왜 「머리는 자르고 꼬리는 남긴다」인지, 오래 채팅하면 왜 까먹는지. 배열 가운데에 하나 꽂는 게 얼마나 비싼지도 보세요.">
+<meta property="og:url" content="https://xueai.app/slides/ds-2.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/ds-2.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="배열: 당신이 나눈 말 한마디가 그 안에 있어요">
+<meta name="twitter:description" content="message list는 곧 배열이에요: 컨텍스트 윈도우가 왜 「머리는 자르고 꼬리는 남긴다」인지, 오래 채팅하면 왜 까먹는지. 배열 가운데에 하나 꽂는 게 얼마나 비싼지도 보세요.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── 对话数组 ── */
+.chatarr-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.chatarr-legend{display:flex;gap:16px;flex-wrap:wrap;padding:11px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015);font-size:12px;font-weight:700;color:var(--sub)}
+.lg-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.chatarr-strip{display:flex;gap:10px;padding:18px 16px 16px;overflow-x:auto;align-items:stretch;scroll-behavior:smooth}
+.arr-cell{flex:0 0 112px;display:flex;flex-direction:column;gap:5px;transition:opacity .5s,filter .5s}
+.arr-idx{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:11.5px;font-weight:800;color:var(--sub);text-align:center}
+.arr-bubble{flex:1;border-radius:10px;padding:8px 10px;font-size:11.5px;line-height:1.55;border:1.5px solid transparent;min-height:66px;font-weight:600}
+.arr-cell.system .arr-bubble{background:rgba(100,116,139,.12);color:#475569;border-color:rgba(100,116,139,.3)}
+.arr-cell.user .arr-bubble{background:rgba(2,132,199,.1);color:var(--ds-deep);border-color:rgba(2,132,199,.28)}
+.arr-cell.assistant .arr-bubble{background:rgba(22,163,74,.09);color:#166534;border-color:rgba(22,163,74,.26)}
+.arr-role{font-size:10px;font-weight:800;text-align:center;color:var(--sub);letter-spacing:.4px}
+.arr-winbar{height:4px;border-radius:2px;background:transparent;transition:background .4s}
+.arr-cell.inwin .arr-winbar{background:var(--ds)}
+.arr-cell.evicted{opacity:.32;filter:grayscale(.9)}
+@keyframes cellIn{from{opacity:0;transform:translateY(14px) scale(.85)}to{opacity:1;transform:none}}
+.arr-cell.fresh{animation:cellIn .45s cubic-bezier(.25,1,.5,1)}
+.chatarr-foot{padding:14px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px}
+.chatarr-controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-ghost{background:var(--card);color:var(--sub);border:1.5px solid var(--border);padding:9px 22px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s}
+.btn-ghost:hover{border-color:var(--ds-line);color:var(--ds-deep)}
+.win-slider{display:flex;align-items:center;gap:10px;flex:1;min-width:220px}
+.win-slider label{font-size:13px;font-weight:800;color:var(--text);flex-shrink:0}
+.win-slider input[type=range]{flex:1;min-width:100px;accent-color:var(--ds)}
+.win-k{font-size:15px;font-weight:900;color:var(--ds);font-variant-numeric:tabular-nums;min-width:56px}
+.chat-status{font-size:12.5px;color:var(--sub);font-weight:600;line-height:1.7}
+.chat-status b{color:var(--ds-deep);font-variant-numeric:tabular-nums}
+
+/* ── 中间插入实验 ── */
+.ins-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 20px}
+.ins-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.ins-hint{font-size:13px;color:var(--sub);font-weight:600}
+.ins-counter{font-size:12.5px;font-weight:700;color:var(--sub)}
+.ins-counter b{font-size:22px;font-weight:900;color:var(--amber);font-variant-numeric:tabular-nums;margin:0 3px}
+.ins-strip{display:flex;gap:8px;flex-wrap:wrap;min-height:84px}
+.ins-cell{width:54px;cursor:pointer}
+.ins-val{height:52px;border-radius:10px;background:rgba(0,0,0,.045);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:var(--text);border:1.5px solid transparent;transition:transform .16s,background .16s,border-color .16s}
+.ins-cell:hover .ins-val{border-color:var(--ds-line);background:var(--ds-soft)}
+.ins-cell.shifting .ins-val{transform:translateX(26px);background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.5)}
+.ins-cell.fresh .ins-val{animation:cellIn .4s cubic-bezier(.25,1,.5,1);background:var(--ds-soft);border-color:var(--ds-line);color:var(--ds-deep)}
+.ins-idx{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:10.5px;font-weight:800;color:var(--sub);text-align:center;margin-top:4px}
+.ins-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;border-top:1px dashed var(--border);padding-top:14px}
+.ins-log{font-size:13px;color:var(--sub);font-weight:600;line-height:1.7}
+.ins-log b{color:var(--amber)}
+.ins-log .ok{color:var(--success);font-weight:800}
+
+/* ── 知识卡 ── */
+.know-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.know-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.know-card .kc-icon{font-size:24px;margin-bottom:8px}
+.know-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.know-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.know-card p b{color:var(--text)}
+.know-card code{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .arr-cell{flex:0 0 96px}
+  .ins-cell{width:46px}
+  .ins-val{height:46px;font-size:15px}
+  .know-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"배열: 당신이 나눈 말 한마디가 그 안에 있어요","name":"배열: 당신이 나눈 말 한마디가 그 안에 있어요","url":"https://xueai.app/slides/ds-2.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 선형 구조: 매일 쓰는 것들","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"message list는 곧 배열이에요: 번호 달린 칸이 당신과 AI의 말 한마디를 어떻게 담는지, 컨텍스트 윈도우가 왜 「머리는 자르고 꼬리는 남긴다」인지, 오래 채팅하면 왜 까먹는지. 배열 가운데에 직접 데이터를 하나 꽂아 보고, 오른쪽이 몇 번 이사해야 하는지 세어 보세요——대화 이력이 왜 뒤로만 자라는지 바로 이해돼요.","datePublished":"2026-08-10","dateModified":"2026-08-17"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">프로그래밍 기초 · 선형 구조: 매일 쓰는 것들</div>
+    <h1>배열: 당신이 나눈 말 한마디가 그 안에 있어요</h1>
+    <p class="subtitle">지난 강의에서 약속했어요: 자료구조 = 수납 방식. 첫 번째 수납 방식은 사실 당신이 매일 데이터를 넣고 있는 거예요——당신과 AI의 대화 한 토막은, 프로그램 눈에는 <b>message list</b>이고, message list의 진짜 모습은 가장 소박한 수납 방식이에요: <b>번호가 매겨진 칸 한 줄, 바로 배열</b>. 이번 강의는 먼저 당신의 대화를 펼쳐 보고, 덤으로 오래된 질문에 답해요: 왜 오래 채팅하면 까먹을까요.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>message list는 곧 배열이에요: 대화 이력이 어떻게 줄을 서는지, 컨텍스트 절단이 왜 머리는 자르고 꼬리는 남기는지; 덤으로 배열 가운데에 하나 꽂는 게 얼마나 비싼지도</p></aside><!--seo:end-->  <div class="sec-label">먼저 해보기 · 당신의 대화가 한 줄 칸에 누워 있어요</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">아래가 message list예요: 메시지마다 칸 하나, 칸 위에는 <b style="color:var(--text)">인덱스</b>(번호, 0부터 세요——프로그래머의 오래된 습관). <b style="color:var(--text)">「메시지 보내기」</b>를 누르면 새 메시지가 어디에 떨어지는지 보고, <b style="color:var(--text)">「컨텍스트 윈도우」 슬라이더</b>를 끌어 보세요. 어느 칸이 회색이 되는지, 어느 칸은 절대 회색이 안 되는지 눈여겨보세요.</p>
+
+  <div class="chatarr-box">
+    <div class="chatarr-legend">
+      <span><span class="lg-dot" style="background:rgba(100,116,139,.5)"></span>system（📌 고정）</span>
+      <span><span class="lg-dot" style="background:rgba(2,132,199,.5)"></span>user（당신）</span>
+      <span><span class="lg-dot" style="background:rgba(22,163,74,.5)"></span>assistant（AI）</span>
+      <span><span class="lg-dot" style="background:var(--ds)"></span>아래 파란 줄 = 컨텍스트 윈도우 안</span>
+    </div>
+    <div class="chatarr-strip" id="chatStrip"></div>
+    <div class="chatarr-foot">
+      <div class="chatarr-controls">
+        <button class="btn-ds" id="btnSend">메시지 보내기 →</button>
+        <div class="win-slider">
+          <label>컨텍스트 윈도우</label>
+          <input type="range" id="winRange" min="2" max="8" value="4">
+          <span class="win-k" id="winK">4개</span>
+        </div>
+      </div>
+      <div class="chat-status" id="chatStatus"></div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>이게 「오래 채팅하면 까먹는」 전부예요.</b> 모델이 한 번에 읽을 수 있는 양에는 상한이 있어요(컨텍스트 윈도우). 다 못 담으면 버려야 하죠. 어느 쪽을? <b>머리는 자르고 꼬리는 남긴다</b>——가장 오래된 잡담부터 버리고, 최근 몇 마디는 꼭 남겨야 해요. 안 그러면 당신이 방금 한 말도 몰라요. 유독 <code>[0]</code>번 칸의 system 프롬프트만 <b>고정</b>돼 있어요: 페르소나와 규칙(「당신은 다정한 어시스턴트예요」)이거든요. 그걸 버리면 AI는 자기가 누군지 잊어요. 그러니 「까먹음」은 신비가 아니라 <b>배열 슬라이스</b>예요: system + 최근 K개를 남기고, 나머지는 모델에 안 넣어요.
+  </div>
+
+  <div class="sec-label">두 번째 판 · 가운데에 하나 꽂으면 얼마나 비쌀까요?</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">배열의 칸은 메모리에서 <b style="color:var(--text)">바짝 붙어</b> 줄 서 있어요. 가운데에 빈칸이 허용되지 않죠. 그래서 골치가 생겨요: 가운데에 새 원소를 넣으려면, 오른쪽 원소가 전부 <b style="color:var(--text)">한 칸씩 오른쪽으로 이사</b>해서 자리를 비워 줘야 해요. <b style="color:var(--text)">아무 칸이나 눌러</b> 그 자리에 ⭐를 넣고 「이동 횟수」를 보세요. 그다음 「끝에 ⭐ 추가」를 눌러 비교해 보세요.</p>
+
+  <div class="ins-box">
+    <div class="ins-head">
+      <span class="ins-hint">👇 칸을 누르면 = 그 자리에 ⭐ 삽입(왼쪽에 꽂을수록, 오른쪽이 더 많이 이사해요)</span>
+      <span class="ins-counter">이동 횟수 <b id="moveN">0</b>회</span>
+    </div>
+    <div class="ins-strip" id="insStrip"></div>
+    <div class="ins-foot">
+      <button class="btn-ds" id="btnAppend">끝에 ⭐ 추가</button>
+      <button class="btn-ghost" id="btnResetIns">초기화 ↻</button>
+      <span class="ins-log" id="insLog">왼쪽 칸을 먼저 눌러 보세요, 예를 들어 [1]</span>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>규칙이 보이죠?</b> 끝 추가는 언제나 1걸음이고, 가운데 삽입은 한 덩어리를 옮겨요——칸이 많을수록, 앞에 꽂을수록 이사가 더 심해요. 그래서 대화 이력은 <b>뒤로만 자라게</b>(append-only) 설계돼요: 새 메시지는 끝에 push하고, 아무도 이사하지 않으니 빠르고 싸요. 「십 분 전 말에 한 줄 끼워 넣기」를 허용하는 채팅 앱을 본 적 없죠——프로덕트 매니저가 생각 못 해서가 아니라, 그렇게 하면 진짜 비싸거든요.
+  </div>
+
+  <div class="sec-label">배열의 특기(그리고 약점)</div>
+
+  <div class="know-grid">
+    <div class="know-card">
+      <div class="kc-icon">🎯</div>
+      <h4>특기: 번호로 바로 도달</h4>
+      <p>3번째 메시지를 가져오고 싶어요? <code>messages[3]</code>, <b>처음부터 셀 필요 없이</b> 한 번에 도착. 칸이 바짝 붙어 있어서 번호 자체가 주소예요——이게 O(1)이고, 사람 말로 「<b>배열이 아무리 길어도 걸리는 시간은 같아요</b>」. 위치로 데이터를 꺼낼 때, 배열은 모든 수납 방식 중 가장 빨라요. 예외 없어요.</p>
+    </div>
+    <div class="know-card">
+      <div class="kc-icon">⚖️</div>
+      <h4>약점: 가운데 삽입이 비싸다</h4>
+      <p>방금 직접 이사시켜 봤죠. 덤으로 친척 하나: <b>연결 리스트</b>——가운데 삽입은 싸요(「다음이 누구」 포인터 두 개만 고치면 돼요). 대가는 번호로 바로 도달을 잃는 것. 100번째를 찾으려면 맨 앞부터 하나씩 걸어야 해요. <b>만능 수납 방식은 없고, 취사선택만 있어요</b>. 「추가만 하고, 자주 통째로 읽는」 대화 장면에서는 배열이 완승이라 message list가 그걸 써요.</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 이 강의가 전하고 싶은 것</h3>
+    <ul>
+      <li><b>message list는 곧 배열</b>: 번호 달린 칸 한 줄, 메시지마다 한 칸, 인덱스는 0부터</li>
+      <li><b>인덱스 직달 O(1)</b>: 위치로 데이터를 꺼낼 때, 배열은 가장 빠른 수납 방식</li>
+      <li><b>컨텍스트 절단 = 배열 슬라이스</b>: system + 최근 K개 남기고 「머리는 자르고 꼬리는 남긴다」——오래 채팅하면 까먹는 진실</li>
+      <li><b>가운데 삽입은 비싸고, 끝 추가는 싸다</b>: 그래서 대화 이력은 뒤로만 자란다(append-only)</li>
+      <li><b>수납 방식은 전부 취사선택</b>: 연결 리스트는 가운데 삽입이 빠르지만 직달을 잃어요——장면이 선택을 정해요</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* ── 交互一：对话就是数组 ──
+   窗口规则：钉住 [0] 的 system，再留最近 K 条 user/assistant。
+   初始 3 条 + 默认 K=4 时怎么发都不溢出，所以 FEED 备了 12 条轮换，
+   发到第 5 条左右学员第一次看到「变灰」，正好在滑块玩腻之前。 */
+const msgs = [
+  { role:'system',    text:'당신은 다정한 생활 어시스턴트예요' },
+  { role:'user',      text:'주말에 어디 갈지 추천해 주세요' },
+  { role:'assistant', text:'근교 등산, 아니면 새 전시 보러 갈까요?' },
+];
+const FEED = [
+  { role:'user',      text:'좀 더 조용한 곳으로 가고 싶어요' },
+  { role:'assistant', text:'그럼 식물원이나 미술관 추천해요' },
+  { role:'user',      text:'식물원은 어떻게 가요?' },
+  { role:'assistant', text:'지하철 3호선 종점이에요' },
+  { role:'user',      text:'입장료 비싸요?' },
+  { role:'assistant', text:'20위안, 어린이는 반값' },
+  { role:'user',      text:'아이 데리고 가기 괜찮아요?' },
+  { role:'assistant', text:'가족 구역이랑 꼬마 기차가 있어요' },
+  { role:'user',      text:'점심은 뭐 먹어요?' },
+  { role:'assistant', text:'동문 쪽 국수집이 괜찮아요' },
+  { role:'user',      text:'혹시 비 오면요?' },
+  { role:'assistant', text:'실내 미술관으로 바꾸면 돼요' },
+];
+let feedIdx = 0;
+let K = 4;
+
+const strip      = document.getElementById('chatStrip');
+const winRange   = document.getElementById('winRange');
+const winK       = document.getElementById('winK');
+const chatStatus = document.getElementById('chatStatus');
+const btnSend    = document.getElementById('btnSend');
+
+function renderChat(freshIdx){
+  strip.innerHTML = msgs.map((m, i) => {
+    const win = i === 0 || i >= msgs.length - K;
+    return `
+    <div class="arr-cell ${m.role}${win ? ' inwin' : ' evicted'}${i === freshIdx ? ' fresh' : ''}">
+      <div class="arr-idx">[${i}]</div>
+      <div class="arr-bubble">${m.role === 'system' ? '📌 ' : ''}${m.text}</div>
+      <div class="arr-role">${m.role === 'system' ? 'system · 고정' : m.role}</div>
+      <div class="arr-winbar"></div>
+    </div>`;
+  }).join('');
+  const evicted = Math.max(0, msgs.length - 1 - K);
+  if (evicted === 0) {
+    chatStatus.innerHTML = `배열 길이 <b>${msgs.length}</b>, 윈도우가 아직 대화 전체를 담아요. 메시지를 더 보내며 언제 넘치는지 보세요`;
+  } else {
+    chatStatus.innerHTML = `배열 길이 <b>${msgs.length}</b>: 가장 오래된 대화 <b>${evicted}</b>개가 윈도우 밖으로 밀려났어요(회색, 모델은 못 봄) — 하지만 [0]의 system 프롬프트는 윈도우에 고정돼 있어요`;
+  }
+}
+
+btnSend.addEventListener('click', () => {
+  msgs.push(FEED[feedIdx % FEED.length]);
+  feedIdx++;
+  renderChat(msgs.length - 1);
+  strip.scrollTo({ left: strip.scrollWidth, behavior: 'smooth' });
+});
+
+winRange.addEventListener('input', () => {
+  K = +winRange.value;
+  winK.textContent = K + '개';
+  renderChat(-1);
+});
+
+renderChat(-1);
+
+/* ── 交互二：中间插入有多贵 ──
+   动画只做「右移预告」：被搬的格子先橙色右滑（此时还没真插入），
+   停一拍再重排 DOM 落位。真同步移动需要 FLIP 动画，成本高且学员
+   要看的其实是「搬了几次」这个数，不是像素级的位移。 */
+const INS_INIT = ['A','B','C','D','E','F','G','H','I','J'];
+let arr = INS_INIT.slice();
+let insBusy = false;
+
+const insStrip    = document.getElementById('insStrip');
+const moveN       = document.getElementById('moveN');
+const insLog      = document.getElementById('insLog');
+const btnAppend   = document.getElementById('btnAppend');
+const btnResetIns = document.getElementById('btnResetIns');
+
+function renderIns(freshIdx){
+  insStrip.innerHTML = arr.map((v, i) => `
+    <div class="ins-cell${i === freshIdx ? ' fresh' : ''}" data-i="${i}">
+      <div class="ins-val">${v}</div>
+      <div class="ins-idx">[${i}]</div>
+    </div>`).join('');
+}
+
+async function insertAt(i){
+  if (insBusy) return;
+  if (arr.length >= 16) {
+    insLog.innerHTML = '칸이 충분히 많아요. 「초기화 ↻」를 누르고 한 판 더 해요';
+    return;
+  }
+  insBusy = true;
+  let moves = 0;
+  moveN.textContent = '0';
+  const cells = [...insStrip.children];
+  for (let j = arr.length - 1; j >= i; j--) {
+    cells[j].classList.add('shifting');
+    moves++;
+    moveN.textContent = moves;
+    await sleep(150);
+  }
+  await sleep(300);
+  arr.splice(i, 0, '⭐');
+  renderIns(i);
+  insLog.innerHTML = `[${i}]에 삽입: 오른쪽 원소 <b>${moves}</b>개가 전부 이사하고, 쓰기 1번 추가. 왼쪽에 꽂을수록 더 많이 옮겨요`;
+  insBusy = false;
+}
+
+insStrip.addEventListener('click', e => {
+  const cell = e.target.closest('.ins-cell');
+  if (cell) insertAt(+cell.dataset.i);
+});
+
+btnAppend.addEventListener('click', () => {
+  if (insBusy) return;
+  if (arr.length >= 16) {
+    insLog.innerHTML = '칸이 충분히 많아요. 「초기화 ↻」를 누르고 한 판 더 해요';
+    return;
+  }
+  arr.push('⭐');
+  moveN.textContent = '0';
+  renderIns(arr.length - 1);
+  insLog.innerHTML = '끝 추가: 이동 <b>0</b>번 + 쓰기 1번, <span class="ok">한 번에 끝</span> — 대화 이력이 append-only인 이유예요';
+});
+
+btnResetIns.addEventListener('click', () => {
+  if (insBusy) return;
+  arr = INS_INIT.slice();
+  moveN.textContent = '0';
+  renderIns(-1);
+  insLog.textContent = '초기화됐어요. 왼쪽 칸을 다시 눌러 보세요';
+});
+
+renderIns(-1);
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Semantic Layer: Double Distillation | Token Cost Engineering</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Don't treat the context window as a dump: attention is O(N²), so long prompts are both expensive and slow—and lost-in-the-middle makes quality worse. Double distillation: dynamic Few-Shot cuts 4000 Tokens to 500; LLMLingua-2 compresses documents 5–20×.">
+<meta name="keywords" content="context optimization,lost-in-the-middle,Lost in the Middle,dynamic Few-Shot,LLMLingua,Prompt compression,RAG optimization">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-10.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/cost-10.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/cost-10.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/cost-10.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/cost-10.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Semantic Layer: Double Distillation">
+<meta property="og:description" content="Only a high-density Prompt earns high-quality Attention.">
+<meta property="og:url" content="https://xueai.app/slides/cost-10.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/cost-10.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Semantic Layer: Double Distillation">
+<meta name="twitter:description" content="Only a high-density Prompt earns high-quality Attention.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl-wrap{overflow-x:auto}
+
+/* 注意力条演示 */
+.att{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.att-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.att-row label{font-size:14px;font-weight:700;color:var(--text)}
+.att-row input[type=range]{flex:1;min-width:170px;accent-color:var(--ct)}
+.att-row .val{font-size:14px;font-weight:800;min-width:96px;text-align:right;color:var(--ct-deep);font-variant-numeric:tabular-nums}
+.att-strip{display:flex;height:44px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)}
+.att-cell{flex:1;transition:background .3s}
+.att-legend{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:6px}
+.att-note{margin-top:12px;font-size:14px;line-height:1.78;color:var(--text);background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px}
+.att-note b{color:var(--ct-deep)}
+.att-note .w{color:var(--warn);font-weight:800}
+
+/* 策略步骤 */
+.steps{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.step{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 17px;box-shadow:var(--shadow-card)}
+.step-num{width:28px;height:28px;border-radius:9px;background:var(--ct-soft);color:var(--ct-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;margin-top:2px}
+.step p{font-size:14px;color:var(--sub);line-height:1.75;margin:0}
+.step p b{color:var(--ct-deep)}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.stat{background:var(--card);border:1.5px solid var(--ct-line);border-radius:13px;padding:16px;text-align:center;box-shadow:var(--shadow-card)}
+.stat .v{font-size:22px;font-weight:800;color:var(--ct-deep)}
+.stat .k{font-size:12.5px;color:var(--sub);margin-top:4px;line-height:1.5}
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+@media (max-width:768px){.stat-grid{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Semantic Layer: Double Distillation","name":"Semantic Layer: Double Distillation","url":"https://xueai.app/slides/cost-10.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Four-Layer Hands-on Optimization","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Don't treat the context window as a dump: attention is O(N²), so long prompts are both expensive and slow—and lost-in-the-middle makes quality worse. Double distillation: dynamic Few-Shot cuts 4000 Tokens to 500; LLMLingua-2 compresses documents 5–20×.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token Cost Engineering · 10 / 13</div>
+    <h1>Semantic Layer: Double Distillation</h1>
+    <p class="subtitle">Format tax is cut. Next look at the content itself. The most common engineering mistake in RAG and long-document work: treat the context window as a dump—stuff every Few-Shot example and retrieved doc in, and hope the model sorts it out. It works. It shouldn't.</p>
+    <div class="chips"><span class="chip">O(N²)</span><span class="chip">lost-in-the-middle</span><span class="chip">dynamic Few-Shot</span><span class="chip">LLMLingua-2</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Lost-in-the-middle: the more you stuff in, the less it holds onto what matters. Dynamic Few-Shot cuts 4000 to 500; LLMLingua-2 compresses 5–20×</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">Two sins of dump-style context</div>
+    <p class="desc"><b>First: expensive and slow.</b> Transformer self-attention is O(N²): double the prompt length, and compute grows 4×. Longer prompts mean longer Prefill and higher time to first token—users lose patience before they see the first character.</p>
+    <p class="desc" style="margin-top:10px"><b>Second: quality can get worse.</b> When signal drowns in filler, you get the lost-in-the-middle effect. Like a person reading a long article: they focus at the start (what's this about?), pay attention at the end (here's the conclusion), and skim the big middle blob—eyes pass, brain doesn't. If your carefully picked references land in the middle, the model may never really read them.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Interactive Demo · How attention gets diluted</div>
+    <p class="desc">The color strip simulates attention strength across Prompt positions (green = strong, gray = weak). Drag the length and watch the middle sag.</p>
+    <div class="att" id="att">
+      <div class="att-row">
+        <label for="attLen">Prompt length</label>
+        <input type="range" id="attLen" min="1" max="32" value="6" step="1">
+        <span class="val" id="attLenVal">6k Tokens</span>
+      </div>
+      <div class="att-strip" id="attStrip"></div>
+      <div class="att-legend"><span>Start</span><span>Middle</span><span>End</span></div>
+      <div class="att-note" id="attNote"></div>
+    </div>
+    <div class="quote-card" style="margin-top:14px">
+      More context is not always better. <b>Put critical information at the start or the end</b>; leave the middle for content you wouldn't mind losing.
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">Strategy 1 · Dynamic Few-Shot—don't hard-code</div>
+    <p class="desc">Take Text-to-SQL: to cover every business case, some people hard-code 20 SQL examples into the Prompt—4,000+ Tokens total. Every user question, the model “reviews” all 4,000 first: burns Tokens and runs slow. Better approach:</p>
+    <div class="steps">
+      <div class="step"><span class="step-num">1</span><p><b>Store the 20 examples in a vector database</b>.</p></div>
+      <div class="step"><span class="step-num">2</span><p>When the user asks “last month's sales,” use semantic retrieval to <b>pull only the Top-3 finance-related examples</b>.</p></div>
+      <div class="step"><span class="step-num">3</span><p>Final Prompt drops from 4,000 Tokens <b>to 500</b>.</p></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat"><div class="v">-87.5%</div><div class="k">Token cost</div></div>
+      <div class="stat"><div class="v">3x+</div><div class="k">Response speed</div></div>
+      <div class="stat"><div class="v">Higher</div><div class="k">SQL accuracy<br>(no irrelevant-example noise)</div></div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Strategy 2 · Compress long docs before you feed them</div>
+    <p class="desc">Financial research, meeting notes—docs packed with “correct filler”: disclaimers, repeated background, spoken padding. Feed that to the AI and you're paying PhD rates to read spam.</p>
+    <p class="desc" style="margin-top:10px">Fix: after RAG retrieval and before inference, insert an <a href="https://llmlingua.com/" target="_blank" rel="noopener">LLMLingua-2</a> middleware. It doesn't chop words blindly: BERT bidirectional attention sees both sides of context, pinpoints core semantics (entities, numbers, key verbs), and strips redundant noise. <b>Compress 5–20×; Prefill that took 1 second drops to 50 ms</b>—high-concurrency throughput jumps a full order of magnitude.</p>
+    <div class="fig-wrap">
+      <img src="images/cost/double-distill.webp" alt="Double distillation: only a high-density Prompt earns high-quality Attention" loading="lazy">
+      <div class="fig-cap">Dynamic Few-Shot + document compression: two funnels filter noise. Only a high-density Prompt earns high-quality Attention. (Figure: from the author's original share deck)</div>
+    </div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>Distillation</th><th>Target</th><th>Method</th><th>Typical gain</th></tr>
+      <tr><td><b>First pass</b></td><td>Few-Shot examples</td><td>Vector retrieval picks Top-K dynamically</td><td>4,000 → 500 Tokens</td></tr>
+      <tr><td><b>Second pass</b></td><td>Retrieved documents</td><td>LLMLingua-2 semantic compression</td><td>5–20× compression; Prefill 1s → 50ms</td></tr>
+    </table></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Key Takeaways</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Double the prompt = 4× the compute:</b> O(N²) is why long context is both expensive and slow.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Lost-in-the-middle:</b> put critical info at the start or end; leave the middle for content you wouldn't mind losing.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Don't hard-code Few-Shot—</b>store in a vector DB and retrieve by question: save 87.5% and get more accuracy.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Run long docs through LLMLingua-2 before inference:</b> high-density Prompt for high-quality Attention—don't lose users while they wait.</p></div>
+    </div>
+    <p class="src-note">
+      <b>Source:</b> Adapted from the author's internal team share “AI Token Cost Engineering Strategy” hands-on section “02｜Semantic Layer.” For lost-in-the-middle, see Chroma's <a href="https://research.trychroma.com/context-rot" target="_blank" rel="noopener">Context Rot research</a>; compression benchmarks at <a href="https://llmlingua.com/" target="_blank" rel="noopener">LLMLingua</a>. Review context-window basics in <a href="5-1.html">Harness Core · Context Window</a>.
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<script>
+/* ── 注意力稀释演示：U 形注意力曲线，越长中段越塌 ── */
+var CELLS = 40;
+var strip = document.getElementById('attStrip');
+for (var i = 0; i < CELLS; i++) {
+  var c = document.createElement('div');
+  c.className = 'att-cell';
+  strip.appendChild(c);
+}
+function attCalc(){
+  var len = +document.getElementById('attLen').value;
+  document.getElementById('attLenVal').textContent = len + 'k Tokens';
+  /* 中段塌陷程度随长度增强 */
+  var sag = Math.min(0.88, 0.25 + len / 32 * 0.75);
+  var cells = strip.children;
+  for (var i = 0; i < CELLS; i++) {
+    var x = i / (CELLS - 1);              /* 0..1 */
+    var u = 4 * Math.pow(x - 0.5, 2);     /* U 形：两端 1，中间 0 */
+    var attn = 1 - sag * (1 - u);         /* 注意力强度 0..1 */
+    var g = Math.round(163 * attn + 200 * (1 - attn) * 0.35);
+    var alpha = 0.15 + attn * 0.85;
+    cells[i].style.background = 'rgba(22,' + (100 + Math.round(attn * 63)) + ',74,' + alpha.toFixed(2) + ')';
+  }
+  var note = document.getElementById('attNote');
+  if (len <= 8) {
+    note.innerHTML = 'Short Prompt: the middle still holds about <b>' + Math.round((1 - sag) * 100) + '%</b> attention—most information still gets seen.';
+  } else if (len <= 20) {
+    note.innerHTML = 'Dilution starts: middle attention is down to <span class="w">' + Math.round((1 - sag) * 100) + '%</span>. If your carefully picked references sit in the middle, the model may “let the eyes pass while the brain doesn't.”';
+  } else {
+    note.innerHTML = '<span class="w">Heavy dilution: middle attention is only ' + Math.round((1 - sag) * 100) + '%.</span> The more you stuff in, the less it holds onto what matters—that\'s “paying PhD rates to read spam.” Time for double distillation.';
+  }
+}
+document.getElementById('attLen').addEventListener('input', attCalc);
+attCalc();
+lessonOnView(document.getElementById('att'), function(){});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

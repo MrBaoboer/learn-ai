@@ -114,11 +114,26 @@
 }
 .conclusion-bar b { color: var(--danger); }
 
+/* ── RAG vs 让模型自己翻文件 ── */
+.vs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vs-col {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+}
+.vs-col .vs-h { font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 2px; }
+.vs-col .vs-sub { font-size: 11px; color: var(--sub); margin-bottom: 10px; }
+.vs-col ul { margin: 0; padding-left: 16px; }
+.vs-col li { font-size: 13px; color: var(--sub); line-height: 1.65; margin-bottom: 5px; }
+.vs-col li b { color: var(--text); }
+.vs-col.rag { border-top: 3px solid var(--accent); }
+.vs-col.tool { border-top: 3px solid var(--success); }
+
 @media (max-width: 768px) {
   .cost-row { flex-wrap: wrap; }
   .cr-step { width: auto; flex: 1; border-right: none; }
   .cr-badge { border-right: none; }
   .cr-note { flex-basis: 100%; padding-top: 0; }
+  .vs-grid { grid-template-columns: 1fr; }
 }
 </style>
 <!-- SEO Start -->
@@ -137,7 +152,7 @@
 <meta property="og:title" content="RAG Costs & Optimization: No Free Lunch">
 <meta property="og:description" content="RAG reduces hallucinations but comes with real costs: increased latency, doubled Token consumption, and retrieval quality that directly impacts answer accuracy. Deep dive into RAG optimization strategies: chunking, reranking, and hybrid search.">
 <meta property="og:url" content="https://xueai.app/slides/rag-advanced.en.html">
-<meta property="og:image" content="https://xueai.app/og-cover.jpg">
+<meta property="og:image" content="https://xueai.app/slides/og/rag-advanced.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="en_US">
@@ -147,7 +162,7 @@
 <meta name="twitter:description" content="RAG reduces hallucinations but comes with real costs: increased latency, doubled Token consumption, and retrieval quality that directly impacts answer accuracy. Deep dive into RAG optimization strategies: chunking, reranking, and hybrid search.">
 <meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
 <!-- SEO End -->
-<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"RAG Costs & Optimization Strategies","name":"RAG Costs & Optimization Strategies","url":"https://xueai.app/slides/rag-advanced.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practical Course · Hallucinations & Four Mitigations","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"RAG reduces hallucinations but comes with real costs: increased latency, doubled Token consumption, and retrieval quality that directly impacts answer accuracy. Deep dive into RAG optimization strategies: chunking, reranking, and hybrid search.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<!--seo:begin--><script type="application/ld+json">{"datePublished":"2026-08-07","dateModified":"2026-08-18","@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"RAG Costs & Optimization Strategies","name":"RAG Costs & Optimization Strategies","url":"https://xueai.app/slides/rag-advanced.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Practical Course · Hallucinations & Four Mitigations","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"RAG reduces hallucinations but comes with real costs: increased latency, doubled Token consumption, and retrieval quality that directly impacts answer accuracy. Deep dive into RAG optimization strategies: chunking, reranking, and hybrid search.","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
 <link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
 </head>
 <body>
@@ -268,13 +283,49 @@
 
   </div>
 
+  <!-- 上面四条都在「怎么把 RAG 做便宜」，但这一页收尾说的是「什么情况下不用 RAG」，
+       那就欠一句：不用 RAG 的时候用什么。Coding Agent 这条路线现在比 RAG 更主流，
+       课件却一个字没提，读者容易以为拿外部资料只有 RAG 一条路。 -->
+  <div class="sec-label paywall-locked">The other road: let the model go look</div>
+
+  <div class="vs-grid paywall-locked">
+    <div class="vs-col rag reveal" id="vsRag">
+      <div class="vs-h">RAG: chunk it and embed it up front</div>
+      <div class="vs-sub">Retrieval means "find similar" — the answer lives in a chunk</div>
+      <ul>
+        <li><b>Fits</b>: a large, fairly stable corpus — product manuals, regulations, support knowledge bases, past tickets</li>
+        <li><b>Fits</b>: questions like "what's the rule on this," where the answer sits in a few paragraphs scattered across hundreds of documents</li>
+        <li><b>Cost</b>: a whole pipeline to chunk, index and refresh; edit a document and you re-run it</li>
+        <li><b>Weak spot</b>: it only scoops by semantic similarity, so exact matches (a specific ID or code) often miss</li>
+      </ul>
+    </div>
+    <div class="vs-col tool reveal" id="vsTool">
+      <div class="vs-h">Tool reads: grep / glob / read</div>
+      <div class="vs-sub">The model decides which file to open, and how many times</div>
+      <ul>
+        <li><b>Fits</b>: corpora that already have structure and change daily — code repos, logs, the files on this machine</li>
+        <li><b>Fits</b>: exact matches (function name, error code, order number) — one grep lands it, while vector search takes the long way around</li>
+        <li><b>Cost</b>: multiple tool calls, so higher latency and more tokens than a single retrieval, plus you must grant read access</li>
+        <li><b>Weak spot</b>: past a certain repo size it starts missing things; directory layout and naming are what keep it converging</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="insight-box reveal paywall-locked" id="vsNote">
+    <b>How to choose:</b> ask whether the material
+    <span class="key">already has a natural index</span>.
+    Code has file paths and function names, logs have timestamps — hand those to tools and let the
+    model browse. A pile of unstructured PDFs and web pages is where RAG earns its keep.
+    Plenty of systems mix both: RAG to find the neighborhood, then a tool read of that whole file.
+  </div>
+
   <div class="conclusion-bar reveal paywall-locked" id="conclusionBar">
     <b>RAG ≠ full retrieval.</b> The core of a production-grade RAG system is knowing "<b>when not to use RAG</b>" — getting filtering and routing right is the real key. Knowledge base quality → retrieval quality → answer quality: all three layers are essential.
   </div>
 
 </article>
 
-<script src="i18n.js?v=20260816b"></script>
+<script src="i18n.js?v=20260823c"></script>
 <script src="lesson.js"></script>
 <script>
 // Strategy card: click to expand/collapse (content fades in on scroll, no unlock required)
@@ -282,7 +333,7 @@ function toggleStrat(i) {
   document.getElementById('si' + i).classList.toggle('active');
 }
 </script>
-<script src="nav-inject.js?v=20260816b"></script>
+<script src="nav-inject.js?v=20260823c"></script>
 <!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
 <script src="skill-data.en.js?v=20260817a"></script>
 <script src="skill-copy.js?v=20260817a"></script>

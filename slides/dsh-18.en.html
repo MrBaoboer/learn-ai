@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Subagent Is a Seam: In-Process to Delegating Claude Code | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:10px 0 0}
+.struct{background:var(--card);border:1px solid rgba(77,107,254,.25);border-radius:16px;padding:24px;box-shadow:var(--shadow-card)}
+.struct svg{width:100%;height:auto;display:block}
+.struct-caption{font-size:12px;color:var(--sub);text-align:center;margin-top:10px}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:10px 16px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:18px;overflow:auto}.source code{color:var(--text);font:12.5px/1.68 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:13px 16px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.7;color:var(--sub)}.snapshot code{color:var(--text)}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#f0f3ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:16px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.28);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.brand-i{flex:none;line-height:1;vertical-align:-2px;margin-right:6px}
+
+/* ── 交互演示：委派切换台 ── */
+#demo-subagent{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:16px}
+.sa-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px}
+.sa-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid rgba(77,107,254,.35);background:var(--accent-soft);color:var(--accent-deep);font:600 13px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:background .2s,border-color .2s}
+.sa-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.sa-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.sa-btn svg{flex:none}
+.sa-ctrl{display:flex;gap:12px;margin-left:auto}
+.sa-cap{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--sub);font:600 12.5px/1.3 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer}
+.sa-cap .dot{width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(77,107,254,.5);display:grid;place-items:center;color:#fff;background:transparent;transition:background .2s}
+.sa-cap.on{color:var(--accent-deep);border-color:rgba(77,107,254,.4)}
+.sa-cap.on .dot{background:var(--accent)}
+.sa-stage{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+.sa-pane{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;min-width:0;display:flex;flex-direction:column}
+.sa-pane-title{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--sub);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.sa-pane-title svg{color:var(--accent)}
+.sa-log{display:flex;flex-direction:column;gap:5px}
+.sa-blk{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);transition:border-color .25s,box-shadow .25s,opacity .3s}
+.sa-blk b{color:var(--accent);font-weight:800;margin-right:6px}
+.sa-blk.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(77,107,254,.16)}
+.sa-blk.dim{opacity:.45}
+.sa-blk.result{border-color:rgba(22,163,74,.5);background:rgba(22,163,74,.06)}
+.sa-blk.hidden{display:none}
+.sa-seam{margin-top:10px;border:1.5px dashed rgba(77,107,254,.45);border-radius:10px;padding:8px 10px;background:var(--card);transition:box-shadow .25s,border-color .25s}
+.sa-seam.on{border-color:var(--accent);box-shadow:0 0 0 3px rgba(77,107,254,.14)}
+.sa-seam .seam-name{font:800 11px/1.4 ui-monospace,Menlo,monospace;color:var(--accent-deep)}
+.sa-provs{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.sa-prov{font:700 10.5px/1 ui-monospace,Menlo,monospace;color:var(--sub);border:1px solid var(--border);border-radius:6px;padding:4px 7px;background:var(--bg);display:inline-flex;align-items:center;gap:4px;transition:all .25s}
+.sa-prov.pick{color:#fff;background:var(--accent);border-color:var(--accent)}
+.sa-caps{margin-bottom:10px;border:1px solid var(--border);border-radius:10px;background:var(--card);overflow:hidden}
+.sa-caps table{width:100%;border-collapse:collapse;font:11px/1.5 ui-monospace,Menlo,monospace}
+.sa-caps th,.sa-caps td{padding:5px 10px;text-align:left;border-bottom:1px solid var(--border)}
+.sa-caps tr:last-child td{border-bottom:none}
+.sa-caps th{background:var(--accent-soft);color:var(--accent-deep);font-weight:800}
+.sa-caps td.yes{color:var(--success);font-weight:800}
+.sa-caps td.no{color:var(--danger);font-weight:800}
+.sa-caps tr.hot td{background:rgba(77,107,254,.1)}
+.sa-caps tr.bad td{background:rgba(220,38,38,.07)}
+.sa-child-wrap{flex:1;display:flex;flex-direction:column;gap:8px}
+.sa-child{border:1.5px solid rgba(77,107,254,.35);border-radius:12px;background:var(--card);padding:10px;opacity:0;transform:translateY(8px);transition:opacity .35s,transform .35s,border-color .3s}
+.sa-child.in{opacity:1;transform:translateY(0)}
+.sa-child.outside{border-style:dashed;border-color:rgba(124,58,237,.45)}
+.sa-child-head{display:flex;align-items:center;gap:6px;font:800 12px/1.4 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:var(--text);margin-bottom:6px}
+.sa-child-head .tag{font:700 10px/1 ui-monospace,Menlo,monospace;color:var(--accent-deep);background:var(--accent-soft);border-radius:5px;padding:3px 6px;margin-left:auto}
+.sa-ctx{display:flex;flex-direction:column;gap:4px;min-height:56px}
+.sa-ctx .sa-blk{opacity:0;transform:translateX(-8px);transition:opacity .3s,transform .3s}
+.sa-ctx .sa-blk.in{opacity:1;transform:translateX(0)}
+.sa-ctx-empty{font-size:11px;color:var(--sub);padding:4px 2px}
+.sa-working{display:none;align-items:center;gap:7px;font-size:12px;color:var(--sub);margin-top:6px}
+.sa-working.show{display:flex}
+.sa-working .wdot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:saPulse 1s ease infinite}
+.sa-working .wdot:nth-child(2){animation-delay:.2s}.sa-working .wdot:nth-child(3){animation-delay:.4s}
+@keyframes saPulse{0%,100%{opacity:.25}50%{opacity:1}}
+.sa-err{display:none;border:1px solid rgba(220,38,38,.45);background:rgba(220,38,38,.07);color:var(--danger);border-radius:10px;padding:9px 12px;font:700 11.5px/1.6 ui-monospace,Menlo,monospace;word-break:break-all}
+.sa-err.show{display:block}
+.sa-caption{margin-top:16px;min-height:56px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.sa-note{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.7}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}.sa-stage{grid-template-columns:1fr}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .sa-ctrl{margin-left:0;width:100%}.sa-ctrl .sa-btn{flex:1}
+  .source-head{flex-direction:column}
+}
+</style>
+<meta name="description" content="DSH makes sub-Agents a capability seam: spawn, fork, Claude Code, and Codex are all providers in the ctx.subagents registry — interface stays, impl swaps, insufficient capability fails loud.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Subagent Is a Seam: In-Process to Delegating Claude Code","name":"Subagent Is a Seam: In-Process to Delegating Claude Code","url":"https://xueai.app/slides/dsh-18.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Orchestration & Subagents","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"DSH makes sub-Agents a capability seam: spawn, fork, Claude Code, and Codex are all providers in the ctx.subagents registry — interface stays, impl swaps, insufficient capability fails loud.","datePublished":"2026-08-13","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Subagent Is a Seam: In-Process to Delegating Claude Code"><meta property="og:description" content="DSH makes sub-Agents a capability seam: spawn, fork, Claude Code, and Codex are all providers in the ctx.subagents registry — interface stays, impl swaps, insufficient capability fails loud."><meta property="og:url" content="https://xueai.app/slides/dsh-18.en.html"><meta property="og:image" content="https://xueai.app/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.app/slides/dsh-18.en.html">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:locale" content="en_US">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/dsh-18.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/dsh-18.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/dsh-18.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/dsh-18.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · Orchestration & Subagents</div>
+    <h1>Subagent Is a Seam: In-Process to Delegating Claude Code</h1>
+    <p class="subtitle">A sub-Agent is a capability seam — in-process, remote, or another product can plug in. Core source: <code>packages/subagent/</code>.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>A sub-Agent is a capability seam — in-process, remote, or another product can plug in</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>Course goal</b>After this you can explain three things: why DSH defines sub-Agents as a provider registry (a seam) so in-process spawn, context-carrying fork, and delegating to Claude Code or Codex share one interface; why capability mismatches fail loud before start instead of silent ignore; and what one-shot run vs continuable Activation each solve.</span>
+  </div>
+
+  <div class="sec-label">Interactive demo · Delegation switchboard</div>
+  <p class="body reveal">Same sub-task “research this module and report back” — switch among four providers and delegate once each. Watch two things: what stays identical on both sides of the seam, and what changes with the impl. Then flip “attach persona requirement” and see how the capability latch blocks out-of-scope requests before start.</p>
+  <div id="demo-subagent" class="reveal">
+    <div class="sa-bar">
+      <button class="sa-btn prov active" data-p="spawn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/><path d="M11 7h4a2 2 0 0 1 2 2v4"/></svg>spawn</button>
+      <button class="sa-btn prov" data-p="fork"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/><path d="M9 6h3a3 3 0 0 1 3 3v0M9 18h3a3 3 0 0 0 3-3v0"/></svg>fork</button>
+      <button class="sa-btn prov" data-p="claude"><svg class="brand-i" fill="currentColor" fill-rule="evenodd" height="14" width="14" style="margin-right:0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code</button>
+      <button class="sa-btn prov" data-p="codex"><svg class="brand-i" fill="currentColor" fill-rule="evenodd" height="14" width="14" style="margin-right:0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>Codex</button>
+      <button class="sa-cap" id="saCap"><span class="dot"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4"><path d="M20 6 9 17l-5-5"/></svg></span>Attach persona requirement<span style="font-weight:400"> (swap the sub-Agent’s persona)</span></button>
+      <div class="sa-ctrl">
+        <button class="sa-btn primary" id="saPlay"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>Play</button>
+        <button class="sa-btn" id="saStep"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>Step</button>
+        <button class="sa-btn" id="saReset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
+      </div>
+    </div>
+    <div class="sa-stage">
+      <div class="sa-pane">
+        <div class="sa-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Parent Agent session log (inside the DSH process)</div>
+        <div class="sa-log">
+          <div class="sa-blk seed" id="saB0"><b>user</b>“Help me wire in the payment module”</div>
+          <div class="sa-blk seed" id="saB1"><b>assistant</b>Sure — I’ll look at the existing structure first.</div>
+          <div class="sa-blk seed" id="saB2"><b>turn/end</b>Turn 1 ended (seed boundary)</div>
+          <div class="sa-blk" id="saB3"><b>user</b>“Also check this module’s historical issues”</div>
+          <div class="sa-blk" id="saB4"><b>tool/call</b>subagent “research this module and report back”</div>
+          <div class="sa-blk result hidden" id="saBR"><b>tool/result</b>Sub-Agent research conclusion (one tool result)</div>
+        </div>
+        <div class="sa-seam" id="saSeam">
+          <span class="seam-name">ctx.subagents · provider registry (seam)</span>
+          <div class="sa-provs">
+            <span class="sa-prov" data-p="spawn">spawn</span>
+            <span class="sa-prov" data-p="fork">fork</span>
+            <span class="sa-prov" data-p="acp">acp</span>
+            <span class="sa-prov" data-p="codex">codex</span>
+            <span class="sa-prov" data-p="claude">claude-code</span>
+            <span class="sa-prov" data-p="sdk">sdk</span>
+          </div>
+        </div>
+      </div>
+      <div class="sa-pane">
+        <div class="sa-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>Capability latch & sub-Agent stage</div>
+        <div class="sa-caps">
+          <table>
+            <tr><th>Start-time capabilities</th><th id="saCapCol">spawn</th></tr>
+            <tr data-c="outputSchema"><td>outputSchema<span style="color:var(--sub)"> (structured output)</span></td><td id="cOut" class="yes">Supported</td></tr>
+            <tr data-c="depthLimit"><td>depthLimit<span style="color:var(--sub)"> (delegation depth cap)</span></td><td id="cDep" class="yes">Supported</td></tr>
+            <tr data-c="toolFilter"><td>toolFilter<span style="color:var(--sub)"> (limit tools)</span></td><td id="cTf" class="yes">Supported</td></tr>
+            <tr data-c="persona"><td>persona<span style="color:var(--sub)"> (swap persona)</span></td><td id="cPer" class="yes">Supported</td></tr>
+          </table>
+        </div>
+        <div class="sa-child-wrap">
+          <div class="sa-err" id="saErr">SubagentError: subagent provider "claude-code" does not support the "persona" capability · code: UNSUPPORTED_CAPABILITY</div>
+          <div class="sa-child" id="saChild">
+            <div class="sa-child-head"><span id="saChildIcon"></span><span id="saChildName">Sub-Agent</span><span class="tag" id="saChildTag">In-process</span></div>
+            <div class="sa-ctx" id="saCtx"><div class="sa-ctx-empty" id="saCtxEmpty">(context empty)</div></div>
+            <div class="sa-working" id="saWork"><span class="wdot"></span><span class="wdot"></span><span class="wdot"></span><span id="saWorkText">Sub-Agent working</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sa-caption" id="saCaption">Pick a provider and hit “Play”, or scroll here to auto-play spawn.</div>
+    <div class="sa-note">Teaching simulation. Capability-table data from each provider’s source: spawn and fork support all four (<code>subagent-spawn-in-process/src/index.ts</code> line 42, <code>subagent-fork-in-process/src/index.ts</code> line 62); Claude Code and Codex are both <code>NO_START_CAPABILITIES</code> (their <code>src/index.ts</code> lines 54 and 49). Error copy verbatim from <code>packages/subagent/subagent/src/index.ts</code> lines 490–493.</div>
+  </div>
+
+  <div class="sec-label">How it works · which layer defines the seam</div>
+  <p class="body reveal">Conclusion first. DSH didn’t build a standalone sub-Agent feature — it built a registry called <code>ctx.subagents</code>: any transport implementing <code>SubagentProvider</code> can register by name. The official release registers six: <code>spawn</code> (in-process fresh), <code>fork</code> (in-process with context), <code>acp</code> (protocol bridge), <code>codex</code>, <code>claude-code</code> (each starts a real product CLI process), <code>sdk</code> (remote DSH instance). Source: <code>docs/subsystems/subagent.zh.md</code> lines 5–7.</p>
+  <p class="body reveal">Input: the tool layer assembles the model’s delegation into a <code>SubagentStartRequest</code> with prompt, parent Agent, cancel signal, plus four optionals (structured-output schema, depth cap, tool filter, persona). What happens: the service checks the chosen provider’s static capability table first — each optional needs a matching capability flag; missing one throws <code>UNSUPPORTED_CAPABILITY</code> before start. Output: a <code>SubagentRun</code> handle; the parent awaits its <code>result</code>, which lands as an ordinary tool result. To the parent, all four providers return the same kind of thing.</p>
+  <p class="body reveal">Worth pausing on fork’s identity. Many frameworks make “carry parent context” a boolean. DSH makes fork its own provider because they differ by more than a switch: fork must slice a “balanced prefix of completed turns” from the parent log as seed, cutting at the last <code>turn/end</code> — in-flight turns are unbalanced and unreplayable, so they must be excluded. That’s a session-log contract a flag can’t explain.</p>
+  <div class="struct reveal paywall-locked xa-peek">
+    <svg viewBox="0 0 940 330" role="img" aria-label="subagent seam structure diagram">
+      <defs><marker id="sa-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#4d6bfe"/></marker></defs>
+      <rect x="20" y="30" width="200" height="72" rx="12" fill="rgba(77,107,254,.09)" stroke="rgba(77,107,254,.4)"/>
+      <text x="120" y="60" fill="#3450d4" text-anchor="middle" font-size="14" font-weight="700">tool-subagent</text>
+      <text x="120" y="82" fill="#6b7280" text-anchor="middle" font-size="11">Model says “go research”</text>
+      <path fill="none" d="M220 66 H286" stroke="#4d6bfe" stroke-width="2" marker-end="url(#sa-a)"/>
+      <text x="253" y="56" fill="#6b7280" text-anchor="middle" font-size="10">StartRequest</text>
+      <rect x="298" y="22" width="250" height="88" rx="12" fill="#fff" stroke="rgba(77,107,254,.5)" stroke-width="1.6"/>
+      <text x="423" y="52" fill="#3450d4" text-anchor="middle" font-size="14" font-weight="800">ctx.subagents registry</text>
+      <text x="423" y="74" fill="#6b7280" text-anchor="middle" font-size="11">Pick provider by name · check capability table</text>
+      <text x="423" y="94" fill="#dc2626" text-anchor="middle" font-size="11" font-weight="700">Missing capability → UNSUPPORTED_CAPABILITY</text>
+      <path fill="none" d="M423 110 V150" stroke="#4d6bfe" stroke-width="2" marker-end="url(#sa-a)"/>
+      <rect x="30" y="162" width="200" height="120" rx="12" fill="#fff" stroke="rgba(0,0,0,.12)"/>
+      <text x="130" y="188" fill="#1c1c1e" text-anchor="middle" font-size="12.5" font-weight="700">spawn / fork</text>
+      <text x="130" y="210" fill="#6b7280" text-anchor="middle" font-size="10.5">In-process sub-Agent</text>
+      <text x="130" y="230" fill="#6b7280" text-anchor="middle" font-size="10.5">fork carries parent-log balanced prefix</text>
+      <text x="130" y="250" fill="#16a34a" text-anchor="middle" font-size="10.5">All four capabilities supported</text>
+      <rect x="250" y="162" width="200" height="120" rx="12" fill="#fff" stroke="rgba(0,0,0,.12)"/>
+      <text x="350" y="188" fill="#1c1c1e" text-anchor="middle" font-size="12.5" font-weight="700">acp / sdk</text>
+      <text x="350" y="210" fill="#6b7280" text-anchor="middle" font-size="10.5">Protocol bridge & remote instance</text>
+      <text x="350" y="230" fill="#6b7280" text-anchor="middle" font-size="10.5">localAgent: undefined</text>
+      <rect x="470" y="162" width="200" height="120" rx="12" fill="#fff" stroke="rgba(124,58,237,.35)" stroke-dasharray="5 4"/>
+      <text x="570" y="188" fill="#1c1c1e" text-anchor="middle" font-size="12.5" font-weight="700">claude-code / codex</text>
+      <text x="570" y="210" fill="#6b7280" text-anchor="middle" font-size="10.5">Starts a real product CLI process</text>
+      <text x="570" y="230" fill="#6b7280" text-anchor="middle" font-size="10.5">Uses parent session’s cwd</text>
+      <text x="570" y="250" fill="#dc2626" text-anchor="middle" font-size="10.5">All start-time capabilities false</text>
+      <rect x="690" y="162" width="228" height="120" rx="12" fill="rgba(77,107,254,.06)" stroke="rgba(77,107,254,.3)"/>
+      <text x="804" y="190" fill="#3450d4" text-anchor="middle" font-size="12.5" font-weight="700">Back to parent Agent</text>
+      <text x="804" y="212" fill="#6b7280" text-anchor="middle" font-size="10.5">SubagentRun.result</text>
+      <text x="804" y="232" fill="#6b7280" text-anchor="middle" font-size="10.5">→ one tool result</text>
+      <text x="804" y="252" fill="#6b7280" text-anchor="middle" font-size="10.5">Non-completed maps to isError</text>
+      <text x="470" y="312" fill="#6b7280" text-anchor="middle" font-size="11">Above the seam everything is the same; below it, transport differs by provider</text>
+    </svg>
+    <div class="struct-caption">Teaching diagram: nodes and edges explain source relationships; content is course-adapted.</div>
+  </div>
+  <div class="facts paywall-locked">
+    <div class="fact reveal"><code>fork and spawn are two providers</code><p>Difference isn’t parameters — it’s the seed: fork slices the parent log to the last <code>turn/end</code> as child-session seed; spawn starts from zero. <code>inheritsParentContext</code> is descriptive only, so the tool layer can phrase honestly.</p></div>
+    <div class="fact reveal"><code>One-shot run vs continuable Activation</code><p><code>SubagentRun</code> is one-and-done: await result, dispose, end. A continuable sub-Agent has no run — it’s a persistent session plus at most one resident Activation; the parent uses <code>send_message</code> to append turns, <code>interrupt_agent</code> to interrupt, and receives <code>report</code>.</p></div>
+    <div class="fact reveal"><code>Background end isn’t silent</code><p>When a continuable sub-Agent settles, the manager unconditionally injects a <code>subagent-settled</code> notice to the parent with final output. It uses a different message-source kind than the sub-Agent’s own report, so the transcript won’t count runtime bookkeeping as the sub-Agent speaking.</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked">Key evidence · Capability latch & fork seed</div>
+  <p class="body reveal paywall-locked">First evidence is the capability latch itself — clear without pasting code. <code>assertCapabilities</code> turns the four optionals into a demand list: if the request carries outputSchema, the provider table must have outputSchema true; maxDepth demands depthLimit; toolFilter and persona likewise. Then item-by-item check — first mismatch throws <code>SubagentError</code> naming which provider lacks which capability, code UNSUPPORTED_CAPABILITY. No degrade, no warn-and-continue; no child process starts before this.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>packages/subagent/subagent/src/index.ts</code> lines 481–495, verified on 2026-08-13. Demo error copy is verbatim from lines 490–493.</p>
+  <p class="body reveal paywall-locked">Second evidence is fork’s seed function — seven lines that say what “with context” actually carries:</p>
+  <div class="source reveal paywall-locked">
+    <div class="source-head"><span>packages/subagent/subagent-fork-in-process/src/index.ts</span><span>lines 48–54 excerpt</span></div>
+    <pre><code><span class="kw">function</span> <span class="fn">completedTurnPrefix</span>(parent: <span class="ty">Agent</span>): <span class="ty">SessionEvent</span>[] {
+  <span class="kw">const</span> events = parent.session.events
+  <span class="kw">const</span> lastEnd = events.<span class="fn">findLast</span>(e =&gt; e.type === <span class="str">'turn/end'</span>)
+  <span class="kw">if</span> (lastEnd === <span class="kw">undefined</span>) <span class="kw">return</span> []
+  <span class="cm">// seq === array index (the append contract), so slice up to and including it.</span>
+  <span class="kw">return</span> events.<span class="fn">slice</span>(<span class="kw">0</span>, lastEnd.seq + <span class="kw">1</span>)
+}</code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>Source snapshot note:</b> Based on the local deepseek-harness-master repo; verified against <code>packages/subagent/subagent/src/index.ts</code> and <code>packages/subagent/subagent-fork-in-process/src/index.ts</code>, verified on 2026-08-13. Code blocks keep the original source text.</div>
+  <p class="body reveal paywall-locked">Two more mechanisms without pasted code — cite in prose. The whole Claude Code provider is: resolve the <code>claude</code> binary, start a real CLI via the official Agent SDK in the parent session’s cwd, hang it under the shared subprocess owner (<code>subagent-claude-code/src/index.ts</code> lines 62–91). In the four official presets, codex and claude-code delegation tool rows ship with <code>disabled: true</code>; comments say: copy the preset, delete disabled, and that product backend opens only for the copied session (<code>apps/cli/config/agent-presets/standard/agent.cordis.yml</code> lines 200–219). Delegating to another product in DSH is a config switch.</p>
+
+  <div class="sec-label paywall-locked">Side-by-side · In-product delegation shapes vs transport-layer registry</div>
+  <p class="body reveal paywall-locked"><svg class="brand-i" fill="currentColor" fill-rule="evenodd" height="14" width="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg><b>Claude Code</b> puts delegation in the product layer. One Task tool (AgentTool) entry packs shapes into params: <code>subagent_type</code> picks role, <code>run_in_background</code> backgrounds, <code>isolation: "worktree"</code> opens an isolated copy, <code>model</code> swaps models (manuscript <code>study/chapters/05-multi-agent.md</code> lines 32–52 citing AgentTool.tsx). Above that sit Coordinator Mode and Agent Teams. Expressive — but every shape is a feature branch inside one product: the delegate is always another Claude Code instance; handing work to another product has no slot. DSH chooses the opposite: product differences sink to the provider layer; above the seam there’s one vocabulary.</p>
+  <p class="body reveal paywall-locked"><svg class="brand-i" fill="currentColor" fill-rule="evenodd" height="14" width="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg><b>Grok Build</b> takes a third path: extract sub-Agent config resolution into a pure-logic crate <code>xai-grok-subagent-resolution</code>, resolving effective config by explicit override &gt; role &gt; persona &gt; parent (that crate’s <code>src/lib.rs</code> lines 7–8), while execution stays in their own shell process. It abstracts what a sub-Agent looks like; DSH abstracts where a sub-Agent runs. Grok’s roles, context inheritance, and tree lineage already have three lessons on this site: <a href="12-14.html">Four sub-Agent roles</a>, <a href="12-15.html">Context inheritance & depth control</a>, <a href="12-16.html">Sub-Agent session lineage</a>.</p>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>Walk through an out-of-scope delegation</h3><p>Deploy enables the <code>subagent_claude_code</code> tool; the model’s delegation carries <code>outputSchema</code> (wants structured output). Walk the capability-latch code from this lesson: which line throws, what error code, and did the Claude Code CLI process ever start? Then: if DSH accepted the request but ignored the schema, what goes wrong in the parent’s tool result, and why is that harder to debug than failing loud?</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway:</b> In DSH a sub-Agent is a provider registry — in-process fork and delegating Claude Code share one interface; differences all sink below the seam. Capability mismatches fail loud before start — never accept-then-silently-degrade. Want to add “delegate to another product” to your Agent system? Ask first which layer defines the seam, then how the capability table is checked.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  var PROVS = {
+    spawn: { label: 'Sub-Agent (spawn)', tag: 'In-process · fresh context', caps: { outputSchema: true, depthLimit: true, toolFilter: true, persona: true }, outside: false },
+    fork: { label: 'Sub-Agent (fork)', tag: 'In-process · inherit parent context', caps: { outputSchema: true, depthLimit: true, toolFilter: true, persona: true }, outside: false },
+    claude: { label: 'Claude Code CLI', tag: 'Separate process · claude-code', caps: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false }, outside: true },
+    codex: { label: 'Codex CLI', tag: 'Separate process · codex', caps: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false }, outside: true }
+  };
+  var PROV_ERR = { claude: 'claude-code', codex: 'codex' };
+  var cur = 'spawn';
+  var capOn = false;
+  var steps = [];
+  var idx = 0;
+  var playing = false;
+  var timer = null;
+  var runId = 0;
+
+  var el = function (id) { return document.getElementById(id); };
+  var caption = el('saCaption');
+  var seam = el('saSeam');
+  var child = el('saChild');
+  var ctxBox = el('saCtx');
+  var ctxEmpty = el('saCtxEmpty');
+  var work = el('saWork');
+  var err = el('saErr');
+  var capBtn = el('saCap');
+
+  function after(ms, fn) {
+    var rid = runId;
+    setTimeout(function () { if (rid === runId) fn(); }, ms);
+  }
+  function say(t) { caption.textContent = t; }
+  function blkOn(ids) {
+    ['saB0', 'saB1', 'saB2', 'saB3', 'saB4', 'saBR'].forEach(function (id) {
+      el(id).classList.toggle('on', ids.indexOf(id) !== -1);
+    });
+  }
+  function setCapsTable() {
+    var caps = PROVS[cur].caps;
+    el('saCapCol').textContent = cur === 'claude' ? 'claude-code' : cur;
+    var map = { outputSchema: 'cOut', depthLimit: 'cDep', toolFilter: 'cTf', persona: 'cPer' };
+    Object.keys(map).forEach(function (k) {
+      var td = el(map[k]);
+      td.className = caps[k] ? 'yes' : 'no';
+      td.textContent = caps[k] ? 'Supported' : 'Not supported';
+    });
+    var rows = document.querySelectorAll('#demo-subagent .sa-caps tr[data-c]');
+    Array.prototype.forEach.call(rows, function (r) { r.classList.remove('hot', 'bad'); });
+  }
+  function addCtx(html, cls) {
+    if (ctxEmpty.parentNode === ctxBox) ctxBox.removeChild(ctxEmpty);
+    var b = document.createElement('div');
+    b.className = 'sa-blk ' + (cls || '');
+    b.innerHTML = html;
+    ctxBox.appendChild(b);
+    requestAnimationFrame(function () { b.classList.add('in'); });
+  }
+
+  function build() {
+    var p = PROVS[cur];
+    var list = [];
+    list.push({ say: 'Parent Agent starts the same sub-task in its own turn: “research this module and report back”.', run: function () { blkOn(['saB4']); } });
+    list.push({ say: 'Tool layer assembles SubagentStartRequest' + (capOn ? ', this time with a persona requirement' : '') + ', hands it to the ctx.subagents registry, picks by name ' + (cur === 'claude' ? 'claude-code' : cur) + '。', run: function () {
+      seam.classList.add('on');
+      var chips = document.querySelectorAll('#demo-subagent .sa-prov');
+      Array.prototype.forEach.call(chips, function (c) { c.classList.toggle('pick', c.getAttribute('data-p') === cur); });
+    } });
+    if (capOn) {
+      list.push({ say: 'Before start, pass the capability latch: this request uses persona — check the provider’s static capability table item by item.', run: function () {
+        var row = document.querySelector('#demo-subagent .sa-caps tr[data-c="persona"]');
+        if (row) row.classList.add('hot');
+      } });
+      if (!p.caps.persona) {
+        list.push({ say: 'Mismatch. Service throws SubagentError immediately, code UNSUPPORTED_CAPABILITY. No child process started — no accept-then-silently-ignore.', run: function () {
+          var row = document.querySelector('#demo-subagent .sa-caps tr[data-c="persona"]');
+          if (row) { row.classList.remove('hot'); row.classList.add('bad'); }
+          err.textContent = 'SubagentError: subagent provider "' + PROV_ERR[cur] + '" does not support the "persona" capability · code: UNSUPPORTED_CAPABILITY';
+          err.classList.add('show');
+        } });
+        list.push({ say: 'Demo ends. To make this delegation succeed, drop the persona requirement or switch to an in-process provider and play again.', run: function () { seam.classList.remove('on'); blkOn([]); } });
+        return list;
+      }
+      list.push({ say: 'Capability table supports all four — latch opens, continue starting.', run: function () {
+        var row = document.querySelector('#demo-subagent .sa-caps tr[data-c="persona"]');
+        if (row) row.classList.remove('hot');
+      } });
+    }
+    list.push({ say: p.outside
+      ? 'Start a real ' + p.label + ' process in the parent session’s working directory. Dashed box means it’s outside the DSH process.'
+      : 'Provider creates the sub-Agent inside the same DSH process.', run: function () {
+      el('saChildName').textContent = p.label;
+      el('saChildTag').textContent = p.tag;
+      child.classList.toggle('outside', p.outside);
+      child.classList.add('in');
+    } });
+    if (cur === 'fork') {
+      list.push({ say: 'fork’s key move: copy the parent log’s “balanced prefix of completed turns” as the child session’s seed, cutting at the last turn/end.', run: function () {
+        blkOn(['saB0', 'saB1', 'saB2']);
+        addCtx('<b>seed</b>“Help me wire in the payment module”');
+        after(220, function () { addCtx('<b>seed</b>Sure — I’ll look at the existing structure first.'); });
+        after(440, function () { addCtx('<b>seed</b>turn/end · seed stops here'); });
+      } });
+      list.push({ say: 'Note: in-flight turn 2 did not enter the seed. It’s unbalanced and unreplayable — fork excludes it on purpose.', run: function () { blkOn(['saB3', 'saB4']); el('saB3').classList.add('dim'); el('saB4').classList.add('dim'); } });
+      list.push({ say: 'Only after the seed is the task prompt appended. When the sub-Agent opens its eyes, it has both ancestral history and its own job.', run: function () { blkOn([]); el('saB3').classList.remove('dim'); el('saB4').classList.remove('dim'); addCtx('<b>user</b>“research this module and report back”'); } });
+    } else {
+      list.push({ say: p.outside
+        ? 'The task prompt is handed over via the SDK. It sees none of the parent session’s history — the prompt must say everything.'
+        : 'spawn’s sub-Agent starts from zero: context holds only the task prompt; not a word of parent-session history.', run: function () {
+        addCtx('<b>user</b>“research this module and report back”');
+      } });
+    }
+    list.push({ say: 'The sub-Agent works independently. It burns its own context window — not one token of the parent’s.', run: function () {
+      el('saWorkText').textContent = p.label + ' working';
+      work.classList.add('show');
+    } });
+    list.push({ say: 'Done. The result crosses the seam back and lands as an ordinary tool result in the parent session. All four providers return this same kind of thing.', run: function () {
+      work.classList.remove('show');
+      addCtx('<b>assistant</b>Research conclusion: the module has three historical pitfalls…', 'result');
+      after(320, function () {
+        el('saBR').classList.remove('hidden');
+        el('saBR').classList.add('on');
+        seam.classList.remove('on');
+      });
+    } });
+    return list;
+  }
+
+  function reset() {
+    runId++;
+    playing = false;
+    clearTimeout(timer);
+    idx = 0;
+    blkOn([]);
+    el('saB3').classList.remove('dim');
+    el('saB4').classList.remove('dim');
+    el('saBR').classList.add('hidden');
+    el('saBR').classList.remove('on');
+    seam.classList.remove('on');
+    var chips = document.querySelectorAll('#demo-subagent .sa-prov');
+    Array.prototype.forEach.call(chips, function (c) { c.classList.remove('pick'); });
+    child.classList.remove('in', 'outside');
+    ctxBox.innerHTML = '';
+    ctxBox.appendChild(ctxEmpty);
+    work.classList.remove('show');
+    err.classList.remove('show');
+    setCapsTable();
+    say('Reset. Current provider: ' + (cur === 'claude' ? 'claude-code' : cur) + (capOn ? ', with persona requirement' : '') + '. Hit “Play” to start.');
+    steps = build();
+  }
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.say) say(s.say);
+    if (s.run) s.run();
+    if (playing) timer = setTimeout(doStep, 2000);
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true;
+    doStep();
+  }
+  function stepOnce() {
+    playing = false;
+    clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-subagent .sa-btn.prov'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-subagent .sa-btn.prov'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-p');
+      reset();
+    });
+  });
+  capBtn.addEventListener('click', function () {
+    capOn = !capOn;
+    capBtn.classList.toggle('on', capOn);
+    reset();
+  });
+  el('saPlay').addEventListener('click', play);
+  el('saStep').addEventListener('click', stepOnce);
+  el('saReset').addEventListener('click', reset);
+
+  reset();
+  (function hookAutoplay(tries) {
+    if (typeof window.lessonOnView === 'function') {
+      window.lessonOnView(document.getElementById('demo-subagent'), play);
+    } else if (tries > 0) {
+      setTimeout(function () { hookAutoplay(tries - 1); }, 120);
+    }
+  })(50);
+})();
+</script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

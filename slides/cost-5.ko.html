@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qwen의 구간 탈출: 32k 레드라인 | Token 비용 엔지니어링</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Qwen은 입력 길이로 구간을 나눕니다. 33k 요청은 초과분만 아니라 전체 33k Token을 2배 요금으로 정산해요. RAG에서 쓰레기 때문에 두 배를 내는 함정과 예산 인지 절단 코드.">
+<meta name="keywords" content="Qwen,입력 구간,전체 정산,RAG 비용,예산 인지 절단,컨텍스트 절단,32k 레드라인">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-5.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/cost-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/cost-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/cost-5.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/cost-5.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="Qwen의 구간 탈출: 32k 레드라인">
+<meta property="og:description" content="Token 1k만 더 써도 전체 청구서가 두 배: 전체 정산 로직과 예산 인지 절단.">
+<meta property="og:url" content="https://xueai.app/slides/cost-5.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/cost-5.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Qwen의 구간 탈출: 32k 레드라인">
+<meta name="twitter:description" content="Token 1k만 더 써도 전체 청구서가 두 배: 전체 정산 로직과 예산 인지 절단.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl td.hi{color:var(--warn);font-weight:800}
+.tbl-wrap{overflow-x:auto}
+
+/* 阶梯模拟器 */
+.lad{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.lad-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.lad-row label{font-size:14px;font-weight:700;color:var(--text);min-width:120px}
+.lad-row input[type=range]{flex:1;min-width:180px;accent-color:var(--ct)}
+.lad-row .val{font-size:15px;font-weight:800;min-width:110px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ct-deep)}
+.lad-row .val.hot{color:var(--warn)}
+.lad-scale{position:relative;height:8px;border-radius:4px;margin:6px 2px 4px;opacity:.3;background:linear-gradient(to right,var(--ct) 0 16%,#f59e0b 16% 51%,var(--warn) 51% 100%)}
+.lad-mark{display:flex;font-size:11.5px;color:var(--sub);margin-bottom:12px;position:relative;height:16px}
+.lad-mark span{position:absolute;transform:translateX(-50%)}
+.lad-out{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px}
+.lo{background:rgba(0,0,0,.03);border-radius:10px;padding:12px 14px;text-align:center}
+.lo .k{font-size:12px;color:var(--sub);margin-bottom:4px}
+.lo .v{font-size:17px;font-weight:800;color:var(--ct-deep);font-variant-numeric:tabular-nums}
+.lo.hot .v{color:var(--warn)}
+.lad-note{margin-top:12px;font-size:14px;line-height:1.78;color:var(--text);background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px}
+.lad-note b{color:var(--ct-deep)}
+.lad-note.bad b{color:var(--warn)}
+
+.codebox{margin-top:12px;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px 18px;font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.codebox .c{color:#64748b}
+.codebox .g{color:#4ade80}
+.codebox .r{color:#f87171}
+.code-tag{display:inline-block;margin-top:14px;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:800}
+.code-tag.bad{background:var(--warn-soft);color:var(--warn)}
+.code-tag.good{background:var(--ct-soft);color:var(--ct-deep)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+@media (max-width:768px){.lad-out{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Qwen의 구간 탈출: 32k 레드라인","name":"Qwen의 구간 탈출: 32k 레드라인","url":"https://xueai.app/slides/cost-5.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 구간 점프 함정 세 가지","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Qwen은 입력 길이로 구간을 나눕니다. 33k 요청은 초과분만 아니라 전체 33k Token을 2배 요금으로 정산해요. RAG에서 쓰레기 때문에 두 배를 내는 함정과 예산 인지 절단 코드.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 비용 엔지니어링 · 5 / 13</div>
+    <h1>Qwen의 구간 탈출: 32k 레드라인</h1>
+    <p class="subtitle">Qwen 시리즈의 구간 로직은 Zhipu와 완전히 달라요. 입력 길이로 과금하고, 경계선은 32k와 128k. 가장 놓치기 쉬운 과금 디테일—선을 넘으면 “초과분만 가산”이 아니라, 전체 요청을 높은 구간 요금으로 정산해요.</p>
+    <div class="chips"><span class="chip">입력 구간</span><span class="chip">전체 정산</span><span class="chip">RAG 비용</span><span class="chip">예산 인지 절단</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>Token 1k만 더 써도 전체가 두 배 되는 전체 정산; 예산 인지 절단으로 RAG 쓰레기 때문에 두 배 내지 마세요</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">현상: Token 1k만 더 써도, 전체 청구서가 두 배</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>입력 길이 (Qwen3-Max)</th><th>단가 (위안/M, 할인 후)</th><th>기준 대비</th></tr>
+      <tr><td>0 – 32k</td><td>1.6</td><td>1x</td></tr>
+      <tr><td>32k – 128k</td><td class="hi">3.2</td><td class="hi">2x</td></tr>
+      <tr><td>128k – 252k</td><td class="hi">4.8</td><td class="hi">3x</td></tr>
+    </table></div>
+    <p class="desc" style="margin-top:12px">입력이 33,000 Token이라고 가정해 봐요—32k보다 겨우 1,000 많아요. <b>요청 전체 33k Token이 모두 3.2 위안/M으로 정산돼요</b>—앞 32k는 1.6, 뒤 1k만 3.2가 아니에요. 이 1k 때문에 전체 비용이 두 배가 돼요.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">인터랙티브 데모 · 사다리 위의 청구서</div>
+    <p class="desc">입력 길이를 끌어 보세요. 32k와 128k 두 레드라인 근처에서 무슨 일이 일어나는지 지켜봐요.</p>
+    <div class="lad" id="lad">
+      <div class="lad-row">
+        <label for="ldIn">입력 길이</label>
+        <input type="range" id="ldIn" min="4" max="200" value="28" step="1">
+        <span class="val" id="ldInVal">28k Tokens</span>
+      </div>
+      <div class="lad-scale"></div>
+      <div class="lad-mark"><span style="left:16%">32k</span><span style="left:51%">128k</span><span style="left:97%">200k</span></div>
+      <div class="lad-out">
+        <div class="lo" id="loP"><div class="k">적용 단가</div><div class="v" id="loPV"></div></div>
+        <div class="lo" id="loB"><div class="k">호출당 입력 비용</div><div class="v" id="loBV"></div></div>
+        <div class="lo" id="loM"><div class="k">일 10만 회 기준 월 청구서</div><div class="v" id="loMV"></div></div>
+      </div>
+      <div class="lad-note" id="ldNote"></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">RAG 시나리오: 쓰레기 때문에 두 배를 내고 있어요</div>
+    <p class="desc">RAG에서는 이 문제가 특히 날카로워요. 검색으로 문서 조각 5개가 돌아와 합치면 딱 33k라고 해 봐요. 이때 물어야 할 질문: <b>다섯 번째 조각이 최종 답에 얼마나 기여하나요?</b></p>
+    <p class="desc" style="margin-top:10px">핵심 법률 조항이나 중요한 기술 파라미터라면 가치 있을 수 있어요. 하지만 웹 페이지 푸터, 저작권 고지, 중복 문단, 심지어 포맷 때문에 남은 줄바꿈이라면? <b>거친 RAG 전략은 쓰레기 때문에 두 배를 내고 있어요.</b></p>
+    <div class="fig-wrap">
+      <img src="images/cost/qwen-tiers.webp" alt="Qwen 과금 로직: 입력 길이가 배수를 정하고, 전체 정산 위험" loading="lazy">
+      <div class="fig-cap">Token 1k만 더 있어도 전체 33k가 2배 요금으로 정산돼요. RAG 검색의 다섯 번째 조각이 정말 두 배 값을 하나요? (그림: 저자 내부 공유 원본)</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">전략: 예산 인지의 동적 절단</div>
+    <p class="desc">해법은 “32k”를 나중에야 발견하는 청구서 사고에서 <b>코드에 박아 넣은 예산 제약</b>으로 바꾸는 거예요. Prompt를 짜는 로직이 무뇌 이어붙이기가 되어선 안 돼요:</p>
+    <span class="code-tag bad">✗ 잘못된 방법: 무뇌 이어붙이기</span>
+    <div class="codebox">prompt = system_prompt + context + user_query</div>
+    <span class="code-tag good">✓ 올바른 방법: 예산 인지</span>
+    <div class="codebox">def build_prompt_within_budget(system_prompt, context_chunks,
+                               user_query, budget=32000):
+    prompt = system_prompt + user_query
+    current_tokens = count_tokens(prompt)
+
+    selected_chunks = []
+    for chunk in sort_by_relevance(context_chunks):  <span class="c"># 按相关性排序</span>
+        chunk_tokens = count_tokens(chunk)
+        if current_tokens + chunk_tokens &gt; budget:
+            break  <span class="c"># 到达预算上限，停止添加</span>
+        selected_chunks.append(chunk)
+        current_tokens += chunk_tokens
+
+    return system_prompt + ''.join(selected_chunks) + user_query</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>시나리오</th><th>전략</th><th>설명</th></tr>
+      <tr><td><b>RAG 검색</b></td><td>동적 Top-K</td><td>chunk를 고정 5개 가져오지 말고, “거의 32k”까지 가져와요</td></tr>
+      <tr><td><b>멀티턴 대화</b></td><td>히스토리 압축</td><td>히스토리가 30k에 가까워지면 Summarization을 트리거</td></tr>
+      <tr><td><b>긴 문서 처리</b></td><td>구간 처리</td><td>한 번에 넣지 말고 Map-Reduce 모드를 쓰세요</td></tr>
+    </table></div>
+    <div class="quote-card" style="margin-top:14px">
+      비즈니스에 레드라인을 그을 수 있어요: <b>32k는 예산 상한—극히 강한 비즈니스 이유가 없으면 고가 구간에 절대 발을 들이지 마세요.</b>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">세 가지 가격 전략 대조</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>벤더</th><th>구간 점프 유형</th><th>핵심 임계값</th><th>대응 전략</th></tr>
+      <tr><td><b>Zhipu GLM-4.6</b></td><td>출력 길이 구간 점프</td><td>200 Tokens</td><td>작업 분할, 또는 출력 구간이 없는 모델로 전환</td></tr>
+      <tr><td><b>Qwen</b></td><td>입력 길이 구간 점프</td><td>32k / 128k</td><td>예산 인지 절단, 컨텍스트를 동적으로 잘라요</td></tr>
+      <tr><td><b>DeepSeek</b></td><td>사고 사슬 누적</td><td>멀티턴 팽창</td><td>컨텍스트 세척, 쓰면 바로 버림</td></tr>
+    </table></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">핵심 요점</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Qwen 전체 정산:</b> 33k 요청은 전체 33k가 2배 요금. 1k만 더 써도 두 배.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>“다섯 번째 조각 값 있나?”를 한 번 물으세요:</b> 거친 RAG는 푸터·면책·줄바꿈 때문에 두 배를 내고 있어요.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>32k를 코드의 예산 제약으로 쓰세요:</b> 관련성 순으로 정렬하고, 예산에 닿으면 멈춤. 동적 Top-K가 고정 Top-K보다 나아요.</p></div>
+    </div>
+    <p class="src-note">
+      <b>출처:</b> 저자 팀 내부 공유 《AI Token 비용 엔지니어링 전략 공유》 「Qwen의 구간 탈출」에서 정리했어요. RAG 비용과 최적화 전략은 <a href="rag-advanced.html">대규모 언어 모델 원리 · RAG의 대가와 최적화 전략</a>에서 다른 각도로도 다루니 대조해 읽어 보세요.
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<script>
+/* ── Qwen 阶梯模拟：Qwen3-Max 折后输入价 ── */
+function ldCalc(){
+  var k = +document.getElementById('ldIn').value;   /* 单位 k */
+  var tier = k <= 32 ? 0 : (k <= 128 ? 1 : 2);
+  var price = [1.6, 3.2, 4.8][tier];
+  var cost = k * 1000 / 1e6 * price;
+  var monthly = cost * 100000 * 30;
+  var v = document.getElementById('ldInVal');
+  v.textContent = k + 'k Tokens';
+  v.className = 'val' + (tier ? ' hot' : '');
+  document.getElementById('loPV').textContent = price + ' 위안/M (' + (tier+1) + 'x)';
+  document.getElementById('loBV').textContent = '¥' + cost.toFixed(4);
+  document.getElementById('loMV').textContent = '¥' + Math.round(monthly).toLocaleString();
+  ['loP','loB','loM'].forEach(function(id){ document.getElementById(id).className = 'lo' + (tier?' hot':''); });
+  var note = document.getElementById('ldNote');
+  if (k <= 32 && k >= 29) {
+    note.className='lad-note';
+    note.innerHTML='<b>선에 딱 붙어 비행:</b> 검색 조각 하나만 더 넣으면 넘어가요. 바로 “동적 Top-K”가 빛나는 자리—거의 32k에 닿으면 손을 멈춰요.';
+  } else if (k <= 32) {
+    note.className='lad-note';
+    note.innerHTML='기준가 구간. 현재 전체 요청 ¥' + cost.toFixed(4) + ', 규모화하면 월 청구서 ¥' + Math.round(monthly).toLocaleString() + '. <b>예산 레드라인을 여기에 그으세요.</b>';
+  } else if (k <= 36) {
+    note.className='lad-note bad';
+    note.innerHTML='<b>선을 넘자마자 전체가 두 배.</b> 32k일 때와 비교: 호출당 ¥' + (32*1.6/1000).toFixed(4) + '에서 ¥' + cost.toFixed(4) + '로—초과 ' + (k-32) + 'k가 푸터와 면책뿐이라면, 쓰레기 때문에 두 배를 내고 있어요.';
+  } else if (k <= 128) {
+    note.className='lad-note bad';
+    note.innerHTML='2x 고가 구간. 월 청구서 ¥' + Math.round(monthly).toLocaleString() + '. <b>스스로에게 물으세요: 이 컨텍스트 매 구간이 그 값인가요?</b> 긴 문서는 Map-Reduce 구간 처리, 멀티턴은 히스토리 압축을 고려하세요.';
+  } else {
+    note.className='lad-note bad';
+    note.innerHTML='<b>3x 심해.</b> 월 청구서 ¥' + Math.round(monthly).toLocaleString() + '. “이 계약 전체를 한 번에 읽기”처럼 극히 강한 비즈니스 이유가 아니면, 이 구간은 고빈도 경로에 있으면 안 돼요.';
+  }
+}
+document.getElementById('ldIn').addEventListener('input', ldCalc);
+ldCalc();
+lessonOnView(document.getElementById('lad'), function(){});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

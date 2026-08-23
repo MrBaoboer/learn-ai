@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Divide and Conquer: The Algorithm Behind Context Compression | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Compaction in the AI Practicum is really divide and conquer: split a long chat, summarize each chunk, then merge. Run recursive summarization yourself—watch a 3600-token dialogue compress to 200, and see what gets dropped.">
+<meta name="keywords" content="divide and conquer,context compression,Compaction,recursive summarization,merge sort,long dialogue compression,AI context">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-7.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/algo-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/algo-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/algo-7.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/algo-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Divide and Conquer: The Algorithm Behind Context Compression">
+<meta property="og:description" content="Split a long chat, summarize each chunk, then merge—Compaction is divide and conquer. Compress a 3600-token dialogue to 200 yourself, and see what gets lost.">
+<meta property="og:url" content="https://xueai.app/slides/algo-7.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/algo-7.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Divide and Conquer: The Algorithm Behind Context Compression">
+<meta name="twitter:description" content="Split, summarize, merge—Compaction is divide and conquer. Compress 3600 → 200 tokens yourself.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── 压缩演示 ── */
+.cmp-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.cmp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.cmp-meter{display:flex;align-items:baseline;gap:7px}
+.cmp-meter .cm-label{font-size:12px;font-weight:800;color:var(--sub)}
+.cmp-meter .cm-val{font-size:24px;font-weight:900;color:var(--al);font-variant-numeric:tabular-nums;transition:color .3s}
+.cmp-meter .cm-val.low{color:var(--success)}
+.cmp-meter .cm-unit{font-size:12px;font-weight:700;color:var(--sub)}
+.cmp-toggle{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;user-select:none}
+.cmp-toggle input{display:none}
+.cmp-toggle .tg-track{width:40px;height:22px;border-radius:99px;background:#d1d5db;position:relative;transition:background .2s;flex-shrink:0}
+.cmp-toggle .tg-track::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.cmp-toggle input:checked + .tg-track{background:var(--al)}
+.cmp-toggle input:checked + .tg-track::after{left:20px}
+.cmp-stage{padding:18px 20px;display:flex;flex-direction:column;gap:8px;min-height:300px}
+.cmp-phase-tag{align-self:center;font-size:12px;font-weight:800;color:var(--al-deep);background:var(--al-soft);border:1px dashed var(--al-line);padding:4px 16px;border-radius:99px;opacity:0;transition:opacity .3s}
+.cmp-phase-tag.show{opacity:1}
+.cmp-group{border-radius:var(--radius-sm);transition:background .4s,border-color .4s,padding .4s;display:flex;flex-direction:column;gap:8px;border:1.5px solid transparent}
+.cmp-group.grouped{padding:10px;border-color:var(--gc, var(--border));background:var(--gbg, transparent)}
+.cmp-group .grp-title{font-size:11.5px;font-weight:800;color:var(--gc);display:none;letter-spacing:.4px}
+.cmp-group.grouped .grp-title{display:block}
+.cmp-msg{display:flex;gap:8px;align-items:flex-start;overflow:hidden;max-height:120px;transition:max-height .5s ease,opacity .4s ease,margin .5s ease;position:relative}
+.cmp-msg.gone{max-height:0;opacity:0;margin:-4px 0}
+.cmp-msg.user{flex-direction:row-reverse}
+.cmp-avatar{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+.cmp-msg.user .cmp-avatar{background:#64748b}
+.cmp-msg.ai .cmp-avatar{background:var(--al)}
+.cmp-bubble{max-width:82%;padding:7px 13px;border-radius:12px;font-size:12.5px;line-height:1.65;color:var(--text)}
+.cmp-msg.user .cmp-bubble{background:rgba(100,116,139,.09);border-top-right-radius:4px}
+.cmp-msg.ai .cmp-bubble{background:var(--al-soft);border-top-left-radius:4px}
+.cmp-bubble .tk{font-size:10px;font-weight:800;color:var(--sub);opacity:.75;margin-left:6px;white-space:nowrap}
+.cmp-bubble .key-fact{background:rgba(217,119,6,.16);border-radius:4px;padding:0 3px;font-weight:700}
+.cmp-keep-badge{position:absolute;top:0;font-size:10px;font-weight:800;color:var(--success);background:rgba(22,163,74,.1);padding:1px 8px;border-radius:99px;display:none}
+.cmp-msg.user .cmp-keep-badge{left:0}
+.cmp-msg.ai .cmp-keep-badge{right:0}
+.cmp-msg.kept .cmp-keep-badge{display:block}
+.cmp-summary{border:1.5px dashed var(--gc, var(--al-line));background:#fff;border-radius:var(--radius-sm);padding:10px 14px;font-size:12.5px;line-height:1.7;color:var(--text);opacity:0;transform:scale(.92);transition:opacity .45s,transform .45s}
+.cmp-summary.show{opacity:1;transform:scale(1)}
+.cmp-summary .sm-tag{font-size:10.5px;font-weight:800;color:var(--gc, var(--al-deep));display:block;margin-bottom:2px}
+.cmp-summary .tk{font-size:10.5px;font-weight:800;color:var(--sub);margin-left:6px;white-space:nowrap}
+.cmp-final{border:2px solid var(--al);background:linear-gradient(135deg,#fdf2f8,#fce7f3);border-radius:var(--radius-sm);padding:13px 16px;font-size:13px;line-height:1.75;color:#831843;opacity:0;transform:scale(.9);transition:opacity .5s,transform .5s;display:none}
+.cmp-final.show{opacity:1;transform:scale(1)}
+.cmp-final .sm-tag{font-size:11px;font-weight:900;color:var(--al-deep);display:block;margin-bottom:3px}
+.cmp-foot{padding:14px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn-al{background:var(--al);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.cmp-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── 归并排序对照卡 ── */
+.merge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.merge-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card);text-align:center}
+.merge-card .mg-step{display:inline-block;font-size:11px;font-weight:900;color:#fff;background:var(--al);padding:2px 14px;border-radius:99px;margin-bottom:8px;letter-spacing:2px}
+.merge-card h4{font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px}
+.merge-card p{font-size:12.5px;color:var(--sub);line-height:1.75;text-align:left}
+.merge-card p b{color:var(--text)}
+
+/* ── 压缩代价对照 ── */
+.loss-box{background:var(--card);border:1.5px solid rgba(217,119,6,.35);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow-card)}
+.loss-box h4{font-size:15px;font-weight:800;color:var(--amber);margin-bottom:12px}
+.loss-row{display:grid;grid-template-columns:1fr 36px 1fr;gap:10px;align-items:center;margin-bottom:10px}
+.loss-cell{border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;line-height:1.7}
+.loss-cell.orig{background:rgba(0,0,0,.035);color:var(--text)}
+.loss-cell.orig b{background:rgba(217,119,6,.18);padding:0 3px;border-radius:4px}
+.loss-cell.after{background:var(--al-soft);color:var(--text)}
+.loss-cell.after .lost{color:var(--danger);font-weight:800;font-size:11.5px}
+.loss-arrow{text-align:center;font-size:17px;color:var(--sub)}
+.loss-note{font-size:13px;color:var(--sub);line-height:1.8;border-top:1px dashed var(--border);padding-top:12px;margin-top:4px}
+.loss-note b{color:var(--text)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .merge-grid{grid-template-columns:1fr}
+  .loss-row{grid-template-columns:1fr;gap:4px}
+  .loss-arrow{transform:rotate(90deg)}
+  .cmp-bubble{max-width:88%}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Divide and Conquer: The Algorithm Behind Context Compression","name":"Divide and Conquer: The Algorithm Behind Context Compression","url":"https://xueai.app/slides/algo-7.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Recursion and Divide-and-Conquer","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Compaction in the AI Practicum is really divide and conquer: split a long chat, summarize each chunk, then merge. Run recursive summarization yourself—watch a 3600-token dialogue compress to 200, and see what gets dropped.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Recursion and Divide-and-Conquer</div>
+    <h1>Divide and Conquer: The Algorithm Behind Context Compression</h1>
+    <p class="subtitle">In the AI Practicum you learned: when a chat is too long to fit, the AI runs Compaction—compressing old turns into a summary. We said it was “like packing clutter before a move.” This lesson peels back the wrapping: <b>it’s a two-thousand-year-old algorithm pattern called divide and conquer</b>. Last lesson’s recursion was “split”; this one adds the other half: “split, then merge.”</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Compaction in the AI Practicum is really divide and conquer: split a long chat, summarize each chunk, then merge. Run recursive summarization yourself and watch information compress layer by layer</p></aside><!--seo:end-->  <div class="sec-label">Compress it yourself · a 3600-token renovation chat</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Below is a full chat where you and an AI discuss a renovation plan—12 messages, about 3600 tokens, about to blow the context window. Hit “Start compressing,” and <b style="color:var(--text)">watch the three acts</b>: first <b style="color:var(--text)">split</b> (into three segments), then <b style="color:var(--text)">conquer</b> (each segment becomes one summary), finally <b style="color:var(--text)">merge</b> (three summaries into one)—the token counter up top shows how much you saved.</p>
+
+  <div class="cmp-box">
+    <div class="cmp-head">
+      <div class="cmp-meter"><span class="cm-label">Current context</span><span class="cm-val" id="tokenVal">3600</span><span class="cm-unit">token</span></div>
+      <label class="cmp-toggle"><input type="checkbox" id="keepRecent"><span class="tg-track"></span>Keep the latest 4 uncompressed</label>
+    </div>
+    <div class="cmp-stage" id="cmpStage"></div>
+    <div class="cmp-foot">
+      <button class="btn-al" id="btnCompress">Start compressing →</button>
+      <span class="cmp-status" id="cmpStatus">Split → summarize each → merge, three acts in a row</span>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>Try turning on “Keep the latest 4” and compress again.</b> That’s what real Agents do: the latest turns are usually what you’re doing right now—too precious to touch—so only the older parts get summarized. You’ll see tokens don’t drop all the way to 200—<b>fidelity and space are always a trade</b>.
+  </div>
+
+  <div class="sec-label">Concept card · the same playbook as merge sort</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:20px;">Those three acts have a formal name: <b style="color:var(--text)">divide and conquer</b> (Divide and Conquer). Its textbook celebrity is merge sort—split a list into small pieces, sort each, then merge pairwise. <b style="color:var(--text)">Merge sort sorts numbers; Compaction compresses talk—same skeleton</b>:</p>
+
+  <div class="merge-grid paywall-locked xa-peek">
+    <div class="merge-card">
+      <div class="mg-step">Split</div>
+      <h4>✂️ Cut into pieces</h4>
+      <p>If the big problem won’t solve directly, cut it into smaller pieces. <b>Merge sort</b>: halve a list until you have singles. <b>Compaction</b>: split a long chat by topic or turn into segments.</p>
+    </div>
+    <div class="merge-card">
+      <div class="mg-step">Conquer</div>
+      <h4>🔧 Solve each piece</h4>
+      <p>Small pieces are easy. <b>Merge sort</b>: sort each short run. <b>Compaction</b>: summarize each segment—short enough for the AI to read and summarize accurately in one go. This step can even run in parallel, so it’s faster.</p>
+    </div>
+    <div class="merge-card">
+      <div class="mg-step">Merge</div>
+      <h4>🧩 Merge the results</h4>
+      <p>Assemble the piece results into a full answer. <b>Merge sort</b>: fuse two sorted runs into one. <b>Compaction</b>: merge several summaries into one master summary. Still too many segments? <b>Recurse for another round</b>—last lesson’s flavor is back.</p>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>Why not ask the AI to summarize the whole thing in one shot?</b> Because “summarize ten thousand words” would itself blow the context—exactly the problem we’re solving. Divide and conquer’s cleverness: <b>turn an “unsolvable big problem” into a pile of “definitely solvable small ones”</b>, then spend a little effort assembling. In the Engineering Advanced Part, Coding Agents read large codebases the same way: file by file, note the key points, then roll up.
+  </div>
+
+  <div class="sec-label paywall-locked">Honest card · the cost of compression</div>
+
+  <div class="loss-box paywall-locked">
+    <h4>⚠️ Summaries are lossy compression—details get lost</h4>
+    <div class="loss-row">
+      <div class="loss-cell orig">Original: “budget <b>under 80k</b>” “I really hate red—<b>no red anywhere in the house</b>”</div>
+      <div class="loss-arrow">→</div>
+      <div class="loss-cell after">After: “discussed budget and color preferences”<span class="lost">← the exact number and the red ban are gone</span></div>
+    </div>
+    <div class="loss-note">After compression the AI still knows you “talked about budget,” but <b>ask “what’s my budget?” and it can only guess</b>; next time it picks a red sofa and you’ve got no ground to stand on. That’s why the AI Practicum keeps stressing: <b>critical facts (numbers, hard constraints, decisions) must live in long-term memory or a doc</b>—don’t trust the summary to keep them. Summaries cover “what we roughly talked about”; the archive holds what’s set in stone.</div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>What this lesson wants to share</h3>
+    <ul>
+      <li><b>Divide and conquer = split small, solve each, then merge</b>: an unsolvable big problem becomes a pile of solvable small ones</li>
+      <li><b>Compaction is divide and conquer’s real face in AI</b>: segment → summarize each → merge—same skeleton as merge sort</li>
+      <li><b>Recent turns are the most precious</b>: real Agents only compress the old and keep the new—fidelity and space are always trading</li>
+      <li><b>Compression is lossy</b>: facts like “under 80k” and “no red” need a separate store—don’t count on the summary</li>
+      <li><b>Too many segments? Recurse and compress again</b>: last lesson’s recursion + this lesson’s merge = full divide and conquer</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 压缩演示 ──
+   12 条消息 × 300 token = 3600。分组三段（每段 4 条）。
+   开启「保留最近 4 条」后只压前 8 条（两段），后 4 条挂「保留原文」徽章。
+   token 计数用 rAF 缓动滚动，比瞬间跳变更有「泄气」的感觉。 */
+const MSGS = [
+  { role:'user', text:'I want to renovate my 89㎡ two-bedroom. <span class="key-fact">Budget under 80k</span>. Help me with an overall plan.' },
+  { role:'ai',   text:'Got it! For 80k, go “light on hard finishes, heavy on soft goods”: solid plumbing/electrical and walls; furniture and lamps can come later—best bang for the buck.' },
+  { role:'user', text:'I want Japanese wood style, but not too cold and minimal—needs some lived-in warmth.' },
+  { role:'ai',   text:'Then pick light oak for main materials, off-white latex on walls, and warm it up with cotton-linen textiles, rattan shades, and plants.' },
+  { role:'user', text:'No TV in the living room—I want a projector that works in daytime too.' },
+  { role:'ai',   text:'Pick a model at 2800+ lumens, recess the screen into the ceiling, and leave HDMI conduit plus a ceiling mount point.' },
+  { role:'user', text:'Also, I really hate red—<span class="key-fact">no red anywhere in the house</span>, not even a bit.' },
+  { role:'ai',   text:'Noted: keep colors within wood tones + off-white + gray-green, and avoid reds in soft furnishings too.' },
+  { role:'user', text:'I want an open kitchen, but my parents worry about grease smoke—what then?' },
+  { role:'ai',   text:'Compromise: a glass sliding door for a semi-open kitchen. Open for space most days; close when stir-frying—both generations happy.' },
+  { role:'user', text:'Also need to reserve 10k in the budget for a fridge and washer.' },
+  { role:'ai',   text:'Then hard finishes to 50k: plumbing/electrical 12k, tiling 10k, carpentry and cabinets 18k, paint and misc 10k.' },
+];
+const TOKEN_PER_MSG = 300;
+
+const GROUPS = [
+  { name:'Segment 1 · Budget & style', color:'#db2777', bg:'rgba(219,39,119,.05)',
+    summary:'User renovating an 89㎡ two-bedroom in Japanese wood with lived-in warmth; overall plan set as light hard finishes, heavy soft goods.' },
+  { name:'Segment 2 · Living room & color', color:'#7c3aed', bg:'rgba(124,58,237,.05)',
+    summary:'Living room gets a projector, not a TV (bright model + ceiling screen); user has color preferences, plan adjusted accordingly.' },
+  { name:'Segment 3 · Kitchen & appliances', color:'#d97706', bg:'rgba(217,119,6,.05)',
+    summary:'Kitchen set as semi-open with a glass sliding door; appliance budget reserved; hard-finish costs broken down by trade.' },
+];
+const FINAL_SUMMARY = 'User renovating an 89㎡ two-bedroom in Japanese wood; discussed budget and color preferences; projector in living room, semi-open kitchen, hard-finish budget broken down by trade.';
+const FINAL_SUMMARY_PARTIAL = 'User renovating an 89㎡ two-bedroom in Japanese wood, plan set; projector in living room; discussed color preferences.';
+
+const stage = document.getElementById('cmpStage');
+const tokenVal = document.getElementById('tokenVal');
+const btnCompress = document.getElementById('btnCompress');
+const cmpStatus = document.getElementById('cmpStatus');
+const keepRecent = document.getElementById('keepRecent');
+let compressing = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* token 计数缓动：600ms 内从当前值滚到目标值 */
+let tokenAnim = null;
+function setTokens(target){
+  if (tokenAnim) cancelAnimationFrame(tokenAnim);
+  const from = parseInt(tokenVal.textContent.replace(/\D/g,''), 10) || 0;
+  const t0 = performance.now();
+  function tick(now){
+    const p = Math.min(1, (now - t0) / 600);
+    const eased = 1 - Math.pow(1 - p, 3);
+    tokenVal.textContent = Math.round(from + (target - from) * eased).toLocaleString('zh-CN');
+    if (p < 1) tokenAnim = requestAnimationFrame(tick);
+    else tokenVal.classList.toggle('low', target <= 1500);
+  }
+  tokenAnim = requestAnimationFrame(tick);
+}
+
+function buildStage(){
+  stage.innerHTML = '';
+  const keep = keepRecent.checked;
+  const groupCount = keep ? 2 : 3;   // 保留模式只压前 8 条（两段）
+  const frag = document.createDocumentFragment();
+
+  const tag = document.createElement('div');
+  tag.className = 'cmp-phase-tag'; tag.id = 'phaseTag';
+  tag.textContent = 'Act 1 · Split';
+  frag.appendChild(tag);
+
+  for (let g = 0; g < 3; g++){
+    const grp = document.createElement('div');
+    grp.className = 'cmp-group';
+    grp.dataset.g = g;
+    if (g < groupCount) {
+      grp.style.setProperty('--gc', GROUPS[g].color);
+      grp.style.setProperty('--gbg', GROUPS[g].bg);
+      grp.innerHTML = `<div class="grp-title">${GROUPS[g].name} (4 msgs · ~1200 tokens)</div>`;
+    }
+    for (let i = g*4; i < g*4+4; i++){
+      const m = MSGS[i];
+      const div = document.createElement('div');
+      div.className = `cmp-msg ${m.role}` + (keep && g === 2 ? ' kept' : '');
+      div.innerHTML = `<div class="cmp-avatar">${m.role==='user'?'You':'AI'}</div>
+        <div class="cmp-bubble">${m.text}<span class="tk">≈300 tk</span></div>
+        <span class="cmp-keep-badge">📌 Keep original</span>`;
+      grp.appendChild(div);
+    }
+    if (g < groupCount){
+      const sm = document.createElement('div');
+      sm.className = 'cmp-summary';
+      sm.style.setProperty('--gc', GROUPS[g].color);
+      sm.style.display = 'none';
+      sm.innerHTML = `<span class="sm-tag">📝 Summary of ${GROUPS[g].name}</span>${GROUPS[g].summary}<span class="tk">1200 → 150 tk</span>`;
+      grp.appendChild(sm);
+    }
+    frag.appendChild(grp);
+  }
+
+  const fin = document.createElement('div');
+  fin.className = 'cmp-final'; fin.id = 'finalCard';
+  frag.appendChild(fin);
+  stage.appendChild(frag);
+}
+
+async function runCompress(){
+  if (compressing) return;
+  compressing = true;
+  btnCompress.disabled = true;
+  keepRecent.disabled = true;
+  btnCompress.textContent = 'Compressing…';
+  buildStage();
+  setTokens(3600);
+  await sleep(500);
+
+  const keep = keepRecent.checked;
+  const groupCount = keep ? 2 : 3;
+  const phaseTag = document.getElementById('phaseTag');
+  const groups = [...stage.querySelectorAll('.cmp-group')];
+
+  /* 第一幕：切分 */
+  phaseTag.classList.add('show');
+  cmpStatus.textContent = keep
+    ? 'Act 1 · Split: first 8 msgs into 2 segments; latest 4 stay tagged “Keep original”'
+    : 'Act 1 · Split: 12 msgs into 3 topic segments; color marks each segment';
+  for (let g = 0; g < groupCount; g++){
+    await sleep(560);
+    groups[g].classList.add('grouped');
+  }
+  await sleep(900);
+
+  /* 第二幕：各段摘要 */
+  phaseTag.textContent = 'Act 2 · Summarize each';
+  cmpStatus.textContent = 'Act 2 · Conquer: each segment collapses into one summary, 1200 → 150 tokens';
+  let tokens = 3600;
+  for (let g = 0; g < groupCount; g++){
+    const grp = groups[g];
+    grp.querySelectorAll('.cmp-msg').forEach(m => m.classList.add('gone'));
+    await sleep(520);
+    const sm = grp.querySelector('.cmp-summary');
+    sm.style.display = 'block';
+    await sleep(30);
+    sm.classList.add('show');
+    tokens -= 1200 - 150;
+    setTokens(tokens);
+    await sleep(620);
+  }
+  await sleep(700);
+
+  /* 第三幕：合并 */
+  phaseTag.textContent = 'Act 3 · Merge';
+  cmpStatus.textContent = keep
+    ? 'Act 3 · Merge: 2 summaries → 1 master summary, plus the 4 kept originals'
+    : 'Act 3 · Merge: 3 summaries → 1 master summary';
+  const summaries = [...stage.querySelectorAll('.cmp-summary')];
+  summaries.forEach(s => { s.classList.remove('show'); });
+  await sleep(500);
+  summaries.forEach(s => { s.style.display = 'none'; });
+  groups.slice(0, groupCount).forEach(g => { g.classList.remove('grouped'); g.style.display = 'none'; });
+
+  const fin = document.getElementById('finalCard');
+  const finalTokens = keep ? 180 : 200;
+  fin.innerHTML = `<span class="sm-tag">🗜 Master summary (~${finalTokens} tokens)</span>${keep ? FINAL_SUMMARY_PARTIAL : FINAL_SUMMARY}`;
+  fin.style.display = 'block';
+  /* 保留模式：总摘要插到保留消息前面，顺序才符合「旧的在上」 */
+  if (keep) stage.insertBefore(fin, groups[2]);
+  await sleep(40);
+  fin.classList.add('show');
+  const total = keep ? finalTokens + 4 * TOKEN_PER_MSG : finalTokens;
+  setTokens(total);
+  await sleep(700);
+
+  phaseTag.classList.remove('show');
+  cmpStatus.textContent = keep
+    ? `Done: 3600 → ${total.toLocaleString('zh-CN')} tokens. Latest 4 untouched—less aggressive, but nothing in progress is lost`
+    : 'Done: 3600 → 200 tokens, freeing 94% of space—what’s the cost? Read on';
+  btnCompress.disabled = false;
+  keepRecent.disabled = false;
+  btnCompress.textContent = 'Compress again ↻';
+  compressing = false;
+}
+
+btnCompress.addEventListener('click', runCompress);
+keepRecent.addEventListener('change', () => {
+  if (compressing) return;
+  buildStage();
+  setTokens(3600);
+  cmpStatus.textContent = keepRecent.checked
+    ? 'Keep mode on: only compress first 8; latest 4 stay as-is'
+    : 'Split → summarize each → merge, three acts in a row';
+  btnCompress.textContent = 'Start compressing →';
+});
+
+buildStage();
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

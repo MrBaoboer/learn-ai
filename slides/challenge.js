@@ -370,6 +370,27 @@
       '<span class="ch-entry-txt-s">' + brief + '</span>';
   }
 
+  /* 「战报看过了没」。按 day1_date 存，下一轮报名换了日期，红点自然重新亮起来；
+     纯本地状态，服务端没有必要为一颗点多存一个字段。localStorage 不可用
+     （无痕、被禁）时一律当作没看过——宁可多亮一次，也别把战报藏了。 */
+  var REPORT_SEEN_KEY = 'xueai_challenge_report_seen';
+
+  function reportRunId() {
+    return (view && view.day1_date) || '';
+  }
+
+  function reportSeen() {
+    var id = reportRunId();
+    if (!id) return false;
+    try { return localStorage.getItem(REPORT_SEEN_KEY) === id; } catch (e) { return false; }
+  }
+
+  function markReportSeen() {
+    var id = reportRunId();
+    if (!id) return;
+    try { localStorage.setItem(REPORT_SEEN_KEY, id); } catch (e) {}
+  }
+
   /* 隐藏走 class 不走 inline style：壳页顶栏把控件统一成 36px 图标时
      用了 display:inline-flex !important，inline 的 display:none 压不过它。 */
   function hideEntry(el) {
@@ -405,8 +426,12 @@
       return;
     }
     if (view.state === 'settled') {
-      // 看过一次就永久藏起来太急：计划刚结束那天还得能翻回战报（收窗时机见上面 entry_open）
-      el.classList.add('ch-entry--claimable');
+      /* 看过一次就永久藏起来太急：计划刚结束那天还得能翻回战报（收窗时机见上面 entry_open）。
+         但也不能一直催——原先这里套的是 --claimable，连脉冲带红点，
+         学满七天、无事可领之后那颗点还亮着不走（吐槽 #41）。
+         现在红点只表示战报还没翻过，翻过就摘掉。 */
+      el.classList.add('ch-entry--report');
+      if (!reportSeen()) el.classList.add('ch-entry--unread');
       el.title = T.entryReport;
       el.innerHTML = coin + entryTxt(T.entryReport, T.sReport);
       return;
@@ -464,7 +489,13 @@
   function renderOverlay() {
     if (!loggedIn || !view || view.state === 'none') { showIntro(); return; }
     if (view.state === 'disqualified') { showDisqualified(); return; }
-    if (view.state === 'settled') { showSettle(); return; }
+    if (view.state === 'settled') {
+      // 战报翻开了，顶栏那颗红点就该摘掉——它的含义就是「这个你还没看」
+      markReportSeen();
+      renderEntry();
+      showSettle();
+      return;
+    }
     showBoard();
   }
 

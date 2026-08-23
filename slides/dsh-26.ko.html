@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>비결정적 시스템 테스트하기 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.doc-quote{background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:20px 22px;margin:12px 0 20px;font-size:14px;line-height:1.9;color:var(--text)}
+.doc-quote .q-src{display:block;margin-top:8px;font-size:12px;color:var(--sub)}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:var(--shadow-card);margin-top:12px}
+.cmp-card h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;color:var(--text)}
+.cmp-card h3 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eef1ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+
+/* ── 交互演示：故障注入与回放实验室 ── */
+#demo-testing{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:12px}
+.d-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.d-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(77,107,254,.4);background:var(--accent-soft);color:var(--accent-deep);border-radius:11px;padding:12px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px}
+.d-btn svg{flex:0 0 auto}
+.d-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.d-btn.scn{padding:10px 14px;font-size:13px;min-height:44px}
+.d-btn.scn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.tst-stage{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tst-pane{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;min-width:0}
+.tst-pane-title{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--accent-deep);margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.tst-pane-title svg{color:var(--accent)}
+.beh{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);transition:opacity .35s,border-color .3s,background .3s,transform .35s}
+.beh .bn{font-weight:800;color:var(--amber)}
+.beh.good .bn{color:var(--success)}
+.beh.armed{border-color:var(--accent);box-shadow:0 0 0 2px rgba(77,107,254,.16)}
+.beh.used{opacity:.35;transform:translateX(-6px)}
+.beh .sub{color:var(--sub);font-size:10.5px}
+.tlog{display:flex;gap:8px;align-items:baseline;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:5px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s}
+.tlog.in{opacity:1;transform:translateY(0)}
+.tlog .et{font-weight:800;color:var(--sub);flex:0 0 auto}
+.tlog.bad{border-color:rgba(220,38,38,.45);background:rgba(220,38,38,.05);color:var(--text)}
+.tlog.bad .et{color:var(--danger)}
+.tlog.retry{border-color:rgba(217,119,6,.5);background:rgba(217,119,6,.06);color:var(--text)}
+.tlog.retry .et{color:var(--amber)}
+.tlog.ok{border-color:rgba(22,163,74,.5);background:rgba(22,163,74,.05);color:var(--text)}
+.tlog.ok .et{color:var(--success)}
+.tlog.msg{border-color:rgba(77,107,254,.45);background:var(--accent-soft);color:var(--text)}
+.tlog.msg .et{color:var(--accent-deep)}
+.diffrow{display:flex;gap:8px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:5px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s,border-color .3s,background .3s}
+.diffrow.in{opacity:1;transform:translateY(0)}
+.diffrow .mark{flex:0 0 auto;width:16px;height:16px;display:grid;place-items:center;color:var(--success)}
+.diffrow.diverged{border-color:rgba(220,38,38,.5);background:rgba(220,38,38,.06)}
+.diffrow.diverged .mark{color:var(--danger)}
+.tst-empty{font-size:12px;color:var(--sub);padding:4px 2px}
+.seed{font:800 11px/1 ui-monospace,Menlo,monospace;color:var(--accent);background:var(--accent-soft);border:1px solid rgba(77,107,254,.3);border-radius:7px;padding:5px 8px}
+.d-caption{display:flex;gap:9px;align-items:flex-start;margin-top:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.8;color:var(--text)}
+.d-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}
+  .tst-stage{grid-template-columns:1fr}
+  .source-head{flex-direction:column}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .d-btn{flex:1 1 auto;justify-content:center}
+}
+</style>
+<meta name="description" content="Agent 동작은 모델 출력에 의존하는데, 어떻게 재현 가능한 테스트를 만들까요? DSH의 답: 결정적 리플레이로 로그를 테스트 자산으로 만들고, 속성 기반 테스트로 교차 시퀀스를 쓸어내며, LLM 클라이언트를 속이는 전용 장애 서버로 모든 끊김을 연습합니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"비결정적 시스템 테스트하기","name":"비결정적 시스템 테스트하기","url":"https://xueai.app/slides/dsh-26.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문에서 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 모델과 외부 연동","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"Agent 동작은 모델 출력에 의존하는데, 어떻게 재현 가능한 테스트를 만들까요? DSH의 답: 결정적 리플레이로 로그를 테스트 자산으로 만들고, 속성 기반 테스트로 교차 시퀀스를 쓸어내며, LLM 클라이언트를 속이는 전용 장애 서버로 모든 끊김을 연습합니다.","datePublished":"2026-08-13","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="비결정적 시스템 테스트하기"><meta property="og:description" content="Agent 동작은 모델 출력에 의존하는데, 어떻게 재현 가능한 테스트를 만들까요? DSH의 답: 결정적 리플레이로 로그를 테스트 자산으로 만들고, 속성 기반 테스트로 교차 시퀀스를 쓸어내며, LLM 클라이언트를 속이는 전용 장애 서버로 모든 끊김을 연습합니다."><meta property="og:url" content="https://xueai.app/slides/dsh-26.ko.html"><meta property="og:image" content="https://xueai.app/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.app/slides/dsh-26.ko.html">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:locale" content="ko_KR">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/dsh-26.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/dsh-26.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/dsh-26.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/dsh-26.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 모델과 외부 연동</div>
+    <h1>비결정적 시스템 테스트하기</h1>
+    <p class="subtitle">결정적 리플레이, 속성 기반 테스트, LLM 클라이언트를 속이는 전용 장애 서버. 핵심 자료: <code>docs/testing.zh.md</code>와 <code>packages/test-support/</code>.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>결정적 리플레이, 속성 기반 테스트, LLM 클라이언트를 속이는 전용 장애 서버</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>강의 목표</b>Agent 동작은 모델 출력에 의존하고, 모델 출력은 매번 달라요 — 이런 시스템을 어떻게 테스트할까요? 읽고 나면 DSH의 세 무기를 말할 수 있어요. 실제 세션 로그를 바로 리플레이 스크립트로 바꾸는 결정적 리플레이로, 비결정성은 녹음 그 한 번에만 남기고; LLM 클라이언트에 끊김·반쪽 패킷·레이트 리밋을 만들어 주는 스크립트형 장애 서버; 그리고 무작위 교차 시퀀스로 프로토콜 코드를 쓸어내는 속성 기반 테스트 — 첫 실행에서 진짜 버그를 잡은 그 테스트.</span>
+  </div>
+
+  <div class="sec-label">인터랙티브 데모 · 장애 주입과 리플레이 실험실</div>
+  <p class="reveal body">먼저 해보고 말해요. 시나리오 A는 진짜 HTTP 장애 서버예요: 동작을 큐에 세우고, 요청마다 하나를 소모하며, 클라이언트가 어떻게 받는지 봐요. 시나리오 B는 결정적 리플레이: 실제 세션 로그로 리플레이 스크립트를 한 번에 유도해 다시 돌리고, 한 줄을 변조해 diff가 그 자리에서 증언하는 걸 봅니다.</p>
+  <div id="demo-testing" class="reveal">
+    <div class="d-toolbar">
+      <button class="d-btn scn active" data-scn="A">시나리오 A · 장애 서버</button>
+      <button class="d-btn scn" data-scn="B">시나리오 B · 결정적 리플레이</button>
+    </div>
+    <div class="d-toolbar">
+      <button class="d-btn primary" id="tPlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>재생</button>
+      <button class="d-btn" id="tStep"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>단스텝</button>
+      <button class="d-btn" id="tReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>초기화</button>
+    </div>
+    <div class="tst-stage">
+      <div class="tst-pane">
+        <div class="tst-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="7" rx="2"/><rect x="2" y="13" width="20" height="7" rx="2"/><path d="M6 7.5h.01M6 16.5h.01"/></svg><span id="tLeftTitle">장애 서버 · 동작 스크립트 큐</span><span class="seed" id="tSeed">seed 0x5A3C</span></div>
+        <div id="tLeft"><div class="tst-empty">(비어 있음)</div></div>
+      </div>
+      <div class="tst-pane">
+        <div class="tst-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span id="tRightTitle">클라이언트 쪽 · 분류 / 재시도 / 로그 기록</span></div>
+        <div id="tRight"><div class="tst-empty">(비어 있음)</div></div>
+      </div>
+    </div>
+    <div class="d-caption">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      <span id="tCaption">시나리오를 고른 뒤 「재생」을 누르거나, 여기로 스크롤하면 시나리오 A가 자동 재생됩니다.</span>
+    </div>
+  </div>
+
+  <div class="sec-label">로직 분해 · 먼저 기초를 결정적으로</div>
+  <p class="reveal body">비결정적 시스템을 테스트하는 생각은 하나뿐이에요: 불확실한 부분을 가두고 나머지는 전부 결정적으로 만들어요. DSH의 테스트 계층(<code>docs/testing.zh.md</code>)은 그 생각 위에 쌓여 있어요. 유닛 테스트는 경계 조건, 오류 경로, 이벤트 순서, 동시성 레이스를 노리고; CI 커버리지 게이트는 <code>packages/*/*/src</code>에 파일별 100%를 요구해요(<code>AGENTS.md</code> 65행 Commands 절). 문서도 단호해요: 행 커버리지는 필요조건이지 충분조건이 아니며, 안 돈 행은 대개 지워야 할 죽은 코드이지 채워야 할 테스트가 아니에요.</p>
+  <p class="reveal body">키가 있는 실제 API 테스트는 또 다른 층이에요. 정체성이 드러나는 한 구절:</p>
+  <div class="doc-quote reveal">
+    “우리는 DeepSeek예요 — 실제 API 테스트를 아끼지 마세요. 키 없는 테스트는 하위 경로만 증명하고, 키가 있는 실행만이 agent가 실제 모델과 붙어 정상 동작함을 증명합니다.”
+    <span class="q-src">출처: <code>docs/testing.zh.md</code> 「키 사용 전략」 절, 확인일 2026-08-13</span>
+  </div>
+  <p class="reveal body">추론이 우리에게는 싸니까 스모크 테스트는 진짜로 가요: 실제 예제를 띄우고, 프롬프트 하나를 보내고, 바깥세상을 확인해요. 단언도 까다로워야 해요. e2e는 파일을 다시 읽고 명령을 다시 돌려 결과를 검증해야 하며, agent 자기 출력에 키워드만 탐지하면 치팅 agent가 통과해요. 키가 없는 환경은 자동으로 건너뛰고, 누구의 막지도 않아요.</p>
+
+  <div class="sec-label">로직 분해 · 로그가 곧 테스트 자산</div>
+  <p class="reveal body">본편은 리플레이예요. 지난 레슨에서 다뤘죠( <a href="dsh-22.html">LLM 어댑터 계층</a> 참고): 스트리밍 청크마다 <code>assistant/chunk</code> 이벤트로 세션 로그에 그대로 남아요. <code>dsh-llm-replay</code> 플러그인은 그걸 거꾸로 써요. 녹음된 <code>session.jsonl</code>을 가져와 chunk 이벤트를 (turn, step)으로 묶으면, 각 그룹이 그때 한 번 모델 호출의 완전한 청크 시퀀스예요. 테스트에서는 실제 agent가 그대로 돌고, 모델 쪽만 리플레이 어댑터로 바꿔 녹음된 청크를 프레임마다 토해내요. 비결정성은 녹음 그 한 번에만 있고, 이후 재실행은 바이트 단위로 같고 API Key도 필요 없어요.</p>
+  <p class="reveal body">이게 “로그가 곧 테스트 자산”의 뜻이에요. fixture는 손으로 쓴 mock이 아니라 프로덕션 포맷 세션 로그 그 자체예요. 스냅샷 테스트로 조립된 전체 동작을 고정하고, 코드 한 줄이 동작을 갈라놓으면 diff가 그 자리에서 빨개져요. fork(분기 세션)에도 정교한 디테일이 있어요: 자식 세션 로그 앞머리는 부모의 시드 이벤트를 물려받으니, 리플레이 스크립트를 유도할 때 <code>seedLength</code> 경계 뒤에서 잘라야 해요. 안 그러면 부모 청크가 자식 호출로 잘못 재생돼요:</p>
+  <div class="source reveal">
+    <div class="source-head"><span>packages/test-support/llm-replay/src/index.ts</span><span>532–542행</span></div>
+    <pre><code>    <span class="kw">const</span> text = <span class="fn">readFileSync</span>(childFile, <span class="str">'utf8'</span>)
+    <span class="kw">const</span> header = <span class="fn">parseSessionHeader</span>(text)
+    <span class="cm">// Derive the child's script from its own events only — events AT OR after the seed</span>
+    <span class="cm">// boundary.</span>
+    <span class="kw">const</span> ownEvents = <span class="fn">parseSessionLog</span>(text).<span class="fn">slice</span>(header.seedLength)
+    children.<span class="fn">push</span>({
+      recordedId: header.id,
+      createdAt: header.createdAt,
+      entries: <span class="fn">deriveReplayScript</span>(ownEvents),
+      primary: <span class="kw">false</span>,
+    })</code></pre>
+  </div>
+  <div class="snapshot"><b>소스 스냅샷 안내:</b> 로컬 저장소 deepseek-harness-master 기준, 확인 파일 <code>packages/test-support/llm-replay/src/index.ts</code>, 확인일 2026-08-13. 코드 블록은 소스 원문을 유지합니다.</div>
+  <p class="reveal body paywall-locked xa-peek">크로스 플랫폼 규율도 여기서 나와요. 체크인한 fixture는 macOS와 Linux에서 모두 리플레이돼야 하고, 녹음된 스냅샷이 어느 플랫폼에서든 깨지면 fixture 자체를 고치세요. <code>AGENTS.md</code> 123행 원문은 “fix fixtures, not normalizers”: fixture를 고치고, 정규화기를 쓰지 마세요. 정규화기는 테스트와 현실 사이에 솜을 끼우는 일이고, 많이 끼우면 현실을 테스트하지 못하게 돼요.</p>
+
+  <div class="sec-label paywall-locked">로직 분해 · LLM 클라이언트를 속이는 전용 서버</div>
+  <p class="reveal body paywall-locked">리플레이는 동작이 변하지 않는지를 봐요 — 아직 한 조각이 남아요: 전송 계층의 화려한 죽는 법. 연결 거부, 전송 중 socket 리셋, 정상 종료인데 <code>[DONE]</code> 없음, Retry-After가 있는 레이트 리밋, 아예 멈춰 있기. 각각은 어댑터와 복구 계층 눈엔 다른 것이고, 프로세스 안 mock으로는 전부 못 잡아요. mock이 fetch, SSE 프레이밍, socket 종료, 유휴 워치독 같은 실제 경계를 우회하거든요. 그래서 DSH는 <code>dsh-llm-mock-server</code>를 만들었어요: OpenAI 방언을 쓰는 진짜 Node HTTP 서버, 동작은 전부 스크립트 제어, 요청마다 동작 하나 소모, 스크립트가 바닥나면 명시적으로 오류(설계 동기는 Agent Note <code>2026-07-25-scriptable-llm-wire-fault-server.zh.md</code>). 개발자가 수동으로 장애를 재현하려면 base URL과 key만 바꿔 어떤 앱이든 붙이면 돼요.</p>
+  <p class="reveal body paywall-locked">random 모드도 있어요. 가중치로 장애를 뽑아 스트레스 테스트하고, seed는 공개·재현 가능해요. 기본 가중치 표 자체가 LLM 클라이언트가 현장에서 만나는 것의 체크리스트예요: 정상 성공 48, 느린 성공 10, 중간 끊김(partial_disconnect) 10, 연결 리셋·끊김·빈 응답·레이트 리밋 각 5, 서버 오류 4, max_tokens 도달·정지 hang·503 각 2, 제일 고약한 둘은 각 1 — 스트림은 정상 끝나지만 덜 보낸 partial_eof, 그리고 깨진 JSON을 뱉는 malformed_json. 소스 주석도 짚어요: 이건 조절 가능한 테스트 압력 설정이지, 프로덕션 사고 빈도 추정이 아니에요.</p>
+  <p class="src-note reveal paywall-locked">출처: <code>packages/test-support/llm-mock-server/src/index.ts</code> 56–70행 DEFAULT_MOCK_LLM_RANDOM_WEIGHTS, 확인일 2026-08-13.</p>
+  <p class="reveal body paywall-locked">서버의 절제는 분명해요: 프로토콜 계층 사실만 보고하고, 재시도할지 말지는 판단하지 않아요 — 정책은 harness 몫이에요. 실제 조합 테스트는 요청을 DeepSeek 어댑터, agent loop, 재시도 플러그인 순으로 통과시키며, 검증은 구체적이에요: 요청 횟수 정확, 재시도 단계에 번호, 실패한 반쪽 청크가 히스토리로 새지 않음, 정상 EOF의 반쪽 출력은 <code>STREAM_CLOSED</code>로 분류되고 기본은 재시도 안 함.</p>
+
+  <div class="sec-label paywall-locked">로직 분해 · 속성 테스트, 첫 총에 피</div>
+  <p class="reveal body paywall-locked">마지막 무기는 아무도 생각 못 한 교차예요. 프로토콜 형태 코드(청크 스트림, 이벤트 로그, 인박스 스케줄링)의 입력 공간은 조합 폭발이고, 예시 테스트는 이미 떠올린 케이스만 고정해요. DSH는 프로토콜 형태 패키지마다 fast-check 기반 속성 테스트를 붙여요: 생성기가 현실적이지만 적대적인 입력(중복 인덱스, 지연 청크, block-start 없는 기형 스트림)을 만들고, 단언은 구체 출력이 아니라 불변조건이에요 — 조립된 블록 수는 본 서로 다른 인덱스를 넘을 수 없고, 반복 호출 결과는 안정해야 해요. 실패하면 재현 가능한 seed를 자동으로 찍어요.</p>
+  <p class="reveal body paywall-locked">전과는 Agent Note 첫 줄에 적혀 있어요:</p>
+  <div class="doc-quote reveal paywall-locked">
+    “속성 테스트 스위트가 첫 실행에서 BlockAssembler 중복 <code>block-end</code> 진짜 버그를 찾았습니다.” 같은 인덱스의 반복 block-end는 이미 끝난 블록을 덮어쓰고, 그 버그는 happy path 100% 행 커버리지 아래에서 살아남았어요.
+    <span class="q-src">출처: <code>.agents/notes/implemented/testing/2026-06-11-property-based-testing.zh.md</code>, 확인일 2026-08-13. 수정 뒤 「첫 닫힘이 우선」 방어는 <a href="dsh-22.html">LLM 어댑터 계층</a> 레슨의 소스 패널을 보세요.</span>
+  </div>
+  <p class="reveal body paywall-locked">이 인프라의 부산물도 있어요. <code>BENCHMARK.md</code>의 공식 벤치마크 경로는 Python SDK에 minimal 변형이고, 작업마다 독립 workspace예요. 테스트 체계가 탄탄하면 평가는 입력만 바꾸면 돼요.</p>
+  <div class="facts paywall-locked">
+    <div class="fact reveal"><code>커버리지는 필요하지만 충분하지 않음</code><p>파일별 100%는 CI 게이트지만, 행이 실행됐다는 것만 증명해요. 진짜 버그는 교차 시퀀스에 숨고 — 속성 테스트 영역 — 전송 경계에 숨으면 장애 서버 영역이에요.</p></div>
+    <div class="fact reveal"><code>fixture는 세션 로그</code><p>리플레이 fixture는 손으로 만든 mock이 아니라 프로덕션 포맷 <code>session.jsonl</code> 그 자체예요. 한 번 녹음해 어디서나 재생하고, 크로스 플랫폼을 통과해야 하며, 깨지면 fixture를 고치고 정규화기는 건드리지 마세요.</p></div>
+    <div class="fact reveal"><code>장애 서버는 정책을 하지 않음</code><p>스크립트대로 끊고, 레이트 리밋하고, 멈출 뿐이에요. 재시도 여부는 harness 몫. 테스트 인프라가 중립이어야 어댑터·loop·재시도 계층에 동시에 증언할 수 있어요.</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked">가로 비교 · 다른 곳은 어떻게 테스트하나</div>
+  <div class="cmp-card reveal paywall-locked">
+    <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build: 스크립트형 mock도 있지만 HTTP 계층에서 멈춤</h3>
+    <p>Grok Build의 <code>xai-grok-test-support</code>에는 <code>MockInferenceServer</code>가 있어요(<code>crates/codegen/xai-grok-test-support/src/mock_server.rs</code>): 기본 echo 모드는 마지막 사용자 메시지를 메아리치고, 경로별 큐 스크립트 응답(상태 코드·body·SSE 이벤트 정밀 제어)을 지원하며, 한 서버가 chat-completions·responses·messages 세 API 방언을 동시에 받고, 모든 요청을 헤더까지 전부 기록해 단언에 씁니다. 발상은 DSH 장애 서버와 한 뿌리예요. 차이는 커버리지: 확인한 소스 기준으로는 HTTP 응답 계층 스크립팅이고, DSH 장애 서버는 한 층 더 내려가 socket 리셋·전송 중 끊김·정지 hang 같은 전송 계층 죽음을 동작 어휘에 넣고, 재현 가능한 가중 랜덤 모드까지 갖춰요. 리플레이 쪽은 Grok이 <code>xai-sqlite-journal</code>로 영속화하지만, 공개 증거상 프로덕션 로그를 바로 리플레이 스크립트로 유도하는 동등 메커니즘은 보이지 않아요.</p>
+  </div>
+  <div class="cmp-card reveal paywall-locked">
+    <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code: 클로즈드소스 제품의 테스트 블랙박스</h3>
+    <p>복원 소스(restored-src)에서 보이는 테스트 흔적은 제한적이에요 — 복원의 성격과 맞아요. 산출물에서 거꾸로 뽑은 건 제품 코드이고, 테스트 코드는 원래 산출물과 함께 배포되지 않아요. 그래서 내릴 수 있는 결론은 하나뿐: 공개 증거만으로는 Claude Code 테스트 체계가 어떤지 바깥에서 평가할 수 없어요. 그게 오픈소스 harness의 가치를 돋보이게 해요. DSH의 테스트 전략·커버리지 게이트·fixture 규율이 전부 저장소에 있고, 테스트 인프라 자체가 배우고 재사용할 수 있는 산출물이에요.</p>
+  </div>
+
+  <div class="sec-label paywall-locked">수업 실습</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>당신만의 불변조건을 설계하세요</h3><p><code>BlockAssembler</code>에 속성 테스트를 하나 더 넣는다고 가정해요. 생성기는 합법·기형이 교차된 청크 스트림을 무작위로 뱉어요(중복 block-end, 빠진 block-start, 지연 delta). 이 레슨의 조립 블록 수 불변조건을 참고해, 단언할 가치가 있다고 생각하는 불변조건 두 개를 더 쓰고, 각각이 어떤 실제 고장 부류를 막는지 설명하세요. 이어서 추론: 녹음된 스냅샷 fixture가 macOS에서는 통과하고 Linux에서는 경로 구분자 diff로 깨질 때, “fix fixtures, not normalizers” 규율에 따라 어디를 고칠까요? 왜 비교기 안에서 경로를 일괄 치환하지 않을까요?</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway:</b> 비결정적 시스템을 테스트하는 법은 비결정성을 녹음 그 순간에 가두는 거예요. 세션 로그에서 리플레이 스크립트를 바로 유도하고, fixture는 프로덕션 포맷 로그 그 자체. 전송 계층의 죽음은 진짜 HTTP 장애 서버로 하나씩 연습하고, 교차 공간은 속성 기반 테스트가 쓸어내며 — 첫 전투에서 커버리지 게이트가 놓친 진짜 버그를 잡았어요. 커버리지는 코드가 돌았다는 증명이고, 코드가 맞다는 증명은 이 세 무기뿐이에요.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  var demo = document.getElementById('demo-testing');
+  var left = document.getElementById('tLeft');
+  var right = document.getElementById('tRight');
+  var leftTitle = document.getElementById('tLeftTitle');
+  var rightTitle = document.getElementById('tRightTitle');
+  var seedEl = document.getElementById('tSeed');
+  var caption = document.getElementById('tCaption');
+  var idx = 0, timer = null, playing = false, cur = 'A', runId = 0;
+  var steps = [];
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function clearEmpty(box) {
+    var e = box.querySelector('.tst-empty');
+    if (e) box.removeChild(e);
+  }
+  function addLog(type, body, cls) {
+    clearEmpty(right);
+    var d = document.createElement('div');
+    d.className = 'tlog' + (cls ? ' ' + cls : '');
+    d.innerHTML = '<span class="et">' + esc(type) + '</span><span>' + esc(body || '') + '</span>';
+    right.appendChild(d);
+    void d.offsetWidth;
+    d.classList.add('in');
+    return d;
+  }
+
+  /* ── 情景 A：故障服务器 ── */
+  var behs = [];
+  function setupA() {
+    leftTitle.textContent = '장애 서버 · 동작 스크립트 큐';
+    rightTitle.textContent = '클라이언트 쪽 · 분류 / 재시도 / 로그 기록';
+    seedEl.style.display = '';
+    left.innerHTML = '';
+    behs = [];
+    [
+      ['rate_limit', '429 + Retry-After: 2', ''],
+      ['partial_disconnect', '반만 보내고 socket 끊기', ''],
+      ['success', '완전한 스트리밍 응답', 'good']
+    ].forEach(function (b) {
+      var d = document.createElement('div');
+      d.className = 'beh' + (b[2] ? ' ' + b[2] : '');
+      d.innerHTML = '<span class="bn">' + esc(b[0]) + '</span><span class="sub">' + esc(b[1]) + '</span>';
+      left.appendChild(d);
+      behs.push(d);
+    });
+  }
+  function arm(i) {
+    behs.forEach(function (b) { b.classList.remove('armed'); });
+    if (behs[i]) behs[i].classList.add('armed');
+  }
+  function consume(i) {
+    if (behs[i]) { behs[i].classList.remove('armed'); behs[i].classList.add('used'); }
+  }
+
+  function buildA() {
+    return [
+      { cap: '이건 OpenAI 방언을 쓰는 진짜 Node HTTP 서버예요. 동작을 큐에 세우고, 요청마다 하나를 소모하며, 스크립트가 바닥나면 명시적으로 오류를 냅니다. 그래서 테스트가 완전히 결정적이에요.', dur: 3000, run: setupA },
+      { cap: '클라이언트가 요청 #1을 보냅니다. 큐 맨 앞은 rate_limit: 서버가 429와 Retry-After: 2를 돌려줘요.', dur: 2500,
+        run: function () { arm(0); addLog('request #1', 'POST /v1/chat/completions'); } },
+      { cap: '어댑터가 RATE_LIMIT 오류 코드로 정규화해요. 재시도 플러그인이 그 코드를 알고, provider가 준 유효 지연이 로컬 백오프를 바꿉니다. llm/retry 이벤트가 남고 2초 기다려요.', dur: 3000,
+        run: function () {
+          consume(0);
+          addLog('failure', 'RATE_LIMIT · status 429', 'bad');
+          addLog('llm/retry', 'r1 · delay 2000ms (Retry-After 적용)', 'retry');
+        } },
+      { cap: '요청 #2가 나가요. 이번엔 partial_disconnect: 서버가 청크 두 개를 보낸 뒤 socket을 바로 끊어요.', dur: 2700,
+        run: function () { arm(1); addLog('request #2', '청크 2개 후 연결 리셋'); } },
+      { cap: 'TRANSPORT로 분류돼요. 두 가지: 반쪽 청크는 chunk 스트림에 증거로 남지만 파생 히스토리엔 절대 안 들어가고, 재시도 번호가 2번째로 올라가요.', dur: 3000,
+        run: function () {
+          consume(1);
+          addLog('failure', 'TRANSPORT · 반쪽 청크 보관, 히스토리 미진입', 'bad');
+          addLog('llm/retry', 'r2 · delay 512ms (로컬 백오프)', 'retry');
+        } },
+      { cap: '요청 #3이 나가요. 큐 맨 앞은 success: 완전한 스트림이 무사히 도착해요.', dur: 2300,
+        run: function () { arm(2); addLog('request #3', '완전 스트림 · finish stop'); } },
+      { cap: 'assistant/message가 파생되어 기록되고 재시도 카운트가 초기화돼요. 이 연습 내내 서버는 하나만 해요: 스크립트를 정직하게 실행. 재시도 여부는 처음부터 끝까지 harness 몫이에요.', dur: 3200,
+        run: function () {
+          consume(2);
+          addLog('assistant/message', '최종 메시지 · 깨끗이 기록', 'msg');
+          addLog('verdict', '요청 3회, 명시적 재시도 2회 — 전부 근거 있음', 'ok');
+        } },
+      { cap: 'random 모드도 있어요: 가중치로 장애를 뽑아 스트레스 테스트하고, seed는 공개·재현 가능. seed만 바꾸면 새롭지만 다시 재생할 수 있는 폭풍이에요.', dur: 2800 }
+    ];
+  }
+
+  /* ── 情景 B：确定性回放 ── */
+  var fixRows = [];
+  function setupB() {
+    leftTitle.textContent = '녹음된 session.jsonl (fixture)';
+    rightTitle.textContent = '재실행 transcript · 원본과 줄별 diff';
+    seedEl.style.display = 'none';
+    left.innerHTML = '';
+    fixRows = [];
+    [
+      ['user/message', '“이 테스트 좀 고쳐 줘”'],
+      ['assistant/chunk', 'turn1 step1 · text-delta “먼저 볼게”'],
+      ['assistant/chunk', 'turn1 step1 · text-delta “스냅샷 볼게”'],
+      ['assistant/chunk', 'turn1 step1 · finish stop'],
+      ['assistant/message', '“먼저 스냅샷을 볼게”']
+    ].forEach(function (r) {
+      var d = document.createElement('div');
+      d.className = 'beh';
+      d.innerHTML = '<span class="bn" style="color:var(--accent-deep)">' + esc(r[0]) + '</span><span class="sub">' + esc(r[1]) + '</span>';
+      left.appendChild(d);
+      fixRows.push(d);
+    });
+  }
+  function addDiff(text, diverged) {
+    clearEmpty(right);
+    var d = document.createElement('div');
+    d.className = 'diffrow' + (diverged ? ' diverged' : '');
+    d.innerHTML = '<span class="mark">' + (diverged
+      ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+      : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>')
+      + '</span><span>' + esc(text) + '</span>';
+    right.appendChild(d);
+    void d.offsetWidth;
+    d.classList.add('in');
+  }
+
+  function buildB() {
+    return [
+      { cap: '왼쪽은 실제 세션 로그 fixture예요. assistant/chunk 세 줄을 보세요 — 그때 모델이 낸 청크가 전부 그대로 누워 있어요.', dur: 2900, run: setupB },
+      { cap: '유도: chunk 이벤트를 (turn, step)으로 묶으면 각 그룹이 모델 호출 한 번의 리플레이 스크립트가 돼요. 손수 mock 없이, 로그 자체가 스크립트예요.', dur: 3000,
+        run: function () { fixRows[1].classList.add('armed'); fixRows[2].classList.add('armed'); fixRows[3].classList.add('armed'); } },
+      { cap: '재실행: 실제 agent가 뜨고, 모델 쪽은 리플레이 어댑터가 녹음 청크를 프레임마다 토해내요. API Key도 없고 네트워크 요청도 없어요.', dur: 2900,
+        run: function () { addLog('replay', '실제 loop + 리플레이 어댑터 실행 중…'); } },
+      { cap: 'diff: 재실행 결과와 원본을 줄마다 비교해 전부 체크. 만 번 돌려도 같고, 비결정성은 녹음 그 한 번에 잠겨 있어요.', dur: 2900,
+        run: function () {
+          addDiff('user/message 일치');
+          addDiff('assistant/chunk ×3 일치');
+          addDiff('assistant/message 일치');
+        } },
+      { cap: '이제 악역을 한 번: 리플레이 스크립트의 text-delta “스냅샷 볼게”를 “지워 버려”로 바꿔 동작 변경을 흉내 내고 다시 돌려요.', dur: 2800,
+        run: function () {
+          fixRows[2].querySelector('.sub').textContent = 'turn1 step1 · text-delta “지워 버려” (변조됨)';
+          fixRows[2].style.borderColor = 'rgba(220,38,38,.5)';
+        } },
+      { cap: 'diff가 분기점에서 바로 빨개져요. 로그가 곧 테스트 자산의 뜻: 어떤 동작 변화도 고정된 로그를 못 피해요. 통과시키려면? 코드를 되돌리거나, fixture를 분명히 다시 녹음하고 리뷰를 받으세요.', dur: 3400,
+        run: function () {
+          addDiff('user/message 일치');
+          addDiff('assistant/chunk #2 분기: “스냅샷 볼게” ≠ “지워 버려”', true);
+          addLog('verdict', '동작 분기를 fixture가 증언 — 숨을 곳 없음', 'bad');
+        } }
+    ];
+  }
+
+  function build(k) { return k === 'A' ? buildA() : buildB(); }
+
+  function reset() {
+    runId++; playing = false; clearTimeout(timer); idx = 0;
+    left.innerHTML = '<div class="tst-empty">(비어 있음)</div>';
+    right.innerHTML = '<div class="tst-empty">(비어 있음)</div>';
+    if (cur === 'A') { setupA(); } else { setupB(); }
+    right.innerHTML = '<div class="tst-empty">(비어 있음)</div>';
+    caption.textContent = '초기화했어요. 「재생」을 눌러 시나리오 ' + cur + '를 실행하세요, 또는 「단스텝」으로 프레임마다 진행하세요.';
+    steps = build(cur);
+  }
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.cap) caption.textContent = s.cap;
+    if (s.run) s.run();
+    if (playing) timer = setTimeout(doStep, s.dur || 1200);
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true; doStep();
+  }
+  function stepOnce() {
+    playing = false; clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-testing .scn'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-testing .scn'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  document.getElementById('tPlay').addEventListener('click', play);
+  document.getElementById('tStep').addEventListener('click', stepOnce);
+  document.getElementById('tReset').addEventListener('click', reset);
+  reset();
+  if (typeof window.lessonOnView === 'function') {
+    window.lessonOnView(demo, function () { if (idx === 0 && !playing) play(); });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

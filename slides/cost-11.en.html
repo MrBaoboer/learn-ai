@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Architecture Layer: KV Cache Caveats | Token Cost Engineering</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="KV Cache is the most underrated commercial cost lever: prefix-match cache hits can save up to 90%. Two invisible traps: dynamically switching the tools parameter invalidates the entire cache; a blunt sliding window keeps the prefix forever changing. Chapter cache lifts hit rate from 10% to 80%.">
+<meta name="keywords" content="KV Cache,prefix cache,context caching,cache hit,tools parameter,sliding window,chapter cache">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-11.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/cost-11.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/cost-11.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/cost-11.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/cost-11.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Architecture Layer: KV Cache Caveats">
+<meta property="og:description" content="Prefix matching saves up to 90%—but switching tools dynamically invalidates the entire cache.">
+<meta property="og:url" content="https://xueai.app/slides/cost-11.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/cost-11.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Architecture Layer: KV Cache Caveats">
+<meta name="twitter:description" content="Prefix matching saves up to 90%—but switching tools dynamically invalidates the entire cache.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl td.hi{color:var(--warn);font-weight:800}
+.tbl td.gd{color:var(--ct-deep);font-weight:800}
+.tbl-wrap{overflow-x:auto}
+
+/* 前缀匹配演示 */
+.pfx{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.pfx-tabs{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:14px}
+.pfx-btn{padding:9px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;color:var(--text);transition:all .18s;min-height:40px}
+.pfx-btn.on{border-color:var(--ct);background:var(--ct-soft);color:var(--ct-deep)}
+.pfx-line{margin-bottom:10px}
+.pfx-line .lb{font-size:12px;font-weight:800;color:var(--sub);margin-bottom:4px}
+.pfx-seq{display:flex;flex-wrap:wrap;gap:4px;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px}
+.pfx-tok{padding:4px 8px;border-radius:6px;background:rgba(0,0,0,.05);color:var(--text)}
+.pfx-tok.hit{background:var(--ct-soft);color:var(--ct-deep);border:1px solid var(--ct-line)}
+.pfx-tok.miss{background:var(--warn-soft);color:var(--warn);border:1px solid rgba(220,38,38,.25)}
+.pfx-note{margin-top:12px;font-size:14px;line-height:1.78;color:var(--text);background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px}
+.pfx-note b{color:var(--ct-deep)}
+.pfx-note .w{color:var(--warn);font-weight:800}
+
+.trap-card{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px 22px;box-shadow:var(--shadow-card)}
+.trap-card h4{font-size:15.5px;font-weight:800;color:var(--warn);margin-bottom:8px}
+.trap-card p{font-size:14.5px;color:var(--sub);line-height:1.8;margin:0}
+.trap-card p b{color:var(--ct-deep)}
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Architecture Layer: KV Cache Caveats","name":"Architecture Layer: KV Cache Caveats","url":"https://xueai.app/slides/cost-11.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Four-Layer Hands-on Optimization","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"KV Cache is the most underrated commercial cost lever: prefix-match cache hits can save up to 90%. Two invisible traps: dynamically switching the tools parameter invalidates the entire cache; a blunt sliding window keeps the prefix forever changing. Chapter cache lifts hit rate from 10% to 80%.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token Cost Engineering · 11 / 13</div>
+    <h1>Architecture Layer: KV Cache Caveats</h1>
+    <p class="subtitle">In commercial cost engineering, KV Cache is one of the most underrated levers. Hit vs miss can mean up to 90% cost difference—but a few invisible traps sit inside. You might never hear them until someone tells you.</p>
+    <div class="chips"><span class="chip">prefix matching</span><span class="chip">trading space for time</span><span class="chip">tools trap</span><span class="chip">chapter cache</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Prefix matching saves up to 90%; why switching tools invalidates the entire cache; sliding window vs chapter cache</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">What is KV Cache: prefix matching</div>
+    <p class="desc">An LLM is “Token pushes Token”: it doesn't care what you asked—only what came before. That means—<b>if two requests share the same prefix, the model is recomputing the same work</b>. KV Cache stores those intermediate results and reuses them on the next identical prefix: cheap storage for expensive live compute—“trading space for time.”</p>
+    <p class="desc" style="margin-top:10px">Example: you ask “2 + 4 = ?”, it gets 6. Ask “3 + 4 = ?”—prefix changed, start over. But “2 + 4 + 1 = ?”—prefix “2 + 4” is intact, so it starts from 6 and gets 7. <b>As long as the prefix doesn't change, the cache can hit.</b> DeepSeek, Qwen, and Zhipu all support this (look back at Lesson 3's price sheet: cached price is only 1/5 of standard price). It's a must-check when the author picks an LLM API.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Interactive Demo · Which Tokens hit the cache</div>
+    <p class="desc">The previous request already cached the full prefix. Tap the three “this request” cases below and see hits (green) vs recomputes (red).</p>
+    <div class="pfx" id="pfx">
+      <div class="pfx-tabs" id="pfxTabs"></div>
+      <div class="pfx-line"><div class="lb">Previous request (cached)</div><div class="pfx-seq" id="pfxPrev"></div></div>
+      <div class="pfx-line"><div class="lb">This request</div><div class="pfx-seq" id="pfxCur"></div></div>
+      <div class="pfx-note" id="pfxNote"></div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">Trap 1 · If you use the tools parameter, don't switch tools dynamically</div>
+    <div class="trap-card">
+      <h4>Looks like Token savings—it's a landmine</h4>
+      <p>Some products mount tools by intent to save every Token: WeatherTool for weather, nothing for small talk. The catch is the backend template—take Qwen 3: <b>any request with a tools parameter gets a tool-description block inserted after the System Prompt</b>; if you didn't write a System Prompt, the template adds one and then inserts. Change tool state (on→off, A→B) and <b>the Prompt-head prefix changes—hundreds of thousands of cached Tokens go up in smoke</b>.</p>
+    </div>
+    <div class="fig-wrap">
+      <img src="images/cost/cache-invalidate.webp" alt="Switching the tools parameter invalidates the entire 200k cache" loading="lazy">
+      <div class="fig-cap">The moment you switch the tools parameter: 200k cached Tokens all miss; the whole stretch recomputes. (Figure: from the author's original share deck)</div>
+    </div>
+    <p class="desc" style="margin-top:12px">Recommended: <b>keep System Prompt stable + don't use the tools field</b>; or waste a few Tokens and keep the full tool set mounted forever—protect the cache hit. System Prompt stability matters more than saving those Tokens.</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Trap 2 · Be careful with sliding windows; prefer inductive forms</div>
+    <p class="desc">In multi-turn and long-text products, many use a “sliding window” on long history—keep the last N turns, drop the rest. That's lazy, and it breaks. A sliding window is a FIFO queue: <b>every scroll changes the prefix; the cache never hits.</b></p>
+    <p class="desc" style="margin-top:10px">The author's product Banxie (伴写) (generate later text from earlier text) started with a fixed 800-character rolling window—expensive and prone to “amnesia.” Later it switched to <b>chapter cache</b>: when the AI detects a topic shift (scene change, new chapter), it inserts a separator; the system decides what to compress into a summary and what to keep verbatim—better to keep the prefix stable and hit the cache than let the AI lossily compress on its own.</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>Metric</th><th>Old (sliding window)</th><th>New (chapter cache)</th></tr>
+      <tr><td>KV Cache hit rate</td><td class="hi">~10% (prefix always changing)</td><td class="gd">~80% (prefix stability)</td></tr>
+      <tr><td>Logical coherence</td><td class="hi">Poor (frequent amnesia)</td><td class="gd">Good (summary + full chapters)</td></tr>
+      <tr><td>Token cost</td><td class="hi">High (recompute)</td><td class="gd">Low (cache reuse)</td></tr>
+    </table></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Four design decisions for context management</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>Question</th><th>Design decision</th></tr>
+      <tr><td>What must be “kept forever”?</td><td>Put it in the <b>Stable zone</b> as the cache prefix</td></tr>
+      <tr><td>What can be “compressed and archived”?</td><td>Replace originals with a <b>summary</b>; control window size</td></tr>
+      <tr><td>What needs “load on demand”?</td><td>Split by <b>chapter / topic</b> and mount dynamically</td></tr>
+      <tr><td>How to spot “compressible boundaries”?</td><td>Design a <b>separator mechanism</b> so the AI marks topic shifts</td></tr>
+    </table></div>
+    <div class="quote-card" style="margin-top:14px">
+      Don't treat the context window as a dump, and don't use a blunt sliding window. Context management is really <b>tiered storage and on-demand scheduling of information</b>—that's the right posture for balancing quality, cost, and speed.
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Key Takeaways</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Stable prefix → cache hit → save up to 90%.</b> When picking an API, “does it support context caching?” is a must-check.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Don't switch tools dynamically:</b> tool state changes rewrite the System Prompt template and invalidate the entire cache. Better keep the full set mounted.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Sliding windows kill the cache:</b> replace with “Stable prefix + summary archive + chapter mount”—hit rate 10% → 80%.</p></div>
+    </div>
+    <p class="src-note">
+      <b>Source:</b> Adapted from the author's internal team share “AI Token Cost Engineering Strategy” hands-on section “03｜Architecture Layer.” DeepSeek disk-cache pricing: <a href="https://api-docs.deepseek.com/zh-cn/news/news0802" target="_blank" rel="noopener">official announcement</a>; review “Token pushes Token” in <a href="1-2-base.html">LLM Fundamentals · Base Model</a>.
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<script>
+/* ── 前缀匹配演示 ── */
+var PREV = ['System Prompt', 'Tool def A', 'Knowledge base 20k', 'History turns 1-5', 'User Q①'];
+var CASES = [
+  {tab:'① Append one more turn', cur:['System Prompt','Tool def A','Knowledge base 20k','History turns 1-5','User Q①','AI reply①','User Q②'], hitTo:5,
+   note:'<b>Ideal case:</b> new content only appends at the tail; everything ahead is a cache hit (green); only the two new segments recompute. That\'s the architectural dividend of “append-only.”'},
+  {tab:'② Switched tools', cur:['System Prompt','Tool def B','Knowledge base 20k','History turns 1-5','User Q①','User Q②'], hitTo:1,
+   note:'<span class="w">Disaster scene:</span> you only swapped tool A for B—but it sits second in the prefix—<b>everything from there on misses</b>; the 20k knowledge base and all history recompute at non-cached prices.'},
+  {tab:'③ Sliding window rolls', cur:['System Prompt','Tool def A','Knowledge base 20k','History turns 2-6','User Q②'], hitTo:3,
+   note:'<span class="w">Cache killer:</span> one scroll turns “History turns 1-5” into “History turns 2-6”—recompute from there. <b>Do this every turn and hit rate never rises</b>—so use chapter cache instead.'}
+];
+var pfxCur = -1;
+function pfxSeq(el, arr, hitTo, isPrev){
+  el.innerHTML = '';
+  arr.forEach(function(t, i){
+    var s = document.createElement('span');
+    s.className = 'pfx-tok' + (isPrev ? '' : (i < hitTo ? ' hit' : ' miss'));
+    s.textContent = t;
+    el.appendChild(s);
+  });
+}
+function pfxRender(){
+  var tabs = document.getElementById('pfxTabs'); tabs.innerHTML = '';
+  CASES.forEach(function(c, i){
+    var b = document.createElement('button');
+    b.className = 'pfx-btn' + (i === pfxCur ? ' on' : ''); b.type = 'button';
+    b.textContent = c.tab; b.onclick = function(){ pfxPick(i); };
+    tabs.appendChild(b);
+  });
+}
+function pfxPick(i){
+  pfxCur = i; var c = CASES[i];
+  pfxSeq(document.getElementById('pfxPrev'), PREV, PREV.length, true);
+  pfxSeq(document.getElementById('pfxCur'), c.cur, c.hitTo, false);
+  document.getElementById('pfxNote').innerHTML = c.note;
+  pfxRender();
+}
+pfxRender();
+lessonOnView(document.getElementById('pfx'), function(){ if (pfxCur < 0) pfxPick(0); });
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.en.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

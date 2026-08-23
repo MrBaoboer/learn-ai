@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Persistence Governance: Versions, fork Boundaries, Refuse-to-Parse | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson .sec-label{margin:56px 0 20px}
+.lesson p.reveal{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.flow{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:var(--shadow-card);margin-bottom:20px}
+.flow svg{width:100%;height:auto;display:block}
+.visual-caption{font-size:12px;color:var(--sub);text-align:center;margin-top:12px}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.doc-quote{background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:20px 22px;margin:12px 0 20px;font-size:14px;line-height:1.9;color:var(--text)}
+.doc-quote .q-src{display:block;margin-top:8px;font-size:12px;color:var(--sub)}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eef1ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.cmp{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;color:var(--text)}
+.cmp-card h3 svg{color:var(--accent);flex:none}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+
+/* ── 交互演示：Log archaeology site ── */
+#demo-persist{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:12px}
+.dp-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.dp-scenes{display:flex;gap:8px;flex-wrap:wrap;margin-right:auto}
+.dp-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(77,107,254,.4);background:var(--accent-soft);color:var(--accent-deep);border-radius:11px;padding:12px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px}
+.dp-btn svg{flex:0 0 auto}
+.dp-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.dp-btn.scene{min-height:44px;padding:9px 13px;font-size:13px}
+.dp-btn.scene.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.dp-file{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px}
+.dp-file-title{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--sub);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.dp-file-title svg{color:var(--accent)}
+.dp-header-line{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.3);color:var(--accent-deep);border-radius:8px;padding:5px 10px;font:700 11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:8px}
+.dp-header-line.newer{background:rgba(217,119,6,.08);border-color:rgba(217,119,6,.4);color:var(--amber)}
+.dp-chips{display:flex;flex-wrap:wrap;gap:6px}
+.dp-chip{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:5px 9px;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s,border-color .2s,box-shadow .2s}
+.dp-chip.in{opacity:1;transform:translateY(0)}
+.dp-chip b{color:var(--accent);font-weight:800}
+.dp-chip.unknown b{color:var(--amber)}
+.dp-chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(77,107,254,.18)}
+.dp-chip .tag{display:inline-block;margin-left:5px;padding:0 5px;border-radius:5px;font-size:10px;font-weight:800;background:rgba(217,119,6,.12);color:var(--amber)}
+.dp-panes{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dp-pane{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;min-width:0;transition:border-color .3s,box-shadow .3s}
+.dp-pane.refused{border-color:rgba(220,38,38,.5);box-shadow:0 0 0 2px rgba(220,38,38,.12)}
+.dp-pane.ok{border-color:rgba(22,163,74,.5);box-shadow:0 0 0 2px rgba(22,163,74,.12)}
+.dp-pane.warn{border-color:rgba(217,119,6,.5);box-shadow:0 0 0 2px rgba(217,119,6,.12)}
+.dp-pane-title{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--sub);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.dp-pane-title svg{color:var(--accent)}
+.dp-msg{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:7px 10px;margin-bottom:7px;font-size:12.5px;line-height:1.6;color:var(--text);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s,border-color .2s,box-shadow .2s}
+.dp-msg.in{opacity:1;transform:translateY(0)}
+.dp-msg .role{font-weight:800;color:var(--accent);margin-right:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+.dp-msg.gap{border-color:rgba(220,38,38,.55);box-shadow:0 0 0 2px rgba(220,38,38,.15)}
+.dp-msg.garbled{border-color:rgba(217,119,6,.45);background:rgba(217,119,6,.05);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--sub)}
+.dp-banner{display:none;margin-top:8px;border-radius:9px;padding:10px 12px;font:11.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+.dp-banner.fail{display:block;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.4);color:var(--danger)}
+.dp-banner.ok{display:block;background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.4);color:var(--success)}
+.dp-banner.warn{display:block;background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.45);color:var(--amber)}
+.dp-empty{font-size:12px;color:var(--sub);padding:4px 2px}
+.dp-caption{display:flex;gap:9px;align-items:flex-start;margin-top:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.8;color:var(--text)}
+.dp-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+.dp-note{font-size:12px;color:var(--sub);margin-top:12px;line-height:1.7}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}.cmp{grid-template-columns:1fr}
+  .dp-panes{grid-template-columns:1fr}
+  .source-head{flex-direction:column}.flow{padding:12px}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .dp-btn{flex:1 1 auto;justify-content:center}
+}
+</style>
+<meta name="description" content="How session-log formats evolve: a monotone integer version, direction-aware read rules, refuse-to-parse for unknown events by default, and fork’s dual boundaries">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Persistence Governance: Versions, fork Boundaries, Refuse-to-Parse","name":"Persistence Governance: Versions, fork Boundaries, Refuse-to-Parse","url":"https://xueai.app/slides/dsh-23.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Persistence & Infrastructure","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"How session-log formats evolve: a monotone integer version, direction-aware read rules, refuse-to-parse for unknown events by default, and fork’s dual boundaries","datePublished":"2026-08-13","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Persistence Governance: Versions, fork Boundaries, Refuse-to-Parse"><meta property="og:description" content="How session-log formats evolve: a monotone integer version, direction-aware read rules, refuse-to-parse for unknown events by default, and fork’s dual boundaries"><meta property="og:url" content="https://xueai.app/slides/dsh-23.en.html"><meta property="og:image" content="https://xueai.app/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.app/slides/dsh-23.en.html">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:locale" content="en_US">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/dsh-23.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/dsh-23.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/dsh-23.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/dsh-23.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · Persistence & Infrastructure</div>
+    <h1>Persistence Governance: Versions, fork Boundaries, Refuse-to-Parse</h1>
+    <p class="subtitle">How log formats evolve, how fork boundaries are set, and prefer refusing data you can’t read.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>How log formats evolve, how fork boundaries are set, and prefer refusing data you can’t read</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>Course goal</b>After this lesson you can explain three things: why session-log format versions use a single monotone integer; why old and new builds meet different fates when reading each other’s logs; and why, to DSH, silently skipping an unrecognized event is a security incident—better to refuse opening the whole session.</span>
+  </div>
+
+  <div class="sec-label">Interactive demo · Log archaeology site</div>
+  <p class="reveal">Play first, then talk. Top: a session log on disk—one header line plus a string of events. Below, two loaders read it together: left is DSH’s refuse-to-parse style—error if it can’t read; right is the common best-effort skip style—skip and keep going. Three scenarios, each with a broken log. Hit Play and watch what the same bytes become in each loader.</p>
+  <div id="demo-persist" class="reveal">
+    <div class="dp-toolbar">
+      <div class="dp-scenes">
+        <button class="dp-btn scene active" data-scn="A">Scenario A · Unknown event</button>
+        <button class="dp-btn scene" data-scn="B">Scenario B · ignorable event</button>
+        <button class="dp-btn scene" data-scn="C">Scenario C · Newer-version log</button>
+      </div>
+      <button class="dp-btn primary" id="dpPlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>Play</button>
+      <button class="dp-btn" id="dpStep"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>Step</button>
+      <button class="dp-btn" id="dpReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
+    </div>
+    <div class="dp-file">
+      <div class="dp-file-title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        Log on disk (~/.dsh/sessions/session-42/log.jsonl.zst)
+      </div>
+      <div class="dp-header-line" id="dpHeader"></div>
+      <div class="dp-chips" id="dpChips"></div>
+    </div>
+    <div class="dp-panes">
+      <div class="dp-pane" id="dpPaneL">
+        <div class="dp-pane-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          DSH loader (refuse-to-parse)
+        </div>
+        <div id="dpConvL"><div class="dp-empty">(no messages restored yet)</div></div>
+        <div class="dp-banner" id="dpBannerL"></div>
+      </div>
+      <div class="dp-pane" id="dpPaneR">
+        <div class="dp-pane-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+          best-effort loader (skip style)
+        </div>
+        <div id="dpConvR"><div class="dp-empty">(no messages restored yet)</div></div>
+        <div class="dp-banner" id="dpBannerR"></div>
+      </div>
+    </div>
+    <div class="dp-caption">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      <span id="dpCaption">Hit Play and watch both loaders read the same log.</span>
+    </div>
+    <div class="dp-note">The demo is a teaching simulation, but the two refusal strings on the left are verbatim from <code>coordinator.ts</code> templates at lines 79 and 1064. Real DSH has no best-effort loader on the right—that’s the cautionary foil.</div>
+  </div>
+
+  <div class="sec-label">How it works · One integer owns versioning</div>
+  <p class="reveal">In one line: DSH’s session log is the single source of truth—resume, fork, and replay all derive from it (see <a href="dsh-2.html">last lesson’s invariant</a>). Truth must outlive any one program version, so format evolution isn’t small: logs written today must be readable by next year’s harness; conversely, when a newer build’s log lands in an older build, the older one must know it can’t read it.</p>
+  <p class="reveal">DSH’s versioning is so plain it’s one number: <code>SESSION_FORMAT_VERSION</code>, currently 0, at <code>packages/core/session/src/types.ts</code> line 56. No major.minor. Design-note reason: whether a step can auto-migrate is decided by whether that step’s upgrader can be written—two-level numbering would pre-promise something you don’t know at design time.</p>
+  <p class="reveal">The bump rule is clear: bump if and only if an older runtime cannot handle the new log fully correctly in semantics. “Parses without error” doesn’t count—reading through but rebuilding a wrong session is a misread. When unsure, bump: a near-identity upgrader costs almost nothing; missing one bump lets an older build silently corrupt data.</p>
+
+  <div class="sec-label">Three fates · direction-aware read rules</div>
+  <p class="reveal">When opening a stored log, compare version numbers first—three outcomes, three wholly different treatments:</p>
+  <div class="flow reveal">
+    <svg viewBox="0 0 940 330" role="img" aria-label="Flowchart of three fates for log versions">
+      <defs>
+        <linearGradient id="g23" x1="0" x2="1"><stop stop-color="#3450d4"/><stop offset="1" stop-color="#4d6bfe"/></linearGradient>
+        <marker id="a23" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#4d6bfe"/></marker>
+      </defs>
+      <rect x="30" y="120" width="200" height="90" rx="14" fill="url(#g23)"/>
+      <text x="130" y="158" fill="#ffffff" text-anchor="middle" font-size="14" font-weight="800">Open stored log</text>
+      <text x="130" y="182" fill="#e6ebff" text-anchor="middle" font-size="12">Read header.version</text>
+      <path fill="none" d="M230 140 H320" stroke="#4d6bfe" stroke-width="2" marker-end="url(#a23)"/>
+      <text x="275" y="130" fill="#9ca3af" text-anchor="middle" font-size="11">equal</text>
+      <rect x="332" y="96" width="256" height="80" rx="13" fill="#ffffff" stroke="rgba(22,163,74,.6)"/>
+      <text x="460" y="128" fill="#16a34a" text-anchor="middle" font-size="13" font-weight="700">Read normally</text>
+      <text x="460" y="152" fill="#6b7280" text-anchor="middle" font-size="11">Then per-event unknown-type guard</text>
+      <path d="M230 165 H320 V236 H332" stroke="#4d6bfe" stroke-width="2" marker-end="url(#a23)" fill="none"/>
+      <text x="275" y="228" fill="#9ca3af" text-anchor="middle" font-size="11">Log older</text>
+      <rect x="332" y="200" width="256" height="92" rx="13" fill="#ffffff" stroke="rgba(77,107,254,.45)"/>
+      <text x="460" y="230" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">Upgrader chain n → n+1 step by step</text>
+      <text x="460" y="252" fill="#6b7280" text-anchor="middle" font-size="11">View converts in memory only; file untouched</text>
+      <text x="460" y="272" fill="#6b7280" text-anchor="middle" font-size="11">Persist only if the session continues: atomic replace + keep backup</text>
+      <path d="M230 190 H300 V50 H332" stroke="#dc2626" stroke-width="2" fill="none"/>
+      <path fill="none" d="M330 50 H332" stroke="#dc2626" stroke-width="2" marker-end="url(#a23)"/>
+      <text x="275" y="44" fill="#dc2626" text-anchor="middle" font-size="11">Log newer</text>
+      <rect x="332" y="16" width="256" height="66" rx="13" fill="#ffffff" stroke="rgba(220,38,38,.55)"/>
+      <text x="460" y="43" fill="#dc2626" text-anchor="middle" font-size="13" font-weight="700">Refuse, and name the direction</text>
+      <text x="460" y="65" fill="#6b7280" text-anchor="middle" font-size="11">“Please upgrade the harness” + raw file path</text>
+      <path fill="none" d="M588 136 H668" stroke="#4d6bfe" stroke-width="2" marker-end="url(#a23)"/>
+      <rect x="680" y="88" width="236" height="112" rx="13" fill="#ffffff" stroke="rgba(77,107,254,.45)"/>
+      <text x="798" y="118" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">Unknown event-type guard</text>
+      <text x="798" y="142" fill="#6b7280" text-anchor="middle" font-size="11">In KNOWN_SESSION_EVENT_TYPES? Allow</text>
+      <text x="798" y="162" fill="#6b7280" text-anchor="middle" font-size="11">Not in list, but ignorable: true? Skip</text>
+      <text x="798" y="182" fill="#dc2626" text-anchor="middle" font-size="11">Not in list, unmarked? Refuse restoring the whole session</text>
+      <text x="470" y="318" fill="#9ca3af" text-anchor="middle" font-size="11">Both gates sit on the read side: the write side doesn’t vocabulary-check, because refusing on write would stall an active session’s persistence mid-flight</text>
+    </svg>
+    <div class="visual-caption">Teaching diagram: adapted from the session-log-version-mechanism Agent Note and coordinator.ts source.</div>
+  </div>
+  <p class="reveal">The cell worth savoring is “Refuse, and name the direction.” Early <code>assertVersion</code> threw one vague error for any mismatch; after the change, errors split by direction: if the log is newer, say plainly “written by a newer harness—please upgrade,” with the raw log path; if older but the upgrader chain is broken, say “this build has no upgrade path for it.” Users always see “time to upgrade,” never “file corrupted.” The data isn’t broken—calling it corrupt is unfair.</p>
+  <p class="reveal">Reading older logs has another detail. When a new build opens an old log, the upgrader chain converts step by step in memory only—a look doesn’t persist; only if the user actually continues the session does the result atomically replace on disk, keeping a backup of the original. Design notes rejected “auto-migrate on view”: rewrite-on-open turns a read into a destructive write, and a buggy converter would corrupt logs while browsing.</p>
+
+  <div class="sec-label">Why “skip unknown events” is a security incident</div>
+  <p class="reveal">Version numbers cover structural change, not vocabulary growth: event kinds depend on which plugins are loaded—one integer can’t describe that. DSH’s answer is per-event marking. When the reader hits an unknown type, it refuses to restore the whole session by default, unless the envelope carries writer-declared <code>ignorable: true</code>. The known vocabulary <code>KNOWN_SESSION_EVENT_TYPES</code> isn’t hand-written—a script merges every event declaration in the repo into 44 types, and with the 946-line persistence catalog <code>docs/persistence-catalog.zh.md</code> a dedicated check script keeps it from going stale.</p>
+  <p class="reveal paywall-locked xa-peek">Why default-required, and refuse too much rather than forget the mark? The design note does the math. Forgetting <code>ignorable</code> refuses a recoverable session—users are annoyed; that’s UX. Default-ignorable with the same slip silently restores a mutilated session and the model keeps working on wrong history—that’s a security incident. Scenario A is the latter on stage: skip an unknown event that carried a user message, and the restored chat has the assistant answering a question that isn’t there. Failures are asymmetric, so the fence leans toward the noisy side.</p>
+  <div class="facts paywall-locked">
+    <div class="fact reveal"><code>Version is one monotone integer</code><p>No major/minor. Whether auto-upgrade is possible is expressed by whether that step’s upgrader exists—the numbering scheme doesn’t pre-promise. Currently <code>SESSION_FORMAT_VERSION = 0</code>.</p></div>
+    <div class="fact reveal"><code>Unknown events are required by default</code><p>The reader refuses to interpret logs with unknown types unless the event has <code>ignorable: true</code>. Directional refusal beats best-effort parse; silent skip is a misread.</p></div>
+    <div class="fact reveal"><code>fork boundaries written twice</code><p>Header <code>seedLength</code> is the durable lineage boundary; the in-log <code>session/end-seed</code> event serves readers who only get stored bytes. <code>seed.length</code> replaces neither.</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked">fork’s dual boundaries · seedLength and session/end-seed</div>
+  <p class="reveal paywall-locked">Forking a session deep-copies events from the source up to a stable point as the child session’s seed. The hard part is the boundary: the child’s log front half is inherited seed, the back half is its own writes—and byte-wise they look identical. Where’s the cut?</p>
+  <p class="reveal paywall-locked">The intuitive answer is count seed events at construction—<code>seed.length</code>. That answer fails quietly: a restored session uses the full stored log as construction seed, so the <code>seed.length</code> boundary drifts forward on every reopen; header <code>seedLength</code> keeps the value from the original fork. So DSH writes the boundary twice: first in the header—<code>fork()</code> writes <code>parentSession</code> and <code>seedLength</code> into create metadata; second in the log—a seeded session appends <code>session/end-seed</code> as its first live write after the seed, for consumers who only get stored bytes.</p>
+  <p class="reveal paywall-locked">This boundary event solves a concrete problem. Seed history may hold an unpaired <code>compaction/start</code>—was that “last lifecycle crashed mid-compaction” or “compacting right now”? Bytes alone can’t tell. With <code>session/end-seed</code>, unpaired starts before it belong to a finished lifecycle. The type’s JSDoc is blunt: <code>Session</code>’s constructor is the only legal writer; a plugin that appends one on its own silently reclassifies all prior live work as seed history.</p>
+  <p class="reveal paywall-locked">A side note on big-log restore cost. Restoring a session with 1.3M events and 62 MiB compressed, DSH never materializes the full plaintext; this round of work cut restore admit from ~600ms to 263ms (Agent Note 2026-08-05). Checksums and freezes weren’t cut: persistent storage is a runtime boundary—the fence itself doesn’t move.</p>
+
+  <div class="sec-label paywall-locked">Key evidence · The refusal in the original text</div>
+  <p class="reveal paywall-locked">“Direction-aware” in source is a five-line helper <code>sessionFormatVersionRefusal</code>: if the version is greater, the copy is “written by a newer harness—upgrade the harness to open it”; if smaller with no upgrade path, “this build has no upgrade path for it.” Coordinators’ load checks and every storage backend share it—backends refuse foreign versions with it before decoding any structure, so users always see “please upgrade,” never “corrupt.” The red error on the demo’s left is that original text.</p>
+  <p class="src-note reveal paywall-locked">Source:<code>packages/session/session-persistence/src/coordinator.ts</code> lines 77–81; verified on 2026-08-13.</p>
+  <p class="reveal paywall-locked">The “unknown events refuse by default” guard is shorter—one loop: type in the list, or writer marked <code>ignorable</code>, allow; else throw, with event type, seq, and a directional hint that it was “likely written by a newer harness”:</p>
+  <div class="source reveal paywall-locked">
+    <div class="source-head"><span>packages/session/session-persistence/src/coordinator.ts</span><span>lines 1061–1066</span></div>
+    <pre><code>  <span class="kw">private</span> <span class="fn">assertEventsSupported</span>(meta: <span class="ty">SessionHeader</span>, events: <span class="kw">readonly</span> <span class="ty">SessionEvent</span>[]): <span class="ty">void</span> {
+    <span class="kw">for</span> (<span class="kw">const</span> event <span class="kw">of</span> events) {
+      <span class="kw">if</span> (KNOWN_SESSION_EVENT_TYPES.<span class="fn">has</span>(event.type) || event.ignorable === <span class="kw">true</span>) <span class="kw">continue</span>
+      <span class="kw">throw</span> <span class="kw">this</span>.<span class="fn">unsupported</span>(meta, <span class="str">`session "${meta.id}" contains event type "${event.type}" (seq ${event.seq}) unknown to this harness and not marked ignorable; refusing to interpret the log — it was likely written by a newer harness`</span>)
+    }
+  }</code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>Source snapshot note:</b>Based on the local <code>deepseek-harness-master</code> repo; verified against <code>packages/session/session-persistence/src/coordinator.ts</code>, verified on 2026-08-13. Code blocks keep the original source text.</div>
+
+  <div class="sec-label paywall-locked">Side-by-side · How others treat data they can’t read</div>
+  <div class="cmp paywall-locked">
+    <div class="cmp-card reveal">
+      <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build</h3>
+      <p>Session-summary reads take the standard serde path. In the resume pre-read loop at <code>persistence.rs</code> lines 700–725, an unreadable or unparseable <code>summary.json</code> is <code>continue</code>d—no error, no trace.</p>
+      <p>No session-related serde struct marks <code>deny_unknown_fields</code>; unknown fields are silently dropped by default—fields a new version adds vanish when an old version reads and writes back. Common for fast-iterating products; it just hands format-evolution correctness to the assumption “don’t mix old and new.”</p>
+    </div>
+    <div class="cmp-card reveal">
+      <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code</h3>
+      <p>Sessions live as <code>.jsonl</code> under <code>~/.claude</code>, with resume and view. Study materials (claude-code-sourcemap study chapters) cover startup, context management, and observability, but show no restored code for session-log format negotiation or refusing unknown records.</p>
+      <p>On published evidence, behavior on unrecognized data is unknown. Closed products can fall back on “the client is always newest”; DSH is open infrastructure where versions coexist for a long time—that fallback doesn’t hold—so refusal rules live in the reader.</p>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>Pick a default for your plugin event</h3><p>You wrote a DSH plugin that appends a custom <code>myplugin/audit</code> event to the session log for each tool call’s audit info. Walk two cases: without <code>ignorable</code>, the user copies the log to a same-version harness without your plugin—what happens? (Hint: <code>KNOWN_SESSION_EVENT_TYPES</code> is generated from in-repo declarations; out-of-repo plugin events are outside the list by construction.) With <code>ignorable: true</code>, what happens, and where did your audit info go in the rebuild? Which events fit each choice—measure with “would losing it change how the rest of the log is interpreted?”</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway:</b>Version is one monotone integer; read rules split by direction: equal → read normally, older → upgrader chain in memory, newer → refuse plainly and point to “please upgrade.” Unknown events refuse by default—over-refusing is UX, silent skip is a security incident. fork boundaries are written twice: header <code>seedLength</code> plus in-log <code>session/end-seed</code>; <code>seed.length</code> replaces neither.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  /* ── Log archaeology site ──
+     左侧加载器的拒绝文案逐字复刻 coordinator.ts 第 79 行（版本方向拒绝）
+     与第 1064 行（未知事件拒绝）的模板，代入演示 fixture 的值。 */
+  var REFUSE_UNKNOWN = 'SessionFormatUnsupportedError: session "session-42" contains event type "user/message-v2" (seq 3) unknown to this harness and not marked ignorable; refusing to interpret the log — it was likely written by a newer harness (raw log: ~/.dsh/sessions/session-42/log.jsonl.zst)';
+  var REFUSE_NEWER = 'SessionFormatUnsupportedError: session "session-42" uses log format v1, but this harness reads only v0: the log was written by a newer harness — upgrade the harness to open it (raw log: ~/.dsh/sessions/session-42/log.jsonl.zst)';
+
+  var SCENES = {
+    A: {
+      header: { text: 'header · version: 0 · id: session-42', newer: false },
+      intro: 'This log mixed in an event from a newer harness: user/message-v2, a new envelope carrying a user message, unmarked ignorable.',
+      events: [
+        { type: 'turn/start', body: 'turn 1', cap: 'turn/start is bookkeeping; neither side produces a message.' },
+        { type: 'user/message', msg: { role: 'user', text: 'Login API sometimes returns 401—help me check' }, cap: 'A normal user message; both sides restore fine.' },
+        { type: 'assistant/message', msg: { role: 'assistant', text: 'Found it: clock skew made the token expire early' }, cap: 'Assistant reply restores fine too. So far the two sides look the same.' },
+        { type: 'user/message-v2', unknown: true, hiddenMsg: { role: 'user', text: 'Then set the skew window to 30 seconds' }, cap: 'Unknown event arrives. DSH refuses on the spot—whole session unrestored; best-effort silently skips as if nothing happened.', refuseL: REFUSE_UNKNOWN },
+        { type: 'assistant/message', msg: { role: 'assistant', text: 'Set the skew window to 30s and added a regression test' }, cap: 'best-effort keeps reading. Watch the right: the assistant answers a question that isn’t there.', gapR: true },
+        { type: 'turn/end', body: 'completed', cap: 'Done. The right session looks usable, but the user’s line is gone—the model will keep working on that mutilated history. The left restored nothing, yet it tells you why and where the file is.', doneR: { kind: 'warn', text: 'Restore “succeeded”: 4 events, silently skipped 1. The missing line in the chat is mentioned in no log or alert.' } }
+      ]
+    },
+    B: {
+      header: { text: 'header · version: 0 · id: session-42', newer: false },
+      intro: 'Same unknown event mixed in, but it’s display-only; the writer marked ignorable: true on the envelope.',
+      events: [
+        { type: 'turn/start', body: 'turn 1', cap: 'Bookkeeping event, as usual.' },
+        { type: 'user/message', msg: { role: 'user', text: 'Help me speed up the build script' }, cap: 'User message; both sides restore fine.' },
+        { type: 'ui/theme-hint', unknown: true, ignorable: true, cap: 'Unknown event, but with ignorable: true. Writer promises: losing it doesn’t affect rebuild. DSH checks the mark, skips, keeps reading.' },
+        { type: 'assistant/message', msg: { role: 'assistant', text: 'Parallelized two steps; build dropped from 6 minutes to 2' }, cap: 'Both sides restore complete.' },
+        { type: 'turn/end', body: 'completed', cap: 'That’s the right path for vocabulary growth: ordinary new events don’t bump the version; the writer declares ignorable so old readers can skip safely. Default-required + explicit exemption covers both ends.', doneL: { kind: 'ok', text: 'Restore succeeded: skipped 1 writer-declared-ignorable event; rebuild is complete.' }, doneR: { kind: 'ok', text: 'Restore succeeded: skipped 1 event.' } }
+      ]
+    },
+    C: {
+      header: { text: 'header · version: 1 · id: session-42', newer: true },
+      intro: 'This log was written by a newer harness; header version is 1, and the current build only knows v0.',
+      events: [
+        { type: '(header)', headerCheck: true, cap: 'DSH compares versions before decoding any event. 1 > 0, direction clear: refuse, error says “please upgrade the harness,” with the raw path. Data isn’t broken—calling it corrupt is unfair.', refuseL: REFUSE_NEWER },
+        { type: 'user/message', garbled: true, raw: '{ role: ???, envelope: v1 }', cap: 'best-effort ignores version and force-parses. v1 envelope shape changed; fields don’t line up.' },
+        { type: 'assistant/message', garbled: true, raw: '[object Object]', cap: 'Keeps force-reading; restored junk looks worse and worse.' },
+        { type: 'turn/end', body: '???', cap: 'Done. The right “restored” a session that seems to exist; every message is wrong. The left stopped immediately—after upgrading the harness the user can open this log intact.', doneR: { kind: 'warn', text: 'Restore “succeeded”: 2 messages unrelated to the real session. The user may keep chatting on this garbled history.' } }
+      ]
+    }
+  };
+
+  var chipsEl = document.getElementById('dpChips');
+  var headerEl = document.getElementById('dpHeader');
+  var convL = document.getElementById('dpConvL');
+  var convR = document.getElementById('dpConvR');
+  var bannerL = document.getElementById('dpBannerL');
+  var bannerR = document.getElementById('dpBannerR');
+  var paneL = document.getElementById('dpPaneL');
+  var paneR = document.getElementById('dpPaneR');
+  var captionEl = document.getElementById('dpCaption');
+
+  var cur = 'A';
+  var idx = 0;
+  var timer = null;
+  var refusedL = false;
+  var runId = 0;
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function setCaption(t) { captionEl.textContent = t; }
+
+  function reset() {
+    runId++;
+    clearTimeout(timer);
+    timer = null;
+    idx = 0;
+    refusedL = false;
+    var sc = SCENES[cur];
+    headerEl.className = 'dp-header-line' + (sc.header.newer ? ' newer' : '');
+    headerEl.textContent = sc.header.text;
+    chipsEl.innerHTML = '';
+    convL.innerHTML = '<div class="dp-empty">(no messages restored yet)</div>';
+    convR.innerHTML = '<div class="dp-empty">(no messages restored yet)</div>';
+    bannerL.className = 'dp-banner'; bannerL.textContent = '';
+    bannerR.className = 'dp-banner'; bannerR.textContent = '';
+    paneL.className = 'dp-pane'; paneR.className = 'dp-pane';
+    setCaption(sc.intro + ' Hit Play or Step.');
+  }
+
+  function addChip(ev, seq) {
+    var chip = document.createElement('div');
+    chip.className = 'dp-chip' + (ev.unknown ? ' unknown' : '');
+    var label = '<b>' + esc(ev.type) + '</b>';
+    if (ev.ignorable) label += '<span class="tag">ignorable</span>';
+    chip.innerHTML = 'seq ' + seq + ' · ' + label;
+    chipsEl.appendChild(chip);
+    var olds = chipsEl.querySelectorAll('.dp-chip.active');
+    Array.prototype.forEach.call(olds, function (c) { c.classList.remove('active'); });
+    chip.classList.add('active');
+    requestAnimationFrame(function () { chip.classList.add('in'); });
+  }
+
+  function addMsg(box, msg, extraClass) {
+    var empty = box.querySelector('.dp-empty');
+    if (empty) empty.remove();
+    var row = document.createElement('div');
+    row.className = 'dp-msg' + (extraClass ? ' ' + extraClass : '');
+    if (msg.raw !== undefined) {
+      row.textContent = msg.raw;
+      row.classList.add('garbled');
+    } else {
+      row.innerHTML = '<span class="role">' + esc(msg.role) + '</span>' + esc(msg.text);
+    }
+    box.appendChild(row);
+    requestAnimationFrame(function () { row.classList.add('in'); });
+  }
+
+  function setBanner(el, pane, kind, text) {
+    el.className = 'dp-banner ' + kind;
+    el.textContent = text;
+    pane.className = 'dp-pane ' + (kind === 'fail' ? 'refused' : kind);
+  }
+
+  function doStep() {
+    var sc = SCENES[cur];
+    if (idx >= sc.events.length) { clearTimeout(timer); timer = null; return; }
+    var ev = sc.events[idx];
+    var seq = idx;
+    idx++;
+    if (!ev.headerCheck) addChip(ev, seq);
+    if (ev.cap) setCaption(ev.cap);
+
+    /* 左：DSH 加载器 */
+    if (!refusedL) {
+      if (ev.refuseL) {
+        refusedL = true;
+        setBanner(bannerL, paneL, 'fail', ev.refuseL);
+      } else if (ev.msg && !ev.garbled) {
+        addMsg(convL, ev.msg);
+      }
+    }
+    /* 右：best-effort 加载器 */
+    if (ev.garbled) {
+      addMsg(convR, { raw: ev.raw });
+    } else if (ev.msg) {
+      addMsg(convR, ev.msg, ev.gapR ? 'gap' : '');
+    }
+    /* 未知且不可忽略：右边静默跳过，什么都不画，这正是问题所在 */
+
+    if (ev.doneL) setBanner(bannerL, paneL, ev.doneL.kind, ev.doneL.text);
+    if (ev.doneR) setBanner(bannerR, paneR, ev.doneR.kind, ev.doneR.text);
+
+    if (timer !== null && idx < sc.events.length) {
+      var rid = runId;
+      timer = setTimeout(function () { if (rid === runId) doStep(); }, 1900);
+    } else if (idx >= sc.events.length) {
+      timer = null;
+    }
+  }
+
+  function play() {
+    if (timer !== null) return;
+    if (idx >= SCENES[cur].events.length) reset();
+    timer = setTimeout(function () {}, 0); /* 标记自动播放中 */
+    doStep();
+  }
+  function stepOnce() {
+    clearTimeout(timer);
+    timer = null;
+    if (idx >= SCENES[cur].events.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-persist .scene'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-persist .scene'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  document.getElementById('dpPlay').addEventListener('click', play);
+  document.getElementById('dpStep').addEventListener('click', stepOnce);
+  document.getElementById('dpReset').addEventListener('click', reset);
+
+  reset();
+  if (typeof window.lessonOnView === 'function') {
+    window.lessonOnView(document.getElementById('demo-persist'), play);
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Four Agent Cost Traps and the Circuit Breaker | Token Cost Engineering</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Four Agent cost traps: tool-return information explosion, the invisible bill of thinking Tokens, infinite loops, and history snowball. Each trap gets a shippable fix: truncation guards, task tiering, forced circuit breakers, and fixed prefix plus summary.">
+<meta name="keywords" content="Agent cost traps,thinking mode,infinite-loop circuit breaker,tool-return truncation,history compression,Token budget">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/cost-8.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/cost-8.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/cost-8.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/cost-8.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/cost-8.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Four Agent Cost Traps and the Circuit Breaker">
+<meta property="og:description" content="Tool explosion, thinking tax, infinite loops, history snowball: one strategy per trap.">
+<meta property="og:url" content="https://xueai.app/slides/cost-8.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/cost-8.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Four Agent Cost Traps and the Circuit Breaker">
+<meta name="twitter:description" content="Tool explosion, thinking tax, infinite loops, history snowball: one strategy per trap.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl td.hi{color:var(--warn);font-weight:800}
+.tbl-wrap{overflow-x:auto}
+.codebox{margin-top:12px;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px 18px;font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.codebox .c{color:#64748b}
+
+/* 陷阱切换 */
+.trap-tabs{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+.trap-btn{padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:800;color:var(--text);transition:all .18s;min-height:42px}
+.trap-btn.on{border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.trap-stage{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow-card)}
+.trap-name{font-size:16px;font-weight:800;color:var(--warn);margin-bottom:10px}
+.trap-body{font-size:14.5px;color:var(--sub);line-height:1.8}
+.trap-body b{color:var(--ct-deep)}
+.trap-fix{margin-top:12px;background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:11px;padding:13px 16px;font-size:14px;line-height:1.75;color:var(--text)}
+.trap-fix b{color:var(--ct-deep)}
+.trap-hint{margin-top:10px;font-size:12.5px;color:var(--sub)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Four Agent Cost Traps and the Circuit Breaker","name":"Four Agent Cost Traps and the Circuit Breaker","url":"https://xueai.app/slides/cost-8.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Hands-on Course · The Agent Bill","url":"https://xueai.app/slides/learn.en.html"},"isAccessibleForFree":false,"description":"Four Agent cost traps: tool-return information explosion, the invisible bill of thinking Tokens, infinite loops, and history snowball. Each trap gets a shippable fix: truncation guards, task tiering, forced circuit breakers, and fixed prefix plus summary.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token Cost Engineering · 8 / 13</div>
+    <h1>Four Agent Cost Traps and the Circuit Breaker</h1>
+    <p class="subtitle">Last lesson was still “one successful run.” In the real world, Agent bill accidents come from four directions: tool-return explosion, thinking tax, infinite loops, and history snowball. Each has an engineering fix.</p>
+    <div class="chips"><span class="chip">Tool truncation</span><span class="chip">thinking tax</span><span class="chip">Loop circuit breaker</span><span class="chip">History compression</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Tool-return explosion, thinking tax, infinite loops, history snowball: one shippable strategy per trap, plus three red lines</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">Interactive Demo · Tear down the four traps one by one</div>
+    <div class="trap-tabs" id="trapTabs"></div>
+    <div class="trap-stage" id="trapStage">
+      <div class="trap-name" id="trapName"></div>
+      <div class="trap-body" id="trapBody"></div>
+      <div class="trap-fix" id="trapFix"></div>
+      <p class="trap-hint" id="trapHint"></p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Trap 1 · Tool-return information explosion</div>
+    <p class="desc">User says “pull every user's orders from the database,” the Agent's SQL tool returns 10,000 rows ≈ <b>500,000 Tokens</b>. Those 500k Tokens get stuffed into the next turn's Input: you trip the expensive tier, maybe blow the context window, and the model “gets lost” under overload so output quality drops. The fix is a truncation guard on every tool:</p>
+    <div class="codebox">def safe_tool_call(tool_func, *args, max_tokens=2000, **kwargs):
+    result = tool_func(*args, **kwargs)
+    result_str = json.dumps(result, ensure_ascii=False)
+    estimated = len(result_str) * 0.5  <span class="c"># 粗略估算 Token</span>
+
+    if estimated &gt; max_tokens:
+        <span class="c"># 保留前后各一段 + 中间标记，提示模型缩小范围</span>
+        truncated = result_str[:1000] + "\n...[truncated]...\n" + result_str[-500:]
+        return {
+            "status": "truncated",
+            "preview": truncated,
+            "total_records": len(result),
+            "message": f"Result too long (~{int(estimated)} Tokens), truncated. "
+                        "Narrow the query if you need the full data."
+        }
+    return result</div>
+    <div class="fig-wrap">
+      <img src="images/cost/tool-explosion.webp" alt="Tool-return information explosion and truncation strategy" loading="lazy">
+      <div class="fig-cap">10,000 SQL rows ≈ 500k Tokens: truncation guards are table stakes for the Agent tool layer. (Figure: from the author's internal share deck)</div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">Trap 2 · The invisible bill of thinking Tokens</div>
+    <p class="desc">Qwen-Plus thinking mode, DeepSeek-R1, o1 and similar models emit a “thinking process”: <b>users may never see it, but it's all billed as Output—and the unit price is 4×</b> (Qwen-Plus non-thinking output 2 ¥/M, thinking mode 8 ¥/M). Same Agent task with thinking on: visible output unchanged (450 Tokens), thinking process +2,000 Tokens, output spend jumps <b>+2,078%</b>.</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>Task type</th><th>Thinking mode</th><th>Why</th></tr>
+      <tr><td>Simple retrieval</td><td><b>❌ Off</b></td><td>No deep reasoning needed</td></tr>
+      <tr><td>Data cleaning</td><td><b>❌ Off</b></td><td>Rules are clear—no “thinking” required</td></tr>
+      <tr><td>Complex reasoning</td><td><b>✅ On</b></td><td>Worth paying for accuracy</td></tr>
+      <tr><td>Code generation</td><td><b>⚠️ It depends</b></td><td>Off for simple functions; on for complex architecture</td></tr>
+    </table></div>
+    <p class="desc" style="margin-top:12px">Advanced fix: <b>use a ~0.6B tiny model as a front-door triage</b>—spend a few 厘 first to decide whether this request needs deep thinking, then route to the right mode. That's the concrete shape of lesson 3's “T2 backs up T0.”</p>
+    <div class="fig-wrap">
+      <img src="images/cost/thinking-tax.webp" alt="The invisible bill of thinking Tokens" loading="lazy">
+      <div class="fig-cap">The model's “inner monologue” is burning money at 4× the unit price: tier thinking mode by task. (Figure: from the author's internal share deck)</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">Trap 3 · Infinite loops</div>
+    <p class="desc">Agent fixing a bug: fix A → error B → fix B → error A (back to square one) → … still spinning at turn 15. If Input grows 1,000 Tokens per turn, 20 turns cost 13×; worse, the user waited 5 minutes with nothing done. The fix is a <b>forced circuit breaker</b>—graceful exit when any of three conditions hits:</p>
+    <div class="codebox">class AgentExecutor:
+    def __init__(self, max_rounds=10, max_tokens=50000):
+        ...
+
+    def execute(self, task):
+        while not task.is_complete():
+            self.round_count += 1
+            <span class="c"># 熔断 1：轮次上限</span>
+            if self.round_count &gt; self.max_rounds:
+                return self._graceful_exit("Hit max execution turns")
+            <span class="c"># 熔断 2：Token 预算</span>
+            if self.total_input_tokens &gt; self.max_tokens:
+                return self._graceful_exit("Hit Token budget cap")
+            <span class="c"># 熔断 3：死循环检测（连续 3 轮输出相似度 &gt; 90%）</span>
+            if self._detect_loop():
+                return self._graceful_exit("Possible infinite loop detected")
+            result = self._run_one_round(task)
+            self.total_input_tokens += result.input_tokens</div>
+    <p class="desc" style="margin-top:10px">On graceful exit, return <code>rounds_executed</code>, <code>tokens_consumed</code>, and <code>partial_result</code>—a half-finished artifact beats a black hole.</p>
+    <div class="fig-wrap">
+      <img src="images/cost/dead-loop.webp" alt="Agent infinite loops and three circuit-breaker strategies" loading="lazy">
+      <div class="fig-cap">Turn cap, Token budget, loop detection: three fuses so a task never waits forever. (Figure: from the author's internal share deck)</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Trap 4 · History snowball</div>
+    <p class="desc">The standard (wrong) approach stuffs the full history into Input every turn. The better approach is <b>fixed prefix + compressed history + last N turns</b>: never compress the System Prompt (preserve the cache prefix), keep the last 3 turns verbatim, and squash older history into one summary sentence with a small model.</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>Approach</th><th>Turn-10 Input</th><th>Notes</th></tr>
+      <tr><td>Unbounded growth</td><td class="hi">~50,000 Tokens</td><td>Includes full history</td></tr>
+      <tr><td>Sliding window (last 5 turns)</td><td>~12,000 Tokens</td><td>Loses early context</td></tr>
+      <tr><td><b>Fixed + summary + last 3 turns</b></td><td><b>~6,000 Tokens</b></td><td>Keeps what matters, controls length</td></tr>
+    </table></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Combined checklist and three red lines</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>Control point</th><th>Strategy</th><th>Expected gain</th></tr>
+      <tr><td>Tool returns</td><td>Truncate + summarize, cap 2k Tokens</td><td>Stop single-turn explosions</td></tr>
+      <tr><td>History management</td><td>Fixed prefix + compress old history</td><td>Cut Input 50%+</td></tr>
+      <tr><td>Loop control</td><td>Circuit-breaker mechanism (turns / Tokens / loop detect)</td><td>Stop bottomless pits</td></tr>
+      <tr><td>Thinking mode</td><td>Enable by task tier</td><td>Cut Output cost ~4×</td></tr>
+      <tr><td>Model selection</td><td>Small models for simple subtasks</td><td>Lower unit price</td></tr>
+      <tr><td>Cache use</td><td>Fixed System Prompt, hit KV Cache</td><td>Cut Input cost ~90%</td></tr>
+    </table></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>Red line</th><th>Suggested threshold</th><th>Consequence</th><th>Response</th></tr>
+      <tr><td>Per-turn Input</td><td>&lt; 32k Tokens</td><td>Jump into expensive tier</td><td>History compression + tool truncation</td></tr>
+      <tr><td>Total turns</td><td>&lt; 10 turns</td><td class="hi">Cost grows exponentially</td><td>Circuit-breaker mechanism</td></tr>
+      <tr><td>I/O Ratio</td><td>Watch &gt; 50:1</td><td class="hi">Agent is “spinning”</td><td>Optimize workflow or degrade the task</td></tr>
+    </table></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">Key Takeaways</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Cap tool returns at 2k:</b> truncate + summarize + tell the model to narrow scope—stop single-turn Input explosions.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Tier thinking mode by task:</b> the invisible inner monologue still bills as Output, at 4× the unit price.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Circuit breakers are the Agent's fuse:</b> hit any of turns, Token budget, or loop detection → graceful exit.</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Manage history with “fixed + summary + last 3 turns,”</b> half the cost of a blunt sliding window without amnesia.</p></div>
+    </div>
+    <p class="src-note">
+      <b>Source:</b> Adapted from the author's internal team share “AI Token Cost Engineering Strategies,” section “Billing Mechanics for Agentic Apps.” Product angles on Agent freezes and fool-proofing are covered in <a href="7-3b.html">Hands-On Practice</a>; for context compression also see <a href="5-2.html">Harness Core · Context Overflow</a>.
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<script>
+/* ── 四陷阱速览切换 ── */
+var TRAPS = [
+  {tab:'① Tool-return explosion', name:'Trap 1 · Tool-return information explosion',
+   body:'One “pull every user\'s orders,” and the SQL tool returns 10,000 rows ≈ <b>500k Tokens</b>—next-turn Input blows up: expensive tier, context-window overflow, model overload and worse output.',
+   fix:'<b>Fix: truncation guard.</b> Wrap every tool in safe_tool_call: over 2k Tokens keep head+tail + a mid summary, and tell the model clearly “result truncated—narrow the query.”'},
+  {tab:'② Thinking tax', name:'Trap 2 · The invisible bill of thinking Tokens',
+   body:'Thinking mode\'s “inner monologue” is invisible to users, but <b>bills fully as Output at 4× the unit price</b>. Same task with thinking on: visible output unchanged, total Output +444%, output spend +2,078%.',
+   fix:'<b>Fix: tier by task.</b> Off for retrieval and cleaning; on only for complex reasoning. Advanced: use a 0.6B tiny model to spend a few 厘 first triaging “does this need deep thinking?”'},
+  {tab:'③ Infinite loops', name:'Trap 3 · Infinite loops',
+   body:'Fix A → error B → fix B → error A… after 20 turns cumulative Input hits 270k Tokens, <b>cost up 13×</b>, and the user waited 5 minutes with no result.',
+   fix:'<b>Fix: forced circuit breaker.</b> Turn cap (10), Token budget (50k), loop detection (3 consecutive turns with output similarity &gt;90%)—any hit exits gracefully with partial_result.'},
+  {tab:'④ History snowball', name:'Trap 4 · History snowball',
+   body:'Stuffing full history every turn puts turn-10 Input at <b>50k Tokens</b>; a blunt sliding window saves money but “forgets” early critical context.',
+   fix:'<b>Fix: fixed prefix + summary + last 3 turns.</b> Never touch System Prompt (preserve cache), squash old history into one sentence, keep only last-3-turn detail: turn-10 Input needs just 6k.'}
+];
+var trapCur=-1, trapSeen={};
+function trapRender(){
+  var t=document.getElementById('trapTabs'); t.innerHTML='';
+  TRAPS.forEach(function(tr,i){
+    var b=document.createElement('button'); b.className='trap-btn'+(i===trapCur?' on':''); b.type='button';
+    b.textContent=(trapSeen[i]?'✓ ':'')+tr.tab; b.onclick=function(){trapPick(i);}; t.appendChild(b);
+  });
+}
+function trapPick(i){
+  trapCur=i; trapSeen[i]=true;
+  var tr=TRAPS[i];
+  document.getElementById('trapName').textContent=tr.name;
+  document.getElementById('trapBody').innerHTML=tr.body;
+  document.getElementById('trapFix').innerHTML=tr.fix;
+  var n=Object.keys(trapSeen).length;
+  document.getElementById('trapHint').textContent = n<TRAPS.length ? ('Seen '+n+' / '+TRAPS.length+' traps—full code in the sections below') : 'All four done. Full code and data in the sections below.';
+  trapRender();
+}
+trapRender();
+lessonOnView(document.getElementById('trapStage'), function(){ if(trapCur<0) trapPick(0); });
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.en.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>

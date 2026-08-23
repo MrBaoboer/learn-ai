@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM 어댑터 계층: 단일 시도, 명시적 재시도, 이중 스트림 영속화 | xueai.app</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.doc-quote{background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:20px 22px;margin:12px 0 20px;font-size:14px;line-height:1.9;color:var(--text)}
+.doc-quote .q-src{display:block;margin-top:8px;font-size:12px;color:var(--sub)}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:var(--shadow-card);margin-top:12px}
+.cmp-card h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;color:var(--text)}
+.cmp-card h3 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eef1ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+
+/* ── 交互演示：요청 수명주기 플레이어 ── */
+#demo-llm{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:12px}
+.d-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.d-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(77,107,254,.4);background:var(--accent-soft);color:var(--accent-deep);border-radius:11px;padding:12px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px}
+.d-btn svg{flex:0 0 auto}
+.d-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.d-btn.scn{padding:10px 14px;font-size:13px;min-height:44px}
+.d-btn.scn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.llm-ui{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:12px;margin-bottom:14px}
+.llm-ui .ui-label{font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--sub);margin-bottom:7px}
+.bubble{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 13px;min-height:44px;font-size:13px;line-height:1.7;color:var(--text);transition:opacity .4s,border-color .3s}
+.bubble .rsn{display:block;font-size:12px;color:var(--purple);background:rgba(124,58,237,.06);border-radius:7px;padding:5px 9px;margin-bottom:6px}
+.bubble.withdrawn{opacity:.35;border-color:rgba(220,38,38,.4)}
+.bubble.withdrawn .txt{text-decoration:line-through}
+.llm-stage{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.llm-pane{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;min-width:0}
+.llm-pane-title{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--accent-deep);margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.llm-pane-title svg{color:var(--accent)}
+.wire{position:relative;min-height:180px}
+.wire.broken:after{content:"연결 끊김";position:absolute;inset:auto 0 0 0;text-align:center;font:700 11px/1 ui-monospace,Menlo,monospace;color:var(--danger);background:rgba(220,38,38,.07);border:1px dashed rgba(220,38,38,.5);border-radius:8px;padding:8px 0}
+.chunk{display:flex;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:5px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);opacity:0;transform:translateX(-8px);transition:opacity .3s,transform .3s}
+.chunk.in{opacity:1;transform:translateX(0)}
+.chunk .t{font-weight:800;color:var(--accent)}
+.chunk.rsn .t{color:var(--purple)}
+.chunk.err .t{color:var(--danger)}
+.chunk.err{border-color:rgba(220,38,38,.45);background:rgba(220,38,38,.05)}
+.logrow{display:flex;gap:8px;align-items:baseline;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:5px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s}
+.logrow.in{opacity:1;transform:translateY(0)}
+.logrow .et{font-weight:800;color:var(--sub);flex:0 0 auto}
+.logrow.msg{border-color:rgba(77,107,254,.45);background:var(--accent-soft);color:var(--text)}
+.logrow.msg .et{color:var(--accent-deep)}
+.logrow.retry{border-color:rgba(217,119,6,.5);background:rgba(217,119,6,.06);color:var(--text)}
+.logrow.retry .et{color:var(--amber)}
+.llm-empty{font-size:12px;color:var(--sub);padding:4px 2px}
+.d-caption{display:flex;gap:9px;align-items:flex-start;margin-top:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.8;color:var(--text)}
+.d-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}
+  .llm-stage{grid-template-columns:1fr}
+  .source-head{flex-direction:column}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .d-btn{flex:1 1 auto;justify-content:center}
+}
+</style>
+<meta name="description" content="DSH의 LLM 어댑터 계층: 어댑터 호출 한 번이 곧 제공자 시도 한 번이고, 재시도는 영속 로그의 명시적 이벤트이며, 원본 청크 스트림과 파생 메시지 스트림을 나눠 저장합니다. assembler.ts와 agent.ts 실제 소스로 설명합니다.">
+<meta name="author" content="뤄샤오산(洛小山)">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"LLM 어댑터 계층: 단일 시도, 명시적 재시도, 이중 스트림 영속화","name":"LLM 어댑터 계층: 단일 시도, 명시적 재시도, 이중 스트림 영속화","url":"https://xueai.app/slides/dsh-22.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강의","educationalLevel":"입문에서 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 모델과 외부 연동","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"DSH의 LLM 어댑터 계층: 어댑터 호출 한 번이 곧 제공자 시도 한 번이고, 재시도는 영속 로그의 명시적 이벤트이며, 원본 청크 스트림과 파생 메시지 스트림을 나눠 저장합니다. assembler.ts와 agent.ts 실제 소스로 설명합니다.","datePublished":"2026-08-13","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="LLM 어댑터 계층: 단일 시도, 명시적 재시도, 이중 스트림 영속화"><meta property="og:description" content="DSH의 LLM 어댑터 계층: 어댑터 호출 한 번이 곧 제공자 시도 한 번이고, 재시도는 영속 로그의 명시적 이벤트이며, 원본 청크 스트림과 파생 메시지 스트림을 나눠 저장합니다. assembler.ts와 agent.ts 실제 소스로 설명합니다."><meta property="og:url" content="https://xueai.app/slides/dsh-22.ko.html"><meta property="og:image" content="https://xueai.app/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.app/slides/dsh-22.ko.html">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:locale" content="ko_KR">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/dsh-22.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/dsh-22.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/dsh-22.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/dsh-22.html">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 모델과 외부 연동</div>
+    <h1>LLM 어댑터 계층: 단일 시도, 명시적 재시도, 이중 스트림 영속화</h1>
+    <p class="subtitle">추론 스트림과 본문 스트림을 나눠 저장하고, 재시도는 명시적 이벤트입니다. 핵심 소스:<code>packages/llm/llm/src/assembler.ts</code>와 <code>packages/core/agent-loop/src/agent.ts</code>.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>추론 스트림과 본문 스트림을 나눠 저장하고, 재시도는 명시적 이벤트입니다</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>강의 목표</b>읽고 나면 세 가지를 말할 수 있어요. DSH가 왜 어댑터 호출 한 번=제공자 시도 한 번이라고 못 박고 SDK 자체 재시도까지 끄는지; 스트리밍 응답 한 번이 어떻게 두 형태로 저장되는지—원본 청크는 리플레이 충실, 파생 메시지는 대화 이력—그리고 실패한 반쪽 출력이 왜 전자에는 들어가고 후자에는 못 들어가는지; 재시도가 왜 영속 로그의 명시적 이벤트가 되어 UI가 반쪽 출력을 거두고, 사후에 매초가 어디로 갔는지 설명할 수 있는지.</span>
+  </div>
+
+  <div class="sec-label">인터랙티브 데모 · 요청 수명주기 플레이어</div>
+  <p class="reveal body">먼저 해보고 말할게요. 왼쪽은 와이어의 SSE 청크(provider가 프레임마다 내보내는 원본), 오른쪽은 세션 로그(청크마다 바로 <code>assistant/chunk</code>, 스트림이 끝나면 파생 <code>assistant/message</code>), 위는 사용자가 보는 UI예요. 시나리오 셋: A는 깨끗한 이중 스트림 저장; B는 중간에 끊겨 재시도가 타임라인에 명시 이벤트로 뜨는 모습; C는 반면교사—SDK 조용한 재시도, 같은 고장인데 로그에 흔적이 없음.</p>
+  <div id="demo-llm" class="reveal">
+    <div class="d-toolbar">
+      <button class="d-btn scn active" data-scn="A">시나리오 A · 이중 스트림 저장</button>
+      <button class="d-btn scn" data-scn="B">시나리오 B · 끊김과 명시적 재시도</button>
+      <button class="d-btn scn" data-scn="C">시나리오 C · SDK 조용한 재시도</button>
+    </div>
+    <div class="d-toolbar">
+      <button class="d-btn primary" id="lPlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>재생</button>
+      <button class="d-btn" id="lStep"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>단스텝</button>
+      <button class="d-btn" id="lReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>초기화</button>
+    </div>
+    <div class="llm-ui">
+      <div class="ui-label">사용자가 보는 UI</div>
+      <div class="bubble" id="lBubble"><span class="txt" id="lBubbleText">(모델 응답 대기 중…)</span></div>
+    </div>
+    <div class="llm-stage">
+      <div class="llm-pane">
+        <div class="llm-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h6l2-7 4 14 2-7h6"/></svg>와이어 · provider가 내보낸 StreamChunk</div>
+        <div class="wire" id="lWire"><div class="llm-empty">(아직 청크 없음)</div></div>
+      </div>
+      <div class="llm-pane">
+        <div class="llm-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>세션 로그 · 영속 이벤트(append-only)</div>
+        <div id="lLog"><div class="llm-empty">(빈 로그)</div></div>
+      </div>
+    </div>
+    <div class="d-caption">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      <span id="lCaption">시나리오를 고른 뒤 「재생」을 누르거나, 여기로 스크롤하면 시나리오 A가 자동 재생됩니다.</span>
+    </div>
+  </div>
+
+  <div class="sec-label">로직 분해 · 호출 한 번이 곧 시도 한 번</div>
+  <p class="reveal body">먼저 규칙을 세워요. DSH 어댑터 계약은 단호해요: 어댑터 호출 한 번이 제공자 시도 한 번이고, 라이브러리 내장 재시도는 반드시 꺼야 합니다(<code>docs/subsystems/llm-streaming.zh.md</code> 어댑터 계약 절). HTTP 라이브러리는 조용히 재시도해 주려 하죠—친절해 보이지만 정보를 숨깁니다. 왜 느렸는지, 몇 번 재시도했는지, 매번 왜 실패했는지 전부 내부 루프에 사라져요. DSH는 그 층을 벗겨요. 어댑터는 한 일만 합니다: 요청 한 번 보내고, 응답을 통일 <code>StreamChunk</code>로 내보내며, 실패면 직렬화 가능한 <code>LlmFailure</code>(안정적 error code)로 정규화. 그 외는 관여하지 않아요.</p>
+  <p class="reveal body">행 방지도 이 층에서 해결해요. 출시된 원격 어댑터 둘 다 <code>streamIdleTimeoutMs</code> 워치독(기본 5분)을 달고, provider가 멈추면 <code>TIMEOUT</code>으로 매핑합니다. 놓치기 쉬운 한 줄: 빈 응답은 오류예요. 내용 블록 없는 stop은 조용한 성공이 아니라 <code>EMPTY_RESPONSE</code>로 매핑해야 재시도 층이 살릴 기회가 생깁니다.</p>
+
+  <div class="sec-label">로직 분해 · 이중 스트림 영속화: 청크와 메시지를 나눠 저장</div>
+  <p class="reveal body">이제 저장을 봐요. agent loop가 청크 스트림을 소비할 때 두 일을 합니다: 청크마다 그대로 <code>assistant/chunk</code>를 세션 로그에 붙이고, 동시에 <code>BlockAssembler</code>에 넣어요. 스트림이 깨끗이 끝나면 조립 결과를 <code>assistant/message</code>로 한 번 더 씁니다. 이게 이중 스트림이에요. 청크 스트림은 원본 녹화—리플레이 테스트가 프레임마다 그때 응답을 재구성하고; 메시지 스트림은 파생 이력—다음 요청의 대화 컨텍스트가 여기서 나옵니다. reasoning 블록과 text 블록은 청크 프로토콜에서 타입이 달라 각자 조립·저장돼요.</p>
+  <div class="source reveal">
+    <div class="source-head"><span>packages/core/agent-loop/src/agent.ts</span><span>343–351행</span></div>
+    <pre><code>      <span class="kw">const</span> assembler = <span class="kw">new</span> <span class="ty">BlockAssembler</span>()
+      <span class="kw">const</span> chunkSeqs: <span class="ty">number</span>[] = []
+      <span class="kw">const</span> stream = preparedCall?.<span class="fn">stream</span>(request) ?? <span class="kw">this</span>.loopCtx.llm.<span class="fn">stream</span>(request)
+      signal.<span class="fn">throwIfAborted</span>()
+      <span class="kw">for await</span> (<span class="kw">const</span> chunk <span class="kw">of</span> stream) {
+        signal.<span class="fn">throwIfAborted</span>()
+        chunkSeqs.<span class="fn">push</span>(<span class="kw">this</span>.session.<span class="fn">append</span>(<span class="str">'assistant/chunk'</span>, { turn, step, chunk }).seq)
+        assembler.<span class="fn">push</span>(chunk)
+      }</code></pre>
+  </div>
+  <div class="snapshot"><b>소스 스냅샷 안내:</b>로컬 저장소 deepseek-harness-master 기준, 확인 파일 <code>packages/core/agent-loop/src/agent.ts</code>, 확인일 2026-08-13. 코드 블록은 소스 원문을 유지합니다.</div>
+  <p class="reveal body paywall-locked xa-peek">이 아홉 줄이 이중 스트림의 심장이에요. 먼저 저장, 그다음 조립, 청크 예외 없음. 스트림이 끝나면 갈라져요: finish가 오류/중단이면 실패를 <code>agent/request-error</code>에 넘겨 재시도 여부를 정하고(354–371행); 성공일 때만 381행에서 <code>assistant/message</code>를 붙이며 이 배치의 청크 seq를 <code>sourceEventSeqs</code>에 적어 어디서 파생됐는지 표시합니다. 실패한 반쪽 출력의 귀착지가 분명해요: 청크 스트림에 증거로 남고, 파생 이력에는 절대 안 들어갑니다. 다음 요청이 컨텍스트를 재구성할 때 그 반쪽은 없었던 일이에요.</p>
+  <p class="reveal body paywall-locked">조립기 자체도 잠깐 멈춰 볼 만해요. <code>BlockAssembler</code>는 저장소 유일의 청크 접기 구현이라, 어댑터는 index대로 올바른 청크만 내면 되고 블록 재조립은 각자 안 짜도 됩니다. 기형 스트림에는 단호해요: <code>block-end</code>를 처리할 때 이미 닫힌 블록이면 바로 return하고 뒤따르는 중복 닫기는 무시합니다. 주석에선 “First close wins”라 불러요—첫 닫힘만 유효해야 스트리밍 출력과 최종 조립 블록이 일치하니까요. 이 방어 한 줄이 바로 property test가 실제 버그를 잡은 자리예요(복기: <a href="dsh-26.html">비결정적 시스템 테스트하기</a>).</p>
+  <p class="src-note reveal paywall-locked">출처:<code>packages/llm/llm/src/assembler.ts</code> block-end 분기 75–82행, 확인일 2026-08-13.</p>
+
+  <div class="sec-label paywall-locked">로직 분해 · 재시도는 영속 로그의 명시적 이벤트</div>
+  <p class="reveal body paywall-locked">재시도는 한 층 위에 살아요. <code>dsh-llm-retry</code> 플러그인이 <code>agent/request-error</code>를 듣고, provider 라우트 등록 때 잡은 정책으로 살릴지 정합니다. 기본 normal 정책: <code>EMPTY_RESPONSE</code>, <code>RATE_LIMIT</code>, <code>SERVER</code>, <code>TIMEOUT</code>, <code>TRANSPORT</code> 다섯 code만, 최대 두 번, 백오프 500ms–10s에 10% 지터; provider의 유효 Retry-After는 로컬 백오프를 대체해요(<code>packages/llm/llm-retry/README.zh.md</code>).</p>
+  <p class="reveal body paywall-locked">핵심은 기장 방식이에요. 백오프 대기 전에 플러그인이 세션 로그에 <code>llm/retry</code>를 붙입니다—재시도 id, 제공자, 정책 mode, 전체 실패 정보, 계획 지연; 백오프가 끝나 실제로 쏘면 <code>llm/retry-started</code>를 또 붙어요. 둘 다 모델 가시 표면에는 안 들어가서 모델은 재시도를 모릅니다. 하지만 UI와 사후 분석은 여기에 기대요: UI가 실패한 반쪽 출력을 거두고 “1/2회 재시도, 3초 후”를 보여 주고; 디버깅할 때 시도마다·대기마다 타임스탬프가 있습니다. 재시도 자체는 새 번호 Turn을 열어 영속 이력에서 같은 요청을 재구성해 보내고, 옛 Turn 기록은 한 글자도 안 고칩니다.</p>
+  <p class="reveal body paywall-locked">어댑터 간 디테일 하나: replayState. 성공 finish 청크는 어댑터 전용 리플레이 상태(예: DeepSeek 추론의 네이티브 표현)를 실어 <code>assistant/message</code>와 함께 저장할 수 있어요. 다음 요청이 이력을 어댑터에 주기 전 <code>LlmRuntime.forAdapter()</code>가 메시지마다 검사합니다: 이력 provider와 대상 provider가 같은 어댑터 인스턴스일 때만 상태를 넘기고; 어댑터를 바꾸면 상태를 벗겨 제공자 무관 내용만 줍니다(<code>packages/llm/llm/src/index.ts</code> 822–836행). 한집 비공개 데이터는 다른 집에 안 먹입니다.</p>
+  <div class="facts paywall-locked">
+    <div class="fact reveal"><code>재시도는 새 Turn을 연다</code><p>실패한 Turn은 정상 종료하고, 재시도 Turn은 새 번호로 처음부터 시작해요. 어떤 기록도 고쳐 쓰지 않아 두 시도가 로그에 각자 완전하고, 타임라인은 앞으로만 갑니다.</p></div>
+    <div class="fact reveal"><code>반쪽 출력은 chunk에만, message에는 안 들어감</code><p>실패 전 받은 청크는 <code>assistant/chunk</code> 스트림에 남아 리플레이가 사고 현장을 정확히 재현할 수 있어요. 하지만 파생 이력에는 그 반쪽이 없어 모델이 다음에 보는 컨텍스트는 깨끗합니다.</p></div>
+    <div class="fact reveal"><code>빈 응답은 재시도 가능한 오류</code><p>내용 블록 없는 stop은 <code>EMPTY_RESPONSE</code>로 매핑되고 기본 정책이 재시도해요. 빈 성공을 조용히 받으면 퇴화 응답을 대화 이력에 쓰는 셈입니다.</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked">가로 비교 · 재시도가 어느 층에 숨나</div>
+  <div class="cmp-card reveal paywall-locked">
+    <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build: 재시도가 샘플러에 내장</h3>
+    <p>Grok Build는 스트리밍과 재시도를 <code>xai-grok-sampler</code>에 함께 넣어요. <code>retry.rs</code>는 순수 분류·백오프 모듈이고 actor 층이 재시도 루프를 감쌉니다. 예산이 넉넉해요: 기본 최대 15회(<code>DEFAULT_MAX_RETRIES = 15</code>, 30초 백오프 상한이면 약 6분); 429는 2회면 보고(<code>RATE_LIMIT_RETRY_THRESHOLD = 2</code>); 413 이미지 초과는 특수 경로로 이미지를 벗기고 한 번 더 시도하며 예산을 안 쓰고; 서버는 <code>x-should-retry</code>로 거부할 수 있어요(<code>crates/codegen/xai-grok-sampler/src/retry.rs</code> 1–34행 동작 요약 주석). 분류는 세밀하지만 재시도 루프가 샘플러 안에 있어 상위에는 유난히 느린 호출 한 번일 뿐입니다.</p>
+  </div>
+  <div class="cmp-card reveal paywall-locked">
+    <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code: API 클라이언트 층의 재시도 래퍼</h3>
+    <p>복원 소스에서 재시도는 <code>restored-src/src/services/api/withRetry.ts</code>에 있어요. Anthropic SDK 밖의 애플리케이션 래퍼로, 기본 최대 10회(52행 <code>DEFAULT_MAX_RETRIES = 10</code>), Retry-After 인지와 fast mode 쿨다운이 있습니다. 재시도는 API 클라이언트 내부 for 루프에서 일어나 디버그 로그는 남기지만, 공개 증거 기준으로 재시도마다 영속 세션 이벤트로 남기는 메커니즘은 보이지 않아요.</p>
+    <p>셋을 맞춰 보면 차이는 한 문장이에요. Grok과 Claude Code의 재시도는 함수 안 루프이고, DSH의 재시도는 로그의 1등 시민입니다. 앞둘은 쉽고, 후자는 감사 가능해요—정책·지연·실패 원인·몇 번째 시도가 모두 영속화되어 UI와 리플레이 테스트가 사실로 쓸 수 있습니다. 대가는 DSH 재시도 경계가 agent Turn 층뿐이라는 점—loop를 우회해 <code>ctx.llm.stream()</code>을 직접 부르는 쪽은 맨몸 시도 한 번입니다.</p>
+  </div>
+
+  <div class="sec-label paywall-locked">수업 실습</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>블록 중간에서 끊긴 스트림을 추리해 보세요</h3><p>모델이 두 번째 text 블록을 출력 중이고 <code>text-delta</code> 3개 뒤 연결이 리셋되어 어댑터가 <code>finish {kind:'error', TRANSPORT}</code>로 끝나요. 답해 보세요: 로그에 이벤트 종류가 몇 개, 각 몇 줄? <code>assistant/message</code>는 나오나? UI의 반쪽 문장은 어떻게 거둬지고 근거 이벤트는? 재시도 성공 후 모델이 컨텍스트를 재구성할 때 그 3개 delta를 보나? 한 층 더: 이 이력을 다른 provider 어댑터에 주면 직전 성공 메시지의 <code>replayState</code>는 어디로 가나?</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway:</b>어댑터는 정직한 시도 한 번만 맡고, 재시도는 agent 층에 살며 <code>llm/retry</code> 이벤트로 영속 로그에 떨어져 대기마다 감사할 수 있어요. 응답 한 번을 두 벌 저장: 청크 스트림은 리플레이 충실, 메시지 스트림은 이력 청결, 실패한 반쪽은 전자에만. 재시도를 SDK에 숨기면 코드는 아끼고 증거는 잃습니다.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  var demo = document.getElementById('demo-llm');
+  var wire = document.getElementById('lWire');
+  var log = document.getElementById('lLog');
+  var bubble = document.getElementById('lBubble');
+  var bubbleText = document.getElementById('lBubbleText');
+  var caption = document.getElementById('lCaption');
+  var idx = 0, timer = null, playing = false, cur = 'A', runId = 0;
+  var steps = [];
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function clearEmpty(box) {
+    var e = box.querySelector('.llm-empty');
+    if (e) box.removeChild(e);
+  }
+  function addChunk(label, detail, cls) {
+    clearEmpty(wire);
+    var d = document.createElement('div');
+    d.className = 'chunk' + (cls ? ' ' + cls : '');
+    d.innerHTML = '<span class="t">' + esc(label) + '</span><span>' + esc(detail || '') + '</span>';
+    wire.appendChild(d);
+    void d.offsetWidth;
+    d.classList.add('in');
+  }
+  function addLog(type, body, cls) {
+    clearEmpty(log);
+    var d = document.createElement('div');
+    d.className = 'logrow' + (cls ? ' ' + cls : '');
+    d.innerHTML = '<span class="et">' + esc(type) + '</span><span>' + esc(body || '') + '</span>';
+    log.appendChild(d);
+    void d.offsetWidth;
+    d.classList.add('in');
+  }
+  /* 一个分片：既上网线，也落日志（assistant/chunk） */
+  function chunkStep(label, detail, cls, capText, uiFn) {
+    return {
+      cap: capText || '',
+      dur: capText ? 1900 : 620,
+      run: function () {
+        addChunk(label, detail, cls);
+        addLog('assistant/chunk', label + (detail ? ' ' + detail : ''));
+        if (uiFn) uiFn();
+      }
+    };
+  }
+
+  var uiRsn = '', uiTxt = '';
+  function renderUi() {
+    var h = '';
+    if (uiRsn) h += '<span class="rsn">추론 중: ' + esc(uiRsn) + '</span>';
+    h += '<span class="txt">' + esc(uiTxt || '…') + '</span>';
+    bubble.innerHTML = h;
+  }
+
+  function buildA() {
+    return [
+      { cap: '사용자 질문 뒤 agent loop가 요청을 조립하고 ctx.llm.stream()을 호출해요. 어댑터는 HTTP 요청을 한 번, 오직 그 한 번만 보냅니다.', dur: 2300 },
+      chunkStep('block-start', '#0 reasoning', 'rsn', '첫 블록은 reasoning이에요. 오른쪽을 보세요: 청크가 오는 즉시 assistant/chunk가 쌓입니다—먼저 기장, 그다음 소화.'),
+      chunkStep('reasoning-delta', '“먼저 CI 로그를 보자”', 'rsn', '', function () { uiRsn = '먼저 CI 로그를 보자'; renderUi(); }),
+      chunkStep('reasoning-delta', '“실패 케이스를 찾자”', 'rsn', '추론 스트림이 프레임마다 저장돼요. UI는 접히는 사고 영역으로 렌더하고, 본문 영역은 아직 비어 있어요.', function () { uiRsn = '먼저 CI 로그를 보고, 실패 케이스를 찾자'; renderUi(); }),
+      chunkStep('block-end', '#0 (완전한 추론 블록)', 'rsn'),
+      chunkStep('block-start', '#1 text', '', '추론 블록이 닫히고 본문 블록이 시작해요. 두 스트림은 index로 구분되어 각자 조립됩니다.'),
+      chunkStep('text-delta', '“빌드가 실패한 이유는”', '', '', function () { uiTxt = '빌드가 실패한 이유는'; renderUi(); }),
+      chunkStep('text-delta', '“ 스냅샷이 만료됐기 때문입니다.”', '', '', function () { uiTxt = '빌드가 실패한 이유는 스냅샷이 만료됐기 때문입니다.'; renderUi(); }),
+      chunkStep('block-end', '#1 (완전한 본문 블록)', ''),
+      chunkStep('usage', 'in 1204 / out 87', '', 'usage는 finish 전에 와요—어댑터 계약이고, 순서가 틀리면 조립기가 인정하지 않아요.'),
+      chunkStep('finish', 'stop', ''),
+      { cap: '스트림이 정상 종료됐어요. BlockAssembler가 청크를 접어 완전한 메시지로 만들고 assistant/message를 붙이며, 어떤 청크 seq에서 파생됐는지 기록합니다. 응답 한 번, 형태 둘, 용도도 각자.', dur: 3000,
+        run: function () { addLog('assistant/message', 'reasoning + text · usage · sourceEventSeqs=[…]', 'msg'); } }
+    ];
+  }
+
+  function buildB() {
+    return [
+      { cap: '같은 요청이 나가요. 이번엔 네트워크가 거칠어요.', dur: 1700 },
+      chunkStep('block-start', '#0 text', ''),
+      chunkStep('text-delta', '“빌드를 분석 중”', '', '', function () { uiTxt = '빌드를 분석 중'; renderUi(); }),
+      chunkStep('text-delta', '“ 로그, 예비”', '', '반 문장이 이미 화면에—그리고 이미 디스크에—올라갔어요.', function () { uiTxt = '빌드 로그를 분석 중, 예비'; renderUi(); }),
+      { cap: '연결이 리셋됐어요. 어댑터는 스스로 재시도하지 않고 실패를 finish 오류 청크로 정규화합니다: code TRANSPORT, 직렬화 가능, 들고 다닐 수 있어요.', dur: 2600,
+        run: function () {
+          wire.classList.add('broken');
+          addChunk('finish', 'error · TRANSPORT', 'err');
+          addLog('assistant/chunk', 'finish error TRANSPORT');
+        } },
+      { cap: '로그를 보세요: 반쪽 청크는 있지만 assistant/message는 없어요. 실패한 스트림은 메시지를 파생하지 않습니다—복구 의미론의 토대예요.', dur: 2700 },
+      { cap: 'agent/request-error가 뜨고 dsh-llm-retry가 정책을 봐요: TRANSPORT는 재시도 가능, 1/2회. 대기 전에 llm/retry 이벤트를 먼저 씁니다—정책·지연·전체 실패 정보가 다 들어 있어요.', dur: 3100,
+        run: function () { addLog('llm/retry', 'retryId r1 · normal · TRANSPORT · delay 512ms', 'retry'); } },
+      { cap: 'UI가 llm/retry를 받아 반 문장을 거둬요. 사용자는 “재시도 중”을 보지, 중간에 끊긴 유령 문장을 보지 않아요.', dur: 2500,
+        run: function () { bubble.classList.add('withdrawn'); } },
+      { cap: '백오프가 끝나고 llm/retry-started가 쌓이며, 재시도 Turn이 새 번호를 열고 영속 이력에서 같은 요청을 재구성해 보냅니다.', dur: 2500,
+        run: function () {
+          addLog('llm/retry-started', 'retryId r1 · 새 Turn 2', 'retry');
+          wire.classList.remove('broken');
+          bubble.classList.remove('withdrawn');
+          uiTxt = ''; renderUi();
+        } },
+      chunkStep('block-start', '#0 text', '', '새 시도가 시작되고, 이번엔 네트워크가 정상이에요.'),
+      chunkStep('text-delta', '“스냅샷이 만료돼 다시 녹화해야 합니다.”', '', '', function () { uiTxt = '스냅샷이 만료돼 다시 녹화해야 합니다.'; renderUi(); }),
+      chunkStep('block-end', '#0', ''),
+      chunkStep('finish', 'stop', ''),
+      { cap: '성공이에요. 로그를 읽으면 완전한 사고 보고서예요: 반쪽 청크, 명시적 재시도, 두 번째 시도—단계마다 근거가 있습니다. 파생 이력에는 이 깨끗한 최종 메시지만 남아요.', dur: 3200,
+        run: function () { addLog('assistant/message', 'text · turn 2에서 파생', 'msg'); } }
+    ];
+  }
+
+  function buildC() {
+    return [
+      { cap: '반면교사: SDK 재시도를 끄지 않고 HTTP 라이브러리가 알아서 커버하게 둔다고 해 봐요. 같은 요청, 같은 고장.', dur: 2400 },
+      chunkStep('block-start', '#0 text', ''),
+      chunkStep('text-delta', '“빌드를 분석 중”', '', '', function () { uiTxt = '빌드를 분석 중'; renderUi(); }),
+      { cap: '연결이 끊겼어요. 이번엔 harness는 아무것도 모릅니다: SDK가 자기 루프에서 오류를 삼키고 조용히 재전송해요.', dur: 2600,
+        run: function () { wire.classList.add('broken'); } },
+      { cap: '대기 중… 오른쪽 로그는 고요해요. llm/retry도, 실패 기록도 없고 UI의 반 문장만 화면에 굳어 있어요.', dur: 2800 },
+      { cap: 'SDK 두 번째 시도가 성공해, 새 청크가 옛 반쪽과 같은 호출 안에서 이어 흘러요.', dur: 2400,
+        run: function () {
+          wire.classList.remove('broken');
+          addChunk('text-delta', '“로그…스냅샷 만료”', '');
+          addLog('assistant/chunk', 'text-delta “로그…스냅샷 만료”');
+          uiTxt = '빌드 로그를 분석 중…스냅샷 만료.'; renderUi();
+        } },
+      chunkStep('finish', 'stop', ''),
+      { cap: '사후에 로그를 보면: 유난히 느린 요청 한 번, 청크 이음이 이상하고 중간에 무슨 일이 있었는지 알 수 없어요. agent 층에도 재시도가 있으면 예산이 곱해져 최악 요청 수가 곱셈이 됩니다. DSH가 SDK 재시도를 끄는 이유예요: 아끼는 건 코드가 아니라 증거입니다.', dur: 3600,
+        run: function () { addLog('assistant/message', 'text · (멀쩡해 보임)', 'msg'); } }
+    ];
+  }
+
+  function build(k) { return k === 'A' ? buildA() : k === 'B' ? buildB() : buildC(); }
+
+  function reset() {
+    runId++; playing = false; clearTimeout(timer); idx = 0;
+    wire.innerHTML = '<div class="llm-empty">(아직 청크 없음)</div>';
+    wire.classList.remove('broken');
+    log.innerHTML = '<div class="llm-empty">(빈 로그)</div>';
+    bubble.classList.remove('withdrawn');
+    uiRsn = ''; uiTxt = '';
+    bubble.innerHTML = '<span class="txt" id="lBubbleText">(모델 응답 대기 중…)</span>';
+    bubbleText = bubble.querySelector('.txt');
+    caption.textContent = '초기화했어요. 「재생」을 눌러 시나리오 ' + cur + '을 실행하거나, 「단스텝」으로 프레임마다 진행하세요.';
+    steps = build(cur);
+  }
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.cap) caption.textContent = s.cap;
+    if (s.run) s.run();
+    if (playing) timer = setTimeout(doStep, s.dur || 900);
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true; doStep();
+  }
+  function stepOnce() {
+    playing = false; clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-llm .scn'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-llm .scn'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  document.getElementById('lPlay').addEventListener('click', play);
+  document.getElementById('lStep').addEventListener('click', stepOnce);
+  document.getElementById('lReset').addEventListener('click', reset);
+  reset();
+  if (typeof window.lessonOnView === 'function') {
+    window.lessonOnView(demo, function () { if (idx === 0 && !playing) play(); });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

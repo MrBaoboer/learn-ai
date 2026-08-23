@@ -163,12 +163,12 @@ window.EXAM_BANK = [
   "q": "Regarding Tokens and tokenization, which statement is correct?",
   "opts": [
    "Tokens correspond strictly one-to-one with Chinese characters — one character always takes exactly one Token",
-   "Tokenization splits continuous text into the basic units a model can process; each Chinese character corresponds to roughly 1 to 2 Tokens",
+   "Tokenization splits continuous text into the basic units a model can process; a Chinese character usually costs around 1 Token, with rare characters costing more",
    "Tokenization only happens during training; at inference time the model reads raw text characters directly",
    "The larger the vocabulary, the greater the model's knowledge — the two are strictly proportional"
   ],
   "ans": 1,
-  "exp": "Tokenization is the first step in text processing: splitting continuous text into basic units called Tokens. Tokens and characters are not equivalent — each Chinese character corresponds to roughly 1 to 2 Tokens, and each English word to roughly 1 Token. Both training and inference require tokenization first. The vocabulary determines granularity; knowledge quantity mainly depends on training data scale and parameter count."
+  "exp": "Tokenization is the first step in text processing: splitting continuous text into basic units called Tokens. Tokens and characters are not equivalent: a Chinese character usually costs around 1 Token (common words cost less, rare characters more), and each English word roughly 1 Token. Both training and inference require tokenization first. The vocabulary determines granularity; knowledge quantity mainly depends on training data scale and parameter count."
  },
  {
   "g": 114,

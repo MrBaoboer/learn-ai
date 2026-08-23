@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>분할 정복: 컨텍스트 압축의 알고리즘 원리 | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="AI 실전편의 Compaction은 사실 분할 정복이에요: 긴 대화를 잘라 각각 요약하고 다시 합칩니다. 재귀 요약을 직접 돌려 3600 token 대화가 200으로 압축되는 과정과, 무엇이 사라지는지 보세요.">
+<meta name="keywords" content="분할 정복,컨텍스트 압축,Compaction,재귀 요약,병합 정렬,긴 대화 압축,AI 컨텍스트">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/algo-7.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/algo-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/algo-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/algo-7.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/algo-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="분할 정복: 컨텍스트 압축의 알고리즘 원리">
+<meta property="og:description" content="긴 대화를 잘라 각각 요약하고 다시 합치기—Compaction이 곧 분할 정복이에요. 3600 token 대화를 200으로 직접 압축하며 무엇이 사라지는지 보세요.">
+<meta property="og:url" content="https://xueai.app/slides/algo-7.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/algo-7.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="분할 정복: 컨텍스트 압축의 알고리즘 원리">
+<meta name="twitter:description" content="잘라 요약하고 합치기—Compaction이 곧 분할 정복. 3600 → 200 token을 직접 압축해 보세요.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--al:#db2777;--al-deep:#9d174d;--al-soft:rgba(219,39,119,.08);--al-line:rgba(219,39,119,.28)}
+.lesson-header .kicker{color:var(--al)}
+.l-callout b{color:var(--al)}
+
+/* ── 压缩演示 ── */
+.cmp-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.cmp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.cmp-meter{display:flex;align-items:baseline;gap:7px}
+.cmp-meter .cm-label{font-size:12px;font-weight:800;color:var(--sub)}
+.cmp-meter .cm-val{font-size:24px;font-weight:900;color:var(--al);font-variant-numeric:tabular-nums;transition:color .3s}
+.cmp-meter .cm-val.low{color:var(--success)}
+.cmp-meter .cm-unit{font-size:12px;font-weight:700;color:var(--sub)}
+.cmp-toggle{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;user-select:none}
+.cmp-toggle input{display:none}
+.cmp-toggle .tg-track{width:40px;height:22px;border-radius:99px;background:#d1d5db;position:relative;transition:background .2s;flex-shrink:0}
+.cmp-toggle .tg-track::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.cmp-toggle input:checked + .tg-track{background:var(--al)}
+.cmp-toggle input:checked + .tg-track::after{left:20px}
+.cmp-stage{padding:18px 20px;display:flex;flex-direction:column;gap:8px;min-height:300px}
+.cmp-phase-tag{align-self:center;font-size:12px;font-weight:800;color:var(--al-deep);background:var(--al-soft);border:1px dashed var(--al-line);padding:4px 16px;border-radius:99px;opacity:0;transition:opacity .3s}
+.cmp-phase-tag.show{opacity:1}
+.cmp-group{border-radius:var(--radius-sm);transition:background .4s,border-color .4s,padding .4s;display:flex;flex-direction:column;gap:8px;border:1.5px solid transparent}
+.cmp-group.grouped{padding:10px;border-color:var(--gc, var(--border));background:var(--gbg, transparent)}
+.cmp-group .grp-title{font-size:11.5px;font-weight:800;color:var(--gc);display:none;letter-spacing:.4px}
+.cmp-group.grouped .grp-title{display:block}
+.cmp-msg{display:flex;gap:8px;align-items:flex-start;overflow:hidden;max-height:120px;transition:max-height .5s ease,opacity .4s ease,margin .5s ease;position:relative}
+.cmp-msg.gone{max-height:0;opacity:0;margin:-4px 0}
+.cmp-msg.user{flex-direction:row-reverse}
+.cmp-avatar{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+.cmp-msg.user .cmp-avatar{background:#64748b}
+.cmp-msg.ai .cmp-avatar{background:var(--al)}
+.cmp-bubble{max-width:82%;padding:7px 13px;border-radius:12px;font-size:12.5px;line-height:1.65;color:var(--text)}
+.cmp-msg.user .cmp-bubble{background:rgba(100,116,139,.09);border-top-right-radius:4px}
+.cmp-msg.ai .cmp-bubble{background:var(--al-soft);border-top-left-radius:4px}
+.cmp-bubble .tk{font-size:10px;font-weight:800;color:var(--sub);opacity:.75;margin-left:6px;white-space:nowrap}
+.cmp-bubble .key-fact{background:rgba(217,119,6,.16);border-radius:4px;padding:0 3px;font-weight:700}
+.cmp-keep-badge{position:absolute;top:0;font-size:10px;font-weight:800;color:var(--success);background:rgba(22,163,74,.1);padding:1px 8px;border-radius:99px;display:none}
+.cmp-msg.user .cmp-keep-badge{left:0}
+.cmp-msg.ai .cmp-keep-badge{right:0}
+.cmp-msg.kept .cmp-keep-badge{display:block}
+.cmp-summary{border:1.5px dashed var(--gc, var(--al-line));background:#fff;border-radius:var(--radius-sm);padding:10px 14px;font-size:12.5px;line-height:1.7;color:var(--text);opacity:0;transform:scale(.92);transition:opacity .45s,transform .45s}
+.cmp-summary.show{opacity:1;transform:scale(1)}
+.cmp-summary .sm-tag{font-size:10.5px;font-weight:800;color:var(--gc, var(--al-deep));display:block;margin-bottom:2px}
+.cmp-summary .tk{font-size:10.5px;font-weight:800;color:var(--sub);margin-left:6px;white-space:nowrap}
+.cmp-final{border:2px solid var(--al);background:linear-gradient(135deg,#fdf2f8,#fce7f3);border-radius:var(--radius-sm);padding:13px 16px;font-size:13px;line-height:1.75;color:#831843;opacity:0;transform:scale(.9);transition:opacity .5s,transform .5s;display:none}
+.cmp-final.show{opacity:1;transform:scale(1)}
+.cmp-final .sm-tag{font-size:11px;font-weight:900;color:var(--al-deep);display:block;margin-bottom:3px}
+.cmp-foot{padding:14px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn-al{background:var(--al);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-al:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-al:disabled{background:#c4c8cf;cursor:not-allowed}
+.cmp-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── 归并排序对照卡 ── */
+.merge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.merge-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card);text-align:center}
+.merge-card .mg-step{display:inline-block;font-size:11px;font-weight:900;color:#fff;background:var(--al);padding:2px 14px;border-radius:99px;margin-bottom:8px;letter-spacing:2px}
+.merge-card h4{font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px}
+.merge-card p{font-size:12.5px;color:var(--sub);line-height:1.75;text-align:left}
+.merge-card p b{color:var(--text)}
+
+/* ── 压缩代价对照 ── */
+.loss-box{background:var(--card);border:1.5px solid rgba(217,119,6,.35);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow-card)}
+.loss-box h4{font-size:15px;font-weight:800;color:var(--amber);margin-bottom:12px}
+.loss-row{display:grid;grid-template-columns:1fr 36px 1fr;gap:10px;align-items:center;margin-bottom:10px}
+.loss-cell{border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;line-height:1.7}
+.loss-cell.orig{background:rgba(0,0,0,.035);color:var(--text)}
+.loss-cell.orig b{background:rgba(217,119,6,.18);padding:0 3px;border-radius:4px}
+.loss-cell.after{background:var(--al-soft);color:var(--text)}
+.loss-cell.after .lost{color:var(--danger);font-weight:800;font-size:11.5px}
+.loss-arrow{text-align:center;font-size:17px;color:var(--sub)}
+.loss-note{font-size:13px;color:var(--sub);line-height:1.8;border-top:1px dashed var(--border);padding-top:12px;margin-top:4px}
+.loss-note b{color:var(--text)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#fdf2f8,#fce7f3);border:1.5px solid #fbcfe8;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:#9d174d;margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#831843;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:#db2777}
+
+@media (max-width:768px){
+  .merge-grid{grid-template-columns:1fr}
+  .loss-row{grid-template-columns:1fr;gap:4px}
+  .loss-arrow{transform:rotate(90deg)}
+  .cmp-bubble{max-width:88%}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"분할 정복: 컨텍스트 압축의 알고리즘 원리","name":"분할 정복: 컨텍스트 압축의 알고리즘 원리","url":"https://xueai.app/slides/algo-7.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 재귀와 분할 정복","url":"https://xueai.app/slides/learn.ko.html"},"isAccessibleForFree":false,"description":"AI 실전편의 Compaction은 사실 분할 정복이에요: 긴 대화를 잘라 각각 요약하고 다시 합칩니다. 재귀 요약을 직접 돌려 3600 token 대화가 200으로 압축되는 과정과, 무엇이 사라지는지 보세요.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">프로그래밍 기초편 · 재귀와 분할 정복</div>
+    <h1>분할 정복: 컨텍스트 압축의 알고리즘 원리</h1>
+    <p class="subtitle">AI 실전편에서 배웠어요: 대화가 너무 길어 담을 수 없으면 AI가 Compaction을 합니다—옛 대화를 요약으로 누르는 거죠. 그때는 “이사 전에 잡동사니를 포장하는 것 같다”고 했어요. 이번 강의는 포장지를 벗깁니다: <b>이천 년 역사의 알고리즘 패턴, 바로 분할 정복</b>. 지난 강의의 재귀는 “나누기”, 이번엔 나머지 반쪽—“나누고 다시 합치기”입니다.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>AI 실전편의 Compaction은 사실 분할 정복이에요: 긴 대화를 잘라 각각 요약하고 다시 합칩니다. 재귀 요약을 직접 돌려 정보가 층층이 압축되는 걸 보세요</p></aside><!--seo:end-->  <div class="sec-label">직접 한 번 압축 · 3600 token 인테리어 대화</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">아래는 당신과 AI가 인테리어 방안을 논의한 전체 대화예요. 메시지 12개, 약 3600 token으로 컨텍스트 윈도우가 곧 터질 지경입니다. 「압축 시작」을 누르고 <b style="color:var(--text)">세 막을 주목</b>하세요: 먼저 <b style="color:var(--text)">나누기</b>(세 구간), 다음 <b style="color:var(--text)">처리</b>(구간마다 요약 하나), 마지막 <b style="color:var(--text)">합치기</b>(요약 셋을 하나로)—위쪽 token 카운터가 얼마나 줄었는지 알려 줍니다.</p>
+
+  <div class="cmp-box">
+    <div class="cmp-head">
+      <div class="cmp-meter"><span class="cm-label">현재 컨텍스트</span><span class="cm-val" id="tokenVal">3600</span><span class="cm-unit">token</span></div>
+      <label class="cmp-toggle"><input type="checkbox" id="keepRecent"><span class="tg-track"></span>최근 4개는 압축하지 않기</label>
+    </div>
+    <div class="cmp-stage" id="cmpStage"></div>
+    <div class="cmp-foot">
+      <button class="btn-al" id="btnCompress">압축 시작 →</button>
+      <span class="cmp-status" id="cmpStatus">나누기 → 구간별 요약 → 합치기, 세 막 연속</span>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>「최근 4개 유지」를 켜고 다시 압축해 보세요.</b> 실제 Agent도 이렇게 합니다: 최근 몇 턴은 지금 하는 일이라 가장 소중하니 한 글자도 안 건드리고, 먼 부분만 요약으로 눌러요. token이 200까지 안 줄어들 거예요—<b>충실도와 공간 절약은 늘 맞바꿉니다</b>.
+  </div>
+
+  <div class="sec-label">개념 카드 · 병합 정렬과 같은 패턴</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:20px;">방금 세 막에는 정식 이름이 있어요: <b style="color:var(--text)">분할 정복</b>(Divide and Conquer). 교과서에서 가장 유명한 얼굴은 병합 정렬—숫자 열을 작게 자르고, 각각 정렬한 뒤 둘씩 합칩니다. <b style="color:var(--text)">병합 정렬은 숫자를, Compaction은 말을 누르지만 뼈대는 똑같아요</b>:</p>
+
+  <div class="merge-grid paywall-locked xa-peek">
+    <div class="merge-card">
+      <div class="mg-step">나누기</div>
+      <h4>✂️ 작게 자르기</h4>
+      <p>큰 문제를 바로 못 풀면 작은 덩어리로 자릅니다. <b>병합 정렬</b>: 숫자 열을 반으로 잘라 하나만 남을 때까지. <b>Compaction</b>: 긴 대화를 주제나 턴으로 몇 구간 나눕니다.</p>
+    </div>
+    <div class="merge-card">
+      <div class="mg-step">처리</div>
+      <h4>🔧 덩어리마다 해결</h4>
+      <p>작으면 쉽습니다. <b>병합 정렬</b>: 짧은 구간을 각각 정렬. <b>Compaction</b>: 구간마다 요약—짧아서 AI가 한 번에 읽고 정확히 정리해요. 이 단계는 병렬로도 돌려 더 빨라집니다.</p>
+    </div>
+    <div class="merge-card">
+      <div class="mg-step">합치기</div>
+      <h4>🧩 결과 합치기</h4>
+      <p>작은 성과를 완전한 답으로 조립합니다. <b>병합 정렬</b>: 정렬된 두 구간을 하나로. <b>Compaction</b>: 요약 몇 개를 총요약 하나로. 구간이 아직 많다면? <b>재귀로 한 바퀴 더</b>—지난 강의 맛이 돌아옵니다.</p>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>왜 AI에게 전문을 한 번에 요약시키지 않을까요?</b> “만 자를 요약해” 자체가 컨텍스트를 터뜨리기 때문—그게 바로 풀려는 문제예요. 분할 정복의 영리함은 <b>“못 푸는 큰 문제”를 “분명히 풀리는 작은 문제” 더미로 바꾼 뒤</b> 조금 힘을 써 조립하는 것. 엔지니어링 심화편의 Coding Agent가 큰 코드베이스를 읽는 방식도 같아요: 파일마다 읽고 요점을 적은 뒤 마지막에 모읍니다.
+  </div>
+
+  <div class="sec-label paywall-locked">솔직 카드 · 압축의 대가</div>
+
+  <div class="loss-box paywall-locked">
+    <h4>⚠️ 요약은 손실 압축—디테일이 사라져요</h4>
+    <div class="loss-row">
+      <div class="loss-cell orig">원문: “예산 <b>8만 이내</b>” “빨간색을 정말 싫어해서 <b>집 어디에도 빨강 금지</b>”</div>
+      <div class="loss-arrow">→</div>
+      <div class="loss-cell after">압축 후: “예산과 배색 선호를 논의함”<span class="lost">← 구체 숫자와 빨강 금지가 사라짐</span></div>
+    </div>
+    <div class="loss-note">압축 후에도 AI는 “예산을 얘기했다”는 걸 알지만, <b>“내 예산이 얼마야?”라고 물으면 추측만</b> 할 수 있어요. 다음에 빨간 소파를 추천해도 따질 근거가 없습니다. 그래서 AI 실전편이 거듭 강조해요: <b>핵심 사실(숫자, 강제 요구, 결정)은 장기 메모리나 문서에 따로 적어두세요</b>—요약이 대신 지켜 주리라 기대하지 말고요. 요약은 “대략 뭘 말했는지”, 기록는 “못 박아 둔 사실”을 담당합니다.</div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>이 강의가 전하고 싶은 것</h3>
+    <ul>
+      <li><b>분할 정복 = 작게 나누고, 각각 처리하고, 다시 합치기</b>: 못 푸는 큰 문제가 분명히 풀리는 작은 문제 더미가 됩니다</li>
+      <li><b>Compaction은 AI 속 분할 정복의 진짜 모습</b>: 구간 나누기 → 구간별 요약 → 합치기—병합 정렬과 같은 뼈대</li>
+      <li><b>최근 대화가 가장 소중해요</b>: 실제 Agent는 옛것만 누르고 새것은 남깁니다—충실도와 공간은 늘 맞바꿉니다</li>
+      <li><b>압축은 손실이에요</b>: “8만 이내” “빨강 금지” 같은 핵심 사실은 따로 저장—요약에 맡기지 마세요</li>
+      <li><b>구간이 아직 많으면 재귀로 한 번 더</b>: 지난 강의 재귀 + 이번 합치기 = 완전한 분할 정복</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 压缩演示 ──
+   12 条消息 × 300 token = 3600。分组三段（每段 4 条）。
+   开启「保留最近 4 条」后只压前 8 条（两段），后 4 条挂「保留原文」徽章。
+   token 计数用 rAF 缓动滚动，比瞬间跳变更有「泄气」的感觉。 */
+const MSGS = [
+  { role:'user', text:'89㎡ 투룸을 다시 꾸미고 싶어요. <span class="key-fact">예산 8만 이내</span>. 전체 방안 좀 짜 주세요.' },
+  { role:'ai',   text:'좋아요! 8만이라면 “하드 마감은 가볍게, 소프트는 무겁게”: 수도·전기·벽은 탄탄히, 가구·조명은 나중에—가성비가 제일 좋아요.' },
+  { role:'user', text:'스타일은 일식 원목 느낌인데, 너무 미니멀·차갑지 않게 생활감이 있었으면 해요.' },
+  { role:'ai',   text:'그럼 주재료는 연한 오크, 벽은 미백 수성페인트, 면마 패브릭·라탄 갓·식물로 온기를 더하면 차갑지 않아요.' },
+  { role:'user', text:'거실은 TV 없이 프로젝터로, 낮에도 볼 수 있는 걸로요.' },
+  { role:'ai',   text:'밝기 2800루멘 이상, 스크린은 천장에 묻고 HDMI 매립선과 천장 마운트 자리를 남겨 두세요.' },
+  { role:'user', text:'아, 빨간색을 정말 싫어해서 <span class="key-fact">집 어디에도 빨강 금지</span>, 조금도요.' },
+  { role:'ai',   text:'기억할게요: 배색은 원목색＋미백＋회록 세 가지 안, 소프트 가구도 빨강 계열은 피합니다.' },
+  { role:'user', text:'주방은 오픈으로 하고 싶은데 부모님이 기름 연기 걱정하시면요?' },
+  { role:'ai',   text:'절충안: 유리 미닫이로 반오픈. 평소엔 열어 넓게, 볶을 땐 닫아 연기 차단—양세대 모두 만족.' },
+  { role:'user', text:'예산에 냉장고·세탁기 살 돈 1만은 남겨야 해요.' },
+  { role:'ai',   text:'그럼 하드 마감은 5만: 수도·전기 1.2만, 타일 1만, 목공·장 1.8만, 페인트·잡비 1만.' },
+];
+const TOKEN_PER_MSG = 300;
+
+const GROUPS = [
+  { name:'1구간 · 예산과 스타일', color:'#db2777', bg:'rgba(219,39,119,.05)',
+    summary:'사용자가 89㎡ 투룸을 일식 원목+생활감으로 꾸미며, 하드 가볍게·소프트 무겁게로 전체 방안을 정함.' },
+  { name:'2구간 · 거실과 배색', color:'#7c3aed', bg:'rgba(124,58,237,.05)',
+    summary:'거실은 TV 대신 프로젝터(고휘도+천장 스크린); 배색 선호에 맞춰 방안 조정.' },
+  { name:'3구간 · 주방과 가전', color:'#d97706', bg:'rgba(217,119,6,.05)',
+    summary:'주방은 유리 미닫이 반오픈; 가전 예산 별도, 하드 마감 공종별 비용 세분.' },
+];
+const FINAL_SUMMARY = '사용자가 89㎡ 투룸을 일식 원목으로 꾸미며 예산·배색 선호를 논의; 거실은 프로젝터, 주방 반오픈, 하드 마감 예산 공종별 세분.';
+const FINAL_SUMMARY_PARTIAL = '사용자가 89㎡ 투룸을 일식 원목으로 꾸미며 방안 확정; 거실은 프로젝터, 배색 선호 논의.';
+
+const stage = document.getElementById('cmpStage');
+const tokenVal = document.getElementById('tokenVal');
+const btnCompress = document.getElementById('btnCompress');
+const cmpStatus = document.getElementById('cmpStatus');
+const keepRecent = document.getElementById('keepRecent');
+let compressing = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* token 计数缓动：600ms 内从当前值滚到目标值 */
+let tokenAnim = null;
+function setTokens(target){
+  if (tokenAnim) cancelAnimationFrame(tokenAnim);
+  const from = parseInt(tokenVal.textContent.replace(/\D/g,''), 10) || 0;
+  const t0 = performance.now();
+  function tick(now){
+    const p = Math.min(1, (now - t0) / 600);
+    const eased = 1 - Math.pow(1 - p, 3);
+    tokenVal.textContent = Math.round(from + (target - from) * eased).toLocaleString('zh-CN');
+    if (p < 1) tokenAnim = requestAnimationFrame(tick);
+    else tokenVal.classList.toggle('low', target <= 1500);
+  }
+  tokenAnim = requestAnimationFrame(tick);
+}
+
+function buildStage(){
+  stage.innerHTML = '';
+  const keep = keepRecent.checked;
+  const groupCount = keep ? 2 : 3;   // 保留模式只压前 8 条（两段）
+  const frag = document.createDocumentFragment();
+
+  const tag = document.createElement('div');
+  tag.className = 'cmp-phase-tag'; tag.id = 'phaseTag';
+  tag.textContent = '1막 · 나누기';
+  frag.appendChild(tag);
+
+  for (let g = 0; g < 3; g++){
+    const grp = document.createElement('div');
+    grp.className = 'cmp-group';
+    grp.dataset.g = g;
+    if (g < groupCount) {
+      grp.style.setProperty('--gc', GROUPS[g].color);
+      grp.style.setProperty('--gbg', GROUPS[g].bg);
+      grp.innerHTML = `<div class="grp-title">${GROUPS[g].name} (메시지 4 · 약 1200 token)</div>`;
+    }
+    for (let i = g*4; i < g*4+4; i++){
+      const m = MSGS[i];
+      const div = document.createElement('div');
+      div.className = `cmp-msg ${m.role}` + (keep && g === 2 ? ' kept' : '');
+      div.innerHTML = `<div class="cmp-avatar">${m.role==='user'?'나':'AI'}</div>
+        <div class="cmp-bubble">${m.text}<span class="tk">≈300 tk</span></div>
+        <span class="cmp-keep-badge">📌 원문 유지</span>`;
+      grp.appendChild(div);
+    }
+    if (g < groupCount){
+      const sm = document.createElement('div');
+      sm.className = 'cmp-summary';
+      sm.style.setProperty('--gc', GROUPS[g].color);
+      sm.style.display = 'none';
+      sm.innerHTML = `<span class="sm-tag">📝 ${GROUPS[g].name} 요약</span>${GROUPS[g].summary}<span class="tk">1200 → 150 tk</span>`;
+      grp.appendChild(sm);
+    }
+    frag.appendChild(grp);
+  }
+
+  const fin = document.createElement('div');
+  fin.className = 'cmp-final'; fin.id = 'finalCard';
+  frag.appendChild(fin);
+  stage.appendChild(frag);
+}
+
+async function runCompress(){
+  if (compressing) return;
+  compressing = true;
+  btnCompress.disabled = true;
+  keepRecent.disabled = true;
+  btnCompress.textContent = '압축 중……';
+  buildStage();
+  setTokens(3600);
+  await sleep(500);
+
+  const keep = keepRecent.checked;
+  const groupCount = keep ? 2 : 3;
+  const phaseTag = document.getElementById('phaseTag');
+  const groups = [...stage.querySelectorAll('.cmp-group')];
+
+  /* 第一幕：切分 */
+  phaseTag.classList.add('show');
+  cmpStatus.textContent = keep
+    ? '1막 · 나누기: 앞 8개를 2구간, 최근 4개는 「원문 유지」 태그로 그대로'
+    : '1막 · 나누기: 12개를 주제별 3구간, 색이 구간 표시';
+  for (let g = 0; g < groupCount; g++){
+    await sleep(560);
+    groups[g].classList.add('grouped');
+  }
+  await sleep(900);
+
+  /* 第二幕：各段摘要 */
+  phaseTag.textContent = '2막 · 구간별 요약';
+  cmpStatus.textContent = '2막 · 처리: 구간마다 요약 하나로, 1200 → 150 token';
+  let tokens = 3600;
+  for (let g = 0; g < groupCount; g++){
+    const grp = groups[g];
+    grp.querySelectorAll('.cmp-msg').forEach(m => m.classList.add('gone'));
+    await sleep(520);
+    const sm = grp.querySelector('.cmp-summary');
+    sm.style.display = 'block';
+    await sleep(30);
+    sm.classList.add('show');
+    tokens -= 1200 - 150;
+    setTokens(tokens);
+    await sleep(620);
+  }
+  await sleep(700);
+
+  /* 第三幕：合并 */
+  phaseTag.textContent = '3막 · 합치기';
+  cmpStatus.textContent = keep
+    ? '3막 · 합치기: 요약 2개 → 총요약 1개 + 유지한 원문 4개'
+    : '3막 · 합치기: 요약 3개 → 총요약 1개';
+  const summaries = [...stage.querySelectorAll('.cmp-summary')];
+  summaries.forEach(s => { s.classList.remove('show'); });
+  await sleep(500);
+  summaries.forEach(s => { s.style.display = 'none'; });
+  groups.slice(0, groupCount).forEach(g => { g.classList.remove('grouped'); g.style.display = 'none'; });
+
+  const fin = document.getElementById('finalCard');
+  const finalTokens = keep ? 180 : 200;
+  fin.innerHTML = `<span class="sm-tag">🗜 총요약 (약 ${finalTokens} token)</span>${keep ? FINAL_SUMMARY_PARTIAL : FINAL_SUMMARY}`;
+  fin.style.display = 'block';
+  /* 保留模式：总摘要插到保留消息前面，顺序才符合「旧的在上」 */
+  if (keep) stage.insertBefore(fin, groups[2]);
+  await sleep(40);
+  fin.classList.add('show');
+  const total = keep ? finalTokens + 4 * TOKEN_PER_MSG : finalTokens;
+  setTokens(total);
+  await sleep(700);
+
+  phaseTag.classList.remove('show');
+  cmpStatus.textContent = keep
+    ? `끝: 3600 → ${total.toLocaleString('zh-CN')} token. 최근 4개는 그대로—덜 세게 눌렀지만 진행 중인 일은 한 글자도 안 잃어요`
+    : '끝: 3600 → 200 token, 공간 94% 확보—대가는? 아래로';
+  btnCompress.disabled = false;
+  keepRecent.disabled = false;
+  btnCompress.textContent = '다시 압축 ↻';
+  compressing = false;
+}
+
+btnCompress.addEventListener('click', runCompress);
+keepRecent.addEventListener('change', () => {
+  if (compressing) return;
+  buildStage();
+  setTokens(3600);
+  cmpStatus.textContent = keepRecent.checked
+    ? '유지 모드 켜짐: 앞 8개만 압축, 최근 4개는 그대로'
+    : '나누기 → 구간별 요약 → 합치기, 세 막 연속';
+  btnCompress.textContent = '압축 시작 →';
+});
+
+buildStage();
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+</body>
+</html>

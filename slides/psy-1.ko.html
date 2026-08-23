@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>엔지니어링 지표는 통과했는데, 사용자는 왜 여전히 느리다고 할까요? | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="psy.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="AI 제품 심리학 1강: 서버 스톱워치와 사용자 스톱워치는 다르게 갑니다. 플레이 가능한 실험 네 개: 같은 5초 요청을 빈 화면 정지·스피너·스트리밍·단계 공개 네 가지 제시로 나란히 돌리고 가장 힘든 쪽을 고르기; 체감으로 8초를 재어 피드백 없는 대기가 얼마나 과대평가되는지 보기; TTFT 슬라이더로 타이핑 스트림을 재생해 첫 토큰 시간이 체감 점수와 어떻게 맞바뀌는지 보기; 세 가지 시각 버릇을 단계별로. 체감 성능이 사용자가 점수를 매기는 기준입니다.">
+<meta name="keywords" content="체감 성능,TTFT,첫 토큰 시간,스트리밍,대기 경험,체감 시간,AI 제품 심리학,AI 프로덕트 매니저">
+<meta name="author" content="뤄샤오산(洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/psy-1.ko.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/psy-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/psy-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/psy-1.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/psy-1.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI 프로덕트 매니저 교육">
+<meta property="og:title" content="엔지니어링 지표는 통과했는데, 사용자는 왜 여전히 느리다고 할까요?">
+<meta property="og:description" content="같은 5초 요청, 네 가지 제시를 나란히 돌리고; 체감으로 8초를 재고 TTFT 슬라이더를 한 번 끌어 보세요. 체감 성능이 사용자가 점수를 매기는 기준입니다.">
+<meta property="og:url" content="https://xueai.app/slides/psy-1.ko.html">
+<meta property="og:image" content="https://xueai.app/slides/og/psy-1.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="엔지니어링 지표는 통과했는데, 사용자는 왜 여전히 느리다고 할까요?">
+<meta name="twitter:description" content="같은 5초 요청, 네 가지 제시를 나란히—물리적 시간은 같고 체감은 세 배 차이. 실험 네 개를 직접 해 보세요.">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 实验一：四方案并排跑 ── */
+.race-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.race-box{background:var(--card);border:2px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:border-color .15s,transform .15s;}
+.race-box:hover{transform:translateY(-2px);}
+.race-box.voted{border-color:var(--ct);box-shadow:0 0 0 2px var(--ct-line);}
+.race-head{padding:11px 15px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.race-head h4{font-size:13.5px;font-weight:800;color:var(--text);}
+.race-tag{font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--ct-soft);color:var(--ct-deep);white-space:nowrap;}
+.race-stage{padding:13px 15px;min-height:132px;font-size:12.5px;line-height:1.75;color:var(--sub);flex:1;}
+.race-stage .rs-answer{color:var(--text);}
+.race-stage .rs-hint{color:#9ca3af;font-size:12px;}
+.race-spinner{width:22px;height:22px;border:3px solid var(--ct-line);border-top-color:var(--ct);border-radius:50%;animation:rspin .8s linear infinite;margin:8px 0;}
+@keyframes rspin{to{transform:rotate(360deg)}}
+.race-steps{display:flex;flex-direction:column;gap:6px;}
+.race-step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub);opacity:0;transform:translateX(-6px);transition:opacity .3s,transform .3s;}
+.race-step.on{opacity:1;transform:none;}
+.race-step .st-dot{width:7px;height:7px;border-radius:50%;background:var(--ct);flex-shrink:0;}
+.race-step.doing .st-dot{animation:stpulse 1s ease infinite;}
+@keyframes stpulse{50%{transform:scale(1.7);opacity:.5}}
+.race-foot{padding:9px 15px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--sub);}
+.race-foot .rf-time{font-variant-numeric:tabular-nums;}
+.race-foot .rf-feel{color:var(--ct-deep);opacity:0;transition:opacity .3s;text-align:right;}
+.race-foot .rf-feel.show{opacity:1;}
+.race-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;}
+.btn-ct{background:var(--ct);color:#fff;border:none;padding:10px 24px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s;}
+.btn-ct:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px);}
+.btn-ct:disabled{background:#c4c8cf;cursor:not-allowed;}
+.race-status{font-size:12.5px;color:var(--sub);font-weight:600;}
+.race-verdict{margin-top:14px;padding:14px 18px;background:var(--ct-soft);border:1.5px dashed var(--ct-line);border-radius:10px;font-size:13.5px;line-height:1.8;color:var(--sub);display:none;}
+.race-verdict.show{display:block;animation:psy-slide-up .35s ease;}
+.race-verdict b{color:var(--ct-deep);}
+
+/* ── 实验二：秒表估时游戏 ── */
+.sw-wrap{display:grid;grid-template-columns:7fr 5fr;gap:16px;align-items:stretch;}
+.sw-panel{border:2px solid var(--border);border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;min-height:200px;font-size:12.5px;color:#9ca3af;user-select:none;}
+.sw-panel.run{color:#d1d5db;}
+.sw-side{display:flex;flex-direction:column;gap:12px;justify-content:center;}
+.sw-side p{font-size:13px;color:var(--sub);line-height:1.75;}
+.sw-side p b{color:var(--ct-deep);}
+.sw-result{display:none;}
+.sw-result.show{display:block;animation:psy-pop .3s ease;}
+.sw-nums{display:flex;gap:10px;margin-bottom:10px;}
+.sw-num{flex:1;background:var(--ct-soft);border:1px solid var(--ct-line);border-radius:10px;padding:10px 12px;text-align:center;}
+.sw-num i{display:block;font-style:normal;font-size:10.5px;font-weight:800;color:var(--sub);margin-bottom:3px;}
+.sw-num b{font-size:16px;color:var(--ct-deep);font-variant-numeric:tabular-nums;}
+.sw-verdict{font-size:13px;line-height:1.8;color:var(--sub);}
+.sw-verdict b{color:var(--ct-deep);}
+
+/* ── 实验三：TTFT 滑块 + 聊天重放 ── */
+.tf-wrap{display:grid;grid-template-columns:6fr 6fr;gap:16px;align-items:start;}
+.tf-chat{border:2px solid var(--border);border-radius:12px;display:flex;flex-direction:column;gap:10px;min-height:216px;}
+.tf-msg{max-width:88%;padding:9px 13px;border-radius:12px;font-size:12px;line-height:1.7;}
+.tf-msg.user{align-self:flex-end;background:var(--ct);color:#fff;border-bottom-right-radius:4px;}
+.tf-msg.ai{align-self:flex-start;background:#f3f4f6;color:#374151;border-bottom-left-radius:4px;min-height:38px;min-width:130px;}
+.tf-wait::after{content:'';';animation:tfblink .8s step-end infinite;color:#9ca3af;}
+@keyframes tfblink{50%{opacity:0}}
+.tf-ctrl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;}
+.tf-kv{margin-top:12px;font-size:13px;line-height:1.8;color:var(--sub);}
+.tf-kv b{color:var(--ct-deep);}
+.tf-note{margin-top:12px;font-size:12.5px;color:var(--sub);line-height:1.75;background:rgba(0,0,0,.03);border-radius:9px;padding:10px 14px;}
+.tf-note b{color:var(--ct-deep);}
+
+/* ── 实验四：三个走时怪癖 ── */
+.qk-pane{display:none;margin-top:16px;}
+.qk-pane.on{display:block;}
+.qk-cap{font-size:13px;color:var(--sub);line-height:1.8;margin-top:14px;}
+.qk-cap b{color:var(--ct-deep);}
+.tl-row{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;margin-top:12px;}
+.tl-label{font-size:12px;font-weight:800;color:var(--sub);}
+.tl-track{height:14px;border-radius:8px;background:rgba(0,0,0,.06);overflow:hidden;}
+.tl-fill{height:100%;width:0;border-radius:8px;background:var(--ct);}
+.tl-fill.dim{background:#94a3b8;}
+.tl-mark{grid-column:2;font-size:11.5px;font-weight:700;color:var(--ct-deep);opacity:0;transition:opacity .3s;}
+.tl-mark.show{opacity:1;}
+.fb-stage{grid-column:2;font-size:11.5px;font-weight:700;color:var(--ct-deep);min-height:17px;}
+.qk-ask{display:none;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;font-size:13px;font-weight:700;color:var(--text);}
+.qk-ask.show{display:flex;animation:psy-slide-up .3s ease;}
+.qk-ask button{padding:7px 15px;border-radius:999px;border:1.5px solid var(--border);background:transparent;font-size:12.5px;font-weight:800;color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s;}
+.qk-ask button:hover:not(:disabled){border-color:var(--ct);color:var(--ct-deep);}
+.qk-ask button:disabled{cursor:default;opacity:.5;}
+.qk-verdict{display:none;margin-top:12px;padding:12px 16px;border-radius:10px;background:var(--ct-soft);border:1px solid var(--ct-line);font-size:13px;line-height:1.8;color:var(--sub);}
+.qk-verdict.show{display:block;animation:psy-pop .3s ease;}
+.qk-verdict b{color:var(--ct-deep);}
+.q3-quote{margin-top:14px;padding:13px 17px;border-radius:10px;background:rgba(0,0,0,.035);font-size:13px;color:var(--text);line-height:1.75;font-style:italic;}
+
+/* ── 全章地图翻卡 ── */
+.map-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.map-card{position:relative;aspect-ratio:1.06;cursor:pointer;perspective:600px;}
+.map-inner{position:absolute;inset:0;transition:transform .5s;transform-style:preserve-3d;}
+.map-card.flip .map-inner{transform:rotateY(180deg);}
+.map-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:12px;border:1.5px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;text-align:center;}
+.map-front{background:var(--card);box-shadow:var(--shadow-card);}
+.map-front .mp-icon{font-size:22px;}
+.map-front .mp-name{font-size:12.5px;font-weight:800;color:var(--text);line-height:1.4;}
+.map-front .mp-hint{font-size:10px;font-weight:700;color:var(--ct);}
+.map-back{background:var(--ct-soft);border-color:var(--ct-line);transform:rotateY(180deg);}
+.map-back .mp-ai{font-size:11px;font-weight:800;color:var(--ct-deep);line-height:1.55;}
+.map-back .mp-tag{font-size:10px;font-weight:800;color:var(--sub);letter-spacing:.5px;}
+
+@media (max-width:768px){
+  .race-grid{grid-template-columns:1fr;}
+  .sw-wrap{grid-template-columns:1fr;}
+  .tf-wrap{grid-template-columns:1fr;}
+  .map-grid{grid-template-columns:repeat(2,1fr);}
+  .tl-row{grid-template-columns:76px 1fr;}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"엔지니어링 지표는 통과했는데, 사용자는 왜 여전히 느리다고 할까요?","name":"엔지니어링 지표는 통과했는데, 사용자는 왜 여전히 느리다고 할까요?","url":"https://xueai.app/slides/psy-1.ko.html","inLanguage":"ko","author":{"@type":"Person","name":"뤄샤오산(洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"강좌","educationalLevel":"입문부터 심화까지","isPartOf":{"@type":"Course","name":"AI 실전 강좌 · 체감 성능","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":true,"description":"AI 제품 심리학 1강: 서버 스톱워치와 사용자 스톱워치는 다르게 갑니다. 플레이 가능한 실험 네 개: 같은 5초 요청을 빈 화면 정지·스피너·스트리밍·단계 공개 네 가지 제시로 나란히 돌리고 가장 힘든 쪽을 고르기; 체감으로 8초를 재어 피드백 없는 대기가 얼마나 과대평가되는지 보기; TTFT 슬라이더로 타이핑 스트림을 재생해 첫 토큰 시간이 체감 점수와 어떻게 맞바뀌는지 보기; 세 가지 시각 버릇을 단계별로. 체감 성능이 사용자가 점수를 매기는 기준입니다.","datePublished":"2026-08-11","dateModified":"2026-08-17"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">AI 제품 심리학</div>
+    <h1>엔지니어링 지표는 통과했는데, 사용자는 왜 여전히 느리다고 할까요?</h1>
+    <p class="subtitle">앞 챕터에서는 지연을 줄이고, 비용을 깎고, 환각률을 내리는 법을 배웠습니다. 이번 챕터는 스톱워치를 바꿉니다: <b>사용자 머릿속에 있는 그 시계</b>. 서버 시계와 가는 방식이 다릅니다. 평점, 구독 갱신, 삭제가 모두 그걸 따라갑니다. 1강은 먼저 실험을 돌리고, 이 시계의 시각 버릇을 하나씩 풀어 봅니다.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">한 줄 요약</span><p>같은 5초 요청을 빈 화면 정지·스피너·스트리밍·단계 공개 네 가지로 나란히 돌려, 물리적 시간은 같고 체감은 세 배 차이나는 걸 직접 느끼고; 사용자 스톱워치의 시각 버릇 세 가지를 알아봅니다</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">실험 1 · 같은 5초, 네 가지 사는 법</div>
+    <p class="desc">아래 네 패널 뒤에는 <b>같은 한 번의 요청</b>이 있습니다: 같은 질문, 같은 5초 만에 완전한 답. 차이는 하나뿐—그 5초 동안 사용자에게 무엇을 보여 주느냐. 버튼을 눌러 네 개를 동시에 돌리고, 체감을 살펴보세요.</p>
+    <div class="toy" id="raceToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+        <span class="toy-t">네 방안 나란히 달리기</span>
+        <span class="toy-badge" id="raceBadge">먼저 출발</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">끝난 뒤, 가장 힘들었던 패널을 눌러 주세요.</div>
+        <div class="race-grid" id="raceGrid">
+          <div class="race-box" data-mode="freeze">
+            <div class="race-head"><h4>방안 A · 빈 화면 정지</h4><span class="race-tag">아무것도 안 줌</span></div>
+            <div class="race-stage" id="stFreeze"><span class="rs-hint">아래 버튼을 눌러 시작</span></div>
+            <div class="race-foot"><span class="rf-time" id="tFreeze">0.0s</span><span class="rf-feel" id="fFreeze"></span></div>
+          </div>
+          <div class="race-box" data-mode="spinner">
+            <div class="race-head"><h4>방안 B · 스피너 대기</h4><span class="race-tag">살아 있다고 알림</span></div>
+            <div class="race-stage" id="stSpinner"><span class="rs-hint">아래 버튼을 눌러 시작</span></div>
+            <div class="race-foot"><span class="rf-time" id="tSpinner">0.0s</span><span class="rf-feel" id="fSpinner"></span></div>
+          </div>
+          <div class="race-box" data-mode="stream">
+            <div class="race-head"><h4>방안 C · 스트리밍</h4><span class="race-tag">먼저 일부를</span></div>
+            <div class="race-stage" id="stStream"><span class="rs-hint">아래 버튼을 눌러 시작</span></div>
+            <div class="race-foot"><span class="rf-time" id="tStream">0.0s</span><span class="rf-feel" id="fStream"></span></div>
+          </div>
+          <div class="race-box" data-mode="steps">
+            <div class="race-head"><h4>방안 D · 단계 공개</h4><span class="race-tag">뭐 하는지 보여 줌</span></div>
+            <div class="race-stage" id="stSteps"><span class="rs-hint">아래 버튼을 눌러 시작</span></div>
+            <div class="race-foot"><span class="rf-time" id="tSteps">0.0s</span><span class="rf-feel" id="fSteps"></span></div>
+          </div>
+        </div>
+        <div class="race-controls">
+          <button class="btn-ct" id="btnRace">네 개 동시에 출발</button>
+          <span class="race-status" id="raceStatus">물리적 시간은 똑같습니다: 모두 5초</span>
+        </div>
+        <div class="race-verdict" id="raceVerdict"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">실험 2 · 몸속 스톱워치를 먼저 맞춰 보세요</div>
+    <p class="desc">방금 대부분에게 가장 힘들었던 건 빈 패널이었습니다. 빈 화면은 힘들 뿐 아니라 숨은 대가가 있습니다: <b>시간에 대한 추정을 부풀립니다</b>. 지각 시간 연구는 「기다리면서 시간에 주의를 두는」 측정을 전망적 타이밍이라고 부릅니다—주의가 시간 자체에 많이 실힐수록 주관적 길이가 부풀고, 긴장 정서가 한 겹 더 늘립니다. Zakay와 Block의 주의 게이트 모델이 이 규칙의 가장 자주 인용되는 설명입니다. 결론은 여기 두고, 직접 재어 보는 편이 더 설득력 있습니다.</p>
+    <div class="toy" id="swToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="2" x2="14" y2="2"/><circle cx="12" cy="14" r="8"/><path d="M12 14l3-3"/></svg></span>
+        <span class="toy-t">체감으로 8초 재기</span>
+        <span class="toy-badge" id="swBadge">시작 전</span>
+      </div>
+      <div class="toy-body">
+        <div class="sw-wrap">
+          <div class="sw-panel" id="swPanel">(준비되면 오른쪽 「시작」을 누르세요)</div>
+          <div class="sw-side">
+            <p>「시작」을 누르면 왼쪽 패널이 <b>진행도 없고, 스피너도 없고, 문구도 없는</b> 대기에 들어갑니다. 체감으로 8초가 지났다 싶으면 멈추세요. 머릿속으로 박자를 세지 마세요—그건 치팅입니다.</p>
+            <button class="btn-ct" id="swBtn">시작</button>
+            <div class="sw-result" id="swResult">
+              <div class="sw-nums">
+                <div class="sw-num"><i>내가 생각한</i><b>8.0s</b></div>
+                <div class="sw-num"><i>실제로 흐른</i><b id="swActual">0.0s</b></div>
+                <div class="sw-num"><i>오차</i><b id="swDelta">0%</b></div>
+              </div>
+              <div class="sw-verdict" id="swVerdict"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:14px;">이게 빈 화면 정지가 데이터 백엔드에는 안 보이는 청구서입니다: 서버는 5초, 사용자는 6초 반. <b>피드백 없는 대기의 과대평가 오차는 실험에서 20~30%가 흔합니다</b>. 제품의 「체감 지연」은 모니터링 패널의 P99보다 더 나쁘고, 그 차이는 인터페이스가 결정합니다.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">실험 3 · 첫 토큰 시간은 얼마나 긴 레버인가</div>
+    <p class="desc">스톱워치가 사용자 마음에서 돈다면, 엔지니어링 예산은 그가 재는 구간에 써야 합니다. 아래 챗봇의 <b>총 시간은 5초로 고정</b>이고, 움직일 수 있는 파라미터는 하나뿐입니다: 첫 토큰 시간 TTFT(전송부터 첫 글자가 보일 때까지). 슬라이더를 끌고 「다시 재생」을 누르면, 오른쪽이 선택한 TTFT로 타이핑 스트림을 다시 보여 주고 체감 점수가 따라 변합니다.</p>
+    <div class="toy" id="tfToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg></span>
+        <span class="toy-t">TTFT 슬라이더 · 총 시간은 그대로</span>
+        <span class="toy-badge" id="tfBadge">끌고 다시 재생</span>
+      </div>
+      <div class="toy-body">
+        <div class="tf-wrap">
+          <div>
+            <div class="sl-row">
+              <label>첫 토큰 시간</label>
+              <input type="range" id="tfSlider" min="0.2" max="5" step="0.1" value="2.4">
+              <span class="sl-val" id="tfVal">2.4s</span>
+            </div>
+            <div class="tf-ctrl">
+              <button class="btn-ct" id="tfBtn">다시 재생</button>
+              <span class="race-status" id="tfStatus">총 시간 고정 5.0s, 첫 토큰만 움직임</span>
+            </div>
+            <div class="psy-meter">
+              <span class="pm-label">체감 점수</span>
+              <div class="pm-track"><div class="pm-fill" id="tfFill" style="width:64%"></div></div>
+              <span class="pm-num" id="tfNum">64</span>
+            </div>
+            <div class="tf-kv" id="tfKv"></div>
+          </div>
+          <div class="tf-chat mock">
+            <div class="tf-msg user">이 회의록을 할 일 세 줄로 줄여 줘</div>
+            <div class="tf-msg ai"><span id="tfAi">「다시 재생」을 눌러 이 TTFT 단계의 체감을 보세요</span></div>
+          </div>
+        </div>
+        <div class="tf-note"><b>엔지니어링이 먼저 TTFT를 누르는 이유:</b> 첫 토큰을 5초에서 0.5초로 줄여도 총 시간은 1초도 안 줄지만, 체감 점수는 두세 배로 뜁니다. 반대로 TTFT는 그대로 두고 총 시간만 5초에서 4초로 줄이면, 이 시계는 거의 안 움직입니다. 스트리밍 연결, 먼저 개요 내기, 구간 반환—가성비는 모두 머신 업그레이드보다 앞입니다.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">실험 4 · 사용자 스톱워치의 시각 버릇 세 가지</div>
+    <p class="desc">앞의 체감을 재사용 가능한 규칙 세 줄로 정리합니다. 각 단계에 mini 데모가 있으니 <b>세 단계를 모두 넘겨 보세요</b>.</p>
+    <div class="toy" id="qkToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+        <span class="toy-t">시각 버릇 세 가지</span>
+        <span class="toy-badge" id="qkBadge">1 / 3 단계</span>
+      </div>
+      <div class="toy-body">
+        <div class="seg" id="qkSeg">
+          <button class="on" data-k="0">① 시계는 첫 글자에서 멈춤</button>
+          <button data-k="1">② 피드백 있으면 빨리 감</button>
+          <button data-k="2">③ 나쁜 결과는 길게 기억</button>
+        </div>
+
+        <div class="qk-pane on" data-k="0">
+          <button class="btn-ct" id="q1Play" style="margin-top:14px;">타임라인 두 줄 재생</button>
+          <div class="tl-row"><span class="tl-label">사용자 스톱워치</span><div class="tl-track"><div class="tl-fill" id="q1UserFill"></div></div><span class="tl-mark" id="q1UserMark">0.6s · 첫 글자 보임, 스톱워치 정지</span></div>
+          <div class="tl-row"><span class="tl-label">서버 스톱워치</span><div class="tl-track"><div class="tl-fill dim" id="q1SrvFill"></div></div><span class="tl-mark" id="q1SrvMark">5.0s · 완전한 답 도착</span></div>
+          <p class="qk-cap">사용자 시계는 전송을 누를 때 시작하고, 첫 글자를 볼 때 멈춥니다. 그 뒤 주의는 읽기로 넘어가고, 읽으면서 도착하는 내용은 대기 장부에 거의 안 잡힙니다. 엔지니어링 팀은 총 시간의 P99를 보고, 사용자는 첫 토큰만 기억합니다. <b>두 시계가 안 맞으면 나쁜 리뷰가 틈으로 새어 나옵니다</b>. 실험 3에서 TTFT 레버의 길이는 바로 이 버릇이 준 것입니다.</p>
+        </div>
+
+        <div class="qk-pane" data-k="1">
+          <button class="btn-ct" id="q2Play" style="margin-top:14px;">같은 속도 진행 바 두 개, 출발</button>
+          <div class="tl-row"><span class="tl-label">맨몸</span><div class="tl-track"><div class="tl-fill dim" id="q2AFill"></div></div></div>
+          <div class="tl-row"><span class="tl-label">안내 있음</span><div class="tl-track"><div class="tl-fill" id="q2BFill"></div></div><span class="fb-stage" id="q2Stage"></span></div>
+          <div class="qk-ask" id="q2Ask"><span>같은 6초, 어느 쪽이 더 힘들었나요?</span><button data-v="a">맨몸 쪽</button><button data-v="b">안내 있는 쪽</button></div>
+          <div class="qk-verdict" id="q2Verdict"></div>
+        </div>
+
+        <div class="qk-pane" data-k="2">
+          <p class="qk-cap" style="margin-top:14px;">같은 한 번의 대기: 5초 뒤 답이 도착합니다. 결말 두 가지를 바꿔 보며, 기억 속 길이가 어떻게 변하는지 보세요.</p>
+          <div class="seg" id="q3Seg" style="margin-top:10px;">
+            <button class="on" data-k="0">결과 좋음 · 답이 맞음</button>
+            <button data-k="1">결과 나쁨 · 동문서답</button>
+          </div>
+          <div class="q3-quote" id="q3Quote">“잠깐 기다리니 나왔고, 답이 꽤 잘 맞네. 이 도구 괜찮다.”</div>
+          <div class="psy-meter">
+            <span class="pm-label">기억 속 길이</span>
+            <div class="pm-track"><div class="pm-fill" id="q3Fill" style="width:42%"></div></div>
+            <span class="pm-num" id="q3Num">약 4초</span>
+          </div>
+          <p class="qk-cap">물리적으로는 그 한 번의 5초입니다. <b>회고적 시간은 사후에 재구성되고, 기분이 나쁠수록 재구성된 대기는 길어집니다</b>. 그래서 지연과 환각이 나쁜 리뷰 한 문장에 자주 같이 들어갑니다: 느리고 멍청하다. 답 품질 문제가 속도 탓으로 연좌되고; 반대로 좋은 답은 느림을 일부 덮어 주기도 합니다. 4강 피크엔드 법칙이 이 줄을 엔딩 디자인에 씁니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">논지 · 사용자는 체감하는 그 시계로 점수를 줍니다</div>
+    <p class="desc">AI 제품에는 타고난 병 세 가지가 있습니다: <b>느림</b>(추론에 시간이 걸림), <b>틀림</b>(환각을 완전히 못 없앰), <b>불투명</b>(사용자가 뭘 하는지 못 봄). 엔지니어링 수단은 단기에는 이 셋을 완화할 뿐이고, 사용자 평가는 지각에서 나옵니다—지각은 설계할 수 있습니다. 앞 챕터에서 배운 스트리밍, 모델 라우팅, 시맨틱 캐시, Agent 진행 보고는 각각 심리학 스위치로서의 정체도 있습니다. 이번 챕터는 심리 효과를 위해 언제 그걸 돌릴지 가르칩니다.</p>
+    <div class="quote-card"><b>체감 성능 ≠ 실제 성능.</b> 서버의 5초는 물리적 사실이고, 사용자의 5초는 심리적 사건입니다. 평점, 구독 갱신, 삭제는 모두 뒤쪽 5초에서 일어납니다.</div>
+    <div class="toy" id="vqToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+        <span class="toy-t">출구 퀴즈 · 예산은 한 칼만</span>
+        <span class="toy-badge">하나 고르기</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">AI 어시스턴트가 느리다고 욕먹습니다. 실측 총 시간 5초, 첫 토큰 4.2초. 스프린트는 한 가지만 할 수 있습니다—어느 칼부터?</div>
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>추론 클러스터를 업그레이드해 총 시간을 5초에서 4초로</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>스트리밍을 붙여 첫 토큰을 0.5초로, 총 시간은 그대로</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>더 예쁜 로딩 애니메이션—스피너를 파티클 효과로</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>모델이 깊이 생각 중이라고 설명하는 안내창을 띄움</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">전체 지도 · 열여섯 강은 어떻게 이어지나</div>
+    <p class="desc">느림, 틀림, 불투명—각 병 뒤에 몇 강이 줄 서 있고; 그 다음은 관계와 돈입니다. <b>카드를 눌러 뒤집고</b>, 각 강이 사용자의 어떤 불만을 푸는지 보세요.</p>
+    <div class="toy" id="mapToy">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15"/><path d="M15 6v15"/></svg></span>
+        <span class="toy-t">열여섯 강 한 장</span>
+        <span class="toy-badge" id="mapBadge">0 / 16 뒤집음</span>
+      </div>
+      <div class="toy-body">
+        <div class="map-grid" id="mapGrid"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="src-note">
+    <b>출처와 더 읽을거리:</b> 지각 시간의 주의 게이트 모델은 Zakay와 Block의 일련 연구(1990년대부터)에 있고, 피드백 없음·높은 각성 상태의 시간 과대평가는 전망적 타이밍 실험에서 반복됩니다. 대기 경험의 고전 정리는 David Maister, The Psychology of Waiting Lines(1985)—「점유된 시간은 더 짧게, 설명 없는 대기는 더 길게 느껴진다」가 여기서 나옵니다. UI 응답의 0.1 / 1 / 10초 세 단계는 Nielsen, Usability Engineering(1993). 진행 표시기가 선호와 인내를 올리는 실험은 Myers(1985). 정서가 시간 기억을 다시 쓰는 메커니즘은 4강 피크엔드 법칙(Kahneman 등)과 뿌리가 같습니다.
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 이 강의가 전하고 싶은 것</h3>
+    <ul>
+      <li><b>스톱워치 두 개를 보세요</b>: 서버는 물리적 길이를 재고, 사용자는 전송부터 첫 토큰까지 잽니다—성과 지표에 TTFT를 한 줄 따로 두세요</li>
+      <li><b>인터페이스를 비워 두지 마세요</b>: 피드백 없는 대기는 20~30% 부풀고, 1초를 넘기면 피드백을, 3초를 넘기면 진행을 주세요</li>
+      <li><b>예산은 먼저 첫 토큰에</b>: 스트리밍, 먼저 개요, 구간 반환—일정은 모두 머신 업그레이드보다 앞입니다</li>
+      <li><b>오류는 그 자리에서 막으세요</b>: 시간 기억은 정서를 따라가고, 동문서답은 「느림」까지 나쁜 리뷰에 같이 씁니다</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 实验一：四方案并排跑 ──
+   四个面板共用一条 5 秒时间线，差异只在呈现层：冻结无输出、转圈、
+   流式（TTFT 0.6s 后逐字出）、步骤外显（四步逐条亮再流式收尾）。
+   跑完让用户投最难受的一票，按票给判词，再揭示物理时长相同。 */
+const ANSWER = '2025년 Q4 데이터 기준, 환불 신청은 배송 파손(41%)과 사이즈 불일치(27%) 두 유형에 몰립니다. 파손 건 「사진 찍으면 바로 보상」 채널을 우선 올리세요—수동 심사량을 약 30% 줄이고, 고객지원 응답 중앙값을 4시간에서 20분으로 낮출 수 있습니다.';
+const RACE_MS = 5000;
+const $ = id => document.getElementById(id);
+const stages = { freeze: $('stFreeze'), spinner: $('stSpinner'), stream: $('stStream'), steps: $('stSteps') };
+const clocks = { freeze: $('tFreeze'), spinner: $('tSpinner'), stream: $('tStream'), steps: $('tSteps') };
+const feels  = { freeze: $('fFreeze'), spinner: $('fSpinner'), stream: $('fStream'), steps: $('fSteps') };
+const FEEL_TEXT = { freeze: '체감이 가장 김—대부분 8초를 넘겼다고 느낌', spinner: '안 죽었다는 건 알지만, 그냥 기다림', stream: '0.6초 뒤부터 읽기 시작, 대기감이 약함', steps: '대기가 진행으로 번역됨' };
+const VOTE_OPEN = {
+  freeze: '<b>대부분과 같은 선택입니다.</b> 빈 화면 정지는 「죽었나?」조차 답하지 않아, 뇌가 단서를 못 얻고 최악으로만 불안해합니다.',
+  spinner: '<b>스피너를 고른 사람도 많습니다.</b> 「아직 살아 있다」에는 답하지만 「얼마나 더?」에는 안 답해, 빈 기다림의 매 초가 그대로 스톱워치에 잡힙니다.',
+  stream: '<b>대부분과 다르게 골랐습니다.</b> 스트리밍의 힘듦은 대개 기대 끌기에서 옵니다: 첫 글자는 빠른데 뒤가 끊겼다 이어져, 기대가 반복해서 흔들립니다.',
+  steps: '<b>대부분과 다르게 골랐습니다.</b> 단계 공개는 가끔 연기가 과해서 실패합니다: 단계 문구와 실제 동작이 안 맞으면 오히려 체감이 나빠집니다. 3강에서 그 선을 풉니다.',
+};
+const btnRace = $('btnRace');
+const raceStatus = $('raceStatus');
+const raceVerdict = $('raceVerdict');
+const raceBadge = $('raceBadge');
+let racing = false, raceDone = false, voted = false;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function runClocks(){
+  const t0 = performance.now();
+  const timer = setInterval(() => {
+    const s = Math.min(RACE_MS, performance.now() - t0) / 1000;
+    Object.values(clocks).forEach(c => c.textContent = s.toFixed(1) + 's');
+    if (s >= RACE_MS / 1000) clearInterval(timer);
+  }, 100);
+}
+
+async function runFreeze(){
+  stages.freeze.innerHTML = '<span class="rs-hint">(페이지가 전혀 안 움직임)</span>';
+  await sleep(RACE_MS);
+  stages.freeze.innerHTML = '<span class="rs-answer">' + ANSWER + '</span>';
+}
+
+async function runSpinner(){
+  stages.spinner.innerHTML = '<div class="race-spinner"></div><span class="rs-hint">생성 중…</span>';
+  await sleep(RACE_MS);
+  stages.spinner.innerHTML = '<span class="rs-answer">' + ANSWER + '</span>';
+}
+
+async function runStream(){
+  stages.stream.innerHTML = '<span class="rs-hint">연결 중…</span>';
+  await sleep(600);
+  stages.stream.innerHTML = '<span class="rs-answer"></span>';
+  const el = stages.stream.querySelector('.rs-answer');
+  const step = (RACE_MS - 600) / ANSWER.length;
+  for (let i = 0; i < ANSWER.length; i++){
+    el.textContent += ANSWER[i];
+    await sleep(step);
+  }
+}
+
+async function runSteps(){
+  const STEPS = [
+    { label: '질문 이해: 환불 흐름 최적화', at: 300 },
+    { label: '지식 베이스 검색: 티켓 12건 히트', at: 1100 },
+    { label: '후보 방안 3개 비교', at: 2200 },
+    { label: '답변 생성', at: 3200 },
+  ];
+  stages.steps.innerHTML = '<div class="race-steps">' + STEPS.map(s =>
+    '<div class="race-step"><span class="st-dot"></span>' + s.label + '</div>').join('') + '</div>';
+  const rows = [...stages.steps.querySelectorAll('.race-step')];
+  STEPS.forEach((s, i) => setTimeout(() => {
+    rows.forEach(r => r.classList.remove('doing'));
+    rows[i].classList.add('on', 'doing');
+  }, s.at));
+  await sleep(3600);
+  stages.steps.innerHTML = '<span class="rs-answer"></span>';
+  const el = stages.steps.querySelector('.rs-answer');
+  const step = (RACE_MS - 3600) / ANSWER.length;
+  for (let i = 0; i < ANSWER.length; i++){
+    el.textContent += ANSWER[i];
+    await sleep(step);
+  }
+}
+
+btnRace.addEventListener('click', async () => {
+  if (racing) return;
+  racing = true; raceDone = false; voted = false;
+  raceVerdict.classList.remove('show');
+  Object.values(feels).forEach(f => { f.textContent = ''; f.classList.remove('show'); });
+  document.querySelectorAll('.race-box').forEach(b => b.classList.remove('voted'));
+  btnRace.disabled = true;
+  btnRace.textContent = '5초, 달리는 중…';
+  raceBadge.textContent = '달리는 중…';
+  raceStatus.textContent = '체감을 보세요: 어느 패널의 5초가 가장 길게 느껴지나요?';
+  runClocks();
+  await Promise.all([runFreeze(), runSpinner(), runStream(), runSteps()]);
+  raceDone = true; racing = false;
+  btnRace.disabled = false;
+  btnRace.textContent = '다시 한 번';
+  raceBadge.textContent = '한 표 주세요';
+  raceStatus.textContent = '끝났어요. 가장 힘들었던 패널을 눌러 주세요 ↑';
+});
+
+document.querySelectorAll('.race-box').forEach(box => {
+  box.addEventListener('click', () => {
+    if (!raceDone || voted) return;
+    voted = true;
+    box.classList.add('voted');
+    Object.keys(feels).forEach(k => { feels[k].textContent = FEEL_TEXT[k]; feels[k].classList.add('show'); });
+    raceVerdict.innerHTML = VOTE_OPEN[box.dataset.mode] + ' 다만 네 패널은 서버 쪽에서 똑같습니다—모두 5초 만에 완전한 답, 차이는 그 5초 동안 사용자에게 무엇을 보여 주느냐뿐입니다. 방안 C는 「5초 기다리기」를 「0.6초 기다린 뒤 읽으면서 받기」로 다시 쓰고, 방안 D는 「대기」를 「진행」으로 번역합니다. <b>체감 성능은 제품 성능의 일부이자, 사용자가 유일하게 만질 수 있는 부분입니다.</b>';
+    raceVerdict.classList.add('show');
+    raceBadge.textContent = '✓ 공개됨';
+    raceBadge.classList.add('solved');
+    raceStatus.textContent = '물리적 시간은 똑같습니다: 모두 5초';
+  });
+});
+
+/* ── 实验二：秒表估时游戏 ──
+   无反馈等待下凭体感掐 8 秒。计时过程不给一丝提示，
+   揭晓时算高估/低估比例，按方向给判词。 */
+const swBtn = $('swBtn'), swPanel = $('swPanel'), swBadge = $('swBadge');
+const swResult = $('swResult'), swVerdict = $('swVerdict');
+let swState = 'idle', swT0 = 0;
+
+swBtn.addEventListener('click', () => {
+  if (swState === 'idle' || swState === 'done'){
+    swState = 'run';
+    swT0 = performance.now();
+    swResult.classList.remove('show');
+    swPanel.classList.add('run');
+    swPanel.textContent = '(인터페이스가 전혀 안 움직임)';
+    swBtn.textContent = '8초 됐나요? 멈추기';
+    swBadge.textContent = '측정 중…';
+    swBadge.classList.remove('solved');
+    return;
+  }
+  const e = (performance.now() - swT0) / 1000;
+  if (e < 2){
+    swPanel.textContent = '(손 미끄러진 것 같아요, 다시)';
+    swState = 'idle';
+    swBtn.textContent = '시작';
+    swBadge.textContent = '시작 전';
+    return;
+  }
+  swState = 'done';
+  swPanel.classList.remove('run');
+  swPanel.textContent = '(대기 끝)';
+  swBtn.textContent = '다시 측정';
+  const over = Math.round((8 / e - 1) * 100);
+  $('swActual').textContent = e.toFixed(1) + 's';
+  $('swDelta').textContent = over > 0 ? '과대 ' + over + '%' : over < 0 ? '과소 ' + (-over) + '%' : '정확';
+  let v;
+  if (over >= 10){
+    v = '<b>' + e.toFixed(1) + '초</b>에 이미 8초가 됐다고 느꼈습니다—이 피드백 없는 대기가 몸속에서 약 <b>' + over + '%</b> 부풀었습니다. 빗나간 건 정상입니다: 주의가 시간 자체로 가득 차면 대부분 과대평가하고, 실험에서 20~30% 오차는 흔합니다.';
+  } else if (over <= -10){
+    v = '<b>' + e.toFixed(1) + '초</b>까지 기다렸다가 멈췄습니다—길이를 짧게 기록한 소수파입니다. 추측: 머릿속으로 박자를 세며 주의가 세기에 잡혀 주관 시간이 오히려 줄었을 수 있습니다. 주의 게이트를 반대 방향에서 검증한 셈입니다.';
+  } else {
+    v = '실제 <b>' + e.toFixed(1) + '초</b>, 오차 10% 미만—몸속 스톱워치가 꽤 안정적이고, 대부분 피험자보다 정확합니다. 그 손감을 들고 사용자 데이터를 보세요: 그들은 덜 안정적이고, 빈 패널 앞 5초는 자주 6초 반으로 기억됩니다.';
+  }
+  swVerdict.innerHTML = v;
+  swResult.classList.add('show');
+  swBadge.textContent = '✓ 공개됨';
+  swBadge.classList.add('solved');
+});
+
+/* ── 实验三：TTFT 滑块 + 聊天重放 ──
+   总时长锁 5 秒，滑块只动首字时间；体感分随滑块即时变化，
+   重放按所选 TTFT 真实演一遍等待与打字流。 */
+const TF_ANSWER = '할 일 세 줄: ① 수요일 전까지 예산표를 재무에 보내 재검토; ② 고객지원 스크립트는 샤오양이 2판으로 고쳐 금요일 리뷰; ③ 다음 주 월요일 오전 공급업체와 납기 확인. 캘린더 알림도 만들어 줄까요?';
+const tfSlider = $('tfSlider'), tfAi = $('tfAi'), tfBtn = $('tfBtn'), tfBadge = $('tfBadge');
+let tfPlaying = false, tfRun = 0;
+
+function tfScore(t){ return Math.round(97 - (t - 0.2) * 15); }
+
+function tfPaint(){
+  const t = +tfSlider.value;
+  const sc = tfScore(t);
+  $('tfVal').textContent = t.toFixed(1) + 's';
+  const fill = $('tfFill');
+  fill.style.width = sc + '%';
+  fill.className = 'pm-fill ' + (sc < 40 ? 'hot' : sc < 70 ? 'warm' : '');
+  $('tfNum').textContent = sc;
+  let kv;
+  if (t <= 0.8){
+    kv = '첫 토큰 ' + t.toFixed(1) + '초: <b>스톱워치가 막 돌다 멈춥니다</b>. 남은 ' + (5 - t).toFixed(1) + '초는 읽기로 지나가, 대기 장부에 거의 안 잡힙니다.';
+  } else if (t <= 2.5){
+    kv = '첫 토큰 ' + t.toFixed(1) + '초: 참을 만하지만, 스톱워치가 진짜 ' + t.toFixed(1) + '초 갔습니다. <b>1초 안으로 누르면, 0.5초마다 뚜렷한 보상이 있습니다</b>.';
+  } else {
+    kv = '첫 토큰 ' + t.toFixed(1) + '초: 앞 ' + t.toFixed(1) + '초는 빈 화면 정지와 다르지 않아, <b>스트리밍의 이점이 꼬리로 밀렸습니다</b>.';
+  }
+  $('tfKv').innerHTML = kv;
+}
+tfSlider.addEventListener('input', tfPaint);
+tfPaint();
+
+tfBtn.addEventListener('click', async () => {
+  if (tfPlaying) return;
+  tfPlaying = true;
+  const my = ++tfRun;
+  const t = +tfSlider.value;
+  tfBtn.disabled = true;
+  tfBtn.textContent = '재생 중…';
+  $('tfStatus').textContent = '이번 재생: 첫 토큰 ' + t.toFixed(1) + 's · 총 5.0s';
+  tfAi.textContent = '';
+  tfAi.classList.add('tf-wait');
+  await sleep(t * 1000);
+  if (my !== tfRun) return;
+  tfAi.classList.remove('tf-wait');
+  const delay = Math.max(0, (5 - t) * 1000 / TF_ANSWER.length);
+  if (delay === 0){
+    tfAi.textContent = TF_ANSWER;
+  } else {
+    for (let i = 0; i < TF_ANSWER.length; i++){
+      tfAi.textContent += TF_ANSWER[i];
+      await sleep(delay);
+      if (my !== tfRun) return;
+    }
+  }
+  tfPlaying = false;
+  tfBtn.disabled = false;
+  tfBtn.textContent = '다시 재생';
+  tfBadge.textContent = '✓ 해 봄';
+  tfBadge.classList.add('solved');
+});
+
+/* ── 实验四：三个走时怪癖 ── */
+const qkSeg = $('qkSeg'), qkBadge = $('qkBadge');
+const qkSeen = new Set([0]);
+qkSeg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const k = +b.dataset.k;
+  [...qkSeg.children].forEach(x => x.classList.toggle('on', +x.dataset.k === k));
+  document.querySelectorAll('.qk-pane').forEach(p => p.classList.toggle('on', +p.dataset.k === k));
+  qkSeen.add(k);
+  if (qkSeen.size === 3){
+    qkBadge.textContent = '✓ 세 단계 완료';
+    qkBadge.classList.add('solved');
+  } else {
+    qkBadge.textContent = qkSeen.size + ' / 3 단계';
+  }
+});
+
+/* 怪癖①：两条时间线，一条 0.6s 停表，一条 5s 走完 */
+const q1Play = $('q1Play');
+q1Play.addEventListener('click', () => {
+  const uf = $('q1UserFill'), sf = $('q1SrvFill');
+  const um = $('q1UserMark'), sm = $('q1SrvMark');
+  q1Play.disabled = true;
+  [uf, sf].forEach(el => { el.style.transition = 'none'; el.style.width = '0'; });
+  [um, sm].forEach(el => el.classList.remove('show'));
+  void uf.offsetWidth;
+  uf.style.transition = 'width .6s linear';
+  uf.style.width = '12%';
+  sf.style.transition = 'width 5s linear';
+  sf.style.width = '100%';
+  setTimeout(() => um.classList.add('show'), 650);
+  setTimeout(() => {
+    sm.classList.add('show');
+    q1Play.disabled = false;
+    q1Play.textContent = '다시 재생';
+  }, 5050);
+});
+
+/* 怪癖②：两根同速进度条，一根裸奔一根带播报，跑完投票 */
+const q2Play = $('q2Play'), q2Ask = $('q2Ask'), q2Verdict = $('q2Verdict'), q2Stage = $('q2Stage');
+const Q2_STAGES = ['질문 이해 중', '지식 베이스 검색: 12건 히트', '후보 방안 3개 비교', '문장 정리 중, 곧 끝'];
+const Q2_V = {
+  a: '<b>대부분 체감과 같습니다.</b> 속도는 같은데, 맨몸 쪽에 없는 건 정보뿐입니다: 몇 할인지, 어느 단계인지, 얼마나 남았는지—뇌가 스스로 메울 수밖에 없습니다. Maister는 The Psychology of Waiting Lines에서 이걸 첫머리에 둡니다: 점유된 시간은 더 짧게, 설명 없는 대기는 더 길게 느껴진다. 2강은 대기 3법칙을, 3강은 노력을 보여 주는 노동 착각을 풉니다.',
+  b: '<b>소수파, 그것도 통합니다.</b> 어떤 사람은 안내 문구를 트집 잡으며 주의가 다시 대기 자체로 끌립니다. 큰 표본에서는 결론이 여전히 안정적입니다: 피드백 있는 대기는 대체로 더 짧게 기억되고, Maister의 The Psychology of Waiting Lines가 이를 첫머리에 둡니다. 2강은 대기 3법칙을, 3강은 노동 착각을 풉니다.',
+};
+q2Play.addEventListener('click', () => {
+  const af = $('q2AFill'), bf = $('q2BFill');
+  q2Play.disabled = true;
+  q2Ask.classList.remove('show');
+  q2Verdict.classList.remove('show');
+  [...q2Ask.querySelectorAll('button')].forEach(b => b.disabled = false);
+  [af, bf].forEach(el => { el.style.transition = 'none'; el.style.width = '0'; });
+  q2Stage.textContent = '';
+  void af.offsetWidth;
+  [af, bf].forEach(el => { el.style.transition = 'width 6s linear'; el.style.width = '100%'; });
+  Q2_STAGES.forEach((s, i) => setTimeout(() => { q2Stage.textContent = s; }, i * 1500 + 100));
+  setTimeout(() => {
+    q2Stage.textContent = '완료';
+    q2Ask.classList.add('show');
+    q2Play.disabled = false;
+    q2Play.textContent = '다시 한 번';
+  }, 6100);
+});
+q2Ask.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled) return;
+  [...q2Ask.querySelectorAll('button')].forEach(x => x.disabled = true);
+  q2Verdict.innerHTML = Q2_V[b.dataset.v];
+  q2Verdict.classList.add('show');
+});
+
+/* 怪癖③：同一次 5 秒等待，结局好坏改写时间记忆 */
+const Q3 = [
+  { quote: '“잠깐 기다리니 나왔고, 답이 꽤 잘 맞네. 이 도구 괜찮다.”', w: 42, n: '약 4초', hot: false },
+  { quote: '“한참 버벅이다 튀어나왔는데, 동문서답이야. 환불.”', w: 88, n: '약 9초', hot: true },
+];
+const q3Seg = $('q3Seg');
+q3Seg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const k = +b.dataset.k;
+  [...q3Seg.children].forEach(x => x.classList.toggle('on', +x.dataset.k === k));
+  const d = Q3[k];
+  $('q3Quote').textContent = d.quote;
+  const fill = $('q3Fill');
+  fill.style.width = d.w + '%';
+  fill.className = 'pm-fill' + (d.hot ? ' hot' : '');
+  $('q3Num').textContent = d.n;
+});
+
+/* ── 出门考：tasteQuiz 在 taste.js 加载后初始化 ── */
+document.addEventListener('DOMContentLoaded', () => {
+  tasteQuiz('vqToy', {
+    answer: 1,
+    why: [
+      '돈이 사용자가 재지 않는 구간에 갔습니다: 첫 토큰은 여전히 4.2초에 걸려 대기감이 그대로이고, 아낀 1초는 그가 읽으면서 기다리는 단계에 떨어집니다.',
+      '사용자 스톱워치는 0.5초에 멈추고, 남은 4.5초는 읽기로 지나갑니다. 머신 비용은 안 올랐는데 체감은 바로 단이 바뀝니다—실험 3이 잰 레버 그대로입니다.',
+      '더 예쁜 스피너도 스피너입니다: 「살아 있다」에는 답하고 「얼마나 더?」에는 안 답해, 4.2초 공백은 1초도 안 줄었습니다.',
+      '설명은 좋은 방향이지만, 안내창은 읽기를 끊고 주의를 다시 시간 자체에 걸어둡니다. 과정을 어떻게 보여야 가산점인지, 3강 노동 착각이 따로 풉니다.',
+    ],
+  });
+});
+
+/* ── 全章地图翻卡 ── */
+const MAP = [
+  { icon: '⏱', name: '체감 성능', ai: '스톱워치 두 개가 다르게 감—체감은 설계할 수 있다', tag: '1강 · 여기' },
+  { icon: '⏳', name: '대기의 심리학', ai: '대기가 얼마나 힘든지는 제시가 결정—제시 결정 세 단계', tag: '2강' },
+  { icon: '🔍', name: '노동 착각', ai: 'AI가 노력을 보여 주게—조금 느려도 더 믿을 만하다', tag: '3강' },
+  { icon: '🎢', name: '피크엔드 법칙', ai: '경험은 피크와 엔딩만 기억된다—예산을 어디에 쓸지 분명하다', tag: '4강' },
+  { icon: '⚖️', name: '신뢰 보정', ai: '맹신은 사고, 불신은 산 돈 낭비—신뢰를 반신반의로', tag: '5강' },
+  { icon: '🤖', name: '알고리즘 혐오', ai: '같은 실수도 AI가 하면 사람이 한 것보다 더 밉다', tag: '6강' },
+  { icon: '🛡', name: '방어 심리', ai: '데이터를 못 올리고 확인을 못 누른다—통제감이 구한다', tag: '7강' },
+  { icon: '📖', name: '멘탈 모델', ai: '사용자가 잘못된 설명서를 들고 AI를 검색엔진처럼 쓴다', tag: '8강' },
+  { icon: '🎭', name: '의인화와 사과', ai: '사람 흉내를 어느 단계까지, 틀린 뒤 어떻게 사과할지', tag: '9강' },
+  { icon: '🌉', name: '허니문 절벽', ai: '신선함이 떨어진 뒤, 무엇으로 붙잡을지', tag: '10강' },
+  { icon: '🏷', name: 'AI 라벨 할인', ai: '같은 내용도 AI라고 붙이면 값이 떨어진다', tag: '11강' },
+  { icon: '🧠', name: '인지 오프로딩', ai: '쓸수록 머리를 덜 쓴다—제품이 받아 줄까 막을까', tag: '12강' },
+  { icon: '💞', name: '정서적 애착', ai: '사용자와 AI가 정이 든 뒤, 경계를 어디에', tag: '13강' },
+  { icon: '💳', name: '결제 심리', ai: '쓰기는 좋은데 돈은 안 내고 싶다—어디에 걸렸나', tag: '14강' },
+  { icon: '🧾', name: '가격', ai: '구독·종량·매절, 가격도 심리 디자인이다', tag: '15강' },
+  { icon: '📮', name: '피드백 심리', ai: '사용자는 왜 싫어요를 안 누르나, 나쁜 소식을 어떻게 듣게 할까', tag: '16강' },
+];
+const mapGrid = $('mapGrid');
+const mapBadge = $('mapBadge');
+const mapFlipped = new Set();
+mapGrid.innerHTML = MAP.map(m => `
+  <div class="map-card">
+    <div class="map-inner">
+      <div class="map-face map-front">
+        <div class="mp-icon">${m.icon}</div>
+        <div class="mp-name">${m.name}</div>
+        <div class="mp-hint">눌러 보기</div>
+      </div>
+      <div class="map-face map-back">
+        <div class="mp-ai">${m.ai}</div>
+        <div class="mp-tag">${m.tag}</div>
+      </div>
+    </div>
+  </div>`).join('');
+[...mapGrid.children].forEach((card, i) => {
+  card.addEventListener('click', () => {
+    card.classList.toggle('flip');
+    mapFlipped.add(i);
+    if (mapFlipped.size === 16){
+      mapBadge.textContent = '✓ 열여섯 장 완료';
+      mapBadge.classList.add('solved');
+    } else {
+      mapBadge.textContent = mapFlipped.size + ' / 16 뒤집음';
+    }
+  });
+});
+</script>
+<script src="taste.js?v=20260810a"></script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

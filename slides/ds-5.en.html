@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hash Tables: Why Lookups Are Unreasonably Fast | xueai.app</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260809a">
+<!-- SEO Start -->
+<meta name="description" content="Why could Set “direct-hit” in lesson one? Drop names into buckets yourself: watch the hash function turn a name into a number, mod 8 for the bucket; see how two names colliding in one bucket get handled; then race “walk the list vs direct hit” on a million rows.">
+<meta name="keywords" content="hash table,hash function,Set internals,dictionary internals,hash collision,chaining,data structures intro">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.app/slides/ds-5.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.app/slides/ds-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.app/slides/ds-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.app/slides/ds-5.ko.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.app/slides/ds-5.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.app · AI Product Manager Training">
+<meta property="og:title" content="Hash Tables: Why Lookups Are Unreasonably Fast">
+<meta property="og:description" content="Drop keys into buckets yourself—watch the hash function turn “walk the list” into a “direct hit,” then see what happens when two keys land in the same bucket.">
+<meta property="og:url" content="https://xueai.app/slides/ds-5.en.html">
+<meta property="og:image" content="https://xueai.app/slides/og/ds-5.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hash Tables: Why Lookups Are Unreasonably Fast">
+<meta name="twitter:description" content="Drop keys into buckets yourself—watch the hash function turn “walk the list” into a “direct hit.”">
+<meta name="twitter:image" content="https://xueai.app/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.hint-line{font-size:12.5px;color:var(--sub);font-weight:600;margin-top:10px}
+.hint-line b{color:var(--amber)}
+
+/* ── 交互 1：把 key 塞进桶 ── */
+.hash-lab{position:relative;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 22px;overflow:hidden}
+.hl-names{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:16px}
+.name-chip{border:1.5px solid var(--border);background:var(--card);border-radius:999px;padding:7px 18px;font-size:14px;font-weight:800;color:var(--text);cursor:pointer;font-family:inherit;transition:all .15s}
+.name-chip:hover:not(:disabled){border-color:var(--ds-line);transform:translateY(-1px)}
+.name-chip.active{background:var(--ds);border-color:var(--ds);color:#fff}
+.name-chip.stored{opacity:.45}
+.name-chip:disabled{cursor:not-allowed}
+.hl-machine{background:rgba(0,0,0,.03);border:1.5px dashed var(--border);border-radius:var(--radius-sm);padding:14px 18px;min-height:118px;margin-bottom:18px}
+.hl-machine-title{font-size:11.5px;font-weight:800;letter-spacing:.6px;color:var(--sub);margin-bottom:8px}
+.hl-line{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:15px;font-weight:700;color:var(--text);min-height:26px;line-height:26px;opacity:0;transition:opacity .3s}
+.hl-line.show{opacity:1}
+.hl-line .num{color:var(--ds-deep);font-variant-numeric:tabular-nums}
+.hl-line .op{color:var(--sub);margin:0 4px}
+.hl-line .bucket-no{color:#fff;background:var(--ds);padding:1px 10px;border-radius:7px}
+.hl-buckets{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
+.bucket{display:flex;flex-direction:column;align-items:center;gap:6px}
+.bucket-label{font-size:11px;font-weight:800;color:var(--sub);font-variant-numeric:tabular-nums}
+.bucket-slot{width:100%;min-height:96px;border:1.5px solid var(--border);border-top:none;border-radius:0 0 10px 10px;background:rgba(0,0,0,.02);display:flex;flex-direction:column-reverse;align-items:center;gap:4px;padding:6px 3px;transition:border-color .2s,background .2s,box-shadow .2s;position:relative}
+.bucket-slot::before{content:'';position:absolute;top:0;left:-1.5px;right:-1.5px;height:3px;background:var(--border);border-radius:3px}
+.bucket.lit .bucket-slot{border-color:var(--ds);background:var(--ds-soft);box-shadow:0 0 0 2px var(--ds-line)}
+.bucket.lit .bucket-label{color:var(--ds)}
+.hl-chip{font-size:12px;font-weight:800;color:#fff;background:var(--ds);border-radius:999px;padding:3px 9px;white-space:nowrap;animation:chipIn .3s ease}
+.hl-chip.chained{background:var(--amber);position:relative}
+.hl-chip.chained::after{content:'';position:absolute;left:50%;bottom:-5px;width:2px;height:5px;background:var(--amber)}
+.hl-chip.hit{box-shadow:0 0 0 2.5px rgba(22,163,74,.6)}
+.hl-chip.miss{box-shadow:0 0 0 2.5px rgba(220,38,38,.5)}
+@keyframes chipIn{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.hl-ball{position:absolute;z-index:5;font-size:13px;font-weight:800;color:#fff;background:var(--ds);border-radius:999px;padding:5px 13px;box-shadow:var(--shadow-pop);transform:translate(-50%,-50%);transition:left .65s cubic-bezier(.3,.7,.4,1),top .65s cubic-bezier(.3,.7,.4,1);pointer-events:none;white-space:nowrap}
+.hl-status{font-size:12.5px;color:var(--sub);font-weight:600;margin-top:12px;min-height:20px}
+.hl-status b{color:var(--ds-deep)}
+
+/* ── 交互 2：碰撞 ── */
+.crash-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 22px;position:relative;overflow:hidden}
+.crash-steps{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.crash-formula{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:14px;font-weight:700;color:var(--text);background:rgba(0,0,0,.03);border-radius:var(--radius-sm);padding:11px 16px;margin-bottom:16px;min-height:44px;opacity:0;transition:opacity .3s}
+.crash-formula.show{opacity:1}
+.crash-formula .num{color:var(--ds-deep)}
+.crash-formula .warn{color:var(--danger);font-weight:800}
+.crash-count{font-size:13px;font-weight:700;color:var(--sub);margin-top:12px;min-height:20px}
+.crash-count b{font-size:19px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums}
+.crash-count.done b{color:var(--success)}
+.crash-verdict{margin-top:14px;padding:14px 18px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;color:var(--sub);opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.crash-verdict.show{opacity:1;transform:translateY(0)}
+.crash-verdict b{color:var(--ds-deep)}
+
+/* ── 交互 3：赛跑 ── */
+.race-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 22px}
+.race-sizes{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px;align-items:center}
+.race-sizes .lbl{font-size:13px;font-weight:800;color:var(--text);margin-right:2px}
+.size-chip{border:1.5px solid var(--border);background:var(--card);border-radius:999px;padding:6px 18px;font-size:13.5px;font-weight:800;color:var(--text);cursor:pointer;font-family:inherit;transition:all .15s}
+.size-chip.active{background:var(--ds);border-color:var(--ds);color:#fff}
+.race-lane{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:10px}
+.race-lane-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.race-lane-head h5{font-size:14px;font-weight:800;color:var(--text)}
+.race-cnt{font-size:12.5px;font-weight:700;color:var(--sub)}
+.race-cnt b{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums}
+.race-lane.slow .race-cnt b{color:var(--danger)}
+.race-lane.fast .race-cnt b{color:var(--success)}
+.race-track{height:12px;border-radius:7px;background:rgba(0,0,0,.05);overflow:hidden}
+.race-fill{height:100%;border-radius:7px;width:0}
+.race-lane.slow .race-fill{background:var(--danger)}
+.race-lane.fast .race-fill{background:var(--success)}
+.race-done{font-size:12px;font-weight:800;margin-top:6px;min-height:18px}
+.race-lane.slow .race-done{color:var(--danger)}
+.race-lane.fast .race-done{color:var(--success)}
+.race-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}
+.race-verdict{margin-top:14px;padding:14px 18px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;color:var(--sub);opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.race-verdict.show{opacity:1;transform:translateY(0)}
+.race-verdict b{color:var(--ds-deep)}
+
+/* ── AI 真身 ── */
+.ai-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.ai-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 16px;box-shadow:var(--shadow-card)}
+.ai-card .ic{font-size:24px;margin-bottom:7px}
+.ai-card h4{font-size:14px;font-weight:800;color:var(--text);margin-bottom:5px}
+.ai-card p{font-size:12.5px;color:var(--sub);line-height:1.7}
+.ai-card p b{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .hl-buckets{gap:5px}
+  .bucket-slot{min-height:82px}
+  .hl-chip{font-size:10.5px;padding:2px 6px}
+  .ai-grid{grid-template-columns:1fr 1fr}
+  .hl-line{font-size:12.5px}
+  .crash-formula{font-size:12px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Hash Tables: Why Lookups Are Unreasonably Fast","name":"Hash Tables: Why Lookups Are Unreasonably Fast","url":"https://xueai.app/slides/ds-5.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.app","url":"https://xueai.app"},"learningResourceType":"Lesson","educationalLevel":"Beginner to Intermediate","isPartOf":{"@type":"Course","name":"AI Hands-on Course · Hashing & Caching: Space for Time","url":"https://xueai.app/slides/learn.html"},"isAccessibleForFree":false,"description":"Why could Set “direct-hit” in lesson one? Drop names into buckets yourself: watch the hash function turn a name into a number, mod 8 for the bucket; see how two names colliding in one bucket get handled; then race “walk the list vs direct hit” on a million rows.","datePublished":"2026-08-10","dateModified":"2026-08-17","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Programming Fundamentals · Hashing & Caching: Space for Time</div>
+    <h1>Hash Tables: Why Lookups Are Unreasonably Fast</h1>
+    <p class="subtitle">Remember the foreshadowing in lesson one? Version B of “check the member list” used one line <code>set.has(user)</code>—list from 100 to 10 million people, time barely moved. We promised to unmask it in lesson five—today we take that “direct hit” magic apart: <b>it doesn't scan; it computes</b>.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Drop keys into buckets yourself—watch the hash function turn “walk the list” into a “direct hit,” then see how two keys colliding in one bucket get handled</p></aside><!--seo:end-->  <div class="sec-label">Unmasking · it doesn't scan—it computes</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Back to the organizing metaphor: searching a big drawer means flipping one by one because you <b style="color:var(--text)">don't know where things are</b>. A hash table flips that completely—the moment you put something in, a fixed formula <b style="color:var(--text)">computes which bucket it belongs in</b>; to look it up, run the same formula again and open that bucket. That formula is the <b style="color:var(--text)">hash function</b>—a “locator formula”: no scanning, one step to where it is.</p>
+
+  <div class="sec-label">Hands-on · drop keys into buckets yourself</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">Below: 8 buckets numbered 0–7, and 6 names waiting to move in. <b style="color:var(--text)">Tap a name</b> and watch three steps into a bucket: turn each character into its computer code and sum them, mod 8 (only 8 buckets), then fly into the computed bucket. <b style="color:var(--amber)">Watch for</b>: no “compare one by one” anywhere—the place is entirely computed.</p>
+
+  <div class="hash-lab" id="hashLab">
+    <div class="hl-names" id="nameChips"></div>
+    <div class="hl-machine">
+      <div class="hl-machine-title">Hash function (locator formula): name → number → mod 8 = bucket</div>
+      <div class="hl-line" id="hlLine1">&nbsp;</div>
+      <div class="hl-line" id="hlLine2">&nbsp;</div>
+      <div class="hl-line" id="hlLine3">&nbsp;</div>
+    </div>
+    <div class="hl-buckets" id="bucketRow"></div>
+    <div class="hl-status" id="hlStatus">Tap a name above to start · each name moves in once</div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>Why is lookup just as fast?</b> Because find and put use the same formula. Ask “Is 丽丽 in?”—the hash table doesn't walk the list; it recomputes on the spot: 丽丽 → 40058 → mod 8 = bucket 2, open bucket 2. Same with 6 people or 6 million—<b>the formula's cost doesn't depend on how many names</b>. That's the whole secret of “unreasonably fast.”
+  </div>
+
+  <div class="sec-label">Plot twist · two names land in the same bucket</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked xa-peek">You may have noticed: 阿芳 and 丽丽 both land in bucket 2! That's a <b style="color:var(--text)">hash collision</b>—only 8 buckets, countless names; collisions are inevitable. The most common fix is charmingly simple: <b style="color:var(--text)">hang a mini linked list in the bucket; newcomers line up on the chain</b> (jargon: “chaining”). Tap the three buttons in order—<b style="color:var(--amber)">watch for</b> how many peeks a lookup takes.</p>
+
+  <div class="crash-box paywall-locked" id="crashBox">
+    <div class="crash-steps">
+      <button class="btn-ds" id="btnPutA">① Put 阿芳</button>
+      <button class="btn-ds" id="btnPutB" disabled>② Put 丽丽</button>
+      <button class="btn-ds" id="btnFind" disabled>③ Find 丽丽</button>
+    </div>
+    <div class="crash-formula" id="crashFormula">&nbsp;</div>
+    <div class="hl-buckets" id="crashBuckets"></div>
+    <div class="crash-count" id="crashCount">&nbsp;</div>
+    <div class="crash-verdict" id="crashVerdict">
+      <b>Even after a collision, only 2 peeks.</b> Direct to bucket 2 (not a scan), see 阿芳 on the chain (peek 1), then 丽丽 (peek 2)—still far faster than walking all 6 names. If buckets are too few and chains grow long, the table <b>adds buckets and rehashes</b> (resize): e.g. 8 → 16 buckets, recompute every name with the new formula so chains shrink again. That's “trade space for time”—spend a few more buckets, buy back direct-hit speed.
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Final duel · walk the list vs direct hit</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">Now scale the data and race both lookup styles head-on. Pick a size, hit Race. <b style="color:var(--amber)">Watch for</b> the counter on the right: no matter how long the left side scans, it always stops at 1–2 peeks.</p>
+
+  <div class="race-box paywall-locked">
+    <div class="race-sizes">
+      <span class="lbl">Data size:</span>
+      <button class="size-chip active" data-n="100">100 rows</button>
+      <button class="size-chip" data-n="10000">10k rows</button>
+      <button class="size-chip" data-n="1000000">1M rows</button>
+    </div>
+    <div class="race-lane slow">
+      <div class="race-lane-head"><h5>🗄 Walk the list (linear lookup)</h5><span class="race-cnt">Peeks <b id="slowCnt">0</b></span></div>
+      <div class="race-track"><div class="race-fill" id="slowFill"></div></div>
+      <div class="race-done" id="slowDone">&nbsp;</div>
+    </div>
+    <div class="race-lane fast">
+      <div class="race-lane-head"><h5>🗃 Direct hit (hash lookup)</h5><span class="race-cnt">Peeks <b id="fastCnt">0</b></span></div>
+      <div class="race-track"><div class="race-fill" id="fastFill"></div></div>
+      <div class="race-done" id="fastDone">&nbsp;</div>
+    </div>
+    <div class="race-controls">
+      <button class="btn-ds" id="btnRace">Race →</button>
+      <span class="hint-line" style="margin-top:0" id="raceStatus">Animation is slowed on purpose—the real gap is even wilder</span>
+    </div>
+    <div class="race-verdict" id="raceVerdict"></div>
+  </div>
+
+  <div class="sec-label paywall-locked">Its real form in the AI world</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">The hash table may be the structure serving you most each day—it just stays backstage. These four scenes all use the same move: “compute the place, one-step direct hit.”</p>
+
+  <div class="ai-grid paywall-locked">
+    <div class="ai-card"><div class="ic">🧰</div><h4>Set & dictionaries</h4><p>Lesson-one version B's <b>Set</b>, Python's dict, JS's Map—every “get by key” container in a language has a hash table inside.</p></div>
+    <div class="ai-card"><div class="ic">🔑</div><h4>Cache keys</h4><p>A cache must answer “have we computed this?” in milliseconds—by hashing the question into a key for a direct lookup. That's <b>next lesson</b>'s star.</p></div>
+    <div class="ai-card"><div class="ic">🧹</div><h4>Dedup</h4><p>Deduping training corpora, crawlers asking “have we fetched this page?”—hash the content into a Set and check. Otherwise pairwise compares on billions of rows run until heat death.</p></div>
+    <div class="ai-card"><div class="ic">🎫</div><h4>session lookup</h4><p>Every time you open ChatGPT, the server takes your session id and finds your conversation among tens of millions of online users <b>instantly</b>—not by walking a roster.</p></div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>What this lesson wants to share</h3>
+    <ul>
+      <li><b>Hash function = locator formula</b>: put and find share one formula; the place is computed, not scanned</li>
+      <li><b>Cost doesn't depend on data size</b>: once for 6 people, once for 6 million—that's the truth behind version B's “direct hit”</li>
+      <li><b>Collisions aren't scary</b>: hang a mini chain in the bucket; if chains get long, add buckets and rehash (resize)</li>
+      <li><b>Trade space for time</b>: keep a “locator formula + buckets” ready for free lookups—in AI, Set, dictionaries, cache keys, dedup, and sessions are all this</li>
+      <li><b>Review lens</b>: when you see “scan a big list one by one” code, ask “why isn't this a hash?”</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+function countUp(el, to, ms){
+  return new Promise(res => {
+    const t0 = performance.now();
+    function tick(t){
+      const p = Math.min(1, (t - t0) / ms);
+      const eased = p * (2 - p);
+      el.textContent = Math.round(to * eased).toLocaleString('zh-CN');
+      if (p < 1) requestAnimationFrame(tick); else res();
+    }
+    requestAnimationFrame(tick);
+  });
+}
+function codeSum(name){
+  let s = 0;
+  for (const ch of name) s += ch.codePointAt(0);
+  return s;
+}
+function renderBuckets(container, count){
+  container.innerHTML = Array.from({length: count}, (_, i) => `
+    <div class="bucket" data-idx="${i}">
+      <div class="bucket-label">bucket ${i}</div>
+      <div class="bucket-slot"></div>
+    </div>`).join('');
+  return [...container.children];
+}
+
+/* ══ 交互 1：把 key 塞进桶 ══
+   编码求和用真实的 Unicode 码点（codePointAt），不造假数字。
+   预置名字的桶号：小明→5 阿芳→2 老王→4 老李→7 丽丽→2 阿强→1，
+   阿芳和丽丽天然撞在 2 号桶，正好给交互 2 埋线。 */
+const NAMES = ['小明', '阿芳', '老王', '老李', '丽丽', '阿强'];
+const BUCKET_N = 8;
+const hashLab = document.getElementById('hashLab');
+const nameChipsEl = document.getElementById('nameChips');
+const hlLine1 = document.getElementById('hlLine1');
+const hlLine2 = document.getElementById('hlLine2');
+const hlLine3 = document.getElementById('hlLine3');
+const hlStatus = document.getElementById('hlStatus');
+const buckets = renderBuckets(document.getElementById('bucketRow'), BUCKET_N);
+let labBusy = false;
+const stored = new Set();
+
+nameChipsEl.innerHTML = NAMES.map(n => `<button class="name-chip" data-name="${n}">${n}</button>`).join('');
+const chips = [...nameChipsEl.children];
+
+async function insertToLab(name, chip){
+  labBusy = true;
+  chips.forEach(c => c.disabled = true);
+  chip.classList.add('active');
+  buckets.forEach(b => b.classList.remove('lit'));
+  hlLine1.classList.remove('show'); hlLine2.classList.remove('show'); hlLine3.classList.remove('show');
+  hlLine1.innerHTML = '&nbsp;'; hlLine2.innerHTML = '&nbsp;'; hlLine3.innerHTML = '&nbsp;';
+  await sleep(150);
+
+  /* 第一步：每个字的编码逐个跳出来 */
+  const codes = [...name].map(ch => ch.codePointAt(0));
+  hlLine1.innerHTML = '';
+  hlLine1.classList.add('show');
+  for (let i = 0; i < name.length; i++){
+    const span = document.createElement('span');
+    span.innerHTML = `${i > 0 ? '<span class="op">+</span>' : ''}“${[...name][i]}”<span class="op">→</span><span class="num">0</span> `;
+    hlLine1.appendChild(span);
+    await countUp(span.querySelector('.num'), codes[i], 450);
+    await sleep(150);
+  }
+
+  /* 第二步：求和 + 对 8 求余 */
+  const sum = codeSum(name);
+  const bkt = sum % BUCKET_N;
+  hlLine2.innerHTML = `${codes.map(c => `<span class="num">${c.toLocaleString('zh-CN')}</span>`).join('<span class="op">+</span>')}<span class="op">=</span><span class="num">0</span>`;
+  hlLine2.classList.add('show');
+  await countUp(hlLine2.querySelectorAll('.num')[codes.length], sum, 500);
+  await sleep(250);
+  hlLine3.innerHTML = `<span class="num">${sum.toLocaleString('zh-CN')}</span><span class="op">%</span>8<span class="op">=</span><span class="bucket-no">bucket ${bkt}</span>`;
+  hlLine3.classList.add('show');
+  buckets[bkt].classList.add('lit');
+  await sleep(450);
+
+  /* 第三步：名字球飞进桶 */
+  const labR = hashLab.getBoundingClientRect();
+  const fromR = hlLine3.querySelector('.bucket-no').getBoundingClientRect();
+  const slot = buckets[bkt].querySelector('.bucket-slot');
+  const toR = slot.getBoundingClientRect();
+  const ball = document.createElement('div');
+  ball.className = 'hl-ball';
+  ball.textContent = name;
+  ball.style.left = (fromR.left + fromR.width / 2 - labR.left) + 'px';
+  ball.style.top = (fromR.top + fromR.height / 2 - labR.top) + 'px';
+  hashLab.appendChild(ball);
+  ball.getBoundingClientRect();
+  ball.style.left = (toR.left + toR.width / 2 - labR.left) + 'px';
+  ball.style.top = (toR.bottom - 16 - slot.children.length * 24 - labR.top) + 'px';
+  await sleep(680);
+  ball.remove();
+
+  const chipEl = document.createElement('div');
+  chipEl.className = 'hl-chip' + (slot.children.length > 0 ? ' chained' : '');
+  chipEl.textContent = name;
+  slot.appendChild(chipEl);
+  stored.add(name);
+  chip.classList.remove('active');
+  chip.classList.add('stored');
+
+  if (slot.children.length > 1) {
+    hlStatus.innerHTML = `<b>Collision!</b> ${name} and a neighbor hashed to the same bucket—hang them as a mini chain for now; next section covers how this ends`;
+  } else {
+    hlStatus.innerHTML = `<b>${name} moved into bucket ${bkt}.</b> To find it later, run the same formula again for a direct hit`;
+  }
+  await sleep(300);
+  buckets[bkt].classList.remove('lit');
+  chips.forEach(c => { if (!stored.has(c.dataset.name)) c.disabled = false; });
+  labBusy = false;
+}
+
+chips.forEach(chip => {
+  chip.addEventListener('click', () => {
+    if (labBusy || stored.has(chip.dataset.name)) return;
+    insertToLab(chip.dataset.name, chip);
+  });
+});
+
+/* ══ 交互 2：碰撞与链地址法 ══ */
+const crashBuckets = renderBuckets(document.getElementById('crashBuckets'), BUCKET_N);
+const crashFormula = document.getElementById('crashFormula');
+const crashCount = document.getElementById('crashCount');
+const crashVerdict = document.getElementById('crashVerdict');
+const btnPutA = document.getElementById('btnPutA');
+const btnPutB = document.getElementById('btnPutB');
+const btnFind = document.getElementById('btnFind');
+let crashBusy = false;
+
+function crashChipInto(name, chained){
+  const slot = crashBuckets[2].querySelector('.bucket-slot');
+  const el = document.createElement('div');
+  el.className = 'hl-chip' + (chained ? ' chained' : '');
+  el.textContent = name;
+  slot.appendChild(el);
+  return el;
+}
+
+btnPutA.addEventListener('click', async () => {
+  if (crashBusy) return;
+  crashBusy = true; btnPutA.disabled = true;
+  const sum = codeSum('阿芳');
+  crashFormula.innerHTML = `阿芳 <span class="op">→</span> <span class="num">${sum.toLocaleString('zh-CN')}</span> <span class="op">%</span> 8 <span class="op">=</span> <span class="num">2</span> bucket`;
+  crashFormula.classList.add('show');
+  crashBuckets[2].classList.add('lit');
+  await sleep(700);
+  crashChipInto('阿芳', false);
+  crashCount.innerHTML = '阿芳 settled into bucket 2';
+  await sleep(500);
+  crashBuckets[2].classList.remove('lit');
+  btnPutB.disabled = false;
+  crashBusy = false;
+});
+
+btnPutB.addEventListener('click', async () => {
+  if (crashBusy) return;
+  crashBusy = true; btnPutB.disabled = true;
+  const sum = codeSum('丽丽');
+  crashFormula.innerHTML = `丽丽 <span class="op">→</span> <span class="num">${sum.toLocaleString('zh-CN')}</span> <span class="op">%</span> 8 <span class="op">=</span> <span class="num">2</span> bucket　<span class="warn">⚠ Also 2! Collision</span>`;
+  crashBuckets[2].classList.add('lit');
+  await sleep(900);
+  crashChipInto('丽丽', true);
+  crashCount.innerHTML = 'Bucket 2 now hangs a mini chain: 阿芳 → 丽丽';
+  await sleep(500);
+  crashBuckets[2].classList.remove('lit');
+  btnFind.disabled = false;
+  crashBusy = false;
+});
+
+btnFind.addEventListener('click', async () => {
+  if (crashBusy) return;
+  crashBusy = true; btnFind.disabled = true;
+  const sum = codeSum('丽丽');
+  crashFormula.innerHTML = `Find 丽丽: <span class="num">${sum.toLocaleString('zh-CN')}</span> <span class="op">%</span> 8 <span class="op">=</span> <span class="num">2</span> bucket, <b>direct hit</b>, then walk the chain`;
+  crashBuckets[2].classList.add('lit');
+  crashCount.innerHTML = 'Peeks <b>0</b>';
+  await sleep(700);
+  const chipsInBucket = [...crashBuckets[2].querySelectorAll('.hl-chip')];
+  for (let i = 0; i < chipsInBucket.length; i++){
+    const isTarget = chipsInBucket[i].textContent === '丽丽';
+    chipsInBucket[i].classList.add(isTarget ? 'hit' : 'miss');
+    crashCount.innerHTML = `Peeks <b>${i + 1}</b>${isTarget ? ' — found 丽丽!' : ' — it\'s 阿芳, wrong, next on the chain'}`;
+    if (isTarget) crashCount.classList.add('done');
+    await sleep(750);
+  }
+  crashVerdict.classList.add('show');
+  crashBusy = false;
+});
+
+/* ══ 交互 3：翻一遍 vs 直达赛跑 ══
+   计数器用缓动 countUp 而非逐次 +1（100 万次真逐帧加会跑几小时）。
+   慢车道时长按数据量对数递增：数据越大动画越久，传达「线性变慢」的体感；
+   真实耗时差距远比动画夸张，页面文案已声明。 */
+const sizeChips = [...document.querySelectorAll('.size-chip')];
+const btnRace = document.getElementById('btnRace');
+const slowCnt = document.getElementById('slowCnt');
+const fastCnt = document.getElementById('fastCnt');
+const slowFill = document.getElementById('slowFill');
+const fastFill = document.getElementById('fastFill');
+const slowDone = document.getElementById('slowDone');
+const fastDone = document.getElementById('fastDone');
+const raceVerdict = document.getElementById('raceVerdict');
+const raceStatus = document.getElementById('raceStatus');
+let raceN = 100, racing = false;
+
+sizeChips.forEach(c => c.addEventListener('click', () => {
+  if (racing) return;
+  sizeChips.forEach(x => x.classList.remove('active'));
+  c.classList.add('active');
+  raceN = +c.dataset.n;
+}));
+
+const RACE_TEXT = {
+  100: '<b>At 100 rows, 50× gap.</b> Walking the list averages ~100 peeks; direct hit is always 2. Humans barely feel it at this scale—but the gap is already planted.',
+  10000: '<b>At 10k rows, 5000× gap.</b> If a page refresh does hundreds of these lookups, “walk the list” starts dragging feel; direct hit still barely moves.',
+  1000000: '<b>At 1M rows, 500,000× gap.</b> Walking needs a million compares; direct hit is still 2—data ×10,000, hash lookup cost up by zero. That's version B's trump card from lesson one.'
+};
+
+function fmtRaceN(n){
+  if (n >= 1000000) return (n / 1000000) + 'M';
+  if (n >= 1000) return (n / 1000) + 'k';
+  return n + '';
+}
+
+btnRace.addEventListener('click', async () => {
+  if (racing) return;
+  racing = true;
+  btnRace.disabled = true;
+  raceVerdict.classList.remove('show');
+  slowDone.innerHTML = '&nbsp;'; fastDone.innerHTML = '&nbsp;';
+  slowFill.style.transition = 'none'; fastFill.style.transition = 'none';
+  slowFill.style.width = '0'; fastFill.style.width = '0';
+  slowCnt.textContent = '0'; fastCnt.textContent = '0';
+  slowFill.getBoundingClientRect();
+  raceStatus.textContent = 'Racing! Watch the peeks on the right…';
+
+  const dur = raceN <= 100 ? 1400 : raceN <= 10000 ? 2400 : 3600;
+  slowFill.style.transition = `width ${dur}ms linear`;
+  fastFill.style.transition = 'width 350ms ease-out';
+
+  /* 快车道：算一次哈希直达，链上最多看 2 眼，0.4 秒收工 */
+  const fastRun = (async () => {
+    fastFill.style.width = '100%';
+    await countUp(fastCnt, 2, 350);
+    fastDone.textContent = '✓ Found! 1 hash, 2 peeks';
+  })();
+  /* 慢车道：从头翻到尾 */
+  const slowRun = (async () => {
+    slowFill.style.width = '100%';
+    await countUp(slowCnt, raceN, dur);
+    slowDone.textContent = `✓ Finally found… ${fmtRaceN(raceN)} peeks`;
+  })();
+  await Promise.all([fastRun, slowRun]);
+
+  raceStatus.textContent = 'The right lane was already waiting at the finish';
+  raceVerdict.innerHTML = RACE_TEXT[raceN];
+  raceVerdict.classList.add('show');
+  btnRace.disabled = false;
+  btnRace.textContent = 'Race again ↻';
+  racing = false;
+});
+</script>
+<script src="i18n.js?v=20260823c"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260823c"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260816a"></script><!--seo:end-->
+<script src="skill-data.en.js?v=20260817a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+</body>
+</html>
