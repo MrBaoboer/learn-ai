@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>語法層：Prompt 是寫給機器的 | Token 降本增效</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<!-- SEO Start -->
+<meta name="description" content="加粗用的 ** 符號吃掉 8.5% 的 Token，格式性內容佔提示詞 10%-20%。三條經驗：複雜物件用 YAML 別用 JSON、扁平列表用 CSV 別用 JSON 陣列、後臺輸出強制 Minified JSON。">
+<meta name="keywords" content="提示詞優化,詞法稅,YAML,TOON,CSV,Minified JSON,Token 節省,格式化開銷">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/cost-9.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/cost-9.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/cost-9.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/cost-9.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/cost-9.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/cost-9.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/cost-9.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/cost-9.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="語法層：Prompt 是寫給機器的">
+<meta property="og:description" content="加粗的 ** 就吃掉 8.5% Token：砍掉詞法稅的三條經驗。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/cost-9.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/cost-9.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="語法層：Prompt 是寫給機器的">
+<meta name="twitter:description" content="加粗的 ** 就吃掉 8.5% Token：砍掉詞法稅的三條經驗。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.codebox{margin-top:12px;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px 18px;font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.code-tag{display:inline-block;margin-top:14px;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:800}
+.code-tag.bad{background:var(--warn-soft);color:var(--warn)}
+.code-tag.good{background:var(--ct-soft);color:var(--ct-deep)}
+
+/* 格式对比器 */
+.fmt{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.fmt-tabs{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:14px}
+.fmt-btn{padding:9px 18px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:800;color:var(--text);transition:all .18s;min-height:40px}
+.fmt-btn.on{border-color:var(--ct);background:var(--ct-soft);color:var(--ct-deep)}
+.fmt-code{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px 18px;font-size:12.5px;line-height:1.65;overflow-x:auto;white-space:pre;font-family:"SF Mono","Fira Code",Menlo,monospace;min-height:200px}
+.fmt-meter{display:flex;align-items:center;gap:12px;margin-top:14px}
+.fmt-meter .n{font-size:13px;font-weight:700;color:var(--sub);width:96px;flex-shrink:0}
+.fmt-meter .t{flex:1;height:24px;background:rgba(0,0,0,.045);border-radius:7px;overflow:hidden}
+.fmt-meter .f{height:100%;border-radius:7px;transition:width .35s;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:12px;font-weight:800;color:#fff;min-width:70px}
+.fmt-note{margin-top:12px;font-size:14px;line-height:1.75;color:var(--text);background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px}
+.fmt-note b{color:var(--ct-deep)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"語法層：Prompt 是寫給機器的","name":"語法層：Prompt 是寫給機器的","url":"https://xueai.miyang.cn/slides/cost-9.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 四層實戰優化","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"加粗用的 ** 符號吃掉 8.5% 的 Token，格式性內容佔提示詞 10%-20%。三條經驗：複雜物件用 YAML 別用 JSON、扁平列表用 CSV 別用 JSON 陣列、後臺輸出強制 Minified JSON。","datePublished":"2026-08-10","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 降本增效 · 9 / 13</div>
+    <h1>語法層：Prompt 是寫給機器的</h1>
+    <p class="subtitle">進入實戰四層的第一層。很多產品早期為了除錯方便，或者乾脆是讓 AI 代寫的提示詞，習慣用 ###、** 加粗、JSON 展示資料。這些對人類友好的排版，在大模型的計費邏輯裡全是「詞法稅」。</p>
+    <div class="chips"><span class="chip">詞法稅</span><span class="chip">YAML</span><span class="chip">CSV</span><span class="chip">Minified JSON</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>加粗的 ** 就吃掉 8.5% Token；複雜物件用 YAML、扁平列表用 CSV、後臺輸出強制 Minified JSON</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">這筆稅有多重：13% 都是格式</div>
+    <p class="desc">作者做了一個 Token 視覺化分析工具（<a href="https://yusuan.ai/analyzer" target="_blank" rel="noopener">yusuan.ai/analyzer</a>），把一段精簡版 Lyra 提示詞丟進去分析：<b>光是加粗用的 ** 符號，就吃掉了 8.5% 的 Token</b>。算上列表、標題符號、JSON 縮排換行，這份提示詞 13% 都是格式性內容。一般產品的 Prompt 裡，10%–20% 都是這種裝飾性 Token。</p>
+    <div class="fig-wrap">
+      <img src="images/cost/analyzer.webp" alt="Token 視覺化分析：** 符號出現 33 次佔比 4.16%" loading="lazy">
+      <div class="fig-cap">Token 視覺化分析（yusuan.ai/analyzer）：一段提示詞裡 ** 出現 33 次，僅這一個符號就佔 4.16%。（圖：作者分享原稿）</div>
+    </div>
+    <div class="fig-wrap">
+      <img src="images/cost/decorative-token.webp" alt="裝飾性 Token 佔比 10%-20%" loading="lazy">
+      <div class="fig-cap">千萬級呼叫量下，每月 10%–20% 的預算花在「讓產品經理看起來舒服一點」上。（圖：作者分享原稿）</div>
+    </div>
+    <div class="quote-card" style="margin-top:12px">
+      Prompt 是寫給機器的指令，最終版本不需要美觀。<b>機器關注的是邏輯，而不是排版。</b>** 只用在真正需要強調的地方。
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">互動演示 · 同一份資料的三種帳單</div>
+    <p class="desc">把 50 條使用者記錄餵給模型，三種格式點開對比。欄位名重複 50 遍的 JSON 陣列，是 RAG 場景的重災區。</p>
+    <div class="fmt" id="fmt">
+      <div class="fmt-tabs" id="fmtTabs"></div>
+      <div class="fmt-code" id="fmtCode"></div>
+      <div class="fmt-meter">
+        <span class="n" id="fmtName"></span>
+        <div class="t"><div class="f" id="fmtBar"></div></div>
+      </div>
+      <div class="fmt-note" id="fmtNote"></div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">三條經驗</div>
+    <p class="desc"><b>1、複雜物件用 YAML（或 TOON），別用 JSON。</b>JSON 的訊雜比太低：每個 Key 雙引號包裹、每層巢狀花括號閉合，而這些符號往往獨立計費。YAML 用縮排代替閉合符號、冒號代替「引號+冒號」，Token 通常省 10%–15%，多的能到 40%。<a href="https://github.com/toon-format/toon" target="_blank" rel="noopener">TOON</a> 是專為省 Token 設計的新格式，但作為新格式 LLM 不一定支援得好——所以更穩的組合是 <b>YAML + CSV</b>。</p>
+    <p class="desc" style="margin-top:12px"><b>2、扁平列表用 CSV，別用 JSON 陣列。</b>帶表頭的表格把重複鍵名全乾掉，長列表場景砍 30%–60%，同樣的上下文視窗還能塞更多資料。</p>
+    <div class="fig-wrap">
+      <img src="images/cost/csv-vs-json.webp" alt="JSON 陣列與 CSV 表格的對比" loading="lazy">
+      <div class="fig-cap">鍵名只寫一遍，消除所有重複：長列表場景 Token 直接省 30%–60%。（圖：作者分享原稿）</div>
+    </div>
+    <p class="desc" style="margin-top:12px"><b>3、後臺輸出強制 Minified JSON。</b>輸出端的 Token 比輸入端更貴，還直接影響介面返回速度。面向使用者的流式輸出可以寬鬆點，但純後臺任務（提取標籤、情感分析、資料清洗）不需要任何排版——在 System Prompt 裡顯式約束：</p>
+    <div class="codebox">輸出必須是 Minified JSON，不換行、不縮排、不加程式碼塊標記。
+示例：{"id":1,"status":"ok"}</div>
+    <p class="desc" style="margin-top:10px">機器讀資料不需要美觀，只需要合法。批次任務加上這條約束後，生成耗時顯著下降。</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>先去 yusuan.ai/analyzer 量一下你的 Prompt：</b>裝飾性 Token 通常佔 10%–20%，這是最容易拿的一筆錢。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>資料結構按場景選：</b>複雜物件 YAML、扁平列表 CSV、後臺輸出 Minified JSON。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>輸出比輸入貴，</b>管住輸出格式既省錢又提速（第 12 節還有三招）。</p></div>
+    </div>
+    <p class="src-note">
+      <b>內容來源：</b>整理自作者團隊內部分享《AI Token 降本增效策略分享》實戰篇「01｜語法層」。工具：<a href="https://yusuan.ai/analyzer" target="_blank" rel="noopener">yusuan.ai/analyzer</a>；YAML 規範見 <a href="https://yaml.org" target="_blank" rel="noopener">yaml.org</a>。
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ── 三格式对比（50 条记录的估算值） ── */
+var FMT = [
+  {name:'JSON 陣列', tokens:1000, pct:100, cls:'#dc2626',
+   code:'[\n  {"id": 1, "name": "Alice", "role": "Admin"},\n  {"id": 2, "name": "Bob", "role": "User"},\n  {"id": 3, "name": "Carol", "role": "User"},\n  ...共 50 條...\n]',
+   note:'<b>id、name、role 這些欄位名重複寫了 50 遍！</b>每個雙引號、花括號、逗號都在獨立計費。這是 RAG 場景的重災區。'},
+  {name:'YAML', tokens:820, pct:82, cls:'#f59e0b',
+   code:'- id: 1\n  name: Alice\n  role: Admin\n- id: 2\n  name: Bob\n  role: User\n...共 50 條...',
+   note:'縮排代替閉合符號、冒號代替「引號+冒號」：<b>省 10%–15%，複雜巢狀物件能省到 40%</b>。也更符合自然語言閱讀習慣。'},
+  {name:'CSV 表格', tokens:450, pct:45, cls:'#16a34a',
+   code:'id name role\n1 Alice Admin\n2 Bob User\n3 Carol User\n...共 50 條...',
+   note:'<b>鍵名只寫一遍，長列表直接砍 30%–60%。</b>同樣的上下文視窗能塞兩倍的資料。扁平結構閉眼選它。'}
+];
+var fmtCur = -1;
+function fmtRender(){
+  var t = document.getElementById('fmtTabs'); t.innerHTML='';
+  FMT.forEach(function(f,i){
+    var b=document.createElement('button'); b.className='fmt-btn'+(i===fmtCur?' on':''); b.type='button';
+    b.textContent=f.name; b.onclick=function(){fmtPick(i);}; t.appendChild(b);
+  });
+}
+function fmtPick(i){
+  fmtCur=i; var f=FMT[i];
+  document.getElementById('fmtCode').textContent=f.code;
+  document.getElementById('fmtName').textContent=f.name;
+  var bar=document.getElementById('fmtBar');
+  bar.style.background=f.cls;
+  bar.style.width=f.pct+'%';
+  bar.textContent='≈'+f.tokens+' Tokens';
+  document.getElementById('fmtNote').innerHTML=f.note;
+  fmtRender();
+}
+fmtRender();
+lessonOnView(document.getElementById('fmt'), function(){ if(fmtCur<0) fmtPick(0); });
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

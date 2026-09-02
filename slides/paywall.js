@@ -24,9 +24,9 @@
   var inFrame = window.top !== window.self;
 
   /* ── 语言检测：与 auth.js 同一套口径，优先读 i18n.js 注入的 lang ── */
+  var _m = location.pathname.match(/\.(en|ko|tw|hk)\.html?$/);
   var _lang = (window.XUEAI_I18N && window.XUEAI_I18N.lang)
-    || (location.pathname.match(/\.(en)\.html?$/) ? 'en'
-       : location.pathname.match(/\.(ko)\.html?$/) ? 'ko' : 'zh');
+    || (_m ? _m[1] : 'zh');
 
   /* 措辞与 auth.js 的登录弹窗保持一致，同一个站里两处引导不该各说各的 */
   var _T = {
@@ -46,6 +46,40 @@
                      + '若你在任何付费课程里买到它，请申请退款。',
       noteText:      '本节为部分预览，登录后可免费阅读全文',
       noteLink:      '登录后继续免费阅读'
+    },
+    hk: {
+      artAlt:        '小山學堂',
+      gateTitle:     '登入後繼續免費閲讀',
+      gateSub:       '本節還沒有結束。登入即可解鎖餘下內容與全部課程，完全免費，不花一分錢。',
+      b0Title:       '解鎖全部課程',
+      b0Desc:        '所有章節完整學完，不花一分錢',
+      b1Title:       'AI 實戰技巧分享',
+      b1Desc:        '定期組織技術分享與交流會',
+      b2Title:       '職位機會推薦',
+      b2Desc:        '幫你對接有 AI 職位需求的公司',
+      gateBtn:       '快速登入，免費學習',
+      gateFoot:      '還沒有帳號？登入頁可直接註冊，一分鐘搞定。<br>'
+                     + '要求登入也是為了防止內容被惡意販賣。本站是免費公益站，'
+                     + '若你在任何付費課程裏買到它，請申請退款。',
+      noteText:      '本節為部分預覽，登入後可免費閲讀全文',
+      noteLink:      '登入後繼續免費閲讀'
+    },
+    tw: {
+      artAlt:        '小山學堂',
+      gateTitle:     '登入後繼續免費閱讀',
+      gateSub:       '本節還沒有結束。登入即可解鎖餘下內容與全部課程，完全免費，不用花一毛錢。',
+      b0Title:       '解鎖全部課程',
+      b0Desc:        '所有章節完整學完，不用花一毛錢',
+      b1Title:       'AI 實戰技巧分享',
+      b1Desc:        '定期舉辦技術分享與交流會',
+      b2Title:       '職缺機會推薦',
+      b2Desc:        '幫你對接有 AI 職缺需求的公司',
+      gateBtn:       '快速登入，免費學習',
+      gateFoot:      '還沒有帳號？登入頁可直接註冊，一分鐘搞定。<br>'
+                     + '要求登入也是為了防止內容被惡意販賣。本站是免費公益站，'
+                     + '若你在任何付費課程裡買到它，請申請退款。',
+      noteText:      '本節為部分預覽，登入後可免費閱讀全文',
+      noteLink:      '登入後繼續免費閱讀'
     },
     en: {
       artAlt:        'Xiaoshan Academy',
@@ -194,7 +228,7 @@
              + '<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
              T.b2Title, T.b2Desc)
     + '</div>'
-    + '<a class="xa-gate-btn" id="xaGateBtn" href="/auth/login">'
+    + '<a class="xa-gate-btn" id="xaGateBtn" rel="nofollow" href="/auth/login">'
     + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
     + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
     + '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>'
@@ -222,7 +256,7 @@
     + '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>'
     + '<path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
     + '<span>' + T.noteText + '</span>'
-    + '<a class="xa-note-link" href="/auth/login">' + T.noteLink + '</a>';
+    + '<a class="xa-note-link" rel="nofollow" href="/auth/login">' + T.noteLink + '</a>';
 
   // 落在标题那一块之后：插到 host 最前面会顶在大标题上方，像条系统横幅，
   // 跟正文没关系。h1 通常裹在 header 里，所以要往上找到 host 的直接子元素。
@@ -241,9 +275,12 @@
   var reader = _lang === 'zh' ? 'learn.html' : 'learn.' + _lang + '.html';
   var next = (inFrame && file) ? '/slides/' + reader + '#' + file : location.pathname;
   var href = '/auth/login?next=' + encodeURIComponent(next);
+  // nofollow：付费墙铺在几百个课页上，每页的登录链接都带不同的 ?next=，
+  // 不标注就等于给爬虫铺一张全是重定向的链接网。
   [gate.querySelector('#xaGateBtn'), note.querySelector('.xa-note-link')]
     .forEach(function (a) {
       a.href = href;
+      a.setAttribute('rel', 'nofollow');
       if (inFrame) a.setAttribute('target', '_top');
     });
 

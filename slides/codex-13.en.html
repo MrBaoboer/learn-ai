@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sandbox manager: compile a permission profile into one command | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* 变量挂在 .lesson 上：nav-inject.js 会在页面样式之后再注入一次 :root 主色，
+   靠就近继承才能保住专题色。 */
+:root,.lesson{--accent:#414b5a;--accent-deep:#262d38;--accent-soft:rgba(65,75,90,.085)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(65,75,90,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(65,75,90,.04),0 0 0 52px rgba(65,75,90,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(65,75,90,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.q-tag{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font-size:13px;font-weight:800;margin:28px 0 14px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.visual{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eff1f5,var(--card));border:1px solid rgba(65,75,90,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.9}.exercise p:last-child{margin:0}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);color:var(--text);display:flex;gap:14px;font-size:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.compare{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h4{margin:0;font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}.cmp-card h4 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:12px 0 0}
+.cmp-card .cmp-tag{display:inline-block;margin-top:14px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent-deep);border:1px solid rgba(65,75,90,.25)}
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card)}
+.demo-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo-ctrl button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;min-height:44px;min-width:44px;border:1px solid rgba(65,75,90,.35);border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font:600 14px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:filter .15s}
+.demo-ctrl button:active{filter:brightness(.92)}
+.demo-top{position:relative;padding-bottom:14px}
+.demo-top:after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:99px;background:var(--accent);transform:scaleX(var(--pipe,0));transform-origin:left center;transition:transform .6s cubic-bezier(.25,1,.5,1)}
+.dm-budget{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-budget .dm-b-label{font-size:13px;font-weight:700;color:var(--text);flex:0 0 auto}
+.dm-budget .dm-b-hint{font-size:12px;color:var(--sub);line-height:1.7}
+.dm-seg{display:flex;gap:8px;flex-wrap:wrap}
+.dm-seg button{min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--sub);font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all .15s cubic-bezier(.4,0,.2,1)}
+.dm-seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dm-stage{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:16px 0}
+.dm-plat{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:16px;min-height:168px;min-width:0;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:10px;opacity:1;transform:scale(1);transition:background .35s cubic-bezier(.4,0,.2,1),border-color .35s cubic-bezier(.4,0,.2,1),opacity .35s cubic-bezier(.4,0,.2,1),transform .35s cubic-bezier(.4,0,.2,1)}
+.dm-stage.is-live .dm-plat{opacity:.4;transform:scale(.98)}
+.dm-stage.is-live .dm-plat.on{opacity:1;transform:scale(1)}
+.dm-plat.on{background:var(--accent-soft);border-color:rgba(65,75,90,.45)}
+.dm-plat.wrap{border-color:rgba(65,75,90,.4)}
+.dm-plat.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-p-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.dm-p-name{font-size:13px;font-weight:800;color:var(--text)}
+.dm-p-type{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--card);color:var(--sub);border:1px solid var(--border);transition:background .35s cubic-bezier(.4,0,.2,1),color .35s cubic-bezier(.4,0,.2,1)}
+.dm-p-type.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-plat.on .dm-p-type{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dm-argv{margin:0;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent-deep);word-break:break-all;overflow-wrap:anywhere;min-height:62px}
+.dm-argv.is-enter,.dm-xml.is-enter,.dm-fade.is-enter{opacity:0;transform:translateY(8px)}
+.dm-argv.is-enter.in,.dm-xml.is-enter.in,.dm-fade.is-enter.in{opacity:1;transform:none;transition:opacity .35s cubic-bezier(.4,0,.2,1),transform .35s cubic-bezier(.4,0,.2,1)}
+.dm-beat{font-size:11px;color:var(--sub);line-height:1.6}
+.dm-eye{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:16px 18px;margin-bottom:4px}
+.dm-eye b{display:block;font-size:12px;color:var(--accent-deep);margin-bottom:8px}
+.dm-xml{margin:0;font:12px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub);word-break:break-all;overflow-wrap:anywhere;min-height:40px}
+.dm-xml.ready{color:var(--accent-deep)}
+.dm-status{padding:12px 14px;border-radius:9px;font-size:12.5px;line-height:1.75;background:var(--bg);border:1px dashed var(--border);color:var(--sub);min-height:48px;margin-top:16px;transition:background .35s cubic-bezier(.4,0,.2,1),border-color .35s cubic-bezier(.4,0,.2,1),color .35s cubic-bezier(.4,0,.2,1)}
+.dm-status.hold{border-style:solid;border-color:rgba(65,75,90,.4);background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-status.ok{border-style:solid;border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.07);color:var(--success);font-weight:600}
+.dm-trace{margin-top:24px;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.dm-trace-tag{padding:12px 18px;background:var(--card);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--sub)}
+.dm-trace ol{margin:0;padding:10px 0;list-style:none}
+.dm-trace li{display:flex;justify-content:space-between;gap:16px;padding:9px 18px;font-size:12.5px;line-height:1.7;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-trace li.on{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+#dm-trace.is-live li{opacity:.4;transform:scale(.98)}
+#dm-trace.is-live li.on{opacity:1;transform:scale(1)}
+.dm-trace li span.ln{flex:0 0 auto;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)}
+.dm-trace li.on span.ln{color:var(--accent-deep)}
+.dm-caption{margin-top:20px;min-height:56px;display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.dm-caption svg{flex:0 0 auto;color:var(--accent)}
+#dm-caption-text{transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-summary{display:flex;flex-direction:column;gap:14px;max-height:0;overflow:hidden;opacity:0;margin-top:0;padding:0 22px;border:1px solid transparent;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),var(--card));transition:max-height .5s cubic-bezier(.25,1,.5,1),opacity .4s cubic-bezier(.4,0,.2,1)}
+.dm-summary.on{max-height:360px;opacity:1;margin-top:20px;padding:20px 22px;border-color:rgba(65,75,90,.3)}
+.dm-summary .dm-s{font-size:13px;line-height:1.8;color:var(--sub)}.dm-summary .dm-s b{display:block;font-size:13.5px;color:var(--accent-deep);margin-bottom:2px}
+.demo-caption{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.7}
+@keyframes flashPop{0%{transform:scale(.8)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(65,75,90,.3)}50%{box-shadow:0 0 20px 6px rgba(65,75,90,.2)}100%{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.demo,.demo *{transition-duration:0s!important;animation-duration:0s!important}}
+@media(max-width:760px){.lesson{overflow-x:hidden}.compare{grid-template-columns:1fr}.dm-stage{grid-template-columns:1fr}.objective{grid-template-columns:1fr}.lesson-header:after{display:none}.demo{padding:18px}.demo-ctrl{width:100%}.demo-ctrl button{flex:1}.visual{padding:14px}.dm-trace li{flex-direction:column;gap:4px}.dm-plat{min-height:0}.demo,.visual,.cmp-card{max-width:100%;min-width:0}.lesson code{overflow-wrap:anywhere;word-break:break-word}}
+</style>
+<meta name="description" content="What shell the same command gets on three platforms. Wanting a sandbox and having a backend are two different questions">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Sandbox manager: compile a permission profile into one command","name":"Sandbox manager: compile a permission profile into one command","url":"https://xueai.miyang.cn/slides/codex-13.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Sandbox","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"What shell the same command gets on three platforms. Wanting a sandbox and having a backend are two different questions","datePublished":"2026-08-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Sandbox manager: compile a permission profile into one command"><meta property="og:description" content="What shell the same command gets on three platforms. Wanting a sandbox and having a backend are two different questions"><meta property="og:url" content="https://xueai.miyang.cn/slides/codex-13.en.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.miyang.cn/slides/codex-13.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/codex-13.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/codex-13.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/codex-13.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/codex-13.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/codex-13.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/codex-13.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/codex-13.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI Product Manager Training">
+<meta property="og:locale" content="en_US">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>OpenAI Codex · Sandbox</div>
+    <h1>Sandbox manager: compile a permission profile into one command</h1>
+    <p class="subtitle">Workspace writable, network tightened. The same <code>git status</code> gets sandbox-exec on Mac, a helper on Linux, and may walk out unchanged on Windows. The difference is the compiler.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Workspace writable, network tightened. The same git status gets sandbox-exec on Mac, a helper on Linux, and may walk out unchanged on Windows. The difference is the compiler.</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5" fill="none"/></svg>
+    <span><b>Course goal</b>After this lesson you can explain how a permission profile is picked as a sandbox type, then compiled into one command. Wanting a sandbox and whether this machine has a backend are two questions. The same profile is also rendered into the <code>environment_context</code> the model sees.</span>
+  </div>
+
+  <div class="sec-label">Try it first · One command, three shells</div>
+  <div class="demo reveal" id="demo-wrap">
+    <div class="demo-top">
+      <div class="demo-title">One profile: watch what shell each machine puts on</div>
+      <div class="demo-ctrl">
+        <button id="dm-play" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="none"/></svg>Play</button>
+        <button id="dm-step" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z" fill="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Step</button>
+        <button id="dm-reset" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" fill="none"/><path d="M3 3v5h5" fill="none"/></svg>Reset</button>
+      </div>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">Windows tier</span>
+      <div class="dm-seg" id="dm-win">
+        <button type="button" data-win="off" class="on">Off</button>
+        <button type="button" data-win="on">RestrictedToken</button>
+      </div>
+      <span class="dm-b-hint">Off cannot provide an implementation. Turn it on and Windows reaches beat two.</span>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">Tool preference</span>
+      <div class="dm-seg" id="dm-pref">
+        <button type="button" data-pref="auto" class="on">Auto</button>
+        <button type="button" data-pref="forbid">Forbid</button>
+        <button type="button" data-pref="require">Require</button>
+      </div>
+      <span class="dm-b-hint">Forbid nails “not needed.” Require nails “needed,” not whether the machine has a backend.</span>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">Managed network</span>
+      <div class="dm-seg" id="dm-net">
+        <button type="button" data-net="off" class="on">Off</button>
+        <button type="button" data-net="on">On</button>
+      </div>
+      <span class="dm-b-hint">Once on, Auto must sandbox. If Windows is still off, the type is still None.</span>
+    </div>
+    <div class="dm-stage">
+      <button type="button" class="dm-plat" id="dm-macos" data-os="macos">
+        <div class="dm-p-top"><span class="dm-p-name">macOS</span><span class="dm-p-type" id="dm-macos-type">Pending</span></div>
+        <p class="dm-argv" id="dm-macos-argv">git status</p>
+        <div class="dm-beat" id="dm-macos-beat">Click a card to watch this machine alone.</div>
+      </button>
+      <button type="button" class="dm-plat" id="dm-linux" data-os="linux">
+        <div class="dm-p-top"><span class="dm-p-name">Linux</span><span class="dm-p-type" id="dm-linux-type">Pending</span></div>
+        <p class="dm-argv" id="dm-linux-argv">git status</p>
+        <div class="dm-beat" id="dm-linux-beat">Click a card to watch this machine alone.</div>
+      </button>
+      <button type="button" class="dm-plat" id="dm-windows" data-os="windows">
+        <div class="dm-p-top"><span class="dm-p-name">Windows</span><span class="dm-p-type" id="dm-windows-type">Pending</span></div>
+        <p class="dm-argv" id="dm-windows-argv">git status</p>
+        <div class="dm-beat" id="dm-windows-beat">Click a card to watch this machine alone.</div>
+      </button>
+    </div>
+    <div class="dm-eye">
+      <b>Profile the model sees</b>
+      <p class="dm-xml" id="dm-xml">Not rendered yet.</p>
+    </div>
+    <div class="dm-status" id="dm-status">Waiting to start. Hit Play to see what shell the same command gets on three machines.</div>
+    <div class="dm-trace">
+      <div class="dm-trace-tag">Logic trail · each animation step maps to a source span</div>
+      <ol id="dm-trace">
+        <li><span>Read the PermissionProfile triad</span><span class="ln">models.rs L411</span></li>
+        <li><span>Layer on additional permissions</span><span class="ln">policy_transforms.rs L525</span></li>
+        <li><span>If Auto, run should_require_platform_sandbox</span><span class="ln">policy_transforms.rs L541</span></li>
+        <li><span>select_initial then asks get_platform_sandbox</span><span class="ln">manager.rs L62</span></li>
+        <li><span>None passes argv through unchanged</span><span class="ln">manager.rs L366</span></li>
+        <li><span>macOS prefixes /usr/bin/sandbox-exec</span><span class="ln">manager.rs L401</span></li>
+        <li><span>Linux serializes the profile to the helper</span><span class="ln">landlock.rs L23</span></li>
+        <li><span>Windows beat one leaves argv alone</span><span class="ln">manager.rs L447</span></li>
+        <li><span>The same profile renders into environment_context</span><span class="ln">environment_context.rs L96</span></li>
+      </ol>
+    </div>
+    <div class="dm-caption" id="dm-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none"/></svg><span id="dm-caption-text">Hit Play to see what shell the same git status gets on three machines.</span></div>
+    <div class="dm-summary" id="dm-summary">
+      <div class="dm-s" id="dm-s1"><b>Three command lines</b></div>
+      <div class="dm-s" id="dm-s2"><b>Need vs can provide</b></div>
+      <div class="dm-s" id="dm-s3"><b>The model’s side</b></div>
+    </div>
+    <div class="demo-caption">Teaching sketch: the command is fixed as git status; no real shell is invoked. Outer wrapping is simplified to the platform contract. Line numbers on the logic trail match openai/codex commit 4f39251a01.</div>
+  </div>
+
+  <div class="sec-label">Idea 1 · Wanting it and having it are two questions</div>
+
+  <div class="q-tag reveal">What problem it solves</div>
+  <p class="reveal">Same repo, three machines, the model issues the same <code>git status</code>. Config writes the same permission profile: workspace writable, network tightened.</p>
+  <p class="reveal">Someone debugging will think the sandbox never took. The profile is still in the logs, and that <code>environment_context</code> is still in the model context. The platform layer just never compiled the profile into a wrapping command. On Windows with the switch off, the compiler hands back the original argv; the policy layer is still there.</p>
+
+  <div class="q-tag reveal">What the idea is</div>
+  <p class="reveal"><code>SandboxManager</code> asks “do we want it” first, then “do we have it.” <code>should_sandbox</code> returns one boolean. <code>Forbid</code> is always false, <code>Require</code> always true, <code>Auto</code> looks at the profile shape. A managed-network requirement forces it on. When the network is tightened, it goes on unless the caller owns the filesystem. Only when the network is open and the filesystem is unrestricted does it skip.</p>
+  <p class="src-note reveal">Source: <code>codex-rs/sandboxing/src/manager.rs</code> lines 310–329 · <code>codex-rs/sandboxing/src/policy_transforms.rs</code> lines 541–561</p>
+  <p class="reveal">Then <code>get_platform_sandbox</code> names a type by OS. macOS gets Seatbelt, Linux a seccomp helper. Windows has an extra switch; off means empty. Empty means this host has no implementation to dispatch.</p>
+  <p class="src-note reveal">Source: <code>codex-rs/sandboxing/src/manager.rs</code> lines 62–76</p>
+  <p class="reveal"><code>select_initial</code> asks the first question, then folds an empty second answer into <code>SandboxType::None</code>. The profile says it needs one; the host cannot provide it; the type is still <code>None</code>.</p>
+  <p class="src-note reveal">Source: <code>codex-rs/sandboxing/src/manager.rs</code> lines 293–306</p>
+  <div class="visual reveal paywall-locked xa-peek">
+    <svg viewBox="0 0 940 300" role="img" aria-label="Ask want, then have, then compile per platform">
+      <defs><marker id="arrA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="24" y="88" width="200" height="120" rx="14" fill="#ffffff" stroke="rgba(65,75,90,.35)"/>
+      <text x="124" y="138" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Permission profile</text>
+      <text x="124" y="168" text-anchor="middle" fill="#6b7280" font-size="13">Who builds it, how wide the entries</text>
+      <path fill="none" d="M224 148H286" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="294" y="36" width="220" height="88" rx="14" fill="#eef0f4" stroke="rgba(65,75,90,.35)"/>
+      <text x="404" y="74" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Want it?</text>
+      <text x="404" y="102" text-anchor="middle" fill="#6b7280" font-size="13">should_sandbox → bool</text>
+      <rect x="294" y="172" width="220" height="88" rx="14" fill="#eef0f4" stroke="rgba(65,75,90,.35)"/>
+      <text x="404" y="210" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Have it?</text>
+      <text x="404" y="238" text-anchor="middle" fill="#6b7280" font-size="13">get_platform_sandbox → optional</text>
+      <path fill="none" d="M514 80H576" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <path fill="none" d="M514 216H576" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="584" y="36" width="332" height="224" rx="14" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="750" y="72" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Three machines’ shells</text>
+      <text x="750" y="112" text-anchor="middle" fill="#262d38" font-size="13">macOS · sandbox-exec</text>
+      <text x="750" y="148" text-anchor="middle" fill="#262d38" font-size="13">Linux · helper plus profile JSON</text>
+      <text x="750" y="184" text-anchor="middle" fill="#262d38" font-size="13">Windows · beat one leaves argv</text>
+      <text x="750" y="220" text-anchor="middle" fill="#6b7280" font-size="13">No implementation → keep the original command</text>
+    </svg>
+    <div class="visual-caption">Teaching diagram: ask the two questions apart, then the compile product forks by platform.</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">Intent in config and the backend on the host will part ways. If product copy, the status bar, and the model brief all read the “we hope it’s on” side of config, debugging starts crooked here. Two functions: one returns a boolean, one an optional backend name. Rewrite it in another language and you still want this.</p>
+
+  <div class="sec-label paywall-locked">Idea 2 · One profile, two exits</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">If permissions are written twice, you change one side and forget the other, and the model plans the next step against a stale boundary. The model seeing no outer sandbox, and Windows falling to <code>None</code> when the sandbox is off, should be two exits of the same intent.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">The three <code>PermissionProfile</code> variants say who builds the outer sandbox. <code>Managed</code>: Codex itself stitches the wrapping command. <code>Disabled</code>: no outer layer. <code>External</code>: the caller owns the filesystem; the network may still belong to Codex.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>codex-rs/protocol/src/models.rs</code> lines 411–425</p>
+  <p class="reveal paywall-locked"><code>transform</code> dispatches by type. <code>None</code> passes the user argv through and does not even prepare a local cwd, because an unsandboxed request may carry a remote-machine path. macOS trusts only <code>/usr/bin/sandbox-exec</code>; policy goes on <code>-p</code>, paths on <code>-D</code>, the user command after <code>--</code>. Linux serializes the whole profile into <code>--permission-profile</code>; a missing helper errors out and does not degrade to no-sandbox. Windows beat one only validates and leaves argv alone; the wrapper is the current exe, and the shell is deferred to <code>transform_for_direct_spawn</code>.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>codex-rs/sandboxing/src/manager.rs</code> lines 365–459 · <code>codex-rs/sandboxing/src/seatbelt.rs</code> lines 52–56 · <code>codex-rs/sandboxing/src/landlock.rs</code> lines 15–23 · <code>codex-rs/sandboxing/src/manager.rs</code> lines 484–518</p>
+  <p class="reveal paywall-locked">The same profile is folded by <code>FileSystemContext</code> into an internal enum and rendered into <code>environment_context</code>. <code>Disabled</code> becomes <code>type="disabled"</code> plus an unrestricted filesystem. Model-visible text cannot stop privilege escape; it only cuts wasted attempts.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>codex-rs/core/src/context/environment_context.rs</code> lines 96–116</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 280" role="img" aria-label="One effective profile compiled into a command and model-visible XML">
+      <defs><marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="90" width="220" height="100" rx="14" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="150" y="132" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Effective profile</text>
+      <text x="150" y="160" text-anchor="middle" fill="#6b7280" font-size="13">Base plus extra</text>
+      <path fill="none" d="M260 122H340" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <path fill="none" d="M260 158H340" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="348" y="36" width="552" height="88" rx="14" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="624" y="74" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">transform → argv</text>
+      <text x="624" y="102" text-anchor="middle" fill="#6b7280" font-size="13">Isolation happens at the child-process door</text>
+      <rect x="348" y="156" width="552" height="88" rx="14" fill="#ffffff" stroke="rgba(65,75,90,.35)"/>
+      <text x="624" y="194" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">render → environment_context</text>
+      <text x="624" y="222" text-anchor="middle" fill="#6b7280" font-size="13">The model sees the same runtime fact</text>
+    </svg>
+    <div class="visual-caption">Teaching diagram: one runtime value, two exits.</div>
+  </div>
+
+  <div class="key-line reveal paywall-locked">When the platform cannot provide an implementation, the XML does not change its story.</div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">There should be one runtime fact. Isolation happens at the child-process door; the orchestration layer keeps holding paths and the profile, and it lands only at the exec boundary. Platform dialects will change; this profile shape, fed to both the wrapping command and the model, still earns its keep.</p>
+
+  <div class="sec-label paywall-locked">Idea 3 · Open with union, approve with intersection</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">A single command can also carry an overlay. If a human approval uses union, one mistaken yes writes a path the request never asked for into session grants.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">Merge uses union: if either side opens the network, the result is open; filesystem entries are concatenated and deduped. Intersection is the other set: the network stays only if both sides are open; the filesystem keeps only already-approved entries that fall inside the request. An empty intersection is not booked on the session; the base profile stays in force. Empty means this extra opening left no widening. Whether the command can still run is up to later policy and the sandbox.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>codex-rs/sandboxing/src/policy_transforms.rs</code> lines 90–142 · <code>codex-rs/sandboxing/src/policy_transforms.rs</code> lines 144–214 · <code>codex-rs/core/src/session/mod.rs</code> lines 2833–2846</p>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">Widening and approval are two jobs. Union makes “this command opened one more path” speakable. Intersection keeps what a human approved no wider than the request. Empty means the opening failed — do not read it as “switch to strictest,” and do not read it as “forbid the whole command.”</p>
+
+  <div class="sec-label paywall-locked">Side-by-side · which layer you cut, which way failure leans</div>
+  <div class="compare paywall-locked">
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness: no backend, refuse to run</h4>
+      <p>DSH also cuts at the child-process door. <code>confine</code> picks a runner for the current host, compiles policy into runner args, and puts the user command after <code>--</code>. The profile vocabulary is three file modes; <code>danger-full-access</code> never enters the wrap.</p>
+      <p>Missing a backend fails closed and does not fall back to the original argv. The copy says refusing to run the command unconfined. Codex also will not run when the Unix helper is missing; when the Windows sandbox is off it folds “cannot provide” into <code>None</code> and hands it to the policy layer.</p>
+      <span class="cmp-tag">Source checked on both sides · 2026-08-22 · <a href="dsh-16.html">DSH · Sandbox</a></span>
+    </div>
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok: one apply, lock the current process</h4>
+      <p>Grok also has a type named <code>SandboxManager</code>; its job is <code>apply()</code> then <code>install()</code>. The comment is blunt: it acts on the current process, irreversibly. The compile product is a <code>CapabilitySet</code>, not a wrap around each command’s argv.</p>
+      <p>Unsupported platform, or <code>apply</code> failure: warn, record <code>apply_failed</code>, keep running. Later tool calls share the same capability. Grok does not recompile argv per command, and cannot give two commands two boundaries inside one process.</p>
+      <span class="cmp-tag">Source checked on both sides · 2026-08-22 · <a href="12-17.html">Grok · Five sandbox Profiles</a></span>
+    </div>
+  </div>
+  <p class="src-note reveal paywall-locked">Source: <code>packages/sandbox/sandbox-local/src/index.ts</code> lines 316–333 · <code>crates/codegen/xai-grok-sandbox/src/lib.rs</code> lines 117–136</p>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div>
+      <h3>Four returns, three inputs</h3>
+      <p>Open <code>should_require_platform_sandbox</code> and sketch the four returns on paper. Then predict these three: a <code>Disabled</code> profile plus managed network; writable root plus one deny, network Enabled; an <code>External</code> profile, network Restricted.</p>
+      <p>Advanced: the same <code>Disabled</code> profile, the tool declares <code>Require</code>, Windows tier still off. What is the type, and will the XML the model sees change its story?</p>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/></svg>
+    <span><b>Takeaway:</b> Write “needs isolation” and “what this machine can provide” as two functions. One permission profile feeds both the wrapping command and the model. Windows is two beats; when off it hands back the original argv, and the policy layer is still there.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function(){
+  var winOn = false, pref = 'auto', netOn = false;
+  var steps = [], idx = 0, autoId = null, pauseUntil = 0, played = false, focus = null;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var RAW = 'git status';
+  var MAC = '/usr/bin/sandbox-exec -p … -DWORKSPACE=… -- git status';
+  var LIN = 'codex-linux-sandbox --permission-profile {json} -- git status';
+  var WIN2 = 'codex.exe --run-as-windows-sandbox --permission-profile {json} -- git status';
+  var XML = '<permission_profile type="managed"><file_system type="restricted" /></permission_profile>';
+  var cards = {
+    macos: {
+      el: document.getElementById('dm-macos'),
+      type: document.getElementById('dm-macos-type'),
+      argv: document.getElementById('dm-macos-argv'),
+      beat: document.getElementById('dm-macos-beat')
+    },
+    linux: {
+      el: document.getElementById('dm-linux'),
+      type: document.getElementById('dm-linux-type'),
+      argv: document.getElementById('dm-linux-argv'),
+      beat: document.getElementById('dm-linux-beat')
+    },
+    windows: {
+      el: document.getElementById('dm-windows'),
+      type: document.getElementById('dm-windows-type'),
+      argv: document.getElementById('dm-windows-argv'),
+      beat: document.getElementById('dm-windows-beat')
+    }
+  };
+  var xmlEl = document.getElementById('dm-xml');
+  var statusEl = document.getElementById('dm-status');
+  var stageEl = document.querySelector('.dm-stage');
+  var demoTop = document.querySelector('.demo-top');
+  var traceBox = document.getElementById('dm-trace');
+  var traceRows = Array.prototype.slice.call(document.querySelectorAll('#dm-trace li'));
+  var captionText = document.getElementById('dm-caption-text');
+  var summary = document.getElementById('dm-summary');
+  var IDLE = 'Hit Play to see what shell the same git status gets on three machines.';
+
+  function needSandbox(){
+    if (pref === 'forbid') return false;
+    if (pref === 'require') return true;
+    return true;
+  }
+  function platTypes(){
+    var need = needSandbox();
+    return {
+      macos: need ? 'MacosSeatbelt' : 'None',
+      linux: need ? 'LinuxSeccomp' : 'None',
+      windows: (need && winOn) ? 'WindowsRestrictedToken' : 'None'
+    };
+  }
+  function macArgv(t){ return t.macos === 'None' ? RAW : MAC; }
+  function linArgv(t){ return t.linux === 'None' ? RAW : LIN; }
+  function winArgv(t, beat){
+    if (t.windows !== 'WindowsRestrictedToken') return RAW;
+    return beat >= 2 ? WIN2 : RAW;
+  }
+  function prefLabel(){
+    if (pref === 'forbid') return 'Forbid';
+    if (pref === 'require') return 'Require';
+    return 'Auto';
+  }
+
+  function buildSteps(){
+    var t = platTypes();
+    var need = needSandbox();
+    var out = [];
+    out.push({
+      cap: 'One profile: workspace writable, network tightened. The command is git status. Watch what it compiles into.',
+      trace: 0, focus: 'all',
+      types: {macos:'Pending', linux:'Pending', windows:'Pending'},
+      argv: {macos: RAW, linux: RAW, windows: RAW},
+      beats: {macos:'Type not chosen yet.', linux:'Type not chosen yet.', windows:'Type not chosen yet.'},
+      xml: 'Not rendered yet.', xmlOn: false,
+      st: 'The profile triad is Managed. Codex itself builds the outer sandbox.',
+      stKind: ''
+    });
+    out.push({
+      cap: 'Layer on extra. This overlay is empty; the effective profile is still the base.',
+      trace: 1, focus: 'all',
+      types: {macos:'Pending', linux:'Pending', windows:'Pending'},
+      argv: {macos: RAW, linux: RAW, windows: RAW},
+      beats: {macos:'Effective profile is set.', linux:'Effective profile is set.', windows:'Effective profile is set.'},
+      xml: 'Not rendered yet.', xmlOn: false,
+      st: 'An empty overlay is not booked; the base stays in force.',
+      stKind: 'hold'
+    });
+    out.push({
+      cap: pref === 'forbid'
+        ? 'Preference is Forbid: decide no sandbox, skip the profile shape.'
+        : (pref === 'require'
+          ? 'Preference is Require: decide sandbox needed, skip the profile shape.'
+          : (netOn
+            ? 'Preference is Auto, managed network is on: platform sandbox is required.'
+            : 'Preference is Auto, network tightened and filesystem restricted: platform sandbox is required.')),
+      trace: 2, focus: 'all',
+      types: {macos:'Pending', linux:'Pending', windows:'Pending'},
+      argv: {macos: RAW, linux: RAW, windows: RAW},
+      beats: {macos:'Ask “want it” first.', linux:'Ask “want it” first.', windows:'Ask “want it” first.'},
+      xml: 'Not rendered yet.', xmlOn: false,
+      st: need ? 'Need sandbox: yes. Still unknown whether this machine has a backend.' : 'Need sandbox: no. All three machines will hand back the original command.',
+      stKind: need ? 'hold' : ''
+    });
+    out.push({
+      cap: need
+        ? (winOn
+          ? 'All three machines can name a type. macOS is Seatbelt, Linux is seccomp, Windows is RestrictedToken.'
+          : 'macOS and Linux have implementations. Windows tier is off; get_platform_sandbox returns empty, folded to None.')
+        : 'No sandbox needed; none of the three ask the platform; every type is None.',
+      trace: 3, focus: 'all',
+      types: t,
+      argv: {macos: RAW, linux: RAW, windows: RAW},
+      beats: {
+        macos: t.macos === 'None' ? 'Type None; pass through later.' : 'Type is set; argv changes on the next beat.',
+        linux: t.linux === 'None' ? 'Type None; pass through later.' : 'Type is set; argv changes on the next beat.',
+        windows: t.windows === 'None' ? 'Type None; pass through later.' : 'Type is set; beat one still leaves argv alone.'
+      },
+      xml: 'Not rendered yet.', xmlOn: false,
+      st: 'Want and have are already split. With Windows off, need can still be true.',
+      stKind: 'hold'
+    });
+    out.push({
+      cap: (t.macos === 'None' || t.linux === 'None' || t.windows === 'None')
+        ? 'The machine whose type is None: transform passes user argv through, wraps no helper, prepares no local cwd.'
+        : 'No None on this step. All three enter their wrap branches.',
+      trace: 4, focus: t.windows === 'None' ? 'windows' : (t.macos === 'None' ? 'macos' : 'all'),
+      types: t,
+      argv: {
+        macos: t.macos === 'None' ? RAW : RAW,
+        linux: t.linux === 'None' ? RAW : RAW,
+        windows: RAW
+      },
+      beats: {
+        macos: t.macos === 'None' ? 'Walks out unchanged.' : 'Waiting for the shell.',
+        linux: t.linux === 'None' ? 'Walks out unchanged.' : 'Waiting for the shell.',
+        windows: 'Before beat one, you still see git status.'
+      },
+      xml: 'Not rendered yet.', xmlOn: false,
+      st: t.windows === 'None' ? 'Windows hands back the original command now. The policy layer is still there.' : 'Nobody walked out unchanged yet.',
+      stKind: t.windows === 'None' ? 'hold' : ''
+    });
+    out.push({
+      cap: t.macos === 'None'
+        ? 'Mac has no shell; argv is still git status.'
+        : 'Mac compiles the profile into policy text plus path params; the user command is squeezed after --. The path is pinned to /usr/bin/sandbox-exec.',
+      trace: 5, focus: 'macos',
+      types: t,
+      argv: {macos: macArgv(t), linux: t.linux === 'None' ? RAW : RAW, windows: RAW},
+      beats: {
+        macos: t.macos === 'None' ? 'No wrap.' : 'The shell goes on at beat one.',
+        linux: 'Linux’s turn is the next beat.',
+        windows: 'Windows is still on beat one.'
+      },
+      xml: 'Not rendered yet.', xmlOn: false,
+      st: t.macos === 'None' ? 'macOS · None' : 'macOS · sandbox-exec',
+      stKind: 'hold'
+    });
+    out.push({
+      cap: t.linux === 'None'
+        ? 'Linux has no shell; argv is still git status.'
+        : 'Linux serializes the whole profile to the helper. A missing helper path errors out and does not degrade to no-sandbox.',
+      trace: 6, focus: 'linux',
+      types: t,
+      argv: {macos: macArgv(t), linux: linArgv(t), windows: RAW},
+      beats: {
+        macos: t.macos === 'None' ? 'No wrap.' : 'The shell is already on.',
+        linux: t.linux === 'None' ? 'No wrap.' : 'helper plus profile JSON.',
+        windows: 'Windows is still beat one.'
+      },
+      xml: 'Not rendered yet.', xmlOn: false,
+      st: t.linux === 'None' ? 'Linux · None' : 'Linux · helper',
+      stKind: 'hold'
+    });
+    out.push({
+      cap: t.windows === 'WindowsRestrictedToken'
+        ? 'Windows beat one finished validating; argv is still git status. The wrapper is the current exe; the shell waits for beat two.'
+        : 'Windows tier is off — no beat two at all. The compiler hands back the original argv.',
+      trace: 7, focus: 'windows',
+      types: t,
+      argv: {macos: macArgv(t), linux: linArgv(t), windows: RAW},
+      beats: {
+        macos: t.macos === 'None' ? 'No wrap.' : 'The shell is already on.',
+        linux: t.linux === 'None' ? 'No wrap.' : 'The shell is already on.',
+        windows: t.windows === 'WindowsRestrictedToken' ? 'Beat one: argv unchanged.' : 'No beat two.'
+      },
+      xml: 'Not rendered yet.', xmlOn: false,
+      st: t.windows === 'WindowsRestrictedToken' ? 'Windows · beat one done' : 'Windows · None',
+      stKind: 'hold'
+    });
+    if (t.windows === 'WindowsRestrictedToken') {
+      out.push({
+        cap: 'Beat two arrives. direct-spawn wraps the current exe with --run-as-windows-sandbox; the user command stays after --.',
+        trace: 7, focus: 'windows',
+        types: t,
+        argv: {macos: macArgv(t), linux: linArgv(t), windows: WIN2},
+        beats: {
+          macos: t.macos === 'None' ? 'No wrap.' : 'The shell is already on.',
+          linux: t.linux === 'None' ? 'No wrap.' : 'The shell is already on.',
+          windows: 'Beat two: wrapper in place.'
+        },
+        xml: 'Not rendered yet.', xmlOn: false,
+        st: 'Windows · two-beat compile done',
+        stKind: 'hold'
+      });
+    }
+    out.push({
+      cap: 'The same profile renders into environment_context. When the platform cannot provide an implementation, the XML does not claim it was never confined.',
+      trace: 8, focus: 'all',
+      types: t,
+      argv: {macos: macArgv(t), linux: linArgv(t), windows: winArgv(t, 2)},
+      beats: {
+        macos: t.macos === 'None' ? 'Original command.' : 'sandbox-exec。',
+        linux: t.linux === 'None' ? 'Original command.' : 'helper。',
+        windows: t.windows === 'WindowsRestrictedToken' ? 'Beat-two wrapper.' : 'Original command; the policy layer is still there.'
+      },
+      xml: XML, xmlOn: true,
+      st: 'The model still sees managed. What actually blocks operations is the wrapping command and later policy.',
+      stKind: 'ok',
+      fin: true
+    });
+    return out;
+  }
+
+  function fillSummary(){
+    var t = platTypes();
+    var need = needSandbox();
+    document.getElementById('dm-s1').innerHTML = '<b>Three command lines</b>macOS is ' + (t.macos === 'None' ? 'the original command' : 'sandbox-exec') + '. Linux is ' + (t.linux === 'None' ? 'the original command' : 'helper plus JSON') + '. Windows is ' + (t.windows === 'None' ? 'the original command' : 'the wrapper that only appears on beat two') + '.';
+    document.getElementById('dm-s2').innerHTML = '<b>Need vs can provide</b>Preference ' + prefLabel() + (netOn ? ', managed network on' : '') + ', need sandbox is ' + (need ? 'yes' : 'no') + '. Windows tier ' + (winOn ? 'on' : 'off') + ', so it ' + (t.windows === 'None' ? 'cannot provide an implementation' : 'got RestrictedToken') + '.';
+    document.getElementById('dm-s3').innerHTML = '<b>The model’s side</b>The XML still says managed. When Windows is off, the compiler hands back the original argv; that model line will not claim it was never confined.';
+  }
+
+  function enterText(el, text){
+    el.classList.remove('in');
+    el.classList.add('is-enter');
+    el.textContent = text;
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ el.classList.add('in'); });
+    });
+  }
+
+  function enterStatus(text){
+    statusEl.textContent = '';
+    var span = document.createElement('span');
+    span.className = 'dm-fade is-enter';
+    span.textContent = text;
+    statusEl.appendChild(span);
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ span.classList.add('in'); });
+    });
+  }
+
+  function flipCards(oldRects){
+    ['macos','linux','windows'].forEach(function(os){
+      var el = cards[os].el;
+      var now = el.getBoundingClientRect();
+      var old = oldRects[os];
+      var dx = old.left - now.left;
+      var dy = old.top - now.top;
+      if (!dx && !dy) return;
+      el.style.transition = 'none';
+      el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      requestAnimationFrame(function(){
+        el.style.transition = '';
+        el.style.transform = '';
+      });
+    });
+  }
+
+  function paint(st, animate){
+    animate = !!animate && !reduceMotion;
+    stageEl.classList.add('is-live');
+    traceBox.classList.add('is-live');
+    var oldRects = {};
+    ['macos','linux','windows'].forEach(function(os){
+      oldRects[os] = cards[os].el.getBoundingClientRect();
+    });
+    ['macos','linux','windows'].forEach(function(os){
+      var c = cards[os];
+      var isOn = focus ? (focus === os) : (st.focus === 'all' || st.focus === os);
+      var wrapped = st.types[os] && st.types[os] !== 'None' && st.types[os] !== 'Pending';
+      var prevType = c.type.textContent;
+      var prevArgv = c.argv.textContent;
+      c.el.className = 'dm-plat' + (isOn ? ' on' : '') + (wrapped ? ' wrap' : ' bare');
+      if (animate && prevType !== st.types[os]) {
+        c.type.classList.remove('pop');
+        void c.type.offsetWidth;
+        c.type.classList.add('pop');
+      }
+      c.type.textContent = st.types[os];
+      if (animate && prevArgv !== st.argv[os]) {
+        c.el.classList.add('firing');
+        enterText(c.argv, st.argv[os]);
+      } else {
+        c.argv.classList.remove('is-enter', 'in');
+        c.argv.textContent = st.argv[os];
+      }
+      c.beat.textContent = st.beats[os];
+    });
+    if (animate) flipCards(oldRects);
+    var prevXml = xmlEl.textContent;
+    if (animate && prevXml !== st.xml) enterText(xmlEl, st.xml);
+    else {
+      xmlEl.classList.remove('is-enter', 'in');
+      xmlEl.textContent = st.xml;
+    }
+    xmlEl.classList.toggle('ready', !!st.xmlOn);
+    statusEl.className = 'dm-status' + (st.stKind ? ' ' + st.stKind : '');
+    if (animate && statusEl.textContent !== st.st) enterStatus(st.st);
+    else statusEl.textContent = st.st;
+    if (st.trace !== null && st.trace !== undefined) {
+      traceRows.forEach(function(el, n){ el.classList.toggle('on', n === st.trace); });
+    }
+    if (animate) {
+      captionText.style.opacity = '0';
+      requestAnimationFrame(function(){
+        captionText.textContent = st.cap;
+        requestAnimationFrame(function(){ captionText.style.opacity = '1'; });
+      });
+    } else {
+      captionText.textContent = st.cap;
+    }
+    if (st.fin) {
+      fillSummary();
+      summary.classList.add('on');
+    } else {
+      summary.classList.remove('on');
+    }
+    var n = steps.indexOf(st);
+    if (n < 0) n = Math.min(steps.length - 1, Math.max(0, idx - 1));
+    demoTop.style.setProperty('--pipe', steps.length ? String((n + 1) / steps.length) : '0');
+  }
+
+  function holdFor(i){
+    var st = steps[i];
+    if (!st) return 1100;
+    if (st.fin) return 2400;
+    if (st.trace === 3 || st.trace === 5 || st.trace === 6 || st.trace === 7) return 2000;
+    if (st.trace === 2 || st.trace === 8) return 1700;
+    return 1100;
+  }
+
+  function tick(){
+    if (idx >= steps.length) { stop(); return; }
+    paint(steps[idx], true);
+    idx++;
+    if (idx >= steps.length) stop();
+  }
+  function stop(){
+    if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+    pauseUntil = 0;
+  }
+  function loop(ts){
+    if (idx >= steps.length) { autoId = null; return; }
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(loop); return; }
+    paint(steps[idx], true);
+    var wait = holdFor(idx);
+    idx++;
+    pauseUntil = ts + wait;
+    if (idx >= steps.length) { autoId = null; return; }
+    autoId = requestAnimationFrame(loop);
+  }
+  function resetVisual(){
+    stageEl.classList.remove('is-live');
+    traceBox.classList.remove('is-live');
+    ['macos','linux','windows'].forEach(function(os){
+      var c = cards[os];
+      c.el.className = 'dm-plat';
+      c.el.style.transition = '';
+      c.el.style.transform = '';
+      c.type.classList.remove('pop');
+      c.type.textContent = 'Pending';
+      c.argv.classList.remove('is-enter', 'in');
+      c.argv.textContent = RAW;
+      c.beat.textContent = 'Click a card to watch this machine alone.';
+    });
+    xmlEl.classList.remove('ready', 'is-enter', 'in');
+    xmlEl.textContent = 'Not rendered yet.';
+    statusEl.className = 'dm-status';
+    statusEl.textContent = 'Waiting to start. Hit Play to see what shell the same command gets on three machines.';
+    traceRows.forEach(function(el){ el.classList.remove('on'); });
+    summary.classList.remove('on');
+    captionText.style.opacity = '1';
+    captionText.textContent = IDLE;
+    demoTop.style.setProperty('--pipe', '0');
+  }
+  function reset(){
+    stop(); idx = 0; focus = null;
+    steps = buildSteps();
+    resetVisual();
+  }
+  function play(){
+    if (idx >= steps.length) reset();
+    if (autoId) return;
+    pauseUntil = 0;
+    autoId = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('dm-play').addEventListener('click', play);
+  document.getElementById('dm-step').addEventListener('click', function(){ stop(); tick(); });
+  document.getElementById('dm-reset').addEventListener('click', reset);
+
+  function bindSeg(id, attr, apply){
+    document.getElementById(id).addEventListener('click', function(e){
+      var b = e.target.closest('button');
+      if (!b) return;
+      Array.prototype.forEach.call(this.children, function(el){ el.classList.remove('on'); });
+      b.classList.add('on');
+      apply(b.getAttribute(attr));
+      reset();
+    });
+  }
+  bindSeg('dm-win', 'data-win', function(v){ winOn = v === 'on'; });
+  bindSeg('dm-pref', 'data-pref', function(v){ pref = v; });
+  bindSeg('dm-net', 'data-net', function(v){ netOn = v === 'on'; });
+
+  ['macos','linux','windows'].forEach(function(os){
+    cards[os].el.addEventListener('click', function(){
+      focus = os;
+      stageEl.classList.add('is-live');
+      if (idx === 0) {
+        captionText.textContent = os === 'macos'
+          ? 'Watch Mac first. After Play, sandbox-exec or the original command will show here.'
+          : (os === 'linux'
+            ? 'Watch Linux first. After Play, the helper or the original command will show here.'
+            : 'Watch Windows first. Off stays the original command; turn the tier on to see beat two.');
+        ['macos','linux','windows'].forEach(function(k){
+          cards[k].el.classList.toggle('on', k === os);
+        });
+        return;
+      }
+      var st = steps[Math.max(0, idx - 1)];
+      var next = {};
+      for (var k in st) next[k] = st[k];
+      next.focus = os;
+      paint(next);
+    });
+  });
+
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(document.getElementById('demo-wrap'), function(){
+      if (played) return; played = true; play();
+    });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

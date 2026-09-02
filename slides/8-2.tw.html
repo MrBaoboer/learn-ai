@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KV Cache：用空間換時間，順便省下真金白銀 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+.analogy-box{background:rgba(124,58,237,.05);border:1.5px solid rgba(124,58,237,.15);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.analogy-box b{color:var(--purple)}
+
+.kv-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kv-box{border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:var(--shadow-card)}
+.kv-box-h{padding:9px 16px;font-size:15px;font-weight:700;border-bottom:1px solid var(--border)}
+.kv-box-b{padding:14px 16px;font-size:14px;color:var(--sub);line-height:1.7}
+.kv-box.no .kv-box-h{background:rgba(220,38,38,.05);color:var(--danger)}
+.kv-box.yes .kv-box-h{background:rgba(22,163,74,.05);color:var(--success)}
+
+.insight-box{background:rgba(22,163,74,.05);border:1.5px solid rgba(22,163,74,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.insight-box b{color:var(--success)}
+.warn-box{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.2);border-radius:var(--radius);padding:16px 20px;font-size:14px;color:var(--text);line-height:1.7}
+.warn-box b{color:var(--danger)}
+
+.next-card{background:rgba(22,163,74,.05);border:1.5px solid rgba(22,163,74,.25);border-radius:var(--radius);padding:14px 18px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.next-card:hover{background:rgba(22,163,74,.1)}
+
+/* ── 演示区 ── */
+.mode-tabs{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.mode-tabs span{font-size:14px;color:var(--sub);margin-right:4px;font-weight:600}
+.mode-btn{padding:7px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-size:14px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s;min-height:36px}
+.mode-btn.active-bad{border-color:var(--danger);background:rgba(220,38,38,.08);color:var(--danger)}
+.mode-btn.active-good{border-color:var(--success);background:rgba(22,163,74,.08);color:var(--success)}
+
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.leg{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--sub)}
+.leg-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+
+.viz-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.viz-title{padding:9px 16px;border-bottom:1px solid var(--border);background:var(--bg);font-size:13px;font-weight:700;color:var(--sub)}
+.turns-list{padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-height:60px;overflow-x:auto}
+
+.turn-row{display:flex;align-items:center;gap:10px;flex-shrink:0;animation:row-in .3s ease}
+@keyframes row-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.turn-label{font-size:13px;font-weight:800;color:var(--sub);min-width:34px;flex-shrink:0}
+
+.bar-wrap{flex:1;overflow:hidden}
+.bar-track{height:28px;border-radius:6px;display:flex;gap:1px;background:transparent;min-width:0}
+.bar-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;overflow:hidden;white-space:nowrap;padding:0 4px;border-radius:4px;flex-shrink:0;animation:seg-in .35s ease}
+@keyframes seg-in{from{opacity:0;transform:scaleX(0.6)}to{opacity:1;transform:scaleX(1)}}
+.bar-seg.sys{background:var(--purple)}
+.bar-seg.recalc{background:var(--danger)}
+.bar-seg.cached{background:rgba(22,163,74,.3);color:var(--success)}
+.bar-seg.new{background:var(--accent)}
+
+.turn-meta{min-width:80px;flex-shrink:0;text-align:right}
+.turn-cost{font-size:14px;font-weight:800}
+.turn-cost.bad{color:var(--danger)}
+.turn-cost.good{color:var(--success)}
+.turn-diff{font-size:11px;color:var(--sub)}
+
+.stat-row{display:flex;gap:10px;margin-top:12px}
+.stat-box{flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center;box-shadow:var(--shadow-card)}
+.stat-box .sv{font-size:22px;font-weight:900}
+.stat-box .sl{font-size:12px;color:var(--sub);font-weight:600}
+.stat-box.waste .sv{color:var(--danger)}
+.stat-box.save .sv{color:var(--success)}
+.stat-box.turns .sv{color:var(--text)}
+
+.ctrl-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn-turn{padding:10px 24px;border-radius:8px;background:var(--success);color:white;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:opacity .2s;min-height:44px}
+.btn-turn:disabled{opacity:.35;cursor:not-allowed}
+.btn-reset{padding:10px 16px;border-radius:8px;background:var(--card);color:var(--sub);font-size:14px;font-weight:600;border:1px solid var(--border);cursor:pointer;font-family:inherit;min-height:44px}
+.ctrl-hint{flex:1;font-size:13px;color:var(--sub);line-height:1.4;min-width:180px}
+
+.takeaway{background:rgba(22,163,74,.05);border:1.5px solid rgba(22,163,74,.18);border-radius:var(--radius);padding:14px 18px;font-size:15px;color:var(--text);line-height:1.7;margin-top:14px}
+.takeaway b{color:var(--success)}
+
+@media (max-width:768px){
+  .kv-compare{grid-template-columns:1fr}
+  .stat-row{flex-wrap:wrap}
+  .stat-box{min-width:calc(50% - 5px)}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="KV Cache 是大模型推理加速的核心技術。解析 KV Cache 的工作原理：如何快取 Attention 的鍵值對，避免對已有 Token 的重複計算，從而同時降低延遲和成本。">
+<meta name="keywords" content="KV Cache,大模型快取,推理加速,Attention Cache,大模型效能優化">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/8-2.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/8-2.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/8-2.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/8-2.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/8-2.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/8-2.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/8-2.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/8-2.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="KV Cache：用空間換時間，順便省下真金白銀">
+<meta property="og:description" content="KV Cache 是大模型推理加速的核心技術。解析 KV Cache 的工作原理：如何快取 Attention 的鍵值對，避免對已有 Token 的重複計算，從而同時降低延遲和成本。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/8-2.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/8-2.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="KV Cache：用空間換時間，順便省下真金白銀">
+<meta name="twitter:description" content="KV Cache 是大模型推理加速的核心技術。解析 KV Cache 的工作原理：如何快取 Attention 的鍵值對，避免對已有 Token 的重複計算，從而同時降低延遲和成本。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"KV Cache：用空間換時間（和錢）","name":"KV Cache：用空間換時間（和錢）","url":"https://xueai.miyang.cn/slides/8-2.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 成本優化與選型","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"KV Cache 是大模型推理加速的核心技術。解析 KV Cache 的工作原理：如何快取 Attention 的鍵值對，避免對已有 Token 的重複計算，從而同時降低延遲和成本。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">成本優化</div>
+    <h1>KV Cache：用空間換時間</h1>
+    <p class="subtitle">每輪對話，模型都要對所有歷史 Token 做 Attention 計算。KV Cache 把已算過的 K/V 矩陣快取下來，下輪只計算新增 Token。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>類比理解 + 節省效果計算器，拖動輪次查看節省比例</p></aside><!--seo:end-->  <div class="sec-label">原理</div>
+
+  <div class="analogy-box">
+    <b>類比：</b><br>
+    無快取 = 每次上課都從頭默寫所有課本<br>
+    有快取 = 課本拍好存檔，今天只看今天的新筆記
+  </div>
+
+  <div class="kv-compare" style="margin-top:14px">
+    <div class="kv-box no">
+      <div class="kv-box-h">無 KV Cache</div>
+      <div class="kv-box-b">
+        每輪：System Prompt + 全部歷史 <b>全量重算</b><br><br>
+        第 N 輪成本 = 第 1 到 N 輪所有 Token 之和
+      </div>
+    </div>
+    <div class="kv-box yes">
+      <div class="kv-box-h">有 KV Cache</div>
+      <div class="kv-box-b">
+        歷史 Token 的 K/V 已快取，<b>只算本輪新 Token</b><br><br>
+        第 N 輪成本 ≈ 本輪新增那幾個 Token
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">逐輪對比演示</div>
+
+  <div class="mode-tabs">
+    <span>模式：</span>
+    <button class="mode-btn active-bad" id="btnBad" onclick="setMode('bad')">無快取</button>
+    <button class="mode-btn" id="btnGood" onclick="setMode('good')">有快取</button>
+  </div>
+  <div class="legend paywall-locked xa-peek">
+    <div class="leg"><div class="leg-dot" style="background:var(--purple)"></div>System Prompt</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--danger)"></div>重複計算</div>
+    <div class="leg"><div class="leg-dot" style="background:rgba(22,163,74,.4)"></div>快取命中</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--accent)"></div>新增計算</div>
+  </div>
+
+  <div class="viz-panel paywall-locked">
+    <div class="viz-title" id="vizTitle">點選「下一輪」開始演示 · 每格 = 固定 token 量，SYS 始終不變</div>
+    <div class="turns-list" id="turnsList"></div>
+  </div>
+
+  <div class="stat-row paywall-locked">
+    <div class="stat-box turns"><div class="sv" id="statTurns">0</div><div class="sl">已演示輪次</div></div>
+    <div class="stat-box waste"><div class="sv" id="statWaste">0T</div><div class="sl">無快取累計算量</div></div>
+    <div class="stat-box save"><div class="sv" id="statSave">0T</div><div class="sl">有快取累計算量</div></div>
+    <div class="stat-box save"><div class="sv" id="statPct" style="color:var(--accent)">—</div><div class="sl">節省比例</div></div>
+  </div>
+
+  <div class="ctrl-bar paywall-locked">
+    <button class="btn-turn" id="btnNext" onclick="nextTurn()">▶ 下一輪</button>
+    <button class="btn-reset" onclick="resetDemo()">重置</button>
+    <div class="ctrl-hint" id="ctrlHint">切換「無快取 / 有快取」對比兩種模式效果</div>
+  </div>
+
+  <div class="takeaway paywall-locked"><b>結論：</b>對話輪次越多，KV Cache 節省越大。保持 System Prompt 不變是最簡單、最有效的優化手段。</div>
+
+  <div class="sec-label paywall-locked">關鍵提醒</div>
+
+  <div class="insight-box paywall-locked">
+    <b>System Prompt 越長，KV Cache 越值錢。</b><br>
+    5000 Token 的系統提示詞，1000 輪對話後，KV Cache 節省約 80% 總成本。<b>保持 System Prompt 不變 = 快取命中。</b>
+  </div>
+
+  <div class="warn-box paywall-locked" style="margin-top:14px">
+    <b>⚠️ 隱藏大坑：分散式推理伺服器</b><br>
+    雲端 LLM 通常跑在<b>多臺推理伺服器</b>上。你的請求可能每次被路由到不同節點，那臺節點沒有你的前文快取，<b>隱式快取永遠 MISS</b>。
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:14px">
+    <b>下一課預告：</b>顯式快取：一行程式碼保證命中，含 Claude / Qwen / OpenAI 程式碼示例與命中率模擬對比。
+  </div>
+
+</article>
+
+<script>
+// 對話內容（用於標題展示）
+const TURNS = [
+  { user: '你好，幫我分析一下', assistant: '好的，我來幫你' },
+  { user: '資料顯示銷售下降了', assistant: '可能有幾個原因' },
+  { user: '競品也有同樣問題嗎', assistant: '根據行業資料來看' },
+  { user: '那我們應該怎麼做', assistant: '建議從三個方向入手' },
+  { user: '重點優化哪個方向', assistant: '我認為第二個最關鍵' },
+];
+
+// 每"格"畫素寬度 — 固定不變，直觀體現 token 量
+const SYS_PX  = 72;   // System Prompt 固定寬度（px）
+const TURN_PX = 40;   // 每輪對話固定寬度（px）
+
+let mode = 'bad';
+let curTurn = 0;
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btnBad').className  = 'mode-btn' + (m === 'bad'  ? ' active-bad'  : '');
+  document.getElementById('btnGood').className = 'mode-btn' + (m === 'good' ? ' active-good' : '');
+  resetDemo();
+}
+
+function resetDemo() {
+  curTurn = 0;
+  document.getElementById('turnsList').innerHTML = '';
+  document.getElementById('vizTitle').textContent = '點選「下一輪」開始演示 · 條形寬度代表計算量';
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('btnNext').textContent = '▶ 下一輪';
+  document.getElementById('statTurns').textContent = '0';
+  document.getElementById('statWaste').textContent = '0T';
+  document.getElementById('statSave').textContent = '0T';
+  document.getElementById('statPct').textContent = '—';
+  document.getElementById('ctrlHint').textContent = '切換「無快取 / 有快取」對比兩種模式效果';
+}
+
+function nextTurn() {
+  if (curTurn >= TURNS.length) return;
+  const turnNum = curTurn + 1;
+  const list = document.getElementById('turnsList');
+
+  // 各段絕對畫素 — SYS 永遠 SYS_PX，每輪永遠 TURN_PX，不隨輪次縮放
+  const sysPx   = SYS_PX;
+  const histPx  = curTurn * TURN_PX;   // 已有歷史輪次
+  const newPx   = TURN_PX;             // 本輪新增（固定）
+
+  // 本輪實際計算畫素（用於統計顯示）
+  const badPx  = sysPx + histPx + newPx;   // 無快取：全量
+  const goodPx = curTurn === 0 ? sysPx + newPx : newPx; // 有快取：首輪含SYS，後續僅新增
+
+  const row = document.createElement('div');
+  row.className = 'turn-row';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'turn-label';
+  lbl.textContent = `輪 ${turnNum}`;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'bar-wrap';
+
+  const bar = document.createElement('div');
+  bar.className = 'bar-track';
+
+  if (mode === 'bad') {
+    bar.appendChild(seg('recalc', sysPx, 'SYS'));
+    if (histPx > 0) bar.appendChild(seg('recalc', histPx, '歷史×' + curTurn));
+    bar.appendChild(seg('new', newPx, `+輪${turnNum}`));
+  } else {
+    const sClass = curTurn === 0 ? 'sys' : 'cached';
+    bar.appendChild(seg(sClass, sysPx, 'SYS'));
+    if (histPx > 0) bar.appendChild(seg('cached', histPx, '快取×' + curTurn));
+    bar.appendChild(seg('new', newPx, `+輪${turnNum}`));
+  }
+
+  wrap.appendChild(bar);
+
+  // 右側標註
+  const meta = document.createElement('div');
+  meta.className = 'turn-meta';
+  const computedPx = mode === 'bad' ? badPx : goodPx;
+  const costDiv = document.createElement('div');
+  costDiv.className = 'turn-cost ' + (mode === 'bad' ? 'bad' : 'good');
+  costDiv.textContent = computedPx + ' T';
+  const diffDiv = document.createElement('div');
+  diffDiv.className = 'turn-diff';
+  diffDiv.textContent = mode === 'bad' ? '全量重算' : (curTurn === 0 ? '首次計算' : '僅新增');
+  meta.appendChild(costDiv);
+  meta.appendChild(diffDiv);
+
+  row.appendChild(lbl);
+  row.appendChild(wrap);
+  row.appendChild(meta);
+  list.appendChild(row);
+  row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  curTurn++;
+
+  // 累計統計
+  let badTotal = 0, goodTotal = 0;
+  for (let i = 1; i <= curTurn; i++) {
+    badTotal  += SYS_PX + (i - 1) * TURN_PX + TURN_PX;          // 全量
+    goodTotal += i === 1 ? SYS_PX + TURN_PX : TURN_PX;           // 首輪含SYS，後續僅新增
+  }
+  const pct = badTotal > 0 ? Math.round((1 - goodTotal / badTotal) * 100) : 0;
+
+  document.getElementById('statTurns').textContent = curTurn;
+  document.getElementById('statWaste').textContent = badTotal + ' T';
+  document.getElementById('statSave').textContent  = goodTotal + ' T';
+  document.getElementById('statPct').textContent   = pct + '%';
+  document.getElementById('vizTitle').textContent  =
+    mode === 'bad'
+      ? `第 ${curTurn} 輪：全量重算 ${badPx} T · SYS + 歷史每輪都在累積`
+      : `第 ${curTurn} 輪：僅算 ${goodPx} T · SYS 寬度不變 = 快取命中`;
+
+  if (curTurn >= TURNS.length) {
+    document.getElementById('btnNext').disabled = true;
+    document.getElementById('btnNext').textContent = '✓ 演示完成';
+    document.getElementById('ctrlHint').textContent =
+      `切換模式後點「重置」重新演示 · 累計節省 ${pct}%`;
+  }
+}
+
+function seg(cls, px, label) {
+  const d = document.createElement('div');
+  d.className = 'bar-seg ' + cls;
+  d.style.width = px + 'px';
+  d.textContent = px >= 36 ? label : '';
+  return d;
+}
+
+resetDemo();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

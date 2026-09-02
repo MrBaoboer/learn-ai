@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>從檢索到 RAG | xueai.miyang.cn</title>
+    <script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+    <link rel="stylesheet" href="lesson.css?v=20260827a">
+    <link rel="stylesheet" href="vector-db-course.css?v=20260825e">
+    <link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+    <style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+    <meta name="description" content="把 Milvus 向量檢索接入 RAG，並理解切分、過濾、重排、混合檢索和 RRF。">
+    <meta name="author" content="洛小山">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://xueai.miyang.cn/slides/vector-db-4.tw.html">
+<meta property="og:locale" content="zh_TW">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vector-db-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vector-db-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vector-db-4.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vector-db-4.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vector-db-4.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vector-db-4.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vector-db-4.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+    <meta property="og:title" content="從檢索到 RAG">
+    <meta property="og:description" content="讓檢索結果成為可引用、可評測的回答上下文。">
+    <meta property="og:url" content="https://xueai.miyang.cn/slides/vector-db-4.tw.html">
+    <meta property="og:image" content="https://xueai.miyang.cn/slides/og/vector-db-4.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"name":"從檢索到 RAG","url":"https://xueai.miyang.cn/slides/vector-db-4.tw.html","inLanguage":"zh-Hant-TW","isAccessibleForFree":false}</script>
+    <style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:150px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(#000 20%,transparent);mask-image:linear-gradient(#000 20%,transparent)}</style>
+    <script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script>
+  <!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"從檢索到 RAG","name":"從檢索到 RAG","url":"https://xueai.miyang.cn/slides/vector-db-4.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"把 Milvus 向量檢索接入 RAG，並理解切分、過濾、重排、混合檢索和 RRF。","datePublished":"2026-08-23","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+  <body>
+    <article class="lesson wide">
+      <header class="lesson-header">
+        <div class="kicker">Agent 工程</div>
+        <h1>從檢索到 RAG</h1>
+        <p class="subtitle">Search 返回“可能相關的片段”，RAG 還要把它們變成有來源、有邊界、能被評測的回答依據。</p>
+      </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>切分、過濾、混合檢索、RRF、重排與評測</p></aside><!--seo:end-->      <div class="vdb-note">
+        <b>本課在哪一層：</b>向量檢索的入門在本主題前面的<a href="7-3c.html">長期記憶：向量檢索</a>，RAG 的產品視角在第一篇章的<a href="1-2-mitigation-rag.html">RAG 檢索增強生成</a>與<a href="rag-advanced.html">RAG 的代價與優化策略</a>。本課不重複這些基礎，只講 Milvus 檢索如何進入可靠的 RAG 鏈路；把檢索封成 Agent 工具則在第四篇章的<a href="vector-db-5.html">Milvus 作為 Agent 知識庫工具</a>。
+      </div>
+      <div class="sec-label">線上鏈路</div>
+      <div class="vdb-flow">
+        <div class="vdb-step">
+          <span class="vdb-num">1</span>
+          <h3>Embed Query</h3>
+          <p>用寫入時同一個模型編碼問題。</p>
+        </div>
+        <div class="vdb-step">
+          <span class="vdb-num">2</span>
+          <h3>Retrieve</h3>
+          <p>租戶/權限過濾 + Top-K 向量檢索。</p>
+        </div>
+        <div class="vdb-step">
+          <span class="vdb-num">3</span>
+          <h3>Rerank</h3>
+          <p>精排、去重，並控制上下文 Token。</p>
+        </div>
+        <div class="vdb-step">
+          <span class="vdb-num">4</span>
+          <h3>Generate</h3>
+          <p>要求模型只依據證據回答並給出來源。</p>
+        </div>
+      </div>
+      <div class="sec-label paywall-locked xa-peek">離線攝取決定了線上上限</div>
+      <div class="vdb-cards paywall-locked">
+        <div class="vdb-card">
+          <h3>切分</h3>
+          <p>按標題、段落和語義邊界切 chunk，保留少量 overlap。太大噪聲多，太小上下文斷裂。</p>
+        </div>
+        <div class="vdb-card">
+          <h3>中繼資料</h3>
+          <p>儲存 source_id、版本、章節、租戶、ACL 與更新時間。引用、過濾和刪除都依賴它。</p>
+        </div>
+        <div class="vdb-card">
+          <h3>版本</h3>
+          <p>內容或 Embedding 模型變化要重算；藍綠 collection 切換可避免新舊向量混用。</p>
+        </div>
+      </div>
+      <div class="sec-label paywall-locked">檢索品質工具箱</div>
+      <div class="vdb-table-wrap paywall-locked">
+        <table class="vdb-table">
+          <thead>
+            <tr>
+              <th>方法</th>
+              <th>解決什麼</th>
+              <th>注意</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>標量 Filter</td>
+              <td>租戶、權限、時間、語言約束</td>
+              <td>權限必須在檢索階段執行，不能只靠 Prompt</td>
+            </tr>
+            <tr>
+              <td>向量 + 關鍵詞混合檢索</td>
+              <td>兼顧語義、產品型號、錯誤碼等精確詞</td>
+              <td>兩種分數尺度不同，不宜直接相加</td>
+            </tr>
+            <tr>
+              <td>RRF 融合</td>
+              <td>按排名融合多路結果</td>
+              <td>簡單穩健；再用 reranker 精排候選</td>
+            </tr>
+            <tr>
+              <td>Partition / TTL</td>
+              <td>隔離熱點或清理過期資料</td>
+              <td>屬於擴充能力，先用清晰的 collection 與 filter 設計</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="vdb-note paywall-locked">
+        <b>評測分兩層：</b>先測檢索 Recall@K、MRR / nDCG 與過濾正確性，再測答案的忠實度、引用準確率和拒答率。只看“回答像不像”會掩蓋召回失敗。</div>
+      <div class="l-callout paywall-locked">
+        <b>收穫</b>　RAG 不是“搜到就塞”。切分、中繼資料、權限過濾、融合與引用共同決定檢索增強是否可靠。</div>
+    </article>
+    <script src="i18n.js?v=20260903a"></script>
+    <script src="nav-inject.js?v=20260903a"></script>
+      <!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>用 Prompt 約束幻覺：指令工程的防禦姿勢 | xueai.miyang.cn</title>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root {
+  /* 兼容旧变量名：映射到设计系统 */
+  --bg-color: var(--bg);
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+.badge {
+  display: inline-block;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 5px 14px; border-radius: 8px;
+  background: rgba(0,102,255,0.1); color: var(--accent);
+  white-space: nowrap; margin-bottom: 12px;
+}
+.main-area {
+  display: grid; grid-template-columns: 340px 1fr; gap: 20px;
+  align-items: start;
+}
+
+/* Left */
+.left-panel {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.section-label {
+  font-size: 12px; font-weight: 800; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+.scene-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 18px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+}
+.scene-card:hover { border-color: rgba(0,102,255,0.2); }
+.scene-card.active { border-color: var(--accent); background: rgba(0,102,255,0.03); }
+.scene-tag {
+  font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 5px;
+}
+.scene-name { font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.scene-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+.pm-tip {
+  background: rgba(0,102,255,0.04);
+  border: 1px solid rgba(0,102,255,0.12);
+  border-radius: 12px; padding: 14px 18px;
+}
+.pm-tip-title { font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 8px; letter-spacing: 0.3px; }
+.pm-tip p { font-size: 13px; color: var(--text-sub); line-height: 1.8; }
+.pm-tip b { color: var(--text-main); }
+
+/* Right */
+.right-panel {
+  display: flex; flex-direction: column;
+  min-width: 0; gap: 14px;
+}
+.right-top {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 10px;
+}
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.toggle-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.toggle-btn {
+  padding: 9px 18px; border-radius: var(--radius-sm); border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.toggle-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+.compare-area {
+  display: flex; gap: 16px;
+}
+.compare-col { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col-label {
+  font-size: 13px; font-weight: 700; padding: 0 2px;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.col-label .dot { width: 10px; height: 10px; border-radius: 50%; }
+.col-label .dot.red { background: var(--danger); }
+.col-label .dot.green { background: var(--success); }
+.col-label span.label-text { color: var(--text-sub); }
+
+.convo-box {
+  flex: 1; background: var(--card); border-radius: var(--radius); padding: 16px 18px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.bubble-user {
+  background: var(--accent); color: white;
+  padding: 11px 16px; border-radius: 12px 12px 4px 12px;
+  font-size: 15px; line-height: 1.6; align-self: flex-end;
+  max-width: 90%;
+}
+.bubble-system {
+  background: rgba(0,0,0,0.04); color: var(--text-sub);
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; line-height: 1.6; font-style: italic;
+  border: 1px dashed rgba(0,0,0,0.1);
+  max-width: 95%;
+}
+.bubble-ai {
+  background: rgba(0,0,0,0.04); color: var(--text-main);
+  padding: 11px 16px; border-radius: 12px 12px 12px 4px;
+  font-size: 15px; line-height: 1.8; align-self: flex-start;
+  max-width: 95%;
+}
+.bubble-ai .hl-red {
+  color: var(--danger); font-weight: 600;
+  text-decoration: underline wavy var(--danger);
+  text-underline-offset: 3px;
+}
+.bubble-ai .hl-green { color: var(--success); font-weight: 600; }
+.bubble-ai .note {
+  display: block; font-size: 13px; color: var(--text-sub);
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.verdict {
+  padding: 10px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 700;
+}
+.verdict.bad { background: rgba(229,62,62,0.06); color: var(--danger); border: 1px solid rgba(229,62,62,0.15); }
+.verdict.good { background: rgba(22,163,106,0.06); color: var(--success); border: 1px solid rgba(22,163,106,0.15); }
+
+/* Why it works */
+.why-box {
+  background: #1c1c1e; border-radius: 12px; padding: 14px 16px;
+  flex-shrink: 0;
+}
+.why-title {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.token-chain {
+  display: flex; align-items: center; gap: 0; margin-bottom: 12px; flex-wrap: wrap; gap: 4px;
+}
+.token-chip {
+  padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+}
+.token-chip.context { background: rgba(255,255,255,0.08); color: #9ca3af; }
+.token-chip.injected { background: rgba(0,102,255,0.25); color: #93c5fd; border: 1px solid rgba(0,102,255,0.4); }
+.token-chip.output { background: rgba(22,163,106,0.2); color: #6ee7b7; border: 1px solid rgba(22,163,106,0.35); }
+.token-chip.output-bad { background: rgba(229,62,62,0.2); color: #fca5a5; border: 1px solid rgba(229,62,62,0.35); }
+.token-arrow { color: #4b5563; font-size: 14px; font-weight: 700; padding: 0 2px; align-self: center; }
+.why-insight {
+  font-size: 13px; color: #9ca3af; line-height: 1.7; border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 10px; margin-top: 2px;
+}
+.why-insight b { color: #e5e7eb; }
+.why-insight .key { color: #93c5fd; font-weight: 700; }
+
+/* "为什么有效" 视图（自然流） */
+.why-flex-row { display: flex; gap: 16px; }
+.why-limit-row { display: flex; gap: 20px; }
+
+@media (max-width: 900px) {
+  .main-area { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .compare-area { flex-direction: column; }
+  .why-flex-row { flex-direction: column; }
+  .why-flex-row > div[style*="width:1px"] { display: none; }
+  .why-limit-row { flex-direction: column; }
+  .why-limit-row > div[style*="width:1px"] { display: none; }
+  .toggle-btn { padding: 11px 14px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="透過精心設計的 System Prompt，可以有效降低大模型幻覺機率。介紹明確知識邊界、要求引用來源、拒絕不確定回答等實戰 Prompt 設計模式。">
+<meta name="keywords" content="Prompt約束幻覺,System Prompt,大模型可信度,指令工程,AI防禦">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/1-2-mitigation-prompt.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/1-2-mitigation-prompt.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/1-2-mitigation-prompt.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/1-2-mitigation-prompt.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/1-2-mitigation-prompt.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/1-2-mitigation-prompt.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/1-2-mitigation-prompt.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/1-2-mitigation-prompt.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="用 Prompt 約束幻覺：指令工程的防禦姿勢">
+<meta property="og:description" content="透過精心設計的 System Prompt，可以有效降低大模型幻覺機率。介紹明確知識邊界、要求引用來源、拒絕不確定回答等實戰 Prompt 設計模式。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/1-2-mitigation-prompt.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/1-2-mitigation-prompt.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="用 Prompt 約束幻覺：指令工程的防禦姿勢">
+<meta name="twitter:description" content="透過精心設計的 System Prompt，可以有效降低大模型幻覺機率。介紹明確知識邊界、要求引用來源、拒絕不確定回答等實戰 Prompt 設計模式。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"應對 1：Prompt Engineering","name":"應對 1：Prompt Engineering","url":"https://xueai.miyang.cn/slides/1-2-mitigation-prompt.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 幻覺與四種應對","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"透過精心設計的 System Prompt，可以有效降低大模型幻覺機率。介紹明確知識邊界、要求引用來源、拒絕不確定回答等實戰 Prompt 設計模式。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">幻覺與應對</div>
+    <h1>Prompt 工程：用指令約束幻覺</h1>
+    <p class="subtitle">PM 視角：寫需求文件、對接 AI 介面時，如何透過 System Prompt 減少模型編造。</p>
+    <div class="badge" style="margin-top:12px;">手段 01 / 04 · 預防</div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>約束指令 + 侷限性：模型不知道自己不知道什麼</p></aside><!--seo:end-->  <div class="main-area paywall-locked xa-peek">
+    <div class="left-panel">
+      <div>
+        <div class="section-label">選擇業務場景</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="scene-card active" onclick="selectScene(0)">
+            <div class="scene-tag">場景 A · 智慧客服</div>
+            <div class="scene-name">電商 / 金融客服機器人</div>
+            <div class="scene-desc">使用者問產品細節、退款政策，模型極易編造不存在的規則。</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(1)">
+            <div class="scene-tag">場景 B · 內容創作</div>
+            <div class="scene-name">AI 寫作助手 / 公文生成</div>
+            <div class="scene-desc">生成報告時模型可能捏造資料、引用不存在的法規檔案。</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(2)">
+            <div class="scene-tag">場景 C · 知識問答</div>
+            <div class="scene-name">企業內部知識庫問答</div>
+            <div class="scene-desc">員工問內部流程，模型用通用知識填充，與公司實際規定不符。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pm-tip" id="pmTip">
+        <div class="pm-tip-title">PM 操作要點</div>
+        <p id="pmTipContent">載入中…</p>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="right-top">
+        <h3 id="rightTitle">對話對比</h3>
+        <div class="toggle-group">
+          <button class="toggle-btn active" onclick="setView('compare')">對比檢視</button>
+          <button class="toggle-btn" onclick="setView('prompt')">Prompt 模板</button>
+          <button class="toggle-btn" onclick="setView('why')">為什麼有效</button>
+          <button class="toggle-btn" onclick="setView('strat')">三種策略</button>
+        </div>
+      </div>
+
+      <!-- Compare view -->
+      <div class="compare-area" id="viewCompare">
+        <div class="compare-col">
+          <div class="col-label"><span class="dot red"></span><span class="label-text">無約束 Prompt</span></div>
+          <div class="convo-box" id="boxBad"></div>
+          <div class="verdict bad" id="verdictBad"></div>
+        </div>
+        <div class="compare-col">
+          <div class="col-label"><span class="dot green"></span><span class="label-text">加約束 System Prompt</span></div>
+          <div class="convo-box" id="boxGood"></div>
+          <div class="verdict good" id="verdictGood"></div>
+        </div>
+      </div>
+
+      <!-- Prompt template view -->
+      <div id="viewPrompt" style="display:none;">
+        <div style="background:#1c1c1e;border-radius:14px;padding:20px 24px;">
+          <div style="font-size:12px;color:#6b7280;margin-bottom:12px;font-family:monospace;">System Prompt 模板 · 可直接複用</div>
+          <pre id="promptTemplate" style="font-family:'SF Mono','Fira Code',monospace;font-size:13px;line-height:1.9;color:#e5e5e5;white-space:pre-wrap;"></pre>
+        </div>
+      </div>
+
+      <!-- Strategy demo view (from 3-3) -->
+      <div id="viewStrat" style="display:none;flex-direction:column;gap:12px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button onclick="showStrat(this,'no_context')" class="strat-tab active-s" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:13px;font-weight:600;cursor:pointer;background:var(--text-main);color:white;">無上下文</button>
+          <button onclick="showStrat(this,'with_doc')" class="strat-tab" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:13px;font-weight:600;cursor:pointer;background:white;color:var(--text-sub);">附上文件</button>
+          <button onclick="showStrat(this,'force_unknown')" class="strat-tab" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);font-size:13px;font-weight:600;cursor:pointer;background:white;color:var(--text-sub);">強制說不知道</button>
+          <span style="font-size:12px;color:var(--text-sub);margin-left:8px;">以「量子糾纏2025年商業應用」為例</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:12px;color:var(--text-sub);">傳送給模型的內容：</div>
+          <div id="stratPromptBox" style="background:#1c1c1e;border-radius:10px;padding:14px 18px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;line-height:1.8;color:#9ca3af;white-space:pre-wrap;"></div>
+          <div style="font-size:12px;color:var(--text-sub);">模型回覆：</div>
+          <div id="stratOutputBox" style="background:white;border-radius:10px;padding:14px 18px;font-size:14px;line-height:1.8;border:1.5px solid rgba(0,0,0,0.08);"></div>
+        </div>
+      </div>
+
+      <!-- Why it works view -->
+      <div id="viewWhy" style="display:none;background:var(--card);border-radius:14px;padding:24px 28px;flex-direction:column;gap:16px;border:1px solid rgba(0,0,0,0.06);">
+        <div class="why-flex-row">
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">沒有 System Prompt</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">使用者問題</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px solid rgba(229,62,62,0.2);">編造的答案…</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">模型直接基於訓練記憶推 Token，碰上知識盲區會流暢地編造</div>
+          </div>
+          <div style="width:1px;background:rgba(0,0,0,0.06);flex-shrink:0;"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">加入約束 System Prompt</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">使用者問題</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">+</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.2);">如果不確定</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.2);">就說不知道</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">我不確定…</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">藍色的約束詞成為上下文的一部分，拉高了「承認不知道」這個序列的機率</div>
+          </div>
+        </div>
+        <div style="background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.12);border-radius:12px;padding:16px 22px;">
+          <div style="font-size:15px;color:var(--text-main);line-height:1.9;">
+            模型推下一個 Token 時，<b>當前上下文裡的每一個 Token 都在影響機率分佈。</b>
+            System Prompt 注入的約束詞，就是在上下文裡放入<span style="color:var(--accent);font-weight:700;">「高品質的前文」</span>：
+            它讓「我不確定」這個序列的機率上升，讓編造序列的機率下降。
+            <b>本質：用精心設計的前文，定向干預後文的機率分佈。</b>
+          </div>
+        </div>
+        <div style="background:rgba(229,62,62,0.04);border:1px solid rgba(229,62,62,0.15);border-radius:12px;padding:16px 22px;">
+          <div style="font-size:13px;font-weight:800;color:var(--danger);margin-bottom:10px;letter-spacing:0.3px;">⚠ 侷限性：模型不知道自己不知道</div>
+          <div class="why-limit-row">
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">約束指令有效的前提</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                模型對某個問題<b>有一定不確定感</b>時，約束詞能把它推向承認不知道的序列。<br>
+                → 適合：<span style="color:var(--success);font-weight:600;">問題超出知識範圍、模糊查詢、時效性資訊</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">約束指令失效的場景</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                模型對某個錯誤答案<b>高度自信</b>時，它推出的第一候選詞就是錯的，約束詞幹預不了這個機率。<br>
+                → 失效於：<span style="color:var(--danger);font-weight:600;">訓練資料裡的系統性錯誤、過時知識被當作事實</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">PM 應對策略</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                對於「模型高度自信但可能出錯」的領域，Prompt 約束不夠，<br>
+                → 需要搭配 <span style="color:var(--accent);font-weight:600;">RAG（注入真實知識）</span> 或 <span style="color:var(--amber);font-weight:600;">人工審核兜底</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script>
+const SCENES = [
+  {
+    name: '智慧客服對話對比',
+    bad: [
+      { type: 'user', text: '你們的七天無理由退款是從什麼時候開始算的？' },
+      { type: 'ai', bad: true, text: '從您<span class="hl-red">確認收貨之日起7天內</span>均可申請無理由退款，<span class="hl-red">包括客製商品和食品</span>，只需保持原包裝即可。' },
+    ],
+    good: [
+      { type: 'system', text: '你是客服助手。只能回答知識庫中有明確記錄的問題。不確定的內容必須說「我需要幫您查詢一下，請稍等」，禁止自行推斷或補充政策細節。' },
+      { type: 'user', text: '你們的七天無理由退款是從什麼時候開始算的？' },
+      { type: 'ai', bad: false, text: '<span class="hl-green">我需要幫您查詢一下，請稍等。</span>根據我們的退款政策，七天無理由從簽收日期起算。但客製商品和食品等特殊品類是否適用，需要我幫您核實具體訂單，您方便提供訂單號嗎？' },
+    ],
+    verdictBad: '✗ 模型編造了「客製商品也可退」，實際上不行，可能引發客訴糾紛。',
+    verdictGood: '✓ 回答了已知部分，主動承認未知部分，引導到安全路徑。',
+    pmTip: '在需求文件中，<b>System Prompt 屬於產品配置項</b>，不是研發決定的。PM 需要明確寫出：哪些話題可以回答、哪些必須轉人工、遇到不確定時的兜底話術。',
+    prompt: `# 智慧客服 System Prompt 模板
+
+你是 [公司名] 的智慧客服助手。
+
+## 核心約束
+- 只回答知識庫中有明確記錄的問題
+- 涉及價格、政策、庫存等數字，必須從知識庫取得，禁止自行推斷
+- 不確定時，統一回復：「這個問題我需要幫您查詢一下，請稍等」
+- 嚴禁編造不存在的優惠活動、退款規則、產品參數
+
+## 兜底話術
+當無法確認時：
+「感謝您的耐心等待，這個問題我幫您轉接專屬客服確認，
+ 預計 [X] 分鐘內回覆，是否方便留下聯絡方式？」
+
+## 拒絕回答的場景
+- 競爭對手產品比較
+- 超出本公司產品範圍的法律/醫療建議
+- 使用者情緒激動時，不做解釋，直接轉人工`
+  },
+  {
+    name: 'AI 寫作助手對話對比',
+    bad: [
+      { type: 'user', text: '幫我寫一段關於公司2024年營收增長的摘要，引用一些行業資料支撐。' },
+      { type: 'ai', bad: true, text: '2024年公司營收實現同比增長<span class="hl-red">32.5%</span>，遠超行業平均水平。根據<span class="hl-red">艾瑞諮詢2024年Q3報告</span>，該細分市場整體增速為18%，公司市佔率提升至<span class="hl-red">14.7%</span>…' },
+    ],
+    good: [
+      { type: 'system', text: '你是寫作助手。生成內容時，如包含具體數字、報告名稱、機構名，必須標註「[需核實]」。不要虛構資料，寧可留空白讓使用者填寫。' },
+      { type: 'user', text: '幫我寫一段關於公司2024年營收增長的摘要，引用一些行業資料支撐。' },
+      { type: 'ai', bad: false, text: '2024年公司營收實現同比增長<span class="hl-green">[填入實際資料]%</span>，根據<span class="hl-green">[來源：請提供報告名稱] [需核實]</span>，行業整體增速約為 [X]%…<span class="note">⚠ 我沒有您公司的真實資料，已標註需要核實的位置，請填入準確數字後再發布。</span>' },
+    ],
+    verdictBad: '✗ 模型捏造了具體數字和報告來源，發出去會造成資訊失實，嚴重時引發法律風險。',
+    verdictGood: '✓ 生成結構框架，主動標註缺口，避免了虛假資料流出。',
+    pmTip: '寫作場景的核心風險是<b>數字幻覺</b>。PM 需要在 Prompt 中明確：遇到需要資料時，模型應留空白並標註「需核實」，禁止自行編造。這是<b>產品安全規範</b>，需要寫入 PRD。',
+    prompt: `# AI 寫作助手 System Prompt 模板
+
+你是專業寫作助手，幫使用者生成高品質文案。
+
+## 資料安全約束
+- 所有具體數字（百分比、金額、排名）如非使用者提供，必須標註 [需核實]
+- 所有報告名稱、機構名如非使用者提供，必須標註 [來源待確認]
+- 禁止虛構調研資料、媒體報導、專家言論
+
+## 處理方式
+遇到需要資料的地方：
+✓ 寫出內容結構，用 [X%] / [報告名] 等佔位符
+✓ 在末尾提示：「以上 [需核實] 處請填入真實資料後再使用」
+✗ 不要自行推測或估算一個看似合理的數字
+
+## 輸出格式
+重要宣告放在回覆末尾：
+「本文由 AI 輔助生成，標註 [需核實] 處請用真實資料替換後再發布。」`
+  },
+  {
+    name: '企業知識庫問答對比',
+    bad: [
+      { type: 'user', text: '員工出差報銷，住宿費標準是多少？' },
+      { type: 'ai', bad: true, text: '根據一般企業標準，住宿費報銷通常為<span class="hl-red">一線城市500元/晚，二線城市350元/晚，三線城市200元/晚</span>。差旅補貼另計，通常為80-100元/天…' },
+    ],
+    good: [
+      { type: 'system', text: '你是企業內部知識庫助手。只能基於提供的公司文件回答問題。如果文件中沒有明確說明，必須回覆「當前知識庫中暫無此資訊，請聯絡HR確認」，禁止使用通用行業經驗推斷公司政策。' },
+      { type: 'user', text: '員工出差報銷，住宿費標準是多少？' },
+      { type: 'ai', bad: false, text: '<span class="hl-green">當前知識庫中暫無出差住宿費標準的明確記錄。</span>建議您聯絡 HR 行政部門確認最新標準，或查閱員工手冊第 [X] 章差旅管理規定。<span class="note">注：不同城市級別、崗位級別可能有不同標準，請以公司正式檔案為準。</span>' },
+    ],
+    verdictBad: '✗ 模型用行業通用資料替代了公司真實政策，員工據此報銷會被駁回，信任崩塌。',
+    verdictGood: '✓ 承認知識邊界，引導到正確渠道，不亂說一句話。',
+    pmTip: '企業知識庫場景中，<b>「不知道就引導」比「知道但說錯」好 10 倍</b>。PM 要在 System Prompt 中明確知識邊界，並設計好兜底引導路徑（聯絡誰、看哪個文件）。這是<b>資訊準確性 SLA</b> 的一部分。',
+    prompt: `# 企業知識庫問答 System Prompt 模板
+
+你是 [公司名] 內部知識庫助手。
+
+## 嚴格邊界
+- 只基於以下上下文文件回答：{context}
+- 文件中沒有明確內容 → 回覆固定話術，不推斷、不補充
+- 禁止用「通常」、「一般來說」、「行業標準」等表述替代公司政策
+
+## 兜底話術（文件中無答案時）
+「當前知識庫中暫無「{問題關鍵詞}」的明確記錄。
+ 建議您：① 聯絡 HR/法務/對應部門 ② 查閱員工手冊 [章節]
+ 如需我幫您轉發問題，可以告知。」
+
+## 回答格式
+1. 直接給出答案（僅限文件有明確記錄）
+2. 標註依據：「根據 [文件名·版本·發布日期]」
+3. 如有歧義，列出多個可能並建議核實`
+  }
+];
+
+let currentScene = 0;
+let currentView = 'compare';
+
+function selectScene(idx) {
+  currentScene = idx;
+  document.querySelectorAll('.scene-card').forEach((c, i) => c.classList.toggle('active', i === idx));
+  renderScene();
+}
+
+function setView(v) {
+  currentView = v;
+  const views = ['compare', 'prompt', 'why', 'strat'];
+  document.querySelectorAll('.toggle-btn').forEach((b, i) => b.classList.toggle('active', views[i] === v));
+  document.getElementById('viewCompare').style.display = v === 'compare' ? 'flex' : 'none';
+  document.getElementById('viewPrompt').style.display = v === 'prompt' ? 'block' : 'none';
+  const whyEl = document.getElementById('viewWhy');
+  whyEl.style.display = v === 'why' ? 'flex' : 'none';
+  const stratEl = document.getElementById('viewStrat');
+  stratEl.style.display = v === 'strat' ? 'flex' : 'none';
+  if (v === 'strat') showStrat(document.querySelector('.strat-tab.active-s'), 'no_context');
+}
+
+const STRATS = {
+  no_context:{
+    prompt:`User: 請告訴我量子糾纏技術在 2025 年的最新商業應用進展。`,
+    output:`截至 2025 年第二季度，IBM 與波士頓量子公司已成功將量子糾纏應用於金融風險建模，交易速度提升 <span style="background:rgba(229,62,62,0.15);color:#dc2626;padding:0 4px;border-radius:3px;font-weight:600">340%</span>；中國科技大學宣佈實現 <span style="background:rgba(229,62,62,0.15);color:#dc2626;padding:0 4px;border-radius:3px;font-weight:600">1024 量子位元糾纏</span>…<br><br><span style="font-size:12px;color:#dc2626;font-weight:600">⚠ 以上內容為模型編造，數字和公司進展均無法核實</span>`,
+    cls: 'bad'
+  },
+  with_doc:{
+    prompt:`System: 你是專業分析師。只根據使用者提供的檔案內容作答，不得引用檔案外的資訊。
+
+[已附加檔案：quantum_report_2025.pdf · 23 頁]
+【檔案節選】
+「2025 年量子通訊商業部署主要集中在安全金鑰分發領域，
+IBM、IonQ 已有小規模試點，預計 2027 年進入規模化商用。」
+
+User: 請告訴我量子糾纏技術在 2025 年的最新商業應用進展。`,
+    output:`根據您提供的報告，2025 年量子糾纏技術的商業應用主要集中在<span style="color:#16a34a;font-weight:600">安全金鑰分發</span>領域，IBM 和 IonQ 已有小規模試點專案。報告預測規模化商用將在 2027 年實現。<br><br><span style="font-size:12px;color:#16a34a;font-weight:600">✅ 資訊來源於使用者提供檔案，準確可溯源</span>`,
+    cls: 'good'
+  },
+  force_unknown:{
+    prompt:`System: 你是一個嚴謹的助手。如果你不確定某個資訊，必須直接說「我不知道」，不得猜測或編造任何資料。
+
+User: 請告訴我量子糾纏技術在 2025 年的最新商業應用進展。`,
+    output:`我沒有關於 2025 年量子糾纏技術商業應用的可靠資訊：我的訓練資料有截止日期，且這一領域的最新進展超出了我的知識範圍。<br><br>建議查閱 Nature、IEEE Spectrum 或相關企業（IBM、Google Quantum AI）的最新發布公告。<br><br><span style="font-size:12px;color:#16a34a;font-weight:600">✅ 拒絕幻覺，給出替代建議</span>`,
+    cls: 'good'
+  }
+};
+
+function showStrat(btn, key) {
+  document.querySelectorAll('.strat-tab').forEach(b => {
+    b.classList.remove('active-s');
+    b.style.background = 'white';
+    b.style.color = 'var(--text-sub)';
+  });
+  if (btn) {
+    btn.classList.add('active-s');
+    btn.style.background = 'var(--text-main)';
+    btn.style.color = 'white';
+  }
+  const d = STRATS[key];
+  document.getElementById('stratPromptBox').textContent = d.prompt;
+  const ob = document.getElementById('stratOutputBox');
+  ob.style.border = d.cls === 'good'
+    ? '1.5px solid rgba(22,163,74,0.25)'
+    : '1.5px solid rgba(229,62,62,0.25)';
+  ob.style.background = d.cls === 'good'
+    ? 'rgba(22,163,74,0.03)'
+    : 'rgba(229,62,62,0.03)';
+  ob.innerHTML = d.output;
+}
+
+function renderScene() {
+  const s = SCENES[currentScene];
+
+  // Bad box
+  const bad = document.getElementById('boxBad');
+  bad.innerHTML = '';
+  s.bad.forEach(m => bad.appendChild(makeBubble(m)));
+  document.getElementById('verdictBad').textContent = s.verdictBad;
+
+  // Good box
+  const good = document.getElementById('boxGood');
+  good.innerHTML = '';
+  s.good.forEach(m => good.appendChild(makeBubble(m)));
+  document.getElementById('verdictGood').textContent = s.verdictGood;
+
+  // PM tip
+  document.getElementById('pmTipContent').innerHTML = s.pmTip;
+
+  // Prompt template
+  document.getElementById('promptTemplate').textContent = s.prompt;
+}
+
+function makeBubble(m) {
+  const div = document.createElement('div');
+  if (m.type === 'user') {
+    div.className = 'bubble-user';
+    div.textContent = m.text;
+  } else if (m.type === 'system') {
+    div.className = 'bubble-system';
+    div.textContent = '⚙ System Prompt: ' + m.text;
+  } else {
+    div.className = 'bubble-ai';
+    div.innerHTML = m.text;
+  }
+  return div;
+}
+
+renderScene();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice-principles.js?v=20260827a"></script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

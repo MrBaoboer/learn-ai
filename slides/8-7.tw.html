@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>語義層優化：不要把上下文視窗當垃圾桶 | xueai.miyang.cn</title>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+@keyframes _si{to{opacity:1}}
+body{opacity:0;animation:_si .15s ease .08s forwards}
+
+:root{
+  --red:var(--danger);
+  --green:var(--success);
+  --orange:var(--amber);
+  --purple:#5b4fcf;
+  --surface:var(--card);
+  --surface2:#f0ede6;
+  --muted:var(--sub);
+}
+
+.lesson-header h1 em{font-style:normal;color:var(--purple)}
+
+.problem-box{background:rgba(91,79,207,.06);border:1px solid rgba(91,79,207,.2);border-radius:10px;padding:14px 16px}
+.problem-box .pb-title{font-size:15px;font-weight:800;color:var(--purple);margin-bottom:6px}
+.problem-row{display:flex;align-items:flex-start;gap:8px;font-size:15px;color:var(--sub);line-height:1.6;margin-bottom:4px}
+.problem-row b{color:var(--text)}
+
+.strat-list{display:flex;flex-direction:column;gap:8px}
+.strat-btn{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;background:var(--surface);border:1.5px solid var(--border);cursor:pointer;font-family:inherit;text-align:left;transition:all .18s;width:100%}
+.strat-btn:hover{border-color:rgba(91,79,207,.3)}
+.strat-btn.active{border-color:var(--purple);background:rgba(91,79,207,.04);box-shadow:0 2px 10px rgba(91,79,207,.1)}
+.sn{width:32px;height:32px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:var(--muted);flex-shrink:0;transition:all .18s}
+.strat-btn.active .sn{background:var(--purple);color:white}
+.si h5{font-size:16px;font-weight:800;color:var(--text);margin-bottom:2px}
+.si p{font-size:14px;color:var(--sub)}
+.saving{margin-left:auto;font-size:15px;font-weight:900;flex-shrink:0}
+
+.demo-title{font-size:18px;font-weight:800;color:var(--text);margin-bottom:12px}
+.demo-area{display:flex;flex-direction:column;gap:10px}
+
+/* === 策略1：Few-Shot 动态检索 === */
+.fewshot-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fs-col{display:flex;flex-direction:column;gap:6px}
+.fs-col-title{font-size:14px;font-weight:700;padding:6px 10px;border-radius:6px;text-align:center;flex-shrink:0}
+.fs-col-title.bad{background:rgba(220,38,38,.1);color:var(--red)}
+.fs-col-title.good{background:rgba(22,163,74,.1);color:var(--green)}
+.case-pool{flex:1;display:flex;flex-direction:column;gap:4px;overflow-y:auto;max-height:340px}
+.case-item{padding:8px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface);font-size:13px;color:var(--sub);line-height:1.4;cursor:default;transition:all .3s;flex-shrink:0}
+.case-item .ci-q{font-weight:700;color:var(--text);font-size:13px}
+.case-item.selected{border-color:var(--green);background:rgba(22,163,74,.06);color:var(--green)}
+.case-item.greyed{opacity:.3}
+.prompt-box{flex:1;background:#1e1e2e;border-radius:8px;padding:12px 14px;font-family:monospace;font-size:12.5px;color:#cdd6f4;overflow-y:auto;line-height:1.6;white-space:pre-wrap;min-height:200px;max-height:340px}
+.prompt-box .p-sys{color:#cba6f7}
+.prompt-box .p-case{color:#a6e3a1}
+.prompt-box .p-user{color:#89b4fa}
+.tok-bar{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.tok-track{flex:1;height:10px;border-radius:5px;background:var(--surface2);overflow:hidden}
+.tok-fill{height:100%;border-radius:5px;transition:width .6s ease}
+.tok-num{font-size:14px;font-weight:800;min-width:70px;text-align:right}
+.btn-sim{padding:10px 18px;border-radius:8px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s}
+.btn-primary{background:var(--purple);color:white}
+.btn-reset{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+
+/* === 策略2：文档压缩 === */
+.compress-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.doc-box{flex:1;border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.75;color:var(--sub);overflow-y:auto;background:var(--surface);max-height:380px}
+.doc-box .keep{color:var(--text);font-weight:500}
+.doc-box .drop{color:rgba(220,38,38,.35);text-decoration:line-through;transition:all .4s}
+.doc-box .drop.hidden{display:none}
+.compress-ctrl{display:flex;flex-direction:column;gap:8px}
+.slider-row{display:flex;align-items:center;gap:10px}
+.slider-label{font-size:14px;font-weight:700;color:var(--muted);white-space:nowrap}
+input[type=range]{flex:1;-webkit-appearance:none;height:6px;border-radius:3px;outline:none;cursor:pointer;background:linear-gradient(to right,var(--purple) 0%,var(--purple) var(--pct,30%),var(--surface2) var(--pct,30%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--purple);box-shadow:0 2px 6px rgba(91,79,207,.35);cursor:pointer}
+
+/* === 策略3：注意力热图 === */
+.attn-wrap{display:flex;flex-direction:column;gap:8px}
+.attn-prompt{display:flex;flex-direction:column;gap:6px}
+.attn-seg{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:9px;border:2px solid transparent;cursor:grab;transition:all .3s;user-select:none}
+.attn-seg:active{cursor:grabbing;transform:scale(0.98)}
+.attn-label{font-size:14px;font-weight:800;min-width:90px;flex-shrink:0}
+.attn-content{font-size:14px;color:var(--sub);flex:1;line-height:1.4}
+.attn-heat{width:70px;height:26px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white;transition:all .4s}
+.attn-note{font-size:13px;padding:9px 12px;border-radius:8px;text-align:center;font-weight:600}
+
+/* 通用 */
+.stat-row{display:flex;gap:8px;flex-wrap:wrap}
+.stat-box{flex:1;min-width:120px;border-radius:8px;padding:10px;text-align:center}
+.stat-box .sv{font-size:24px;font-weight:900;transition:all .4s}
+.stat-box .sl{font-size:12px;font-weight:700;margin-top:1px}
+.stat-box.good{background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.2)}
+.stat-box.good .sv{color:var(--green)}
+.stat-box.bad{background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.2)}
+.stat-box.bad .sv{color:var(--red)}
+.stat-box.neutral{background:var(--surface);border:1px solid var(--border)}
+.stat-box.neutral .sv{color:var(--purple)}
+.sl{color:var(--muted)}
+
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+.pop{animation:pop .3s ease}
+
+@media (max-width:768px){
+  .fewshot-wrap,.compress-wrap{grid-template-columns:1fr}
+  .case-pool,.prompt-box,.doc-box{max-height:280px}
+  .attn-label{min-width:76px;font-size:13px}
+  .attn-content{font-size:13px}
+  .stat-box .sv{font-size:20px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="上下文視窗是寶貴的計算資源，不應該塞滿無關資訊。從語義層面講解：如何識別並刪除冗餘歷史訊息、動態摘要壓縮、只保留高相關性內容的上下文管理策略。">
+<meta name="keywords" content="上下文優化,語義層優化,對話歷史壓縮,Token管理,上下文視窗管理">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/8-7.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/8-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/8-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/8-7.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/8-7.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/8-7.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/8-7.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/8-7.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="語義層優化：不要把上下文視窗當垃圾桶">
+<meta property="og:description" content="上下文視窗是寶貴的計算資源，不應該塞滿無關資訊。從語義層面講解：如何識別並刪除冗餘歷史訊息、動態摘要壓縮、只保留高相關性內容的上下文管理策略。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/8-7.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/8-7.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="語義層優化：不要把上下文視窗當垃圾桶">
+<meta name="twitter:description" content="上下文視窗是寶貴的計算資源，不應該塞滿無關資訊。從語義層面講解：如何識別並刪除冗餘歷史訊息、動態摘要壓縮、只保留高相關性內容的上下文管理策略。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"語義層優化：不要把上下文當垃圾桶","name":"語義層優化：不要把上下文當垃圾桶","url":"https://xueai.miyang.cn/slides/8-7.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 成本優化與選型","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"上下文視窗是寶貴的計算資源，不應該塞滿無關資訊。從語義層面講解：如何識別並刪除冗餘歷史訊息、動態摘要壓縮、只保留高相關性內容的上下文管理策略。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">成本優化</div>
+    <h1>語義層優化：<em>不要把上下文視窗當垃圾桶</em></h1>
+    <p class="subtitle">資訊密度越高 → 注意力越集中 → 效果越好。三個語義層策略，讓每個 Token 都有價值。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>動態 Few-Shot、LLMLingua-2 壓縮、關鍵資訊放首尾，提升資訊密度</p></aside><!--seo:end-->  <div class="sec-label">為什麼不能無限塞內容</div>
+  <div class="problem-box">
+    <div class="pb-title">為什麼不能無限塞內容？</div>
+    <div class="problem-row">① <b>貴而慢</b>：注意力複雜度 O(N²)，Prompt 翻倍 → 計算翻四倍</div>
+    <div class="problem-row">② <b>效果差</b>：模型對中間內容注意力最弱，關鍵資訊被淹沒</div>
+  </div>
+
+  <div class="sec-label">三個優化策略</div>
+  <div class="strat-list">
+        <button class="strat-btn active" onclick="pickStrat(this,0)">
+          <div class="sn">1</div>
+          <div class="si">
+            <h5>動態 Few-Shot：別硬編碼案例</h5>
+            <p>用向量檢索，每次只取最相關的 3 條</p>
+          </div>
+          <div class="saving" style="color:var(--green)">省 87.5%</div>
+        </button>
+        <button class="strat-btn" onclick="pickStrat(this,1)">
+          <div class="sn">2</div>
+          <div class="si">
+            <h5>長文件：先壓縮再餵給 AI</h5>
+            <p>LLMLingua-2 過濾冗餘，保留語義核心</p>
+          </div>
+          <div class="saving" style="color:var(--purple)">壓縮 5-20x</div>
+        </button>
+        <button class="strat-btn" onclick="pickStrat(this,2)">
+          <div class="sn">3</div>
+          <div class="si">
+            <h5>關鍵資訊放首尾，別放中間</h5>
+            <p>利用模型注意力的首尾偏好特性</p>
+          </div>
+          <div class="saving" style="color:var(--cyan)">效果↑↑</div>
+        </button>
+  </div>
+
+  <div class="sec-label">互動演示</div>
+  <div class="paywall-locked xa-peek">
+    <div class="demo-title" id="demoTitle">動態 Few-Shot：Text-to-SQL 演示</div>
+    <div class="demo-area" id="demoArea"></div>
+  </div>
+</article>
+<script>
+// ── 策略1：動態 Few-Shot ──
+const ALL_CASES = [
+  { q: 'Q: 查詢 2024 年銷售額最高的 5 個產品', sim: 0.95, sql: 'SELECT p.name, SUM(o.amount) AS sales\nFROM orders o JOIN products p ON...\nORDER BY sales DESC LIMIT 5' },
+  { q: 'Q: 按地區統計本月訂單總量', sim: 0.78, sql: 'SELECT region, COUNT(*) AS cnt\nFROM orders WHERE MONTH(...)' },
+  { q: 'Q: 找出退款率超過 5% 的商品', sim: 0.62, sql: 'SELECT product_id, refund_rate\nFROM (...) WHERE refund_rate > 0.05' },
+  { q: 'Q: 查詢活躍使用者的平均消費金額', sim: 0.51, sql: 'SELECT AVG(total) FROM orders\nWHERE user_id IN (SELECT ...)' },
+  { q: 'Q: 統計每個類別的庫存數量', sim: 0.38, sql: 'SELECT category, SUM(stock) FROM products GROUP BY category' },
+  { q: 'Q: 查詢最近 7 天新註冊使用者數', sim: 0.29, sql: 'SELECT COUNT(*) FROM users WHERE created_at > NOW()-7' },
+];
+
+function renderFewShot() {
+  return `
+  <div class="fewshot-wrap">
+    <div class="fs-col">
+      <div class="fs-col-title bad">案例庫（20 個固定案例）</div>
+      <div class="case-pool" id="casePool">
+        ${ALL_CASES.map((c,i)=>`
+          <div class="case-item" id="ci${i}">
+            <div class="ci-q">${c.q}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">相關度 ${Math.round(c.sim*100)}%</div>
+          </div>`).join('')}
+      </div>
+      <div class="tok-bar">
+        <span style="font-size:13px;font-weight:700;color:var(--muted)">舊方案</span>
+        <div class="tok-track"><div class="tok-fill" style="width:100%;background:var(--red)"></div></div>
+        <span class="tok-num" style="color:var(--red)">4,000 T</span>
+      </div>
+    </div>
+    <div class="fs-col">
+      <div class="fs-col-title good">注入 Prompt（動態檢索 Top-3）</div>
+      <pre class="prompt-box" id="promptBox"><span class="p-sys">System: 你是 SQL 專家。</span>
+
+<span style="color:var(--muted)">← 點選「開始檢索」
+   模擬向量匹配過程</span></pre>
+      <div class="tok-bar">
+        <span style="font-size:13px;font-weight:700;color:var(--muted)">新方案</span>
+        <div class="tok-track"><div class="tok-fill" id="newTokBar" style="width:0%;background:var(--green)"></div></div>
+        <span class="tok-num" id="newTokNum" style="color:var(--green)">0 T</span>
+      </div>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-box bad"><div class="sv">4,000</div><div class="sl">舊方案 Token</div></div>
+    <div class="stat-box neutral"><div class="sv" id="fsSave">—</div><div class="sl">節省比例</div></div>
+    <div class="stat-box good"><div class="sv" id="fsSpeed">—</div><div class="sl">響應速度</div></div>
+    <div class="stat-box neutral" style="background:rgba(22,163,74,.04);border-color:rgba(22,163,74,.2)">
+      <div class="sv" style="color:var(--green)" id="fsAcc">—</div><div class="sl">準確率變化</div></div>
+  </div>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <button class="btn-sim btn-primary" id="btnSim" onclick="runFewShot()">▶ 開始檢索</button>
+    <button class="btn-sim btn-reset" onclick="resetFewShot()">重置</button>
+    <span style="font-size:13px;color:var(--muted);align-self:center">使用者問：查詢本月各地區銷售額 Top-5 產品</span>
+  </div>`;
+}
+
+let fsStep = 0, fsTimer = null;
+function runFewShot() {
+  const btn = document.getElementById('btnSim');
+  if (fsStep >= 3) return;
+  btn.disabled = true;
+
+  const sorted = [...ALL_CASES].sort((a,b)=>b.sim-a.sim);
+  let delay = 0;
+  const selected = [];
+
+  sorted.forEach((c, rank) => {
+    const origIdx = ALL_CASES.indexOf(c);
+    setTimeout(() => {
+      const el = document.getElementById('ci'+origIdx);
+      if (rank < 3) {
+        el.classList.add('selected');
+        selected.push(c);
+        updatePromptBox(selected);
+        const tok = 120 + selected.length * 130;
+        const pct = Math.round(tok / 4000 * 100);
+        document.getElementById('newTokBar').style.width = pct + '%';
+        document.getElementById('newTokNum').textContent = tok + ' T';
+        if (selected.length === 3) {
+          document.getElementById('fsSave').textContent = '87.5%';
+          document.getElementById('fsSave').classList.add('pop');
+          document.getElementById('fsSpeed').textContent = '3x↑';
+          document.getElementById('fsAcc').textContent = '↑更高';
+          btn.disabled = false;
+          btn.textContent = '✓ 完成';
+        }
+      } else {
+        el.classList.add('greyed');
+      }
+    }, delay);
+    delay += rank < 3 ? 600 : 200;
+  });
+}
+
+function updatePromptBox(cases) {
+  const box = document.getElementById('promptBox');
+  let html = `<span class="p-sys">System: 你是 SQL 專家。</span>\n\n`;
+  cases.forEach((c,i) => {
+    html += `<span class="p-case">/* 案例 ${i+1}（相关度 ${Math.round(c.sim*100)}%）*/\n${c.q}\nSQL: ${c.sql}</span>\n\n`;
+  });
+  html += `<span class="p-user">User: 查詢本月各地區銷售額 Top-5 產品</span>`;
+  box.innerHTML = html;
+  box.scrollTop = box.scrollHeight;
+}
+
+function resetFewShot() {
+  ALL_CASES.forEach((_,i) => {
+    const el = document.getElementById('ci'+i);
+    if (el) { el.classList.remove('selected','greyed'); }
+  });
+  document.getElementById('promptBox').innerHTML = `<span class="p-sys">System: 你是 SQL 專家。</span>\n\n<span style="color:var(--muted)">← 點選「開始檢索」\n   模擬向量匹配過程</span>`;
+  document.getElementById('newTokBar').style.width = '0%';
+  document.getElementById('newTokNum').textContent = '0 T';
+  document.getElementById('fsSave').textContent = '—';
+  document.getElementById('fsSpeed').textContent = '—';
+  document.getElementById('fsAcc').textContent = '—';
+  const btn = document.getElementById('btnSim');
+  btn.disabled = false;
+  btn.textContent = '▶ 開始檢索';
+}
+
+// ── 策略2：文件壓縮 ──
+// 4個檔次，每檔右側顯示對應階段的壓縮結果，核心4條資料永遠保留
+
+// 左側原文（帶高亮標註哪些詞/句會被壓縮）
+const ORIG_PARAS = [
+  // [段落HTML, 在哪個檔次開始在左側顯示刪除線]
+  { html: '免責聲明：本報告<span id="del-00">僅供參考</span>，不構成投資建議，<span id="del-01">不對任何損失負責</span>。', delAt: 2 },
+  { html: '核心結論：2024Q3 營收同比增長 <b>23.5%</b>，超市場預期 <b>8 個百分點</b>。', delAt: 99 }, // 永遠保留
+  { html: '<span id="del-20">眾所周知，</span>宏觀經濟環境<span id="del-21">複雜多變，</span>各行業均面臨<span id="del-22">不同程度的</span>挑戰與機遇。', delAt: 1 },
+  { html: '毛利率提升 <b>2.1pp</b> 至 <b>61.3%</b>，主要受益於高毛利 SaaS 業務佔比提升。', delAt: 99 }, // 永遠保留
+  { html: '<span id="del-40">正如我們在上季度報告中提到的，以及在多次路演中反覆強調的…</span>', delAt: 2 },
+  { html: '經營現金流淨額 <b>12.8 億元</b>，同比增長 <b>41%</b>，<span id="del-51">現金儲備充裕。</span>', delAt: 99 }, // 永遠保留
+  { html: '<span id="del-60">感謝各位投資者長期以來的關注與支援，我們將繼續努力創造價值…</span>', delAt: 2 },
+  { html: '下季度指引：營收 <b>42-45 億元</b>，Non-GAAP 淨利率 <b>18-20%</b>。', delAt: 99 }, // 永遠保留
+];
+
+// 右側4個檔次的結果（對應滑塊位置 1/2/3/4）
+const COMPRESS_LEVELS = [
+  // 檔次0：不壓縮（原文）
+  {
+    label: '1x（不壓縮）',
+    tok: 10000, savePct: 0,
+    titleColor: 'var(--sub)',
+    desc: '原始文件，含大量冗餘詞彙和無效句子',
+    html: `<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">免責聲明：本報告僅供參考，不構成投資建議，不對任何損失負責。</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>核心結論：2024Q3 營收同比增長 23.5%，超市場預期 8 個百分點。</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">眾所周知，宏觀經濟環境複雜多變，各行業均面臨不同程度的挑戰與機遇。</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>毛利率提升 2.1pp 至 61.3%，主要受益於高毛利 SaaS 業務佔比提升。</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">正如我們在上季度報告中提到的，以及在多次路演中反覆強調的…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>經營現金流淨額 12.8 億元，同比增長 41%，現金儲備充裕。</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">感謝各位投資者長期以來的關注與支援，我們將繼續努力創造價值…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>下季度指引：營收 42-45 億元，Non-GAAP 淨利率 18-20%。</b></p>`
+  },
+  // 檔次1：輕度壓縮 —— 刪掉冗餘詞彙（"眾所周知"、"複雜多變"、"不同程度的"等副詞/套話詞）
+  {
+    label: '3x（輕度）',
+    tok: 3800, savePct: 62,
+    titleColor: 'var(--amber)',
+    desc: '第一步：刪掉冗餘副詞和套話短語，語義不變',
+    html: `<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">免責聲明：本報告僅供參考，不構成投資建議，不對任何損失負責。</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>核心結論：2024Q3 營收同比增長 23.5%，超市場預期 8 個百分點。</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">宏觀經濟環境面臨挑戰與機遇。<span style="color:var(--amber);font-size:12px">←「眾所周知」「複雜多變」「不同程度的」已刪</span></p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>毛利率提升 2.1pp 至 61.3%，主要受益於高毛利 SaaS 業務佔比提升。</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">正如我們在上季度報告中提到的，以及在多次路演中反覆強調的…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>經營現金流淨額 12.8 億元，同比增長 41%，現金儲備充裕。</b></p>
+<p style="margin-bottom:8px;color:var(--sub);line-height:1.75">感謝各位投資者長期以來的關注與支援，我們將繼續努力創造價值…</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>下季度指引：營收 42-45 億元，Non-GAAP 淨利率 18-20%。</b></p>`
+  },
+  // 檔次2：中度壓縮 —— 刪掉整段冗餘句（免責聲明、路演套話、感謝語）
+  {
+    label: '7x（中度）',
+    tok: 1500, savePct: 85,
+    titleColor: 'var(--orange)',
+    desc: '第二步：刪掉整句無效段落（免責聲明、感謝語、套話段）',
+    html: `<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">免責聲明：本報告僅供參考… ← 整段刪除</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>核心結論：2024Q3 營收同比增長 23.5%，超市場預期 8 個百分點。</b></p>
+<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">宏觀經濟環境面臨挑戰與機遇。← 無實質資訊，刪除</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>毛利率提升 2.1pp 至 61.3%，主要受益於高毛利 SaaS 業務佔比提升。</b></p>
+<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">正如我們在上季度報告中提到的… ← 整段刪除</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>經營現金流淨額 12.8 億元，同比增長 41%，現金儲備充裕。</b></p>
+<p style="margin-bottom:6px;color:rgba(220,38,38,.4);text-decoration:line-through;font-size:13px;line-height:1.6">感謝各位投資者長期以來的關注… ← 整段刪除</p>
+<p style="margin-bottom:8px;color:var(--text);line-height:1.75"><b>下季度指引：營收 42-45 億元，Non-GAAP 淨利率 18-20%。</b></p>`
+  },
+  // 檔次3：激進壓縮 —— 重組為極簡列表，核心4條資料完整保留
+  {
+    label: '20x（激進）',
+    tok: 520, savePct: 95,
+    titleColor: 'var(--green)',
+    desc: '第三步：重組為極簡列表，核心資料 100% 保留',
+    html: `<p style="margin-bottom:10px;font-size:13px;color:var(--muted)">↓ 壓縮為結構化摘要，資訊密度最大：</p>
+<div style="background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:10px 14px;line-height:2;font-size:15px;color:var(--text)">
+• 營收同比 +23.5%，超預期 8pp<br>
+• 毛利率 61.3%（+2.1pp），SaaS 佔比提升<br>
+• 經營現金流 12.8億，同比 +41%<br>
+• Q4指引：營收 42-45億，Non-GAAP利潤率 18-20%
+</div>
+<p style="margin-top:8px;font-size:13px;color:var(--green);font-weight:700">✓ 4條核心資料完整保留，冗餘內容全部過濾</p>`
+  },
+];
+
+function renderCompress() {
+  return `
+  <div style="font-size:14px;color:var(--sub);flex-shrink:0">拖動滑塊體驗 LLMLingua-2 壓縮層次：<b style="color:var(--purple)">先刪詞 → 再刪句 → 最後重組為列表。核心資料永遠保留。</b></div>
+  <div class="compress-wrap">
+    <div class="fs-col">
+      <div class="fs-col-title bad">原始文件（含大量冗餘）</div>
+      <div class="doc-box" id="docOriginal">
+        ${ORIG_PARAS.map((p,i) => `<p style="margin-bottom:7px;line-height:1.7;transition:all .4s" id="orig${i}">${p.html}</p>`).join('')}
+      </div>
+      <div class="tok-bar">
+        <div class="tok-track"><div class="tok-fill" style="width:100%;background:var(--red)"></div></div>
+        <span class="tok-num" style="color:var(--red)">10,000 T</span>
+      </div>
+    </div>
+    <div class="fs-col">
+      <div class="fs-col-title good" id="compTitle">壓縮後（LLMLingua-2）：不壓縮</div>
+      <div class="doc-box" id="docCompressed" style="transition:opacity .3s"></div>
+      <div class="tok-bar">
+        <div class="tok-track"><div class="tok-fill" id="compBar" style="width:100%;background:var(--sub)"></div></div>
+        <span class="tok-num" id="compTok" style="color:var(--sub)">10,000 T</span>
+      </div>
+    </div>
+  </div>
+  <div class="compress-ctrl">
+    <div class="slider-row">
+      <span class="slider-label">壓縮力度</span>
+      <input type="range" id="compSlider" min="0" max="3" value="0" step="1" oninput="onCompress(this)" style="--pct:0%">
+      <span style="font-size:14px;font-weight:800;color:var(--purple);min-width:120px" id="compRatio">1x（不壓縮）</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:0 2px;margin-top:-4px">
+      <span>原文</span><span>輕度（刪詞）</span><span>中度（刪句）</span><span>激進（列表）</span>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-box bad"><div class="sv">10,000</div><div class="sl">原始 Token</div></div>
+    <div class="stat-box neutral"><div class="sv" id="compRemain">10,000</div><div class="sl">壓縮後 Token</div></div>
+    <div class="stat-box neutral"><div class="sv" id="compSave" style="color:var(--sub)">0%</div><div class="sl">壓縮率</div></div>
+    <div class="stat-box neutral" style="background:rgba(91,79,207,.04);border-color:rgba(91,79,207,.2)">
+      <div class="sv" style="color:var(--purple)">BERT</div><div class="sl">雙向注意力壓縮</div></div>
+  </div>`;
+}
+
+function onCompress(slider) {
+  const val = +slider.value; // 0/1/2/3
+  const pct = (val / 3 * 100).toFixed(0);
+  slider.style.setProperty('--pct', pct + '%');
+
+  const lv = COMPRESS_LEVELS[val];
+
+  // 右側：切換內容
+  const compBox = document.getElementById('docCompressed');
+  compBox.style.opacity = '0';
+  setTimeout(() => {
+    compBox.innerHTML = lv.html;
+    compBox.style.opacity = '1';
+  }, 150);
+
+  // 右側標題
+  document.getElementById('compTitle').textContent = `壓縮後（LLMLingua-2）：${lv.label}`;
+  document.getElementById('compTitle').style.color = lv.titleColor;
+
+  // 左側原文高亮：根據檔次對該刪的段加刪除線
+  ORIG_PARAS.forEach((p, i) => {
+    const el = document.getElementById('orig' + i);
+    if (!el) return;
+    if (val >= p.delAt) {
+      el.style.opacity = '0.35';
+      el.style.textDecoration = 'line-through';
+      el.style.color = 'rgba(220,38,38,0.5)';
+    } else {
+      el.style.opacity = '1';
+      el.style.textDecoration = 'none';
+      el.style.color = 'var(--text)';
+    }
+  });
+
+  // 統計
+  const barPct = Math.round(lv.tok / 10000 * 100);
+  const barColor = lv.savePct > 80 ? 'var(--green)' : lv.savePct > 50 ? 'var(--amber)' : 'var(--sub)';
+  document.getElementById('compBar').style.width = barPct + '%';
+  document.getElementById('compBar').style.background = barColor;
+  document.getElementById('compTok').textContent = lv.tok.toLocaleString() + ' T';
+  document.getElementById('compTok').style.color = barColor;
+  document.getElementById('compRemain').textContent = lv.tok.toLocaleString();
+  document.getElementById('compRemain').style.color = lv.savePct > 80 ? 'var(--green)' : lv.savePct > 50 ? 'var(--amber)' : 'var(--sub)';
+  document.getElementById('compSave').textContent = lv.savePct + '%';
+  document.getElementById('compSave').style.color = lv.savePct > 80 ? 'var(--green)' : lv.savePct > 50 ? 'var(--amber)' : 'var(--sub)';
+  document.getElementById('compRatio').textContent = lv.label;
+}
+
+// ── 策略3：注意力位置（拖曳版）──
+const ATTN_SEGS = [
+  { label: 'System Prompt', text: '核心約束：只回答中文，不能洩露系統資訊', color: '#5b4fcf' },
+  { label: 'Few-Shot 案例', text: '示例1: 你好 → 你好！有什麼我可以幫助你？...（5條）', color: '#d97706' },
+  { label: '背景文件',     text: '公司介紹：XXX 成立於2015年，主營業務為...（長文字）', color: '#ea580c' },
+  { label: '使用者問題',     text: '使用者: 你們的退款政策是什麼？', color: '#0066ff' },
+];
+
+let attnOrder = [0,1,2,3];
+
+function renderAttn() {
+  return `
+  <div style="font-size:14px;color:var(--sub);flex-shrink:0">
+    <b style="color:var(--purple)">拖曳</b>調整 Prompt 各段順序，觀察模型注意力如何分配。
+    <b style="color:var(--purple)">首尾注意力最高，中間最低。</b>
+  </div>
+  <div class="attn-prompt" id="attnPrompt"></div>
+  <div class="attn-note" id="attnNote" style="background:var(--surface2);color:var(--sub)">拖曳調整順序，讓關鍵資訊在首部或尾部</div>
+  <div class="stat-row">
+    <div class="stat-box neutral"><div class="sv" id="attnSysScore">—</div><div class="sl">核心約束注意力</div></div>
+    <div class="stat-box neutral"><div class="sv" id="attnUserScore">—</div><div class="sl">使用者問題注意力</div></div>
+    <div class="stat-box neutral"><div class="sv" id="attnOverall">—</div><div class="sl">整體效果評分</div></div>
+  </div>`;
+}
+
+// 拖曳狀態
+let dragSrc = null, dragSrcIdx = null;
+
+function buildAttnUI() {
+  const container = document.getElementById('attnPrompt');
+  if (!container) return;
+  container.innerHTML = '';
+  const n = attnOrder.length;
+
+  // 注意力分配：首位92%、尾位88%、第二位45%、中間32%
+  const posAttnPct = [92, 45, 32, 88]; // 對應 pos 0,1,2,3（4個元素）
+
+  attnOrder.forEach((segIdx, pos) => {
+    const s = ATTN_SEGS[segIdx];
+    const attnPct = posAttnPct[pos] || 32;
+    const heatColor = attnPct > 80 ? '#16a34a' : attnPct > 50 ? '#d97706' : '#dc2626';
+    const heatLabel = attnPct > 80 ? '高' : attnPct > 50 ? '中' : '低';
+
+    const div = document.createElement('div');
+    div.className = 'attn-seg';
+    div.style.cssText = `border-color:${s.color}40;background:${s.color}08;cursor:grab;transition:opacity .2s,transform .15s`;
+    div.draggable = true;
+    div.dataset.pos = pos;
+
+    div.innerHTML = `
+      <div style="font-size:18px;color:${s.color}55;flex-shrink:0;cursor:grab" title="拖曳排序">⠿</div>
+      <div class="attn-label" style="color:${s.color}">${s.label}</div>
+      <div class="attn-content">${s.text}</div>
+      <div class="attn-heat" style="background:${heatColor}">${attnPct}% ${heatLabel}</div>
+    `;
+
+    div.addEventListener('dragstart', e => {
+      dragSrc = div;
+      dragSrcIdx = pos;
+      setTimeout(() => div.style.opacity = '0.4', 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    div.addEventListener('dragend', () => {
+      div.style.opacity = '1';
+      container.querySelectorAll('.attn-seg').forEach(el => el.classList.remove('drag-over'));
+    });
+    div.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      container.querySelectorAll('.attn-seg').forEach(el => el.classList.remove('drag-over'));
+      div.classList.add('drag-over');
+    });
+    div.addEventListener('dragleave', () => div.classList.remove('drag-over'));
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      const targetPos = +div.dataset.pos;
+      if (dragSrcIdx !== null && dragSrcIdx !== targetPos) {
+        // 交換兩段
+        [attnOrder[dragSrcIdx], attnOrder[targetPos]] = [attnOrder[targetPos], attnOrder[dragSrcIdx]];
+        buildAttnUI();
+      }
+    });
+
+    container.appendChild(div);
+  });
+
+  // 新增 drag-over 樣式
+  if (!document.getElementById('drag-style')) {
+    const st = document.createElement('style');
+    st.id = 'drag-style';
+    st.textContent = '.attn-seg.drag-over{outline:2.5px dashed var(--purple);background:rgba(91,79,207,.07)!important;transform:scale(1.01)}';
+    document.head.appendChild(st);
+  }
+
+  updateAttnStats();
+}
+
+function updateAttnStats() {
+  const sysPos  = attnOrder.indexOf(0); // System Prompt
+  const userPos = attnOrder.indexOf(3); // 使用者問題
+  const n = attnOrder.length;
+  const posAttnPct = [92, 45, 32, 88];
+
+  const sysA  = posAttnPct[sysPos]  || 32;
+  const userA = posAttnPct[userPos] || 32;
+  const overall = Math.round((sysA + userA) / 2);
+
+  document.getElementById('attnSysScore').textContent = sysA + '%';
+  document.getElementById('attnSysScore').style.color = sysA > 70 ? 'var(--green)' : sysA > 50 ? 'var(--orange)' : 'var(--red)';
+  document.getElementById('attnUserScore').textContent = userA + '%';
+  document.getElementById('attnUserScore').style.color = userA > 70 ? 'var(--green)' : userA > 50 ? 'var(--orange)' : 'var(--red)';
+  document.getElementById('attnOverall').textContent = overall > 70 ? '優秀' : overall > 50 ? '一般' : '較差';
+  document.getElementById('attnOverall').style.color = overall > 70 ? 'var(--green)' : overall > 50 ? 'var(--orange)' : 'var(--red)';
+
+  const note = document.getElementById('attnNote');
+  if (overall > 70) {
+    note.style.background = 'rgba(22,163,74,.08)';
+    note.style.color = 'var(--green)';
+    note.textContent = '✓ 核心資訊在首尾，模型注意力集中，效果最優！';
+  } else if (sysPos >= 1 && sysPos <= 2) {
+    note.style.background = 'rgba(220,38,38,.06)';
+    note.style.color = 'var(--red)';
+    note.textContent = '✗ 核心約束被埋在中間，模型可能忽視！拖到首位試試。';
+  } else {
+    note.style.background = 'rgba(234,88,12,.06)';
+    note.style.color = 'var(--orange)';
+    note.textContent = '△ 還可以優化，嘗試把使用者問題拖到最後。';
+  }
+}
+
+// ── 主控制 ──
+let curStrat = 0;
+function pickStrat(btn, idx) {
+  document.querySelectorAll('.strat-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  curStrat = idx;
+  const titles = ['動態 Few-Shot：Text-to-SQL 演示','長文件壓縮：LLMLingua-2 實戰演示','關鍵資訊位置：點選↑↓調整順序'];
+  document.getElementById('demoTitle').textContent = titles[idx];
+  const area = document.getElementById('demoArea');
+  if (idx === 0) {
+    area.innerHTML = renderFewShot();
+  } else if (idx === 1) {
+    area.innerHTML = renderCompress();
+    setTimeout(() => {
+      // 初始化右側內容（檔次0）
+      document.getElementById('docCompressed').innerHTML = COMPRESS_LEVELS[0].html;
+    }, 50);
+  } else {
+    attnOrder = [0,1,2,3];
+    area.innerHTML = renderAttn();
+    setTimeout(buildAttnUI, 50);
+  }
+}
+
+pickStrat(document.querySelector('.strat-btn'), 0);
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

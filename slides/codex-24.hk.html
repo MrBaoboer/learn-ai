@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>多 Agent 是一張要持久化的圖 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* 变量挂在 .lesson 上：nav-inject.js 会在页面样式之后再注入一次 :root 主色，
+   靠就近继承才能保住专题色。 */
+:root,.lesson{--accent:#414b5a;--accent-deep:#262d38;--accent-soft:rgba(65,75,90,.085)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(65,75,90,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(65,75,90,.04),0 0 0 52px rgba(65,75,90,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson code{overflow-wrap:anywhere;word-break:break-all}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(65,75,90,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.q-tag{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font-size:13px;font-weight:800;margin:28px 0 14px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.visual{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eff1f5,var(--card));border:1px solid rgba(65,75,90,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.9}.exercise p:last-child{margin:0}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);color:var(--text);display:flex;gap:14px;font-size:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.compare{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h4{margin:0;font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}.cmp-card h4 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:12px 0 0}
+.cmp-card .cmp-tag{display:inline-block;margin-top:14px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent-deep);border:1px solid rgba(65,75,90,.25);overflow-wrap:anywhere;word-break:break-all}
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card)}
+.demo-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo-ctrl button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;min-height:44px;min-width:44px;border:1px solid rgba(65,75,90,.35);border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font:600 14px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:filter .15s}
+.demo-ctrl button:active{filter:brightness(.92)}
+.dm-budget{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px;padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-budget .dm-b-label{font-size:13px;font-weight:700;color:var(--text)}
+.dm-budget .dm-b-hint{font-size:12px;color:var(--sub);line-height:1.7}
+.dm-seg{display:flex;gap:8px;flex-wrap:wrap}
+.dm-seg button{min-height:44px;padding:10px 18px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--sub);font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all .15s cubic-bezier(.4,0,.2,1)}
+.dm-seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dm-input{display:flex;align-items:center;gap:10px;flex:1;min-width:220px}
+.dm-input label{font-size:13px;font-weight:700;color:var(--text);flex:0 0 auto}
+.dm-input input{flex:1;min-width:0;min-height:44px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+.dm-graph{position:relative;display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;padding:22px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-bottom:20px}
+.dm-graph:after{content:"";position:absolute;left:22px;right:22px;bottom:8px;height:3px;border-radius:99px;background:var(--accent);transform:scaleX(var(--bar,0));transform-origin:left center;transition:transform .5s cubic-bezier(.25,1,.5,1)}
+.dm-node{padding:18px 16px;border-radius:12px;background:var(--card);border:1px solid var(--border);min-height:118px;opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-graph.is-live .dm-node{opacity:.4;transform:scale(.98)}
+.dm-graph.is-live .dm-node.now{opacity:1;transform:scale(1)}
+.dm-node .nm{display:block;font-size:14px;font-weight:800;color:var(--text);margin-bottom:6px}
+.dm-node .path{display:block;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub);word-break:break-all}
+.dm-node .st{display:block;margin-top:8px;font-size:12px;color:var(--sub);line-height:1.7}
+.dm-node.on{border-color:rgba(65,75,90,.5);background:var(--accent-soft)}
+.dm-node.run{border-color:rgba(65,75,90,.55);background:var(--accent-soft)}
+.dm-node.dim{border-style:dashed;opacity:.42}
+.dm-node.wait{border-style:dashed;opacity:.35}
+.dm-node.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-node.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-link{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:88px}
+.dm-link-line{display:block;width:72px;height:2px;background:var(--accent);opacity:.25;transform:scaleX(var(--link,0));transform-origin:center;transition:transform .5s cubic-bezier(.25,1,.5,1),opacity .35s cubic-bezier(.4,0,.2,1),background .35s cubic-bezier(.4,0,.2,1)}
+.dm-link.open .dm-link-line{opacity:1;--link:1}
+.dm-link.closed .dm-link-line{opacity:.7;--link:1;background:repeating-linear-gradient(90deg,var(--accent) 0 8px,transparent 8px 14px)}
+.dm-link.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-link-tag{font-size:11px;font-weight:800;color:var(--faint);letter-spacing:.04em;transition:color .35s cubic-bezier(.4,0,.2,1)}
+.dm-link.open .dm-link-tag{color:var(--accent-deep)}
+.dm-link.closed .dm-link-tag{color:var(--sub)}
+.dm-ghost{position:absolute;z-index:2;pointer-events:none;margin:0;transition:all .4s cubic-bezier(.25,1,.5,1)}
+.dm-ghost.fly{opacity:0;transform:scale(.9)}
+.dm-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.dm-col{border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+.dm-head{padding:14px 16px;background:var(--card);border-bottom:1px solid var(--border);font-size:13px;font-weight:800;color:var(--text)}
+.dm-body{padding:16px;display:flex;flex-direction:column;gap:10px;min-height:132px}
+.dm-kv{padding:12px 14px;border-radius:9px;background:var(--card);border:1px solid var(--border);font-size:13px;line-height:1.8;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-cols.is-live .dm-kv{opacity:.4;transform:scale(.98)}
+.dm-cols.is-live .dm-kv.now{opacity:1;transform:scale(1)}
+.dm-kv.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-kv b{display:block;color:var(--accent-deep);font-size:13px;margin-bottom:2px}
+.dm-mails{display:flex;flex-wrap:wrap;gap:8px;min-height:40px}
+.dm-mail{padding:8px 12px;border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:12px;font-weight:700;color:var(--faint);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-mails.is-live .dm-mail{opacity:.4;transform:scale(.98)}
+.dm-mails.is-live .dm-mail.on{opacity:1;transform:scale(1)}
+.dm-mail.on{border-color:rgba(65,75,90,.45);background:var(--accent-soft);color:var(--accent-deep)}
+.dm-mail.is-enter{opacity:0;transform:translateY(8px)}
+.dm-mail.is-enter.in{opacity:1;transform:none;transition:opacity .35s cubic-bezier(.4,0,.2,1),transform .35s cubic-bezier(.4,0,.2,1)}
+.dm-mail.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-trace{margin-top:24px;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.dm-trace-tag{padding:12px 18px;background:var(--card);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--sub)}
+.dm-trace ol{margin:0;padding:10px 0;list-style:none}
+.dm-trace li{display:flex;justify-content:space-between;gap:16px;padding:9px 18px;font-size:12.5px;line-height:1.7;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-trace.is-live li{opacity:.4;transform:scale(.98)}
+.dm-trace li.on,.dm-trace.is-live li.on{background:var(--accent-soft);color:var(--accent-deep);font-weight:600;opacity:1;transform:scale(1)}
+.dm-trace li.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-trace li span.ln{flex:0 0 auto;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)}
+.dm-trace li.on span.ln{color:var(--accent-deep)}
+.dm-caption{margin-top:20px;min-height:56px;display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.dm-caption svg{flex:0 0 auto;color:var(--accent)}
+#dm-caption-text,#dm-root-st,#dm-child-nm,#dm-child-path,#dm-child-st,#dm-link-tag,#dm-sql,#dm-reg{transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-summary{display:flex;flex-direction:column;gap:14px;max-height:0;overflow:hidden;opacity:0;margin-top:0;padding:0 22px;border:1px solid transparent;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),var(--card));transition:max-height .5s cubic-bezier(.25,1,.5,1),opacity .4s cubic-bezier(.4,0,.2,1)}
+.dm-summary.on{max-height:320px;opacity:1;margin-top:20px;padding:20px 22px;border-color:rgba(65,75,90,.3)}
+.dm-summary .dm-s{font-size:13px;line-height:1.8;color:var(--sub)}.dm-summary .dm-s b{display:block;font-size:13.5px;color:var(--accent-deep);margin-bottom:2px}
+.demo-caption{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.7}
+@keyframes flashPop{0%{transform:scale(.8)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(65,75,90,.3)}50%{box-shadow:0 0 20px 6px rgba(65,75,90,.2)}100%{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.demo,.demo *{transition-duration:0s!important;animation-duration:0s!important}}
+@media(max-width:760px){
+  .lesson{overflow-x:hidden}
+  .compare{grid-template-columns:1fr}
+  .objective{grid-template-columns:1fr}
+  .lesson-header:after{display:none}
+  .demo{padding:18px}
+  .demo-ctrl{width:100%}
+  .demo-ctrl button{flex:1}
+  .dm-graph{grid-template-columns:1fr;justify-items:stretch}
+  .dm-link{flex-direction:row;min-width:0;width:100%;justify-content:center}
+  .dm-link-line{width:2px;height:28px;transform:scaleY(var(--link,0))}
+  .dm-link.closed .dm-link-line{background:repeating-linear-gradient(180deg,var(--accent) 0 6px,transparent 6px 11px)}
+  .dm-cols{grid-template-columns:1fr}
+  .dm-body{min-height:0}
+  .visual{padding:14px}
+  .dm-trace li{flex-direction:column;gap:4px}
+  .dm-input{width:100%;min-width:0}
+  .demo,.visual,.cmp-card{max-width:100%;min-width:0}
+  .dm-summary.on{max-height:520px}
+}
+</style>
+<meta name="description" content="Codex 把子 agent 做成圖上的節點：邊有 Open 和 Closed，消息先入隊再決定叫醒，關掉的是邊，歷史還在">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/codex-24.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/codex-24.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/codex-24.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/codex-24.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/codex-24.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/codex-24.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/codex-24.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/codex-24.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"多 Agent 是一張要持久化的圖","name":"多 Agent 是一張要持久化的圖","url":"https://xueai.miyang.cn/slides/codex-24.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 擴展","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Codex 把子 agent 做成圖上的節點：邊有 Open 和 Closed，消息先入隊再決定叫醒，關掉的是邊，歷史還在","datePublished":"2026-08-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="多 Agent 是一張要持久化的圖"><meta property="og:description" content="Codex 把子 agent 做成圖上的節點：邊有 Open 和 Closed，消息先入隊再決定叫醒，關掉的是邊，歷史還在"><meta property="og:url" content="https://xueai.miyang.cn/slides/codex-24.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>OpenAI Codex · 多 Agent 圖</div>
+    <h1>多 Agent 是一張要持久化的圖</h1>
+    <p class="subtitle">派出去的是節點，邊一出生就是 Open。信先入隊，followup 才叫醒。關掉的是邊，歷史還在。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>派出去的是節點，邊一出生就是 Open。信先入隊，followup 才叫醒。關掉的是邊，歷史還在。</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5" fill="none"/></svg>
+    <span><b>課程目標</b>讀完能説清三件事：子 agent 是圖上的節點，邊只有 Open 和 Closed；<code>send_message</code> 只入隊，<code>followup_task</code> 才叫醒；關機卸運行時，關邊才從圖裏除名。第二天還能不能接着説話，先查邊。</span>
+  </div>
+
+  <div class="sec-label">先玩一遍 · 派生一個探索者</div>
+  <div class="demo reveal" id="demo-graph">
+    <div class="demo-top">
+      <div class="demo-title">從 /root 派出 Hypatia，看信怎麼走、結果怎麼迴流</div>
+      <div class="demo-ctrl">
+        <button id="dm-play" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="none"/></svg>播放</button>
+        <button id="dm-step" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z" fill="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>單步</button>
+        <button id="dm-reset" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" fill="none"/><path d="M3 3v5h5" fill="none"/></svg>重置</button>
+      </div>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">收尾</span>
+      <div class="dm-seg" id="dm-seg">
+        <button type="button" data-mode="shutdown" class="on">關機</button>
+        <button type="button" data-mode="close">關邊</button>
+      </div>
+      <div class="dm-input">
+        <label for="dm-msg">發給孩子</label>
+        <input id="dm-msg" type="text" value="再查一下 token 刷新" autocomplete="off">
+      </div>
+      <span class="dm-b-hint">關機只卸運行時，邊仍是 Open。關邊才寫成 Closed。切一下再播，重啓後的名單不一樣。</span>
+    </div>
+    <div class="dm-graph">
+      <div class="dm-node on" id="dm-root">
+        <span class="nm">根會話</span>
+        <span class="path">/root</span>
+        <span class="st" id="dm-root-st">空閒，可以派孩子</span>
+      </div>
+      <div class="dm-link" id="dm-link">
+        <span class="dm-link-line"></span>
+        <span class="dm-link-tag" id="dm-link-tag">尚無邊</span>
+      </div>
+      <div class="dm-node wait" id="dm-child">
+        <span class="nm" id="dm-child-nm">還沒派出</span>
+        <span class="path" id="dm-child-path">等待 spawn</span>
+        <span class="st" id="dm-child-st">圖上還沒有這個節點</span>
+      </div>
+    </div>
+    <div class="dm-cols">
+      <div class="dm-col">
+        <div class="dm-head">SQLite 邊卡</div>
+        <div class="dm-body">
+          <div class="dm-kv" id="dm-sql">還沒有 <code>thread_spawn_edges</code> 記錄。</div>
+        </div>
+      </div>
+      <div class="dm-col">
+        <div class="dm-head">信箱與註冊表</div>
+        <div class="dm-body">
+          <div class="dm-mails" id="dm-mails">
+            <span class="dm-mail" data-kind="MESSAGE">MESSAGE</span>
+            <span class="dm-mail" data-kind="FOLLOWUP">FOLLOWUP</span>
+            <span class="dm-mail" data-kind="RESULT">RESULT</span>
+          </div>
+          <div class="dm-kv" id="dm-reg">註冊表空着。恢復只沿着 Open 邊把身份貼回來。</div>
+        </div>
+      </div>
+    </div>
+    <div class="dm-trace">
+      <div class="dm-trace-tag">邏輯軌跡 · 動畫每一步對應源碼裏的哪一段</div>
+      <ol id="dm-trace">
+        <li><span>計算下一層深度，寫入 ThreadSpawn</span><span class="ln">registry.rs L87</span></li>
+        <li><span>用 task_name 拼出絕對路徑 /root/explore_auth</span><span class="ln">multi_agents_common.rs L117</span></li>
+        <li><span>從科學家名單抽出外號 Hypatia</span><span class="ln">control/spawn.rs L32</span></li>
+        <li><span>非臨時會話立刻 upsert 一條 Open 邊</span><span class="ln">control.rs L776</span></li>
+        <li><span>send_message 按 QueueOnly 組包，只入隊</span><span class="ln">message_tool.rs L103</span></li>
+        <li><span>信箱是會話級隊列，入隊後發 Mailbox 活動</span><span class="ln">input_queue.rs L127</span></li>
+        <li><span>followup_task 把 trigger_turn 打開，這才叫醒</span><span class="ln">handlers.rs L98</span></li>
+        <li><span>子 turn 結束，給父發 Result，不叫醒</span><span class="ln">session/mod.rs L1977</span></li>
+        <li><span>關機不改邊；關邊只標目標自己的入邊 Closed</span><span class="ln">legacy.rs L6</span></li>
+        <li><span>重啓只把 Open 後代的身份裝回註冊表</span><span class="ln">control/spawn.rs L158</span></li>
+      </ol>
+    </div>
+    <div class="dm-caption" id="dm-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none"/></svg><span id="dm-caption-text">點播放，看一個探索者怎麼長到圖上，信怎麼走，結果怎麼迴流。</span></div>
+    <div class="dm-summary" id="dm-summary">
+      <div class="dm-s"><b>圖先於運行時</b>節點一出生就有路徑、外號和一條 Open 邊。運行時可以卸掉，邊還在，歷史還在 rollout 裏。</div>
+      <div class="dm-s"><b>信和叫醒是兩件事</b>MESSAGE 只入隊。FOLLOWUP 才開工。RESULT 飛回父信箱，預設不搶當前輪。</div>
+      <div class="dm-s" id="dm-s-end"><b>收尾決定明天還在不在</b>切換上面的收尾再播一遍，看重啓後註冊表還認不認這個孩子。</div>
+    </div>
+    <div class="demo-caption">教學示意：外號固定為 Hypatia，路徑固定為 /root/explore_auth，用於展示圖、信箱和邊狀態。邏輯軌跡右側行號對應 openai/codex 倉庫 commit 4f39251a01。</div>
+  </div>
+
+  <div class="sec-label">思路一 · 父子關係做成有狀態的邊</div>
+
+  <div class="q-tag reveal">它解決什麼問題</div>
+  <p class="reveal">你讓主會話派一個探索者去查 <code>auth</code> 模組。模型調用 <code>spawn_agent</code>，工具回了一句任務名 <code>/root/explore_auth</code>，外號 Hypatia。過幾分鐘點 <code>wait_agent</code>，信箱裏躺着一份 <code>FINAL_ANSWER</code>。</p>
+  <p class="reveal">第二天打開同一條 thread。子會話的運行時已經卸掉了。系統如果只記得昨天發生過一次調用，這條路徑就找不到。你再發 <code>send_message</code>，控制面會報 <code>live agent path not found</code>。</p>
+
+  <div class="q-tag reveal">思路是什麼</div>
+  <p class="reveal">Codex 把父子做成有向邊。邊只有兩個值。Open 表示還能當打開的 spawned agent 恢復。Closed 表示從圖的視角已經關掉。序列化是 <code>open</code> 和 <code>closed</code>。</p>
+  <p class="src-note reveal">出處：<code>codex-rs/agent-graph-store/src/types.rs</code> 第 4 至 12 行</p>
+  <p class="reveal">圖存在 SQLite 的 <code>thread_spawn_edges</code> 表。<code>child_thread_id</code> 是主鍵，一個孩子不能掛兩個父。同一孩子再 spawn 一次，父和狀態都會被新值蓋住。會話正文不進這張表。子 agent 的模型上下文仍走自己的 rollout。圖只回答誰生了誰，這條邊現在開還是關。</p>
+  <p class="src-note reveal">出處：<code>codex-rs/state/migrations/0021_thread_spawn_edges.sql</code> 第 1 至 8 行</p>
+  <p class="reveal">非臨時會話在綫程建出來之後立刻 upsert 一條 Open 邊。寫入失敗只打 warn。子 thread 已經在跑，圖可以稍後補。補寫用 <code>ON CONFLICT DO NOTHING</code>，不會把已經 Closed 的邊改回去。</p>
+  <p class="src-note reveal">出處：<code>codex-rs/core/src/agent/control.rs</code> 第 767 至 780 行</p>
+  <p class="reveal">列後代時，過濾條件作用在走過的每一條邊上。<code>Some(Open)</code> 只沿着 Open 走。父邊已經 Closed 的子樹，就算孫邊仍是 Open，也不會被列出來。</p>
+  <p class="src-note reveal">出處：<code>codex-rs/agent-graph-store/src/store.rs</code> 第 49 至 54 行</p>
+  <p class="reveal paywall-locked xa-peek">路徑才是尋址鍵，外號是給人認的。根是 <code>/root</code>。相對名接到當前路徑後面。<code>..</code> 和 <code>.</code> 被拒絕，所以不能靠相對路徑爬到兄弟。角色可以收能力，不能替換父會話的權威。內置活角色是 <code>default</code>、<code>explorer</code>、<code>worker</code>。<code>explorer.toml</code> 是空文件。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>codex-rs/core/src/agent/role.rs</code> 第 1 至 4 行</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 300" role="img" aria-label="一次 spawn 之後記憶體、SQLite 和 rollout 各記住什麼">
+      <defs><marker id="arrA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="118" width="150" height="64" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="115" y="155" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">spawn_agent</text>
+      <path fill="none" d="M198 150H268" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="276" y="118" width="168" height="64" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="360" y="155" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">新 child thread</text>
+      <path fill="none" d="M360 118V72" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="276" y="20" width="168" height="48" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="360" y="49" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">路徑 + 外號</text>
+      <path fill="none" d="M452 150H522" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="530" y="86" width="170" height="52" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="615" y="117" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">upsert Open 邊</text>
+      <path fill="none" d="M708 112H770" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="778" y="86" width="122" height="52" rx="10" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="839" y="117" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">SQLite</text>
+      <path fill="none" d="M360 182V228" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="248" y="236" width="224" height="48" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="360" y="265" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">child rollout JSONL</text>
+      <text x="615" y="168" fill="#6b7280" text-anchor="middle" font-size="13">誰生了誰，開還是關</text>
+      <text x="360" y="294" fill="#6b7280" text-anchor="middle" font-size="13">會話正文不進邊表</text>
+    </svg>
+    <div class="visual-caption">一次 spawn 之後：身份進註冊表，邊進 SQLite，正文進 rollout。</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">為什麼長期成立</div>
+  <p class="reveal paywall-locked">重啓之後必須能問：這個孩子還算活着嗎。只記一次 spawn 事件回答不了。Open 才能進恢復列表。Closed 從子樹遍歷裏消失。<code>child_id</code> 做主鍵，圖保持樹，遍歷可以按深度 BFS。換個語言重寫，最小形態仍是一張三列表：parent、child、status。</p>
+
+  <div class="sec-label paywall-locked">思路二 · 通信和叫醒分開</div>
+
+  <div class="q-tag reveal paywall-locked">它解決什麼問題</div>
+  <p class="reveal paywall-locked">子 agent 轉完了，要回一封 <code>FINAL_ANSWER</code>。如果這封信自帶叫醒，父正在寫用戶看得見的最終答案時，會被子結果強行開一輪。用戶看到半截話，再加一份突然插進來的完成通知。</p>
+
+  <div class="q-tag reveal paywall-locked">思路是什麼</div>
+  <p class="reveal paywall-locked">通信種類有四個標籤：Spawn、Message、Followup、Result。它們是 OTEL 用的標籤。協議側只有一份 <code>InterAgentCommunication</code>，靠 <code>trigger_turn</code> 區分要不要叫醒。</p>
+  <p class="reveal paywall-locked"><code>send_message</code> 是 QueueOnly，只入隊。<code>followup_task</code> 是 TriggerTurn，才叫醒。空消息直接拒。<code>followup_task</code> 不能打根節點。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>codex-rs/core/src/tools/handlers/multi_agents_v2/message_tool.rs</code> 第 11 至 24 行</p>
+  <p class="reveal paywall-locked">處理函式先入隊，再決定要不要開工。<code>trigger_turn</code> 為假時，信繼續躺着。只有它為真，或會話還有未完成的 durable sleep，才去開工。V2 的完成通知是 Result，<code>trigger_turn</code> 為假。父如果正在説話，這封信按信箱相位排隊。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>codex-rs/core/src/session/handlers.rs</code> 第 89 至 99 行</p>
+  <p class="reveal paywall-locked">信箱是會話級隊列。用戶插話進 <code>pending_input</code>，子郵件進 <code>mailbox_pending_mails</code>，兩條槽。兄弟之間只要用絕對路徑，例如 <code>/root/worker_b</code>，就可以互發。相對名 <code>worker_b</code> 會接到自己後面，變成自己的孩子。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>codex-rs/core/src/session/input_queue.rs</code> 第 76 至 80 行</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 280" role="img" aria-label="三種信如何入隊以及誰決定叫醒">
+      <defs><marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="28" width="170" height="52" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="125" y="59" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">send_message</text>
+      <path fill="none" d="M218 54H300" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <text x="259" y="44" fill="#6b7280" text-anchor="middle" font-size="12">QueueOnly</text>
+      <rect x="40" y="114" width="170" height="52" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="125" y="145" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">followup_task</text>
+      <path fill="none" d="M218 140H300" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <text x="259" y="130" fill="#6b7280" text-anchor="middle" font-size="12">TriggerTurn</text>
+      <rect x="40" y="200" width="170" height="52" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="125" y="231" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">子 turn 結束</text>
+      <path fill="none" d="M218 226H300" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <text x="259" y="216" fill="#6b7280" text-anchor="middle" font-size="12">Result</text>
+      <rect x="308" y="100" width="250" height="80" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="433" y="136" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">父或子的信箱</text>
+      <text x="433" y="160" fill="#6b7280" text-anchor="middle" font-size="13">先入隊，再看 trigger_turn</text>
+      <path fill="none" d="M566 140H648" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="656" y="36" width="244" height="70" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="778" y="66" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">躺着，等下一輪</text>
+      <text x="778" y="88" fill="#6b7280" text-anchor="middle" font-size="13">MESSAGE / RESULT</text>
+      <rect x="656" y="174" width="244" height="70" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="778" y="204" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">開工，maybe_start_turn</text>
+      <text x="778" y="226" fill="#6b7280" text-anchor="middle" font-size="13">只有 FOLLOWUP 走這裏</text>
+      <path fill="none" d="M433 100V70H648" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <path fill="none" d="M433 180V209H648" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+    </svg>
+    <div class="visual-caption">三種信都進信箱。只有 followup 打開 trigger_turn，完成通知不搶當前輪。</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">為什麼長期成立</div>
+  <p class="reveal paywall-locked">叫醒權是稀缺的。誰能開一輪，誰就不能隨便開。把投遞和開工拆開，完成通知預設不叫醒，叫醒權留給 <code>followup_task</code> 和用戶。換一套消息總綫也用得上這根布爾：wake 還是只入隊。</p>
+
+  <div class="sec-label paywall-locked">思路三 · 關邊和關機是兩件事</div>
+
+  <div class="q-tag reveal paywall-locked">它解決什麼問題</div>
+  <p class="reveal paywall-locked">V2 駐留名額滿了，會按 LRU 卸掉一個孩子。如果卸運行時順便把邊標成 Closed，這個孩子從 Open 子樹消失。下次恢復找不到它。用戶沒關過它，系統自己把它除名了。</p>
+
+  <div class="q-tag reveal paywall-locked">思路是什麼</div>
+  <p class="reveal paywall-locked"><code>shutdown_live_agent</code> 關掉活着的 agent，刷 rollout，發 Shutdown，從管理器摘掉 thread。邊還是 Open。下次恢復仍會把它當活子樹成員。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>codex-rs/core/src/agent/control/legacy.rs</code> 第 6 至 8 行</p>
+  <p class="reveal paywall-locked"><code>close_agent</code> 先把目標自己的入邊標 Closed，再關機。後代的邊不會在這裏被標 Closed。父 turn 正常結束走 <code>TurnComplete</code>，不調用 <code>close_agent</code>。孩子繼續跑，邊保持 Open。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>codex-rs/core/src/agent/control/legacy.rs</code> 第 48 至 58 行</p>
+  <p class="reveal paywall-locked">V2 恢復分兩步。先把 Open 後代的身份裝回註冊表，不重開運行時。真正有人 <code>send_message</code> 或 <code>followup_task</code> 時，才按 rollout 把 thread 掛回來。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>codex-rs/core/src/agent/control/spawn.rs</code> 第 144 至 162 行</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 220" role="img" aria-label="關機保持 Open，關邊才變成 Closed">
+      <defs><marker id="arrC" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="78" width="150" height="64" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="115" y="115" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">邊是 Open</text>
+      <path fill="none" d="M198 94H300" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <path fill="none" d="M198 126H300" stroke="#414b5a" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrC)"/>
+      <text x="249" y="80" fill="#6b7280" text-anchor="middle" font-size="12">關機</text>
+      <text x="249" y="154" fill="#6b7280" text-anchor="middle" font-size="12">關邊</text>
+      <rect x="308" y="46" width="250" height="56" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="433" y="79" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">邊仍 Open，運行時卸掉</text>
+      <rect x="308" y="118" width="250" height="56" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="433" y="151" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">邊變成 Closed</text>
+      <path fill="none" d="M566 74H648" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <path fill="none" d="M566 146H648" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <rect x="656" y="46" width="244" height="56" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="778" y="79" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">恢復時身份裝回註冊表</text>
+      <rect x="656" y="118" width="244" height="56" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="778" y="151" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">恢復時這條邊被濾掉</text>
+    </svg>
+    <div class="visual-caption">卸運行時不等於從圖裏除名。只有 close 才改 status。</div>
+  </div>
+  <div class="key-line reveal paywall-locked">關掉的是邊，歷史還在。</div>
+
+  <div class="q-tag reveal paywall-locked">為什麼長期成立</div>
+  <p class="reveal paywall-locked">運行時活着和從圖上除名是兩件獨立的事。駐留 LRU、進程重啓、用戶關視窗，都可能卸運行時。只有編排者明確 close，才寫成 Closed。恢復時沿着 Open 邊走。這條分帳不依賴 Rust。</p>
+
+  <div class="sec-label paywall-locked">橫向對比 · 子 agent 該抽象成什麼</div>
+  <div class="compare paywall-locked">
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DSH：接縫優先，圖是列舉結果</h4>
+      <p>DSH 把子 agent 做成可替換的 provider 接縫。<code>SubagentProvider</code> 帶 <code>name</code>、<code>capabilities</code>、<code>inheritsParentContext</code>、<code>start</code>。進程內 fork、Claude Code、Codex、ACP，都是同一張接口上的不同實現。</p>
+      <p>它也能列出孩子和後代，從活着的 session store 和可選的 persistence 只讀枚舉。沒有一張 <code>thread_spawn_edges</code> 那樣的 Open / Closed 邊表。拓撲是 session header 的 <code>origin: subagent</code> 加上事後折出來的。換實現便宜，按邊恢復要另做。</p>
+      <span class="cmp-tag">已核對源碼 · 2026-08-22 · packages/subagent/subagent/src/types.ts 第 285 至 295 行 · <a href="dsh-18.html">DSH · Subagent 是一個 seam</a></span>
+    </div>
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code：工具調用加 transcript 側鏈</h4>
+      <p>模型面對的工具現名是 <code>Agent</code>。舊綫名仍叫 <code>Task</code>，給權限規則、hook、恢復中的會話做相容。Explore / Plan 是一次性的，父不會再續跑。</p>
+      <p>運行時給每個孩子發一個 <code>agentId</code>。沒有單獨的 spawn-edge 表。恢復靠讀這個 id 對應的 transcript。父要列活孩子得掃側鏈，沒有按邊過濾。Codex 多一張表、兩套狀態，換來重啓後仍能按圖説話。</p>
+      <span class="cmp-tag">已核對源碼 · 2026-08-22 · restored-src/src/tools/AgentTool/constants.ts 第 1 至 4 行</span>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">課堂練習</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div>
+      <h3>Closed 父邊下面的 Open 孫邊還在嗎</h3>
+      <p>畫一棵三層樹：根到 A 為 Closed，A 到 B 為 Open。用 <code>Some(Open)</code> 和 <code>None</code> 各列一次後代。B 會不會出現？</p>
+      <p>過濾條件作用在走過的每一條邊上。然後對照 <code>codex-rs/agent-graph-store/src/store.rs</code> 第 49 至 54 行的註釋，把兩種結果寫下來。</p>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/></svg>
+    <span><b>Takeaway：</b>子 agent 是圖上的節點。邊只有 Open 和 Closed，會話正文走 rollout。send 只入隊，followup 才叫醒，完成通知不搶當前輪。關機卸運行時，關邊才從圖裏除名。第二天先查邊，再決定要不要掛回運行時。</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function(){
+  var mode = 'shutdown';
+  var msg = '再查一下 token 刷新';
+  var steps = [], idx = 0, autoId = null, pauseUntil = 0, played = false;
+  var prevEdge = '', prevMails = [], prevTrace = null, prevSql = '', prevReg = '', prevChild = '';
+  var rootEl = document.getElementById('dm-root');
+  var childEl = document.getElementById('dm-child');
+  var linkEl = document.getElementById('dm-link');
+  var linkTag = document.getElementById('dm-link-tag');
+  var rootSt = document.getElementById('dm-root-st');
+  var childNm = document.getElementById('dm-child-nm');
+  var childPath = document.getElementById('dm-child-path');
+  var childSt = document.getElementById('dm-child-st');
+  var sqlEl = document.getElementById('dm-sql');
+  var regEl = document.getElementById('dm-reg');
+  var mailBox = document.getElementById('dm-mails');
+  var mailEls = Array.prototype.slice.call(document.querySelectorAll('#dm-mails .dm-mail'));
+  var graphEl = document.querySelector('.dm-graph');
+  var colsEl = document.querySelector('.dm-cols');
+  var traceBox = document.querySelector('.dm-trace');
+  var traceRows = Array.prototype.slice.call(document.querySelectorAll('#dm-trace li'));
+  var captionText = document.getElementById('dm-caption-text');
+  var summary = document.getElementById('dm-summary');
+  var endLine = document.getElementById('dm-s-end');
+  var msgInput = document.getElementById('dm-msg');
+  var IDLE = '點播放，看一個探索者怎麼長到圖上，信怎麼走，結果怎麼迴流。';
+  var MAIL_ORDER = ['MESSAGE', 'FOLLOWUP', 'RESULT'];
+
+  function buildSteps(){
+    var text = (msgInput && msgInput.value.trim()) || msg;
+    msg = text;
+    var out = [];
+    out.push({
+      cap: '根會話決定派一個探索者去查 auth。先算下一層深度，再準備路徑。',
+      trace: 0, child: 'wait', edge: '',
+      root: '正在準備 spawn', cnm: '還沒派出', cpath: '等待 spawn', cst: '圖上還沒有這個節點',
+      sql: '還沒有 thread_spawn_edges 記錄。',
+      reg: '註冊表空着。恢復只沿着 Open 邊把身份貼回來。',
+      mail: []
+    });
+    out.push({
+      cap: 'V2 必須帶 task_name。父路徑是 /root，拼出來就是 /root/explore_auth。缺路徑會直接回模型。',
+      trace: 1, child: 'wait', edge: '',
+      root: '正在拼路徑', cnm: '還沒派出', cpath: '/root/explore_auth', cst: '路徑有了，節點還沒落地',
+      sql: '還沒有 thread_spawn_edges 記錄。',
+      reg: '註冊表空着。',
+      mail: []
+    });
+    out.push({
+      cap: '外號從科學家名單裏抽。這次抽到 Hypatia。路徑才是尋址鍵，外號是給人認的。',
+      trace: 2, child: 'idle', edge: '',
+      root: '孩子已建出，邊還沒寫', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: 'thread 在，邊還沒落庫',
+      sql: '還沒有 thread_spawn_edges 記錄。',
+      reg: '記憶體裏已經能看見 Hypatia，持久化邊還沒有。',
+      mail: []
+    });
+    out.push({
+      cap: '非臨時會話立刻 upsert 一條 Open 邊。派出去的是節點，邊一出生就是 Open。',
+      trace: 3, child: 'idle', edge: 'open',
+      root: '邊已落庫，可以發信', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: '運行時掛着，邊是 Open',
+      sql: 'parent=/root → child=explore_auth，status=open',
+      reg: '註冊表：Hypatia · /root/explore_auth',
+      mail: []
+    });
+    out.push({
+      cap: '你寫下「' + text + '」。send_message 按 QueueOnly 組包，信進孩子信箱，不叫醒。',
+      trace: 4, child: 'on', edge: 'open',
+      root: '已投遞，沒叫醒', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: '信箱多了一封 MESSAGE，還在睡',
+      sql: 'parent=/root → child=explore_auth，status=open',
+      reg: '註冊表：Hypatia · /root/explore_auth',
+      mail: ['MESSAGE']
+    });
+    out.push({
+      cap: '信箱是會話級隊列。入隊後發 Mailbox 活動。wait_agent 訂的就是這個活動。',
+      trace: 5, child: 'on', edge: 'open',
+      root: '等孩子自己被叫醒', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: 'MESSAGE 仍躺在信箱裏',
+      sql: 'parent=/root → child=explore_auth，status=open',
+      reg: '註冊表：Hypatia · /root/explore_auth',
+      mail: ['MESSAGE']
+    });
+    out.push({
+      cap: 'followup_task 把 trigger_turn 打開。處理函式先入隊，再 maybe_start_turn。孩子這才開工。',
+      trace: 6, child: 'run', edge: 'open',
+      root: '已叫醒孩子', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: 'Running，正在處理 FOLLOWUP',
+      sql: 'parent=/root → child=explore_auth，status=open',
+      reg: '註冊表：Hypatia · /root/explore_auth',
+      mail: ['FOLLOWUP']
+    });
+    out.push({
+      cap: '孩子轉完，給父發 Result，trigger_turn 為假。完成通知不搶當前輪，先躺進父信箱。',
+      trace: 7, child: 'idle', edge: 'open',
+      root: '信箱收到 FINAL_ANSWER', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: 'Completed，邊仍是 Open',
+      sql: 'parent=/root → child=explore_auth，status=open',
+      reg: '註冊表：Hypatia · /root/explore_auth',
+      mail: ['RESULT']
+    });
+    if (mode === 'close') {
+      out.push({
+        cap: 'close_agent 先把目標自己的入邊標 Closed，再關機。後代的邊不會在這裏被改。',
+        trace: 8, child: 'dim', edge: 'closed',
+        root: '已顯式關邊', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: '運行時卸掉，邊是 Closed',
+        sql: 'parent=/root → child=explore_auth，status=closed',
+        reg: '註冊表還認得它，邊已經 Closed',
+        mail: []
+      });
+      out.push({
+        cap: '第二天打開同一條 thread。恢復只列 Open 後代。這條 Closed 邊被濾掉，不再裝回註冊表。',
+        trace: 9, child: 'dim', edge: 'closed',
+        root: '重啓後不再認這個孩子', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: '歷史還在 rollout，圖上已除名',
+        sql: 'parent=/root → child=explore_auth，status=closed',
+        reg: '註冊表空着。Closed 邊不進恢復列表。',
+        mail: [], fin: true
+      });
+    } else {
+      out.push({
+        cap: 'shutdown_live_agent 卸掉運行時，刷 rollout，摘掉 thread。邊還是 Open。卸運行時不等於從圖裏除名。',
+        trace: 8, child: 'dim', edge: 'open',
+        root: '運行時已卸，邊仍 Open', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: '運行時卸掉，邊仍是 Open',
+        sql: 'parent=/root → child=explore_auth，status=open',
+        reg: '註冊表：Hypatia · /root/explore_auth',
+        mail: []
+      });
+      out.push({
+        cap: '重啓只把 Open 後代的身份裝回註冊表，不重開運行時。再發信時才會按 rollout 把 thread 掛回來。',
+        trace: 9, child: 'idle', edge: 'open',
+        root: '重啓後仍認得 Hypatia', cnm: 'Hypatia', cpath: '/root/explore_auth', cst: '身份在，運行時未掛，等下一封信',
+        sql: 'parent=/root → child=explore_auth，status=open',
+        reg: '註冊表：Hypatia · /root/explore_auth · 運行時未掛',
+        mail: [], fin: true
+      });
+    }
+    return out;
+  }
+
+  function bump(el, cls){
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  function fadeText(el, text, animate){
+    if (!el) return;
+    if (!animate || el.textContent === text) {
+      el.style.opacity = '1';
+      el.textContent = text;
+      return;
+    }
+    el.style.opacity = '0';
+    requestAnimationFrame(function(){
+      el.textContent = text;
+      requestAnimationFrame(function(){ el.style.opacity = '1'; });
+    });
+  }
+
+  function spawnGhost(fromEl, toEl, label){
+    if (!graphEl || !fromEl || !toEl) return;
+    var box = graphEl.getBoundingClientRect();
+    var a = fromEl.getBoundingClientRect();
+    var b = toEl.getBoundingClientRect();
+    var ghost = document.createElement('span');
+    ghost.className = 'dm-mail on dm-ghost';
+    ghost.textContent = label;
+    ghost.style.left = (a.left - box.left + a.width / 2 - 36) + 'px';
+    ghost.style.top = (a.top - box.top + a.height / 2 - 14) + 'px';
+    graphEl.appendChild(ghost);
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        ghost.style.left = (b.left - box.left + b.width / 2 - 36) + 'px';
+        ghost.style.top = (b.top - box.top + b.height / 2 - 14) + 'px';
+        ghost.classList.add('fly');
+      });
+    });
+    setTimeout(function(){ if (ghost.parentNode) ghost.remove(); }, 480);
+  }
+
+  function paintMails(kinds, animate){
+    var oldRects = {};
+    mailEls.forEach(function(el){
+      oldRects[el.getAttribute('data-kind')] = el.getBoundingClientRect();
+    });
+    mailBox.classList.add('is-live');
+    kinds.forEach(function(k){
+      var el = mailBox.querySelector('[data-kind="' + k + '"]');
+      if (el) mailBox.insertBefore(el, mailBox.firstChild);
+    });
+    mailEls.forEach(function(el){
+      var kind = el.getAttribute('data-kind');
+      var on = kinds.indexOf(kind) !== -1;
+      var wasOn = prevMails.indexOf(kind) !== -1;
+      el.classList.toggle('on', on);
+      if (animate && on && !wasOn) {
+        el.classList.add('is-enter');
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){ el.classList.add('in'); });
+        });
+        bump(el, 'pop');
+      } else if (!on) {
+        el.classList.remove('is-enter');
+        el.classList.remove('in');
+      }
+    });
+    if (animate) {
+      mailEls.forEach(function(el){
+        var kind = el.getAttribute('data-kind');
+        var old = oldRects[kind];
+        if (!old || kinds.indexOf(kind) !== -1 && prevMails.indexOf(kind) === -1) return;
+        var now = el.getBoundingClientRect();
+        var dx = old.left - now.left;
+        var dy = old.top - now.top;
+        if (!dx && !dy) return;
+        el.style.transition = 'none';
+        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        requestAnimationFrame(function(){
+          el.style.transition = '';
+          el.style.transform = '';
+        });
+      });
+    }
+    prevMails = kinds.slice();
+  }
+
+  function setBar(n){
+    var max = steps.length || 10;
+    if (graphEl) graphEl.style.setProperty('--bar', String(n / max));
+  }
+
+  function paint(st, animate){
+    var focusChild = st.trace >= 2 && st.trace !== 7;
+    var focusRoot = st.trace === 0 || st.trace === 1 || st.trace === 7;
+    graphEl.classList.add('is-live');
+    colsEl.classList.add('is-live');
+    fadeText(rootSt, st.root, animate);
+    fadeText(childNm, st.cnm, animate);
+    fadeText(childPath, st.cpath, animate);
+    fadeText(childSt, st.cst, animate);
+    var childCls = 'dm-node' + (st.child ? ' ' + st.child : '') + (focusChild ? ' now' : '');
+    childEl.className = childCls;
+    rootEl.className = 'dm-node on' + (focusRoot ? ' now' : '');
+    if (animate && st.child !== prevChild && (st.child === 'idle' || st.child === 'run' || st.child === 'dim')) {
+      bump(childEl, st.child === 'dim' ? 'firing' : 'pop');
+    }
+    prevChild = st.child;
+    var edgeTag = st.edge === 'open' ? 'Open' : (st.edge === 'closed' ? 'Closed' : '尚無邊');
+    linkEl.className = 'dm-link' + (st.edge ? ' ' + st.edge : '');
+    fadeText(linkTag, edgeTag, animate);
+    if (animate && st.edge && st.edge !== prevEdge) bump(linkEl, 'firing');
+    prevEdge = st.edge || '';
+    sqlEl.className = 'dm-kv' + (st.sql !== prevSql ? ' now' : '');
+    regEl.className = 'dm-kv' + (st.reg !== prevReg ? ' now' : '');
+    fadeText(sqlEl, st.sql, animate);
+    fadeText(regEl, st.reg, animate);
+    if (animate && st.sql !== prevSql) bump(sqlEl, 'pop');
+    if (animate && st.reg !== prevReg) bump(regEl, 'pop');
+    prevSql = st.sql;
+    prevReg = st.reg;
+    var arrived = st.mail.filter(function(k){ return prevMails.indexOf(k) === -1; });
+    paintMails(st.mail, animate);
+    if (animate && arrived.indexOf('MESSAGE') !== -1) spawnGhost(rootEl, childEl, 'MESSAGE');
+    if (animate && arrived.indexOf('FOLLOWUP') !== -1) spawnGhost(rootEl, childEl, 'FOLLOWUP');
+    if (animate && arrived.indexOf('RESULT') !== -1) spawnGhost(childEl, rootEl, 'RESULT');
+    if (st.trace !== null && st.trace !== undefined) {
+      traceBox.classList.add('is-live');
+      traceRows.forEach(function(el, n){
+        el.classList.toggle('on', n === st.trace);
+        if (animate && n === st.trace && st.trace !== prevTrace) bump(el, 'firing');
+      });
+      prevTrace = st.trace;
+    }
+    setBar((st.trace == null ? 0 : st.trace) + 1);
+    if (animate) {
+      captionText.style.opacity = '0';
+      requestAnimationFrame(function(){
+        captionText.textContent = st.cap;
+        requestAnimationFrame(function(){ captionText.style.opacity = '1'; });
+      });
+    } else {
+      captionText.style.opacity = '1';
+      captionText.textContent = st.cap;
+    }
+    if (st.fin) {
+      endLine.innerHTML = mode === 'close'
+        ? '<b>收尾決定明天還在不在</b>關邊之後，重啓不再裝回 Hypatia。歷史還在 rollout 裏，圖上已經除名。'
+        : '<b>收尾決定明天還在不在</b>關機之後，重啓仍把 Hypatia 貼回註冊表。運行時要等再發信才掛上。';
+      summary.classList.add('on');
+    } else {
+      summary.classList.remove('on');
+    }
+  }
+
+  function holdFor(i){
+    var st = steps[i];
+    if (!st) return 1100;
+    if (st.fin) return 2400;
+    if (st.trace === 8) return 2200;
+    if (st.trace === 3 || st.trace === 4 || st.trace === 6 || st.trace === 7) return 1900;
+    if (st.trace === 0 || st.trace === 1 || st.trace === 5) return 1100;
+    return 1400;
+  }
+
+  function tick(){
+    if (idx >= steps.length) { stop(); return; }
+    paint(steps[idx], true);
+    idx++;
+    if (idx >= steps.length) stop();
+  }
+  function stop(){
+    if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+    pauseUntil = 0;
+  }
+  function loop(ts){
+    if (idx >= steps.length) { autoId = null; return; }
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(loop); return; }
+    paint(steps[idx], true);
+    var wait = holdFor(idx);
+    idx++;
+    pauseUntil = ts + wait;
+    if (idx >= steps.length) { autoId = null; return; }
+    autoId = requestAnimationFrame(loop);
+  }
+  function resetMails(){
+    MAIL_ORDER.forEach(function(k){
+      var el = mailBox.querySelector('[data-kind="' + k + '"]');
+      if (!el) return;
+      el.className = 'dm-mail';
+      el.style.transition = '';
+      el.style.transform = '';
+      mailBox.appendChild(el);
+    });
+    mailBox.classList.remove('is-live');
+  }
+  function reset(){
+    stop(); idx = 0;
+    prevEdge = ''; prevMails = []; prevTrace = null; prevSql = ''; prevReg = ''; prevChild = '';
+    steps = buildSteps();
+    graphEl.classList.remove('is-live');
+    colsEl.classList.remove('is-live');
+    traceBox.classList.remove('is-live');
+    Array.prototype.slice.call(graphEl.querySelectorAll('.dm-ghost')).forEach(function(g){ g.remove(); });
+    rootSt.style.opacity = '1';
+    childNm.style.opacity = '1';
+    childPath.style.opacity = '1';
+    childSt.style.opacity = '1';
+    linkTag.style.opacity = '1';
+    sqlEl.style.opacity = '1';
+    regEl.style.opacity = '1';
+    rootSt.textContent = '空閒，可以派孩子';
+    childNm.textContent = '還沒派出';
+    childPath.textContent = '等待 spawn';
+    childSt.textContent = '圖上還沒有這個節點';
+    childEl.className = 'dm-node wait';
+    rootEl.className = 'dm-node on';
+    linkEl.className = 'dm-link';
+    linkTag.textContent = '尚無邊';
+    sqlEl.className = 'dm-kv';
+    regEl.className = 'dm-kv';
+    sqlEl.textContent = '還沒有 thread_spawn_edges 記錄。';
+    regEl.textContent = '註冊表空着。恢復只沿着 Open 邊把身份貼回來。';
+    resetMails();
+    traceRows.forEach(function(el){ el.classList.remove('on'); el.classList.remove('firing'); });
+    summary.classList.remove('on');
+    captionText.style.opacity = '1';
+    captionText.textContent = IDLE;
+    setBar(0);
+  }
+  function play(){
+    if (idx >= steps.length) reset();
+    if (autoId) return;
+    pauseUntil = 0;
+    autoId = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('dm-play').addEventListener('click', play);
+  document.getElementById('dm-step').addEventListener('click', function(){ stop(); tick(); });
+  document.getElementById('dm-reset').addEventListener('click', reset);
+  document.getElementById('dm-seg').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    Array.prototype.forEach.call(this.children, function(el){ el.classList.remove('on'); });
+    b.classList.add('on');
+    mode = b.getAttribute('data-mode');
+    reset();
+  });
+  msgInput.addEventListener('keydown', function(e){
+    if (e.key !== 'Enter' || e.isComposing) return;
+    e.preventDefault();
+    reset();
+    play();
+  });
+
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(document.getElementById('demo-graph'), function(){
+      if (played) return; played = true; play();
+    });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

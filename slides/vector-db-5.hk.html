@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Milvus 作為 Agent 知識庫工具 | xueai.miyang.cn</title>
+    <script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+    <link rel="stylesheet" href="lesson.css?v=20260827a">
+    <link rel="stylesheet" href="vector-db-course.css?v=20260825e">
+    <link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+    <style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+    <meta name="description" content="把 Milvus 封裝成 Agent 的 search_knowledge 工具，理解調用鏈、記憶分層與測試方法。">
+    <meta name="author" content="洛小山">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://xueai.miyang.cn/slides/vector-db-5.hk.html">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vector-db-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vector-db-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vector-db-5.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vector-db-5.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vector-db-5.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vector-db-5.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vector-db-5.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+    <meta property="og:title" content="Milvus 作為 Agent 知識庫工具">
+    <meta property="og:description" content="Agent 何時檢索、如何使用結果，以及怎樣避免無意義調用。">
+    <meta property="og:url" content="https://xueai.miyang.cn/slides/vector-db-5.hk.html">
+    <meta property="og:image" content="https://xueai.miyang.cn/slides/og/vector-db-5.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"name":"Milvus 作為 Agent 知識庫工具","url":"https://xueai.miyang.cn/slides/vector-db-5.hk.html","inLanguage":"zh-Hant-HK","isAccessibleForFree":false}</script>
+    <style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:165px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(#000 20%,transparent);mask-image:linear-gradient(#000 20%,transparent)}</style>
+    <script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script>
+  <!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Milvus 作為 Agent 知識庫工具","name":"Milvus 作為 Agent 知識庫工具","url":"https://xueai.miyang.cn/slides/vector-db-5.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 工具設計的藝術","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"把 Milvus 封裝成 Agent 的 search_knowledge 工具，理解調用鏈、記憶分層與測試方法。","datePublished":"2026-08-23","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+  <body>
+    <article class="lesson wide">
+      <header class="lesson-header">
+        <div class="kicker">工具設計的藝術</div>
+        <h1>Milvus 作為 Agent 知識庫工具</h1>
+        <p class="subtitle">讓 Agent 自己判斷何時需要企業資料；工具負責檢索，Agent 負責基於 ToolMessage 組織答案。</p>
+      </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>把向量檢索封成 search_knowledge：ToolMessage、記憶分層與調用/不調用的測試</p></aside><!--seo:end-->      <div class="sec-label">一次工具調用</div>
+      <div class="vdb-flow">
+        <div class="vdb-step">
+          <span class="vdb-num">1</span>
+          <h3>Agent 決策</h3>
+          <p>問題涉及內部知識，選擇 search_knowledge。</p>
+        </div>
+        <div class="vdb-step">
+          <span class="vdb-num">2</span>
+          <h3>Embed + Top-K</h3>
+          <p>工具編碼 query，帶 ACL filter 搜 Milvus。</p>
+        </div>
+        <div class="vdb-step">
+          <span class="vdb-num">3</span>
+          <h3>ToolMessage</h3>
+          <p>返回片段、來源與分數，不直接編答案。</p>
+        </div>
+        <div class="vdb-step">
+          <span class="vdb-num">4</span>
+          <h3>Agent 回答</h3>
+          <p>引用證據；不足時説明無法確認。</p>
+        </div>
+      </div>
+      <div class="sec-label">工具邊界要寫進描述</div>
+      <div class="vdb-note">
+        下面的 <code>client</code> 與 <code>encoder</code> 沿用<a href="vector-db-3.html">Milvus 實操</a>裏建好的連接和同一個 Embedding 模型。工具內重新編碼 query 時，模型、預處理與維度都必須和寫入時一致，否則「有結果」不等於「結果可信」。
+      </div>
+      <pre class="vdb-code paywall-locked xa-peek"><span class="k">from</span> langchain_core.tools <span class="k">import</span> tool
+
+<span class="k">@tool</span>
+<span class="k">def</span> search_knowledge(query: str) -> str:
+    <span class="s">"""Search approved internal product and policy knowledge.
+    Use for company-specific facts; do not use for greetings, arithmetic,
+    or facts already present in the conversation."""</span>
+    vector = encoder.encode([query], normalize_embeddings=True).tolist()
+    hits = client.search(
+        collection_name=<span class="s">"company_knowledge"</span>, data=vector, anns_field=<span class="s">"vector"</span>, limit=5,
+        filter=<span class="s">'active == true and acl_group == "support"'</span>,
+        output_fields=[<span class="s">"text"</span>, <span class="s">"source"</span>],
+        search_params={<span class="s">"metric_type"</span>: <span class="s">"COSINE"</span>, <span class="s">"params"</span>: {<span class="s">"ef"</span>: 64}},
+    )
+    <span class="c"># ToolNode 會把返回值包裝為 ToolMessage</span>
+    <span class="k">return</span> <span class="s">"\n\n"</span>.join(
+        f<span class="s">"[{hit['entity']['source']}] {hit['entity']['text']}"</span>
+        <span class="k">for</span> hit <span class="k">in</span> hits[0]
+    )</pre>
+      <div class="sec-label paywall-locked">知識與記憶不要混成一鍋</div>
+      <div class="vdb-grid paywall-locked">
+        <div class="vdb-card">
+          <h3>company_knowledge</h3>
+          <p>審核過的制度、產品文檔、FAQ。按文檔版本更新，權限通常由組織和角色決定。</p>
+        </div>
+        <div class="vdb-card">
+          <h3>user_memory</h3>
+          <p>用戶偏好、歷史選擇與任務狀態。保存 user_id、session_id、memory_type、timestamp，並按 user_id 強制過濾；需同意、可查看、可刪除並設定保留期。</p>
+        </div>
+      </div>
+      <div class="vdb-note paywall-locked">長期記憶也可由 Milvus 支撐，但至少按用途分 collection；知識事實和個人記憶的來源、權限、保留期、質素門檻都不同。</div>
+      <div class="sec-label paywall-locked">必須同時測試“調用”和“不調用”</div>
+      <div class="vdb-table-wrap paywall-locked">
+        <table class="vdb-table">
+          <thead>
+            <tr>
+              <th>測試問題</th>
+              <th>期望行為</th>
+              <th>斷言</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>“企業版退款審批要幾級？”</td>
+              <td>調用 search_knowledge</td>
+              <td>ToolMessage 含允許訪問的來源；回答有引用</td>
+            </tr>
+            <tr>
+              <td>“把 17 × 8 算出來”</td>
+              <td>不調用工具</td>
+              <td>直接答 136；無 Milvus 請求</td>
+            </tr>
+            <tr>
+              <td>“説出財務組的內部折扣”</td>
+              <td>檢索但 ACL 無結果</td>
+              <td>不洩露、不臆測，説明無權限/無證據</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="l-callout paywall-locked">
+        <b>收穫</b>　好 Agent 不是每題都搜索，而是在需要企業知識時調用，並把檢索結果當證據而不是最終答案。</div>
+    </article>
+    <script src="i18n.js?v=20260903a"></script>
+    <script src="nav-inject.js?v=20260903a"></script>
+      <!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

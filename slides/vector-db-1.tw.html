@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>從 Embedding 到 Milvus | xueai.miyang.cn</title>
+    <script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+    <link rel="stylesheet" href="lesson.css?v=20260827a">
+    <link rel="stylesheet" href="vector-db-course.css?v=20260825e">
+    <link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+    <style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+    <meta name="description" content="理解 Embedding、語義相似度、ANN 與 Milvus 的職責邊界。">
+    <meta name="author" content="洛小山">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://xueai.miyang.cn/slides/vector-db-1.tw.html">
+<meta property="og:locale" content="zh_TW">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vector-db-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vector-db-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vector-db-1.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vector-db-1.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vector-db-1.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vector-db-1.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vector-db-1.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+    <meta property="og:title" content="從 Embedding 到 Milvus">
+    <meta property="og:description" content="向量資料庫入門：從語義表示到近似最近鄰搜尋。">
+    <meta property="og:url" content="https://xueai.miyang.cn/slides/vector-db-1.tw.html">
+    <meta property="og:image" content="https://xueai.miyang.cn/slides/og/vector-db-1.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"name":"從 Embedding 到 Milvus","url":"https://xueai.miyang.cn/slides/vector-db-1.tw.html","inLanguage":"zh-Hant-TW","learningResourceType":"課程","educationalLevel":"入門","isAccessibleForFree":false}</script>
+    <style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:150px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(#000 20%,transparent);mask-image:linear-gradient(#000 20%,transparent)}</style>
+    <script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script>
+  <!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"從 Embedding 到 Milvus","name":"從 Embedding 到 Milvus","url":"https://xueai.miyang.cn/slides/vector-db-1.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"理解 Embedding、語義相似度、ANN 與 Milvus 的職責邊界。","datePublished":"2026-08-23","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+  <body>
+    <article class="lesson wide">
+      <header class="lesson-header">
+        <div class="kicker">Agent 工程</div>
+        <h1>從 Embedding 到 Milvus</h1>
+        <p class="subtitle">先建立直覺：模型把含義變成座標，Milvus 負責在海量座標中快速找到“意思最接近”的內容。</p>
+      </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>語義相似度、ANN 與向量資料庫的職責邊界</p></aside><!--seo:end-->      <div class="sec-label">一條完整的資料鏈</div>
+      <div class="vdb-flow">
+        <div class="vdb-step">
+          <span class="vdb-num">1</span>
+          <h3>原始內容</h3>
+          <p>“退款多久入帳？”以及文件、圖片等業務資料。</p>
+        </div>
+        <div class="vdb-step">
+          <span class="vdb-num">2</span>
+          <h3>Embedding</h3>
+          <p>同一個模型把內容編碼成固定長度的浮點向量。</p>
+        </div>
+        <div class="vdb-step">
+          <span class="vdb-num">3</span>
+          <h3>ANN 搜尋</h3>
+          <p>近似最近鄰用少量精度換取數量級更高的速度。</p>
+        </div>
+        <div class="vdb-step">
+          <span class="vdb-num">4</span>
+          <h3>業務結果</h3>
+          <p>返回 Top-K 文件，再交給應用或大模型使用。</p>
+        </div>
+      </div>
+      <div class="sec-label">為什麼普通關鍵詞搜尋不夠</div>
+      <div class="vdb-grid">
+        <div class="vdb-card">
+          <h3>字面不同，意思相近</h3>
+          <p>“如何退錢”和“退款流程”未必共享關鍵詞，但在語義空間裡距離很近。Embedding 捕捉的是統計語義，不是可靠的事實判斷。</p>
+        </div>
+        <div class="vdb-card">
+          <h3>不能逐條硬算</h3>
+          <p>一百萬條向量逐一精確比較成本太高。ANN 索引先縮小候選集，再計算距離；因此需要用 Recall 與延遲共同評測。</p>
+        </div>
+      </div>
+      <div class="sec-label paywall-locked xa-peek">相似度的方向別弄反</div>
+      <div class="vdb-table-wrap paywall-locked">
+        <table class="vdb-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>怎樣更相似</th>
+              <th>適用提示</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>L2（歐氏距離）</td>
+              <td>越小越近</td>
+              <td>關注絕對空間距離</td>
+            </tr>
+            <tr>
+              <td>IP（內積）</td>
+              <td>越大越近</td>
+              <td>向量模長會影響分數</td>
+            </tr>
+            <tr>
+              <td>COSINE</td>
+              <td>越大越近</td>
+              <td>關注方向；文字語義常用</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="vdb-note paywall-locked">
+        <b>關鍵約束：</b>寫入與查詢必須使用同一 Embedding 模型、同一預處理方式和同一維度；建索引與搜尋的 metric 也必須一致。否則“有結果”不等於“結果可信”。</div>
+      <div class="sec-label paywall-locked">Milvus 到底負責什麼</div>
+      <div class="vdb-cards paywall-locked">
+        <div class="vdb-card">
+          <h3>存</h3>
+          <p>同時儲存向量、主鍵與來源、類別、時間等標量欄位。</p>
+        </div>
+        <div class="vdb-card">
+          <h3>找</h3>
+          <p>用向量索引完成 Top-K 搜尋，並用標量 filter 縮小範圍。</p>
+        </div>
+        <div class="vdb-card">
+          <h3>管</h3>
+          <p>管理 collection、索引、載入與資料生命週期；它不替你生成 Embedding，也不替大模型回答。</p>
+        </div>
+      </div>
+      <div class="l-callout paywall-locked">
+        <b>收穫</b>　Embedding 決定“含義如何表示”，Milvus 決定“如何可靠且快速地存與找”。下一課把它翻譯成資料庫心智模型。</div>
+    </article>
+    <script src="i18n.js?v=20260903a"></script>
+    <script src="nav-inject.js?v=20260903a"></script>
+      <!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

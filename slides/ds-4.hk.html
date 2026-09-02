@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>隊列：Agent 的活是排着隊幹的 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<!-- SEO Start -->
+<meta name="description" content="隊列是什麼？先進先出（FIFO）就是排隊的公平。親手開動一條「生產者-消費者」流水綫：拖動請求量和處理速度兩個滑塊，看隊列什麼時候空轉、什麼時候積壓變紅；再用 30 秒動畫對比棧和隊列——同樣 A B C 進去，出來的順序完全不同。Agent 的 todo list、API 限流、消息隊列，真身都在這。">
+<meta name="keywords" content="隊列是什麼,先進先出,FIFO,消息隊列,生產者消費者,削峯填谷,任務隊列,API限流,數據結構隊列">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/ds-4.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/ds-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/ds-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/ds-4.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/ds-4.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/ds-4.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/ds-4.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/ds-4.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="隊列：Agent 的活是排着隊幹的">
+<meta property="og:description" content="拖動請求量和處理速度兩個滑塊，親眼看隊列什麼時候積壓、什麼時候空轉。FIFO、削峯填谷、消息隊列，一條流水綫全講清。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/ds-4.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/ds-4.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="隊列：Agent 的活是排着隊幹的">
+<meta name="twitter:description" content="拖動請求量和處理速度兩個滑塊，親眼看隊列什麼時候積壓、什麼時候空轉。FIFO、削峯填谷、消息隊列，一條流水綫全講清。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-ghost{background:var(--card);color:var(--sub);border:1.5px solid var(--border);padding:9px 22px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s}
+.btn-ghost:hover{border-color:var(--ds-line);color:var(--ds-deep)}
+
+/* ── 生产者-消费者流水线 ── */
+.pipe-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 20px}
+.pipe-row{display:grid;grid-template-columns:120px 1fr 120px;gap:12px;align-items:stretch}
+.pipe-end{border:1.5px solid var(--border);border-radius:12px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center}
+.pipe-end .pe-icon{font-size:30px;line-height:1}
+.pipe-end .pe-name{font-size:12.5px;font-weight:800;color:var(--text)}
+.pipe-end .pe-sub{font-size:10.5px;font-weight:700;color:var(--sub)}
+.pipe-end.working{border-color:rgba(22,163,74,.45);background:rgba(22,163,74,.05)}
+.pipe-end.idle{background:rgba(0,0,0,.02)}
+.q-lane{border:2px dashed var(--border);border-radius:12px;display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:10px 12px;min-height:76px;overflow:hidden;position:relative;transition:border-color .3s,background .3s}
+.q-lane::before{content:'→ 出口在這頭';position:absolute;right:10px;top:-9px;background:var(--bg);padding:0 7px;font-size:10px;font-weight:800;color:var(--sub)}
+.q-lane.st-ok{border-color:rgba(22,163,74,.45)}
+.q-lane.st-hot{border-color:rgba(220,38,38,.55);background:rgba(220,38,38,.045)}
+.q-chip{flex-shrink:0;width:44px;height:44px;border-radius:10px;background:var(--ds-soft);border:1.5px solid var(--ds-line);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--ds-deep);font-variant-numeric:tabular-nums}
+.q-chip .qc-ico{font-size:15px;line-height:1.2}
+.q-chip.front{background:rgba(22,163,74,.12);border-color:rgba(22,163,74,.45);color:#166534}
+.q-chip.q-more{background:rgba(0,0,0,.05);border-color:var(--border);color:var(--sub);font-size:12px;font-weight:900}
+.q-empty{font-size:12px;color:var(--sub);opacity:.6;margin:0 auto}
+.pipe-meter{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(0,0,0,.025);transition:background .3s}
+.pipe-meter.st-hot{background:rgba(220,38,38,.07)}
+.pipe-meter.st-ok{background:rgba(22,163,74,.06)}
+.qm-num{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1}
+.pipe-meter.st-idle .qm-num{color:var(--sub)}
+.pipe-meter.st-ok .qm-num{color:var(--success)}
+.pipe-meter.st-hot .qm-num{color:var(--danger)}
+.qm-label{font-size:11px;font-weight:800;color:var(--sub)}
+.qm-state{font-size:13.5px;font-weight:800;flex:1;min-width:180px}
+.pipe-meter.st-idle .qm-state{color:var(--sub)}
+.pipe-meter.st-ok .qm-state{color:var(--success)}
+.pipe-meter.st-hot .qm-state{color:var(--danger)}
+.qm-tally{font-size:11.5px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.pipe-sliders{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.ps-item{display:flex;align-items:center;gap:10px}
+.ps-item label{font-size:12.5px;font-weight:800;color:var(--text);flex-shrink:0}
+.ps-item input[type=range]{flex:1;min-width:80px;accent-color:var(--ds)}
+.ps-val{font-size:13px;font-weight:900;color:var(--ds);font-variant-numeric:tabular-nums;min-width:64px}
+.pipe-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;border-top:1px dashed var(--border);padding-top:14px}
+.pipe-hint{font-size:12.5px;color:var(--sub);font-weight:600;line-height:1.7}
+
+/* ── 栈 vs 队列对比 ── */
+.cmp-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cmp-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden;display:flex;flex-direction:column}
+.cmp-head{padding:11px 15px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.cmp-head h4{font-size:14px;font-weight:800;color:var(--text)}
+.cmp-head p{font-size:11.5px;color:var(--sub);margin-top:2px}
+.cmp-stage{padding:14px;min-height:150px;display:flex;align-items:center;justify-content:center}
+.cmp-stack{display:flex;flex-direction:column-reverse;gap:6px;width:110px;min-height:120px;justify-content:flex-start;border-bottom:3px solid var(--border);padding-bottom:4px}
+.cmp-queue{display:flex;align-items:center;justify-content:flex-end;gap:6px;width:100%;min-height:52px;border-bottom:3px solid var(--border);padding-bottom:6px}
+.cmp-item{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;animation:itemIn .35s cubic-bezier(.25,1,.5,1);transition:transform .3s,opacity .3s;flex-shrink:0}
+.cmp-item.popping{transform:translateY(-20px);opacity:0}
+.cmp-item.i-A{background:#0284c7}
+.cmp-item.i-B{background:#7c3aed}
+.cmp-item.i-C{background:#d97706}
+.cmp-stack .cmp-item{width:100%}
+@keyframes itemIn{from{opacity:0;transform:translateY(-14px) scale(.85)}to{opacity:1;transform:none}}
+.cmp-out{padding:11px 15px;border-top:1px solid var(--border);font-size:12.5px;font-weight:700;color:var(--sub);min-height:42px}
+.cmp-out b{color:var(--text);font-size:14px;letter-spacing:1px}
+.cmp-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+.cmp-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── 知识三连卡 ── */
+.why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.why-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.why-card .why-icon{font-size:26px;margin-bottom:8px}
+.why-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.why-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.why-card p b{color:var(--text)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .pipe-row{grid-template-columns:76px 1fr 76px;gap:8px}
+  .pipe-end .pe-icon{font-size:22px}
+  .pipe-end .pe-sub{display:none}
+  .q-chip{width:36px;height:36px}
+  .pipe-sliders{grid-template-columns:1fr}
+  .cmp-wrap{grid-template-columns:1fr}
+  .why-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"隊列：Agent 的活是排着隊幹的","name":"隊列：Agent 的活是排着隊幹的","url":"https://xueai.miyang.cn/slides/ds-4.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 綫性結構：你天天在用","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"隊列是什麼？先進先出（FIFO）就是排隊的公平。親手開動一條「生產者-消費者」流水綫：拖動請求量和處理速度兩個滑塊，看隊列什麼時候空轉、什麼時候積壓變紅；再用 30 秒動畫對比棧和隊列——同樣 A B C 進去，出來的順序完全不同。Agent 的 todo list、API 限流、消息隊列，真身都在這。","datePublished":"2026-08-10","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">編程基礎篇 · 綫性結構：你天天在用</div>
+    <h1>隊列：Agent 的活是排着隊幹的</h1>
+    <p class="subtitle">上一課的棧是「後進先出」，這一課把方向掉個頭：<b>先進先出</b>，一頭進、另一頭出——就是食堂打飯的那條隊。別嫌它樸素，AI 服務能扛住一萬個人同時提問、Agent 能有條不紊地幹完一串任務，靠的都是這條隊。這一課你來當調度員：<b>親手開動一條流水綫，把它玩到積壓、再救回來</b>。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>先進先出：任務隊列、消息隊列、生產者消費者。拖動生產和消費的速度，看隊列什麼時候積壓、什麼時候空轉</p></aside><!--seo:end-->  <div class="sec-label">上手 · 你來當調度員</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">左邊的用戶不停發請求，請求排進中間的隊列，右邊的 Agent 工人從<b style="color:var(--text)">出口那頭</b>按順序取走處理（先來的先辦）。流水綫滾到這裏會自己開動。<b style="color:var(--text)">玩法</b>：先把「請求量」拖到最大，看隊列多久變紅；再把「處理速度」也拉上去，看積壓怎麼被消化掉。</p>
+
+  <div class="pipe-box" id="pipeBox">
+    <div class="pipe-row">
+      <div class="pipe-end" id="prodEnd">
+        <div class="pe-icon">👥</div>
+        <div class="pe-name">用戶請求</div>
+        <div class="pe-sub" id="prodSub">生產者</div>
+      </div>
+      <div class="q-lane" id="qLane"><span class="q-empty">（隊列是空的）</span></div>
+      <div class="pipe-end idle" id="workEnd">
+        <div class="pe-icon" id="workIcon">😴</div>
+        <div class="pe-name">Agent 工人</div>
+        <div class="pe-sub" id="workSub">消費者</div>
+      </div>
+    </div>
+    <div class="pipe-meter st-idle" id="pipeMeter">
+      <div>
+        <div class="qm-num" id="qNum">0</div>
+        <div class="qm-label">排隊中</div>
+      </div>
+      <div class="qm-state" id="qState">流水綫還沒開動</div>
+      <div class="qm-tally" id="qTally">進隊 0 ｜ 辦結 0</div>
+    </div>
+    <div class="pipe-sliders">
+      <div class="ps-item">
+        <label>📨 請求量</label>
+        <input type="range" id="prodRange" min="1" max="10" value="4">
+        <span class="ps-val" id="prodVal">2.0/秒</span>
+      </div>
+      <div class="ps-item">
+        <label>⚙️ 處理速度</label>
+        <input type="range" id="consRange" min="1" max="10" value="4">
+        <span class="ps-val" id="consVal">2.0/秒</span>
+      </div>
+    </div>
+    <div class="pipe-bar">
+      <button class="btn-ds" id="btnRun">開動流水綫 →</button>
+      <button class="btn-ghost" id="btnPipeReset">清空重來 ↻</button>
+      <span class="pipe-hint" id="pipeHint">灰 = 空轉 ｜ 綠 = 健康 ｜ 紅 = 積壓超過 8 條</span>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>剛才那波積壓，就是「削峯填谷」的現場。</b>請求突然暴漲（峯），工人一時幹不完——沒關係，<b>隊列先兜住</b>，誰也不丟、誰也不插隊；等請求回落（谷），工人慢慢把隊伍消化掉。要是沒有這條隊，超出處理能力的請求只能當場拒絕。你用 AI 高峯期偶爾轉圈圈但很少直接報錯，就是背後的隊列在替你排着。反過來，隊列長期是空的也説明工人配多了——<b>隊列長度是系統健康度最誠實的儀表盤</b>。
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">30 秒 · 棧 vs 隊列，只差在從哪頭取</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">同樣把 A、B、C 三個元素放進去再全部取出來，<b style="color:var(--text)">一鍵播放</b>，盯住兩邊「出來的順序」。</p>
+
+  <div class="cmp-wrap paywall-locked" id="cmpWrap">
+    <div class="cmp-box">
+      <div class="cmp-head"><h4>🥞 棧（上一課的老朋友）</h4><p>同一頭進、同一頭出</p></div>
+      <div class="cmp-stage"><div class="cmp-stack" id="cmpStack"></div></div>
+      <div class="cmp-out" id="stackOut">出來的順序：—</div>
+    </div>
+    <div class="cmp-box">
+      <div class="cmp-head"><h4>🚶 隊列（這一課的主角）</h4><p>一頭進、另一頭出</p></div>
+      <div class="cmp-stage"><div class="cmp-queue" id="cmpQueue"></div></div>
+      <div class="cmp-out" id="queueOut">出來的順序：—</div>
+    </div>
+  </div>
+
+  <div class="cmp-bar paywall-locked">
+    <button class="btn-ds" id="btnCmp">播放對比 →</button>
+    <span class="cmp-status" id="cmpStatus">A、B、C 依次放入，再全部取出</span>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>C → B → A 和 A → B → C。</b>兩種結構的差別就這一條：從哪頭取。棧從<b>同一頭</b>取，天生適合「原路退回」（撤銷、函式返回）；隊列從<b>另一頭</b>取，天生適合「按先來後到辦事」。收納方式沒有高低，只有合不合適。
+  </div>
+
+  <div class="sec-label paywall-locked">隊列在 AI 世界裏的真身</div>
+
+  <div class="why-grid paywall-locked">
+    <div class="why-card">
+      <div class="why-icon">📋</div>
+      <h4>Agent 的 todo list</h4>
+      <p>Agent 把任務拆成一串子任務後，就是<b>塞進隊列按順序幹</b>：查資料 → 寫初稿 → 自查。先計劃的先執行，不跳步、不遺漏——這份條理不是智能，是隊列。</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🚦</div>
+      <h4>API 限流排隊</h4>
+      <p>模型 API 每分鐘只接受固定次數的調用，超出的請求不是被扔掉，而是<b>排進隊列等下一個窗口</b>。你的程式偶爾「慢半拍才返回」，多半是在隊裏等。</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">📮</div>
+      <h4>消息隊列</h4>
+      <p>大系統裏服務之間不直接喊話，而是把活寫成消息丟進隊列，對方按自己的節奏取。這就是剛才流水綫的工業級版本，行話叫<b>消息隊列</b>（Kafka、RabbitMQ 都是它）。</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 這一課想和你分享的</h3>
+    <ul>
+      <li><b>隊列 = 排隊</b>：一頭進、另一頭出，先進先出（FIFO），排隊是為了公平</li>
+      <li><b>削峯填谷</b>：請求突增時隊列先兜住，工人慢慢消化——不丟請求、不插隊</li>
+      <li><b>隊列長度是儀表盤</b>：一直空轉是浪費，持續積壓要加人（或限流）</li>
+      <li><b>AI 裏的真身</b>：Agent 的 todo list、API 限流、消息隊列，全是這條隊</li>
+      <li><b>棧和隊列只差在從哪頭取</b>：原路退回用棧，先來後到用隊列</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* ── 生产者-消费者流水线 ──
+   用 100ms 一拍的「漏桶」模型：每拍给生产/消费各攒 rate×0.1 的额度，
+   攒满 1 就动一次。比 setInterval 一人一个定时器省事，改速度也即时生效。
+   额度上限 1.5：不然暂停久了一恢复会瞬间喷出一大串，像 bug。 */
+let q = [];
+let nextId = 1;
+let running = false;
+let prodAcc = 0, consAcc = 0;
+let totalIn = 0, totalDone = 0;
+let pipeTimer = null;
+
+const qLane     = document.getElementById('qLane');
+const qNum      = document.getElementById('qNum');
+const qState    = document.getElementById('qState');
+const qTally    = document.getElementById('qTally');
+const pipeMeter = document.getElementById('pipeMeter');
+const workEnd   = document.getElementById('workEnd');
+const workIcon  = document.getElementById('workIcon');
+const prodRange = document.getElementById('prodRange');
+const consRange = document.getElementById('consRange');
+const prodVal   = document.getElementById('prodVal');
+const consVal   = document.getElementById('consVal');
+const btnRun    = document.getElementById('btnRun');
+const btnPipeReset = document.getElementById('btnPipeReset');
+
+const HOT_AT = 8;        // 積壓紅綫
+const MAX_SHOW = 12;     // 車道最多擺幾個，多出來摺疊成 +N
+
+function rate(el){ return +el.value / 2; }  // 滑塊 1..10 → 0.5..5.0 條/秒
+
+function renderPipe(){
+  /* q[0] 是队首（最早进的），画在右边出口侧 */
+  if (!q.length) {
+    qLane.innerHTML = '<span class="q-empty">（隊列是空的）</span>';
+  } else {
+    let html = '';
+    if (q.length > MAX_SHOW) html += '<div class="q-chip q-more">+' + (q.length - MAX_SHOW) + '</div>';
+    const shown = Math.min(q.length, MAX_SHOW);
+    for (let i = shown - 1; i >= 0; i--) {
+      html += '<div class="q-chip' + (i === 0 ? ' front' : '') + '"><span class="qc-ico">📩</span>#' + q[i] + '</div>';
+    }
+    qLane.innerHTML = html;
+  }
+  qNum.textContent = q.length;
+  qTally.textContent = '進隊 ' + totalIn + ' ｜ 辦結 ' + totalDone;
+
+  let st, msg;
+  if (!running && !q.length) { st = 'st-idle'; msg = '流水綫還沒開動'; }
+  else if (q.length === 0)   { st = 'st-idle'; msg = '隊列空轉——工人在摸魚，處理能力有富餘 😴'; }
+  else if (q.length < HOT_AT){ st = 'st-ok';   msg = '健康——來多少辦多少，用戶幾乎不用等'; }
+  else                        { st = 'st-hot';  msg = '積壓！用戶開始等待了 🔥 拉高處理速度試試'; }
+  pipeMeter.className = 'pipe-meter ' + st;
+  qLane.classList.toggle('st-ok', st === 'st-ok');
+  qLane.classList.toggle('st-hot', st === 'st-hot');
+
+  const busy = running && q.length > 0;
+  workEnd.classList.toggle('working', busy);
+  workEnd.classList.toggle('idle', !busy);
+  workIcon.textContent = busy ? '🔧' : '😴';
+  qState.textContent = msg;
+}
+
+function pipeTick(){
+  prodAcc = Math.min(prodAcc + rate(prodRange) * 0.1, 1.5);
+  consAcc = Math.min(consAcc + rate(consRange) * 0.1, 1.5);
+  let changed = false;
+  while (prodAcc >= 1) {
+    prodAcc -= 1;
+    if (q.length < 60) { q.push(nextId++); totalIn++; changed = true; }
+  }
+  while (consAcc >= 1 && q.length) {
+    consAcc -= 1;
+    q.shift();          // 隊首出列：先來的先辦
+    totalDone++;
+    changed = true;
+  }
+  if (!q.length) consAcc = Math.min(consAcc, 1);
+  if (changed) renderPipe();
+}
+
+function startPipe(){
+  if (running) return;
+  running = true;
+  pipeTimer = setInterval(pipeTick, 100);
+  btnRun.textContent = '暫停 ⏸';
+  renderPipe();
+}
+function stopPipe(){
+  running = false;
+  clearInterval(pipeTimer);
+  btnRun.textContent = '繼續 →';
+  renderPipe();
+}
+
+btnRun.addEventListener('click', () => { running ? stopPipe() : startPipe(); });
+btnPipeReset.addEventListener('click', () => {
+  q = []; prodAcc = 0; consAcc = 0; totalIn = 0; totalDone = 0; nextId = 1;
+  renderPipe();
+});
+
+prodRange.addEventListener('input', () => { prodVal.textContent = rate(prodRange).toFixed(1) + '/秒'; });
+consRange.addEventListener('input', () => { consVal.textContent = rate(consRange).toFixed(1) + '/秒'; });
+
+renderPipe();
+
+/* ── 栈 vs 队列 30 秒对比 ── */
+const cmpStack  = document.getElementById('cmpStack');
+const cmpQueue  = document.getElementById('cmpQueue');
+const stackOut  = document.getElementById('stackOut');
+const queueOut  = document.getElementById('queueOut');
+const cmpStatus = document.getElementById('cmpStatus');
+const btnCmp    = document.getElementById('btnCmp');
+let cmpBusy = false;
+
+function cmpItem(name){
+  const el = document.createElement('div');
+  el.className = 'cmp-item i-' + name;
+  el.textContent = name;
+  return el;
+}
+
+async function playCmp(){
+  if (cmpBusy) return;
+  cmpBusy = true;
+  btnCmp.disabled = true;
+  cmpStack.innerHTML = '';
+  cmpQueue.innerHTML = '';
+  stackOut.textContent = '出來的順序：—';
+  queueOut.textContent = '出來的順序：—';
+
+  const items = ['A', 'B', 'C'];
+  for (const name of items) {
+    cmpStatus.textContent = '放入 ' + name + '……';
+    cmpStack.appendChild(cmpItem(name));   // column-reverse：後放的在上面
+    cmpQueue.prepend(cmpItem(name));       // 隊列從左邊進，右邊是出口
+    await sleep(650);
+  }
+
+  cmpStatus.textContent = '開始取——棧從頂上拿，隊列從出口拿';
+  await sleep(600);
+  const outS = [], outQ = [];
+  for (let i = 0; i < 3; i++) {
+    const sTop = cmpStack.lastElementChild;   // 棧頂
+    const qFront = cmpQueue.lastElementChild; // 隊首（最右）
+    outS.push(sTop.textContent);
+    outQ.push(qFront.textContent);
+    sTop.classList.add('popping');
+    qFront.classList.add('popping');
+    stackOut.innerHTML = '出來的順序：<b>' + outS.join(' → ') + '</b>';
+    queueOut.innerHTML = '出來的順序：<b>' + outQ.join(' → ') + '</b>';
+    await sleep(320);
+    sTop.remove();
+    qFront.remove();
+    await sleep(520);
+  }
+
+  cmpStatus.textContent = '同樣 A B C 進去：棧吐出 C B A（後進先出），隊列吐出 A B C（先進先出）';
+  btnCmp.disabled = false;
+  btnCmp.textContent = '再播一遍 ↻';
+  cmpBusy = false;
+}
+
+btnCmp.addEventListener('click', playCmp);
+
+/* lessonOnView 由页面底部的 lesson.js 提供，此刻还没加载，等 DOMContentLoaded 再绑 */
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.lessonOnView) {
+    window.lessonOnView(document.getElementById('pipeBox'), startPipe);
+    window.lessonOnView(document.getElementById('cmpWrap'), playCmp);
+  }
+});
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

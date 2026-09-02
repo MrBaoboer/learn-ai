@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MCP 協議：工具的 USB 接口 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* ── Before / After 对比 ── */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.compare-col{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card);display:flex;flex-direction:column}
+.compare-label{font-size:14px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.compare-label .badge{padding:3px 10px;border-radius:6px;font-size:12px;font-weight:800}
+
+/* 图 */
+.diagram{display:flex;align-items:center;justify-content:center}
+.diagram svg{width:100%;height:auto}
+.node-box{rx:10;ry:10;stroke-width:1.5}
+.node-label{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;font-size:13px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+.conn-line{stroke-width:2;fill:none;opacity:.7;stroke-linecap:round}
+.conn-line-mcp{stroke:var(--success);stroke-width:2.5;opacity:.9}
+
+/* stats */
+.stats-row{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap}
+.stat-chip{padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+
+/* ── 传输方式 ── */
+.transport-body{display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start}
+
+.t-cards{display:flex;flex-direction:column;gap:8px}
+.t-card{padding:12px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;transition:all .2s}
+.t-card:hover{border-color:rgba(0,102,255,.3);background:rgba(0,102,255,.02)}
+.t-card.active{border-color:var(--accent);background:rgba(0,102,255,.04);box-shadow:0 2px 8px rgba(0,102,255,.1)}
+.t-card-hd{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.t-card-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.t-card-name{font-size:14px;font-weight:800;color:var(--text)}
+.t-card-tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-left:auto}
+.t-card-desc{font-size:12px;color:var(--sub);line-height:1.5}
+
+/* 详情 */
+.t-detail{display:flex;flex-direction:column;gap:10px;min-width:0}
+.t-detail-title{font-size:15px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px}
+.t-detail-quote{font-size:14px;color:var(--sub);line-height:1.6;padding:10px 14px;background:var(--card);border-radius:10px;border:1px solid var(--border)}
+
+/* 数据流动画 */
+.flow-box{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 18px;position:relative;overflow:hidden;min-height:80px}
+.flow-row{display:flex;align-items:center;gap:12px;position:relative}
+.flow-node{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;flex-shrink:0;z-index:1}
+.flow-track{flex:1;height:4px;border-radius:2px;background:rgba(0,0,0,.05);position:relative;overflow:hidden}
+.flow-dot{width:10px;height:10px;border-radius:50%;position:absolute;top:-3px;opacity:0}
+@keyframes flowRight{0%{left:0;opacity:1}100%{left:calc(100% - 10px);opacity:1}}
+@keyframes flowLeft{0%{left:calc(100% - 10px);opacity:1}100%{left:0;opacity:1}}
+.flow-dot.go-right{animation:flowRight 1.2s ease-in-out infinite}
+.flow-dot.go-left{animation:flowLeft 1.2s ease-in-out .6s infinite}
+.flow-dot.go-left-2{animation:flowLeft 1.2s ease-in-out 1s infinite}
+.flow-dot.go-left-3{animation:flowLeft 1.2s ease-in-out 1.4s infinite}
+
+/* 优缺点 */
+.pc-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.pc-item{padding:6px 10px;border-radius:8px;font-size:13px;line-height:1.5;display:flex;align-items:flex-start;gap:6px}
+.pc-icon{flex-shrink:0;font-size:14px;margin-top:1px}
+
+/* 决策卡 */
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text);line-height:1.6}
+.dec-card b{color:var(--accent)}
+
+@media (max-width:768px){
+  .compare{grid-template-columns:1fr}
+  .transport-body{grid-template-columns:1fr}
+  .pc-grid{grid-template-columns:1fr}
+}
+</style>
+<meta name="description" content="MCP（Model Context Protocol）就是 AI 工具的 USB 標準。工具開發者只寫一次適配，就能接入所有 Agent。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/7-2d.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/7-2d.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/7-2d.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/7-2d.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/7-2d.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/7-2d.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/7-2d.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/7-2d.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="MCP 協議：工具的 USB 接口">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/7-2d.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/7-2d.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"MCP 協議：工具的 USB 接口","name":"MCP 協議：工具的 USB 接口","url":"https://xueai.miyang.cn/slides/7-2d.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"MCP（Model Context Protocol）就是 AI 工具的 USB 標準。工具開發者只寫一次適配，就能接入所有 Agent。","datePublished":"2026-04-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:description" content="MCP（Model Context Protocol）就是 AI 工具的 USB 標準。工具開發者只寫一次適配，就能接入所有 Agent。"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 工程</div>
+    <h1>MCP 協議：工具的 USB 接口</h1>
+    <p class="subtitle">USB 之前每台設備要專屬數據綫；MCP 之前每個 Agent 要專屬對接程式碼。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>stdio / SSE / Streamable HTTP 三種傳輸方式對比，數據流動畫</p></aside><!--seo:end-->  <div class="sec-label">Before / After 對比</div>
+  <div class="compare" id="compareArea">
+    <!-- LEFT: before MCP -->
+    <div class="compare-col">
+      <div class="compare-label">
+        <span class="badge" style="background:rgba(220,38,38,.08);color:var(--danger)">Before</span>
+        沒有 MCP 的世界
+      </div>
+      <div class="diagram" id="diagramBefore">
+        <svg viewBox="0 0 420 200" preserveAspectRatio="xMidYMid meet">
+          <rect class="node-box" x="10" y="15" width="90" height="36" fill="rgba(124,58,237,.06)" stroke="var(--purple)"/>
+          <text class="node-label" x="55" y="33" fill="var(--purple)">Cursor</text>
+          <rect class="node-box" x="10" y="82" width="90" height="36" fill="rgba(124,58,237,.06)" stroke="var(--purple)"/>
+          <text class="node-label" x="55" y="100" fill="var(--purple)">Alice</text>
+          <rect class="node-box" x="10" y="150" width="90" height="36" fill="rgba(124,58,237,.06)" stroke="var(--purple)"/>
+          <text class="node-label" x="55" y="168" fill="var(--purple)">Claude</text>
+
+          <rect class="node-box" x="320" y="15" width="90" height="36" fill="rgba(8,145,178,.06)" stroke="var(--cyan)"/>
+          <text class="node-label" x="365" y="33" fill="var(--cyan)">GitHub</text>
+          <rect class="node-box" x="320" y="82" width="90" height="36" fill="rgba(8,145,178,.06)" stroke="var(--cyan)"/>
+          <text class="node-label" x="365" y="100" fill="var(--cyan)">Slack</text>
+          <rect class="node-box" x="320" y="150" width="90" height="36" fill="rgba(8,145,178,.06)" stroke="var(--cyan)"/>
+          <text class="node-label" x="365" y="168" fill="var(--cyan)">Database</text>
+
+          <path class="conn-line" d="M100,33 C210,33 210,33 320,33" stroke="#dc2626"/>
+          <path class="conn-line" d="M100,33 C180,33 240,100 320,100" stroke="#d97706"/>
+          <path class="conn-line" d="M100,33 C180,45 240,155 320,168" stroke="#7c3aed"/>
+          <path class="conn-line" d="M100,100 C180,100 240,33 320,33" stroke="#0891b2"/>
+          <path class="conn-line" d="M100,100 C210,100 210,100 320,100" stroke="#16a34a"/>
+          <path class="conn-line" d="M100,100 C180,110 240,155 320,168" stroke="#ea580c"/>
+          <path class="conn-line" d="M100,168 C180,155 240,33 320,33" stroke="#8e8e93"/>
+          <path class="conn-line" d="M100,168 C180,168 240,100 320,100" stroke="#a855f7"/>
+          <path class="conn-line" d="M100,168 C210,168 210,168 320,168" stroke="#f59e0b"/>
+        </svg>
+      </div>
+      <div class="stats-row">
+        <div class="stat-chip" style="background:rgba(220,38,38,.06);color:var(--danger)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          9 條專屬對接
+        </div>
+        <div class="stat-chip" style="background:rgba(220,38,38,.06);color:var(--danger)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4m0 4h.01"/><circle cx="12" cy="12" r="10"/></svg>
+          新增 1 個工具 → +3 條對接
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: with MCP -->
+    <div class="compare-col">
+      <div class="compare-label">
+        <span class="badge" style="background:rgba(22,163,74,.08);color:var(--success)">After</span>
+        有 MCP 的世界
+      </div>
+      <div class="diagram" id="diagramAfter">
+        <svg viewBox="0 0 420 200" preserveAspectRatio="xMidYMid meet">
+          <rect class="node-box" x="10" y="15" width="90" height="36" fill="rgba(124,58,237,.06)" stroke="var(--purple)"/>
+          <text class="node-label" x="55" y="33" fill="var(--purple)">Cursor</text>
+          <rect class="node-box" x="10" y="82" width="90" height="36" fill="rgba(124,58,237,.06)" stroke="var(--purple)"/>
+          <text class="node-label" x="55" y="100" fill="var(--purple)">Alice</text>
+          <rect class="node-box" x="10" y="150" width="90" height="36" fill="rgba(124,58,237,.06)" stroke="var(--purple)"/>
+          <text class="node-label" x="55" y="168" fill="var(--purple)">Claude</text>
+
+          <rect x="175" y="60" width="70" height="80" rx="12" ry="12" fill="rgba(22,163,74,.08)" stroke="var(--success)" stroke-width="2"/>
+          <text x="210" y="95" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif" font-size="12" font-weight="800" fill="var(--success)" text-anchor="middle" dominant-baseline="central">MCP</text>
+          <text x="210" y="115" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif" font-size="10" fill="var(--success)" text-anchor="middle" dominant-baseline="central" opacity=".7">標準協議</text>
+
+          <rect class="node-box" x="320" y="15" width="90" height="36" fill="rgba(8,145,178,.06)" stroke="var(--cyan)"/>
+          <text class="node-label" x="365" y="33" fill="var(--cyan)">GitHub</text>
+          <rect class="node-box" x="320" y="82" width="90" height="36" fill="rgba(8,145,178,.06)" stroke="var(--cyan)"/>
+          <text class="node-label" x="365" y="100" fill="var(--cyan)">Slack</text>
+          <rect class="node-box" x="320" y="150" width="90" height="36" fill="rgba(8,145,178,.06)" stroke="var(--cyan)"/>
+          <text class="node-label" x="365" y="168" fill="var(--cyan)">Database</text>
+
+          <line x1="100" y1="33" x2="175" y2="80" class="conn-line conn-line-mcp"/>
+          <line x1="100" y1="100" x2="175" y2="100" class="conn-line conn-line-mcp"/>
+          <line x1="100" y1="168" x2="175" y2="120" class="conn-line conn-line-mcp"/>
+          <line x1="245" y1="80" x2="320" y2="33" class="conn-line conn-line-mcp"/>
+          <line x1="245" y1="100" x2="320" y2="100" class="conn-line conn-line-mcp"/>
+          <line x1="245" y1="120" x2="320" y2="168" class="conn-line conn-line-mcp"/>
+        </svg>
+      </div>
+      <div class="stats-row">
+        <div class="stat-chip" style="background:rgba(22,163,74,.06);color:var(--success)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          6 條標準連接
+        </div>
+        <div class="stat-chip" style="background:rgba(22,163,74,.06);color:var(--success)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14m-7-7h14"/></svg>
+          新增 1 個工具 → 只需 +1 條適配
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">三種傳輸方式 · 點擊查看數據流動</div>
+  <div class="transport-body paywall-locked xa-peek">
+    <div class="t-cards" id="tCards">
+      <div class="t-card active" onclick="pickTransport(0)">
+        <div class="t-card-hd">
+          <div class="t-card-icon" style="background:rgba(124,58,237,.08);color:var(--purple)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          </div>
+          <span class="t-card-name">stdio</span>
+          <span class="t-card-tag" style="background:rgba(124,58,237,.08);color:var(--purple)">本地進程</span>
+        </div>
+        <div class="t-card-desc">Agent 啓動一個本地程式，通過標準輸入輸出通信</div>
+      </div>
+      <div class="t-card" onclick="pickTransport(1)">
+        <div class="t-card-hd">
+          <div class="t-card-icon" style="background:rgba(8,145,178,.08);color:var(--cyan)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+          </div>
+          <span class="t-card-name">SSE</span>
+          <span class="t-card-tag" style="background:rgba(8,145,178,.08);color:var(--cyan)">伺服器推送</span>
+        </div>
+        <div class="t-card-desc">Agent 通過 HTTP 連接遠程服務，伺服器主動推送數據</div>
+      </div>
+      <div class="t-card" onclick="pickTransport(2)">
+        <div class="t-card-hd">
+          <div class="t-card-icon" style="background:rgba(22,163,74,.08);color:var(--success)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+          </div>
+          <span class="t-card-name">Streamable HTTP</span>
+          <span class="t-card-tag" style="background:rgba(22,163,74,.08);color:var(--success)">雙向流</span>
+        </div>
+        <div class="t-card-desc">最新標準，支持雙向流式通信</div>
+      </div>
+    </div>
+    <div class="t-detail" id="tDetail"></div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b>　MCP 就是 AI 工具的 USB 標準：工具開發者只寫一次適配，就能接入所有 Agent。沒有 MCP 之前，每個 Agent 都要為每個工具寫專屬對接程式碼，就像每台設備都要專屬數據綫一樣。
+  </div>
+</article>
+
+<script>
+var TRANSPORTS = [
+  {
+    name: 'stdio',
+    color: 'var(--purple)',
+    bg: 'rgba(124,58,237,.06)',
+    title: 'stdio — 本地進程通信',
+    quote: 'Agent 在本地啓動一個子進程（如 Python 腳本），通過 stdin/stdout 收發 JSON-RPC 消息。就像兩個人面對面傳紙條。',
+    agentLabel: 'Agent 進程',
+    agentColor: 'var(--purple)', agentBg: 'rgba(124,58,237,.1)',
+    toolLabel: 'MCP Server 進程',
+    toolColor: 'var(--cyan)', toolBg: 'rgba(8,145,178,.1)',
+    dotColor: 'var(--purple)',
+    sendLabel: 'stdin（請求）',
+    recvLabel: 'stdout（響應）',
+    pros: [
+      { icon: '✅', text: '最簡單，不需要網絡', bg: 'rgba(22,163,74,.04)' },
+      { icon: '✅', text: '啓動快，延遲極低', bg: 'rgba(22,163,74,.04)' },
+      { icon: '✅', text: '安全，只走本地通道', bg: 'rgba(22,163,74,.04)' }
+    ],
+    cons: [
+      { icon: '⚠️', text: '只能本地運行', bg: 'rgba(215,119,6,.04)' },
+      { icon: '⚠️', text: '進程隨 Agent 退出而終止', bg: 'rgba(215,119,6,.04)' }
+    ],
+    useCase: '開發工具（Cursor）、本地檔案操作、數據庫查詢',
+    decision: '📌 開發階段調試 MCP Server 時，首選 stdio：不需要配端口、不需要 HTTPS，跑起來就能測。'
+  },
+  {
+    name: 'SSE',
+    color: 'var(--cyan)',
+    bg: 'rgba(8,145,178,.06)',
+    title: 'SSE — 一去多回（Server-Sent Events）',
+    quote: 'Agent 發一次 HTTP 請求，MCP Server 保持連接不斷開，通過同一個連接持續推送多條事件回來。就像你問了一個問題，對方通過對講機一條一條地持續回答你，你只能聽不能插嘴。典型的「一去多回」模式。',
+    agentLabel: 'Agent（客户端）',
+    agentColor: 'var(--cyan)', agentBg: 'rgba(8,145,178,.1)',
+    toolLabel: 'MCP Server（遠程）',
+    toolColor: 'var(--success)', toolBg: 'rgba(22,163,74,.1)',
+    dotColor: 'var(--cyan)',
+    sendLabel: 'HTTP POST（一次請求）',
+    recvLabel: 'SSE 事件流（持續多條推送）',
+    pros: [
+      { icon: '✅', text: '支持遠程部署', bg: 'rgba(22,163,74,.04)' },
+      { icon: '✅', text: '伺服器主動推送，適合流式結果', bg: 'rgba(22,163,74,.04)' },
+      { icon: '✅', text: '兼容現有 HTTP 基礎設施', bg: 'rgba(22,163,74,.04)' }
+    ],
+    cons: [
+      { icon: '⚠️', text: '客户端無法中途追加消息（單向推送）', bg: 'rgba(215,119,6,.04)' },
+      { icon: '⚠️', text: '長連接可能被代理/防火牆中斷', bg: 'rgba(215,119,6,.04)' }
+    ],
+    useCase: '雲端工具服務、即時數據訂閲、共享 MCP Server',
+    decision: '📌 SSE 正在被 Streamable HTTP 逐步替代，但很多現有 MCP Server 仍使用 SSE。選型時注意向前兼容。'
+  },
+  {
+    name: 'Streamable HTTP',
+    color: 'var(--success)',
+    bg: 'rgba(22,163,74,.06)',
+    title: 'Streamable HTTP — 雙向流式通信',
+    quote: '最新的 MCP 傳輸標準。Agent 和 Server 通過 HTTP 建立雙向流式通道，兩邊都可以主動發消息。就像打電話，雙方隨時都能説話。',
+    agentLabel: 'Agent（客户端）',
+    agentColor: 'var(--success)', agentBg: 'rgba(22,163,74,.1)',
+    toolLabel: 'MCP Server（遠程）',
+    toolColor: 'var(--amber)', toolBg: 'rgba(217,119,6,.1)',
+    dotColor: 'var(--success)',
+    sendLabel: 'HTTP 請求流（雙向）',
+    recvLabel: 'HTTP 響應流（雙向）',
+    pros: [
+      { icon: '✅', text: '最靈活，雙向即時通信', bg: 'rgba(22,163,74,.04)' },
+      { icon: '✅', text: '支持大數據分塊傳輸', bg: 'rgba(22,163,74,.04)' },
+      { icon: '✅', text: 'MCP 官方推薦的標準方式', bg: 'rgba(22,163,74,.04)' }
+    ],
+    cons: [
+      { icon: '⚠️', text: '實現複雜度較高', bg: 'rgba(215,119,6,.04)' },
+      { icon: '⚠️', text: '部分老舊基礎設施不兼容', bg: 'rgba(215,119,6,.04)' }
+    ],
+    useCase: '複雜交互場景、大數據傳輸、生產級雲端部署',
+    decision: '📌 新項目建議直接用 Streamable HTTP。它是 MCP 官方推薦的標準，未來所有 Agent 都會優先支持。'
+  }
+];
+
+var curTransport = 0;
+
+function pickTransport(idx) {
+  curTransport = idx;
+  var cards = document.querySelectorAll('.t-card');
+  for (var i = 0; i < cards.length; i++) {
+    cards[i].className = 't-card' + (i === idx ? ' active' : '');
+  }
+  renderTransportDetail(idx);
+}
+
+function renderTransportDetail(idx) {
+  var t = TRANSPORTS[idx];
+  var h = '';
+
+  h += '<div class="t-detail-title"><span style="color:' + t.color + '">' + t.title + '</span></div>';
+  h += '<div class="t-detail-quote">' + t.quote + '</div>';
+
+  h += '<div class="flow-box">';
+  h += '<div class="flow-row">';
+  h += '<div class="flow-node" style="background:' + t.agentBg + ';color:' + t.agentColor + '">' + t.agentLabel + '</div>';
+  h += '<div style="flex:1;display:flex;flex-direction:column;gap:8px">';
+
+  h += '<div style="display:flex;align-items:center;gap:8px">';
+  h += '<span style="font-size:11px;color:var(--sub);min-width:140px;text-align:right">' + t.sendLabel + '</span>';
+  h += '<div class="flow-track"><div class="flow-dot go-right" style="background:' + t.dotColor + '"></div></div>';
+  h += '<span style="font-size:12px;color:var(--sub)">→</span>';
+  h += '</div>';
+
+  h += '<div style="display:flex;align-items:center;gap:8px">';
+  h += '<span style="font-size:11px;color:var(--sub);min-width:140px;text-align:right">' + t.recvLabel + '</span>';
+  h += '<div class="flow-track">';
+  h += '<div class="flow-dot go-left" style="background:' + t.toolColor + '"></div>';
+  if (idx === 1) {
+    h += '<div class="flow-dot go-left-2" style="background:' + t.toolColor + '"></div>';
+    h += '<div class="flow-dot go-left-3" style="background:' + t.toolColor + '"></div>';
+  }
+  h += '</div>';
+  h += '<span style="font-size:12px;color:var(--sub)">←</span>';
+  h += '</div>';
+
+  h += '</div>';
+  h += '<div class="flow-node" style="background:' + t.toolBg + ';color:' + t.toolColor + '">' + t.toolLabel + '</div>';
+  h += '</div>';
+  h += '</div>';
+
+  h += '<div class="pc-grid">';
+  h += '<div style="display:flex;flex-direction:column;gap:4px">';
+  h += '<div style="font-size:12px;font-weight:800;color:var(--success);margin-bottom:2px">優點</div>';
+  for (var i = 0; i < t.pros.length; i++) {
+    h += '<div class="pc-item" style="background:' + t.pros[i].bg + '"><span class="pc-icon">' + t.pros[i].icon + '</span><span>' + t.pros[i].text + '</span></div>';
+  }
+  h += '</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:4px">';
+  h += '<div style="font-size:12px;font-weight:800;color:var(--amber);margin-bottom:2px">注意</div>';
+  for (var j = 0; j < t.cons.length; j++) {
+    h += '<div class="pc-item" style="background:' + t.cons[j].bg + '"><span class="pc-icon">' + t.cons[j].icon + '</span><span>' + t.cons[j].text + '</span></div>';
+  }
+  h += '</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:4px">';
+  h += '<div style="font-size:12px;font-weight:800;color:var(--cyan);margin-bottom:2px">適合場景</div>';
+  h += '<div class="pc-item" style="background:rgba(8,145,178,.04)"><span>' + t.useCase + '</span></div>';
+  h += '</div>';
+  h += '</div>';
+
+  h += '<div class="dec-card"><b>' + t.decision + '</b></div>';
+
+  document.getElementById('tDetail').innerHTML = h;
+}
+
+pickTransport(0);
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

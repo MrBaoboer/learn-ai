@@ -28,7 +28,7 @@
      （seo-2.en.html），不剥掉就查不到，卡片会在 192 个译文页上静默消失。 */
   var page = (location.pathname.split('/').pop() || '')
     .replace(/\.html$/, '')
-    .replace(/\.(en|ko)$/, '');
+    .replace(/\.(en|ko|tw|hk)$/, '');
   var conf = REG[page];
   if (!conf) return;
   if (typeof conf === 'string') conf = { skill: conf };

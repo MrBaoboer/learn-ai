@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>多入口與 Typert：一個內核，五張面孔 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson .sec-label{margin:56px 0 20px}
+.lesson p.reveal{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eef1ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.cmp{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;color:var(--text)}
+.cmp-card h3 svg{color:var(--accent);flex:none}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+
+/* ── 交互演示：五面孔控制台 ── */
+#demo-entry{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:12px}
+.de-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.de-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-right:auto}
+.de-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(77,107,254,.4);background:var(--accent-soft);color:var(--accent-deep);border-radius:11px;padding:12px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px}
+.de-btn svg{flex:0 0 auto}
+.de-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.de-btn.tab{min-height:44px;padding:9px 13px;font-size:13px}
+.de-btn.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.de-panes{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.de-pane{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;min-width:0}
+.de-pane-title{font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--sub);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.de-pane-title svg{color:var(--accent)}
+.de-skin-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.de-skin{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:6px 10px;font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);opacity:0;transform:translateY(4px);transition:opacity .3s,transform .3s,border-color .3s,box-shadow .3s}
+.de-skin.in{opacity:1;transform:translateY(0)}
+.de-skin.hot{border-color:var(--accent);box-shadow:0 0 0 2px rgba(77,107,254,.18)}
+.de-wire{display:none;background:var(--card);border:1px solid rgba(77,107,254,.4);border-radius:9px;padding:10px 12px;font:11.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent-deep);white-space:pre-wrap;word-break:break-all}
+.de-wire.show{display:block}
+.de-wire-label{display:none;font-size:11px;font-weight:800;color:var(--sub);margin:10px 0 5px;letter-spacing:.4px}
+.de-wire-label.show{display:block}
+.de-core{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.de-core-chip{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 9px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub);transition:border-color .3s,box-shadow .3s,color .3s}
+.de-core-chip.hot{border-color:var(--accent);color:var(--accent-deep);box-shadow:0 0 0 2px rgba(77,107,254,.15)}
+.de-ev-label{font-size:11px;font-weight:800;color:var(--sub);margin:10px 0 5px;letter-spacing:.4px}
+.de-events{display:flex;flex-direction:column;gap:6px;min-height:120px}
+.de-ev{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:6px 10px;font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);opacity:0;transform:translateY(4px);transition:opacity .3s,transform .3s}
+.de-ev.in{opacity:1;transform:translateY(0)}
+.de-ev b{color:var(--accent);font-weight:800}
+.de-ev .seq{color:var(--sub);font-size:10.5px}
+.de-empty{font-size:12px;color:var(--sub);padding:4px 2px}
+.de-same{display:none;margin-top:8px;border-radius:9px;padding:9px 12px;background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.4);color:var(--success);font-size:12px;line-height:1.6;font-weight:700}
+.de-same.show{display:block}
+.de-caption{display:flex;gap:9px;align-items:flex-start;margin-top:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.8;color:var(--text)}
+.de-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+.de-note{font-size:12px;color:var(--sub);margin-top:12px;line-height:1.7}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}.cmp{grid-template-columns:1fr}
+  .de-panes{grid-template-columns:1fr}
+  .source-head{flex-direction:column}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .de-btn{flex:1 1 auto;justify-content:center}
+}
+</style>
+<meta name="description" content="Web、headless、ACP、Python SDK、HTTP API 五個入口共享同一個 DSH 內核：入口只是協議翻譯的皮，Typert 讓一處類型改動同步到所有端">
+<meta name="author" content="洛小山">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/dsh-25.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/dsh-25.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/dsh-25.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/dsh-25.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/dsh-25.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/dsh-25.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/dsh-25.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/dsh-25.html">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"多入口與 Typert：一個內核，五張面孔","name":"多入口與 Typert：一個內核，五張面孔","url":"https://xueai.miyang.cn/slides/dsh-25.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 持久化與基建","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Web、headless、ACP、Python SDK、HTTP API 五個入口共享同一個 DSH 內核：入口只是協議翻譯的皮，Typert 讓一處類型改動同步到所有端","datePublished":"2026-08-13","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="多入口與 Typert：一個內核，五張面孔"><meta property="og:description" content="Web、headless、ACP、Python SDK、HTTP API 五個入口共享同一個 DSH 內核：入口只是協議翻譯的皮，Typert 讓一處類型改動同步到所有端"><meta property="og:url" content="https://xueai.miyang.cn/slides/dsh-25.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 持久化與基建</div>
+    <h1>多入口與 Typert：一個內核，五張面孔</h1>
+    <p class="subtitle">Web、headless、ACP、SDK、HTTP 共享同一個內核。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>Web、headless、ACP、SDK、HTTP 共享同一個內核</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>課程目標</b>讀完你能説清三件事：五個入口怎麼共享同一個內核而不把邏輯 fork 五份；為什麼 JSON-RPC 和 ACP 入口的配置裏明令禁止 console logger；以及自研的 Typert 到底解決了什麼現成 RPC 框架管不了的問題。</span>
+  </div>
+
+  <div class="sec-label">互動演示 · 五面孔控制台</div>
+  <p class="reveal">先玩再講。下面左邊是入口，右邊是內核。五個標籤是五張面孔，選一個，點播放：看這個入口披着什麼皮、發出什麼樣的報文，再看內核的會話日誌裏落下什麼事件。然後換一個入口重播一遍，盯住右邊那排事件，這就是本課要講的全部。</p>
+  <div id="demo-entry" class="reveal">
+    <div class="de-toolbar">
+      <div class="de-tabs">
+        <button class="de-btn tab active" data-ent="web">Web UI</button>
+        <button class="de-btn tab" data-ent="headless">headless</button>
+        <button class="de-btn tab" data-ent="acp">ACP</button>
+        <button class="de-btn tab" data-ent="sdk">Python SDK</button>
+        <button class="de-btn tab" data-ent="http">HTTP API</button>
+      </div>
+      <button class="de-btn primary" id="dePlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>播放</button>
+      <button class="de-btn" id="deStep"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>單步</button>
+      <button class="de-btn" id="deReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>重置</button>
+    </div>
+    <div class="de-panes">
+      <div class="de-pane">
+        <div class="de-pane-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8M12 18v4"/></svg>
+          入口的皮 · <span id="deEntName">Web UI</span>
+        </div>
+        <div class="de-skin-list" id="deSkins"></div>
+        <div class="de-wire-label" id="deWireLabel">發出的請求</div>
+        <div class="de-wire" id="deWire"></div>
+      </div>
+      <div class="de-pane">
+        <div class="de-pane-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>
+          同一個內核（五個入口共用的插件）
+        </div>
+        <div class="de-core" id="deCore"></div>
+        <div class="de-ev-label">會話日誌 · 落盤的事件</div>
+        <div class="de-events" id="deEvents"><div class="de-empty">（還沒有事件）</div></div>
+        <div class="de-same" id="deSame"></div>
+      </div>
+    </div>
+    <div class="de-caption">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      <span id="deCaption">選一個入口，點「播放」。</span>
+    </div>
+    <div class="de-note">演示為教學化模擬：報文和事件是課程虛構的示意 fixture，報文字段做了簡化。各入口的插件清單依據 <code>examples/headless-agent/cordis.yml</code>、<code>examples/jsonrpc-agent/cordis.yml</code>、<code>examples/acp-agent/cordis.yml</code> 與 <code>docs/api-gateway.zh.md</code> 整理，共用內核插件取三份配置的交集。</div>
+  </div>
+
+  <div class="sec-label">邏輯拆解 · 入口只是一份配置文件</div>
+  <p class="reveal">上一批課講過，DSH 的一切功能都是 Cordis 插件，進程啓動時按一份 <code>cordis.yml</code> 把插件掛成一棵樹。這個設計在本課收穫回報：所謂「入口」，就是一份不同的 <code>cordis.yml</code>。倉庫的 <code>examples/</code> 目錄下躺着現成的三份：headless、JSON-RPC、ACP，翻開對比會發現它們大同小異，DeepSeek 適配器、bash 執行器、JSONL 會話持久化、壓縮、文件系統工具這些內核插件三份全有，差異集中在最上面幾行：JSON-RPC 入口多掛一個 <code>sdk-jsonrpc-server</code>，ACP 入口多掛一個 <code>acp-demo</code> 協議橋和沙箱策略，headless 乾脆什麼伺服器都不掛，進程本身就是入口。</p>
+  <p class="reveal">Web 面孔的皮厚一點，但仍然是插件：<code>host-webserver</code> 是個純粹的 <code>node:http</code> 載體，文檔明説它不屬於 agent loop、不瞭解任何 harness 概念（<code>docs/subsystems/web-server.zh.md</code>）；<code>frontend-static</code> 認領回退席位當 SPA 伺服器；<code>client-modules</code> 用 <code>tapIndex</code> 往 index.html 裏注入啓動清單 <code>window.__DSH_BOOT__</code>，瀏覽器端照單加載各插件的前端模組。HTTP API 面孔則是一條鏈：<code>api-remotes</code> 做身份解析，<code>api-gateway</code> 做參數解碼和方法調用，<code>connection</code> 獨佔 <code>/api</code> 路由的 RPC 信封，最後落回同一個 webserver（<code>docs/api-gateway.zh.md</code>）。</p>
+  <p class="reveal">Python SDK 最能説明「皮」有多薄。<code>pip install deepseek-harness-sdk</code> 會連帶裝一個平台 wheel，裏面是單文件可執行的 <code>dsh-jsonrpc-agent</code>；SDK 啓動它當子進程，通過 <code>DSH_CORDIS_CONFIG</code> 注入預設組合，然後在 stdio 上説 JSON-RPC（<code>python/sdk/README.zh.md</code>）。所以 Python SDK 和 JSON-RPC 入口是同一張面孔的兩種穿法，Python 這層只是把協議包成了 <code>harness.run("…")</code>。</p>
+  <p class="reveal">大綱裏那道邊界條件題的答案就藏在配置註釋裏。JSON-RPC 示例的第 2 行寫着 stdout 保留給 JSON-RPC，禁止加 console logger 或終端 UI；ACP 示例同樣聲明整棵樹不掛 stdout 日誌和 HMR，因為 stdout 載着 ACP 的 JSON-RPC（兩份 <code>cordis.yml</code> 的開頭註釋）。道理一句話：這兩種協議把 stdout 當傳輸綫，往上面混打一行日誌，對端的解析器就斷綫了。日誌走 <code>ctx.logger</code> 另尋出路，這是協議入口的鐵律。</p>
+  <div class="facts">
+    <div class="fact reveal"><code>入口 = 一份 cordis.yml</code><p>三個示例入口共享同一批內核插件，差異是頂部那幾行協議橋。加一張新面孔約等於寫一個翻譯插件加一份配置。</p></div>
+    <div class="fact reveal"><code>stdout 歸協議</code><p>JSON-RPC 與 ACP 入口的配置明令禁掛 console logger：stdout 是傳輸綫，混入一行日誌對端就解析斷綫。</p></div>
+    <div class="fact reveal"><code>方法不標記就不存在</code><p>Typert 只導出 <code>@Remote</code> 標記的方法，未標記的既不進 Client 類型，也無法經 <code>ctx.remote</code> 調用。</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">關鍵證據一 · 入口的全部家當</div>
+  <p class="reveal paywall-locked">翻開 <code>examples/jsonrpc-agent/cordis.yml</code>，第 1 行註釋説明這是給捆綁運行時用的無人值守部署，第 2 行就是那條鐵律的原文：stdout 保留給 JSON-RPC，不要加 console logger 或終端 UI。往下看，協議橋 <code>sdk-jsonrpc-server</code> 只是插件列表裏普通的第一項，連它的配置都走環境變數注入。一個入口的全部家當就這麼多：一份配置，頂部幾行是它的臉，其餘全是和別的入口共用的內核。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>examples/jsonrpc-agent/cordis.yml</code> 第 1 至 7 行，核對日期 2026-08-13。</p>
+
+  <div class="sec-label paywall-locked">Typert · 為什麼要自研 RPC 層</div>
+  <p class="reveal paywall-locked">五張面孔裏，Web 和 HTTP API 這兩張要跨進程調用 Host 裏的業務方法，這就需要一層 RPC。DSH 沒用現成框架，自研了 Typert。業務開發者要做的事少到只剩一個裝飾器：在服務方法上標 <code>@Remote('create')</code>，構建時 Typert 分析 TypeScript 類型圖，生成三樣東西：校驗參數的 Zod schema、描述調用的 descriptor、給瀏覽器端用的類型聲明。不需要手寫路由表、參數轉換、客戶端 stub，改一處方法簽名，重新構建後所有端的調用約定同步更新（<code>docs/subsystems/typert.zh.md</code>、<code>packages/typert/generator/README.zh.md</code>）。</p>
+  <p class="reveal paywall-locked">為什麼現成方案不行？因為要跨 wire 的東西裏有 Cordis 特有的概念，通用 schema 生成器沒有詞彙描述它們。三個例子。第一，Host 和瀏覽器是兩個獨立的 TypeScript Program，同名的 Cordis <code>Context</code> 在兩邊的類型合併結果不一樣，一份 schema 餵兩邊行不通。第二，業務方法的參數可能是 <code>Agent</code> 這樣的活對象，它不能被序列化過 wire，Typert 用 lookup 機制把 <code>agent</code> 參數改寫成 wire 字段 <code>agentId</code>，Gateway 收到請求後先把 id 解析回活對象再調方法。第三，客戶端的 <code>ctx.remote.goals</code> 是隨插件掛載卸載的活服務，最後一個方法撤回，整個 namespace 跟着卸載，這是 OpenAPI 那種靜態描述表達不了的生命週期（Typert Gateway Agent Note 2026-08-02）。</p>
+  <p class="reveal paywall-locked">還有一條值得記住的紀律：descriptor 是本地反射信息，不上 wire。Host 和客戶端各自在構建時生成彼此對應的 descriptor，請求裏只發 endpoint 和具名參數；取消信號作為帶外的 carrier signal 注入，絕不混進業務參數（<code>docs/subsystems/typert.zh.md</code> 的調用 descriptor 一節）。生成器還很固執：遇到表達不了的類型投影直接報錯，絕不把源類型展平弱化了矇混過去。這和前兩課的「拒絕解讀」一脈相承，説不清楚的事寧可不做。</p>
+
+  <div class="sec-label paywall-locked">關鍵證據二 · 業務方法怎麼變成遠程方法</div>
+  <p class="reveal paywall-locked">Goal 服務的真實程式碼。一個裝飾器加一個薄適配，JSDoc 裏那句「從 wire identity 解析出的活 Agent」就是 lookup 機制在業務側的樣子：</p>
+  <div class="source reveal paywall-locked">
+    <div class="source-head"><span>packages/goal/goal/src/index.ts</span><span>第 579 至 589 行</span></div>
+    <pre><code>  <span class="cm">/**
+   * Create one Goal through the remote boundary.
+   * @param agent - exact live Agent resolved from the wire identity.
+   * @param request - objective and optional round cap.
+   * @returns the created Goal identity.
+   */</span>
+  <span class="ty">@Remote</span>(<span class="str">'create'</span>)
+  <span class="fn">remoteExportCreate</span>(agent: <span class="ty">Agent</span>, request: <span class="ty">CreateGoalRequest</span>): <span class="ty">CreateGoalResult</span> {
+    <span class="kw">const</span> view = <span class="kw">this</span>.<span class="fn">create</span>(agent, request)
+    <span class="kw">return</span> { ref: { id: view.id, revision: view.revision } }
+  }</code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>源碼快照説明：</b>依據本地倉庫 <code>deepseek-harness-master</code>，核對文件 <code>packages/goal/goal/src/index.ts</code>，核對日期 2026-08-13。程式碼塊保留源碼原文。</div>
+
+  <div class="sec-label paywall-locked">橫向對比 · 別家的面孔怎麼長</div>
+  <div class="cmp paywall-locked">
+    <div class="cmp-card reveal">
+      <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build</h3>
+      <p>兩家在 ACP 這張面孔上正面相遇。Grok Build 有獨立的 Rust 實現 <code>xai-acp-lib</code>（<code>crates/codegen/xai-acp-lib/</code>）：stdin 行讀取器、雙向通道、網關收發器，同樣跑在 stdio 的 JSON-RPC 上，所以同樣得遵守「stdout 歸協議」的紀律。編輯器接編碼 agent，ACP 正在變成事實標準。</p>
+      <p>差別在面孔的數量和長法：Grok Build 以桌面端和 CLI 為主體，ACP 是給編輯器的接口；DSH 把五張面孔全部攤平成配置差異，內核對入口一無所知。站內 <a href="12-1.html">Grok 專題</a>拆過它的整體架構，可對照着看。</p>
+    </div>
+    <div class="cmp-card reveal">
+      <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code</h3>
+      <p>路綫相反：TUI-first。終端 CLI 是主體，headless 是同一個可執行文件的 <code>-p</code> 模式，Agent SDK 再往外包一層，多張面孔從同一個 CLI 衍生。一個進程一個用戶介面，不需要 RPC 層，也就沒有 Typert 要解決的問題。</p>
+      <p>DSH 是 Web-first，發佈時甚至沒有傳統的終端互動入口，發佈討論裏最響的聲音就是「我的 CLI 呢」。這是入口取捨的產品決策：先把內核和麪孔解耦的架構立住，缺哪張皮補哪張。兩條路綫沒有對錯，成本結構不一樣：TUI-first 加 Web 面孔要補一整層 RPC；Web-first 加 CLI 面孔，理論上是一份新的 cordis.yml 加一個驅動器。</p>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">課堂練習</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>設計第六張面孔</h3><p>假設要給 DSH 加一個聊天軟件機器人入口：用戶在羣裏 @機器人 説話，回覆流回羣裏。照着本課的路子列清單：哪些東西不用寫？（內核插件、會話持久化、壓縮、工具，全部照抄現有 <code>cordis.yml</code>。）哪些東西必須寫？（一個協議橋插件，把羣消息翻成會話 prompt、把會話事件翻成羣回覆。）再想一個細節：這個橋有沒有 stdout 互斥問題？如果沒有，它的「傳輸綫紀律」等價物是什麼？（提示：羣消息有速率限制和消息長度限制，事件流得節流合併。）</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway：</b>入口是皮，內核是身：五張面孔各自只是一份 <code>cordis.yml</code> 加一個協議翻譯插件，同一個操作從哪張臉進來，會話日誌裏落下的事件一字不差。協議入口守「stdout 歸協議」的鐵律，日誌絕不混進傳輸綫。跨 wire 調用交給自研的 Typert：<code>@Remote</code> 一個裝飾器，類型圖生成 schema、descriptor 和客戶端類型，活對象經 lookup 換成 wire id，改一處簽名全端同步。</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  /* ── 五面孔控制台 ── 报文与事件为教学化示意 fixture */
+  var CORE = ['llm-deepseek', 'agent-spine', 'session-persistence-jsonl', 'subprocess + bash', 'tool-fs', 'token-meter', 'compaction-basic'];
+  var EVENTS = [
+    { type: 'turn/start', body: 'turn 7' },
+    { type: 'user/message', body: '「修復登入 401 的 bug」' },
+    { type: 'assistant/message', body: '「找到了，時鐘偏移導致 token 過早失效…」' },
+    { type: 'turn/end', body: 'completed' }
+  ];
+  var PROMPT = '修復登入 401 的 bug';
+
+  var ENTRIES = {
+    web: {
+      name: 'Web UI',
+      skins: [
+        'host-webserver（node:http 載體，只認路由不懂 harness）',
+        'frontend-static（認領回退席位的 SPA 伺服器）',
+        'client-modules（往 index.html 注入 window.__DSH_BOOT__）',
+        'connection + api-gateway（/api 路由上的 RPC 信封）'
+      ],
+      wire: 'POST /api\n{"rpcId": 7, "endpoint": "session/prompt",\n "args": {"sessionId": "sess-42", "text": "' + PROMPT + '"}}',
+      capSkin: '這是 Web 面孔的皮：四個插件管 HTTP、靜態文件、前端啓動清單和 RPC 信封。注意它們全是普通插件，內核對它們一無所知。',
+      capWire: '瀏覽器點了發送。請求走共享的 /api 路由，信封裏只有 endpoint 和具名參數。',
+      capBridge: '網關解碼參數、把 wire id 解析成活對象，然後調內核裏同一個方法。皮的工作到此為止。'
+    },
+    headless: {
+      name: 'headless',
+      skins: [
+        '沒有協議伺服器：進程本身就是入口',
+        'format-pure stdout，結果原樣輸出',
+        '組合裏預創建一個 main agent 供驅動器使用'
+      ],
+      wire: '$ dsh-headless-agent "' + PROMPT + '"',
+      capSkin: 'headless 的皮最薄：什麼伺服器都不掛，命令行參數進，結果 stdout 出。',
+      capWire: '進程啓動，提示詞從命令行參數進來。沒有報文，因為沒有協議。',
+      capBridge: '驅動器把參數交給預創建的 main agent，走的是和別的入口完全相同的內核調用。'
+    },
+    acp: {
+      name: 'ACP',
+      skins: [
+        'acp-demo 協議橋（agent spine + 持久化 + 橋）',
+        'sandbox-local + sandbox-policy（編輯器場景預設收緊權限）',
+        '整棵樹不掛 stdout logger 和 HMR：stdout 載着 ACP 協議'
+      ],
+      wire: '{"jsonrpc": "2.0", "id": 3, "method": "session/prompt",\n "params": {"sessionId": "sess-42",\n  "prompt": [{"type": "text", "text": "' + PROMPT + '"}]}}',
+      capSkin: 'ACP 的皮：一個協議橋加一套沙箱。配置註釋明説不掛 stdout 日誌，因為 stdout 是傳輸綫。',
+      capWire: '編輯器在 stdin 上發來一行 JSON-RPC。這條綫上只許有協議，混進一行日誌對端就解析斷綫。',
+      capBridge: '橋把 session/prompt 翻成內核調用。它只做方言翻譯，業務邏輯一行沒有。'
+    },
+    sdk: {
+      name: 'Python SDK',
+      skins: [
+        'sdk-jsonrpc-server（stdio 上的 JSON-RPC 伺服器）',
+        'dsh-jsonrpc-agent 單文件可執行，隨 pip 一起裝',
+        'DSH_CORDIS_CONFIG 注入插件組合'
+      ],
+      wire: 'harness.run("' + PROMPT + '")\n→ 子進程 stdin 上是一行 JSON-RPC prompt 調用',
+      capSkin: 'Python SDK 的皮：把 JSON-RPC 入口包成一個 Python 對象，運行時子進程隨 pip 安裝。',
+      capWire: '你寫的是一行 Python，SDK 把它翻成子進程 stdio 上的 JSON-RPC。和 ACP 一樣，這條 stdout 也歸協議管。',
+      capBridge: '子進程裏的 sdk-jsonrpc-server 把調用交給內核。SDK 面孔和 JSON-RPC 面孔是同一張臉的兩種穿法。'
+    },
+    http: {
+      name: 'HTTP API',
+      skins: [
+        'api-remotes（BFF 層：身份解析 + lookup 配置）',
+        'api-gateway（按 descriptor 解碼參數、調用、編碼結果）',
+        'connection（/api 信封）→ host-webserver'
+      ],
+      wire: 'curl -s localhost:8641/api -d \'{"rpcId": 1,\n "endpoint": "goals/create",\n "args": {"agentId": "agent-1",\n  "request": {"objective": "' + PROMPT + '"}}}\'',
+      capSkin: 'HTTP API 的皮是一條鏈：remotes 到 gateway 到 connection 到 webserver，每層只管一件事。',
+      capWire: '外部程式直接打 /api。注意 args 裏是 agentId：活的 Agent 對象過不了 wire，Typert 的 lookup 把它換成了 id。',
+      capBridge: '網關先把 agentId 解析回活對象，再調業務方法。業務程式碼的簽名裏寫的仍然是 Agent，感覺不到 wire 的存在。'
+    }
+  };
+
+  var entNameEl = document.getElementById('deEntName');
+  var skinsEl = document.getElementById('deSkins');
+  var wireEl = document.getElementById('deWire');
+  var wireLabel = document.getElementById('deWireLabel');
+  var coreEl = document.getElementById('deCore');
+  var eventsEl = document.getElementById('deEvents');
+  var sameEl = document.getElementById('deSame');
+  var captionEl = document.getElementById('deCaption');
+
+  var cur = 'web';
+  var idx = 0;
+  var timer = null;
+  var runId = 0;
+  var playedOnce = false;
+
+  CORE.forEach(function (name) {
+    var chip = document.createElement('div');
+    chip.className = 'de-core-chip';
+    chip.textContent = name;
+    coreEl.appendChild(chip);
+  });
+
+  function setCaption(t) { captionEl.textContent = t; }
+
+  function reset() {
+    runId++;
+    clearTimeout(timer);
+    timer = null;
+    idx = 0;
+    var ent = ENTRIES[cur];
+    entNameEl.textContent = ent.name;
+    skinsEl.innerHTML = '';
+    ent.skins.forEach(function (s) {
+      var d = document.createElement('div');
+      d.className = 'de-skin in';
+      d.textContent = s;
+      skinsEl.appendChild(d);
+    });
+    wireEl.className = 'de-wire'; wireEl.textContent = '';
+    wireLabel.className = 'de-wire-label';
+    eventsEl.innerHTML = '<div class="de-empty">（還沒有事件）</div>';
+    sameEl.className = 'de-same'; sameEl.textContent = '';
+    Array.prototype.forEach.call(coreEl.children, function (c) { c.classList.remove('hot'); });
+    Array.prototype.forEach.call(skinsEl.children, function (c) { c.classList.remove('hot'); });
+    setCaption('入口切到 ' + ent.name + '。點「播放」或「單步」。');
+  }
+
+  function addEvent(ev) {
+    var empty = eventsEl.querySelector('.de-empty');
+    if (empty) empty.remove();
+    var row = document.createElement('div');
+    row.className = 'de-ev';
+    row.innerHTML = '<span class="seq">seq ' + eventsEl.querySelectorAll('.de-ev').length + '</span><b>' + ev.type + '</b>' + ev.body;
+    eventsEl.appendChild(row);
+    requestAnimationFrame(function () { row.classList.add('in'); });
+  }
+
+  var STEP_COUNT = 6;
+
+  function doStep() {
+    var ent = ENTRIES[cur];
+    if (idx >= STEP_COUNT) { clearTimeout(timer); timer = null; return; }
+    var step = idx;
+    idx++;
+
+    if (step === 0) {
+      Array.prototype.forEach.call(skinsEl.children, function (c) { c.classList.add('hot'); });
+      setCaption(ent.capSkin);
+    } else if (step === 1) {
+      Array.prototype.forEach.call(skinsEl.children, function (c) { c.classList.remove('hot'); });
+      wireLabel.className = 'de-wire-label show';
+      wireEl.className = 'de-wire show';
+      wireEl.textContent = ent.wire;
+      setCaption(ent.capWire);
+    } else if (step === 2) {
+      Array.prototype.forEach.call(coreEl.children, function (c) { c.classList.add('hot'); });
+      setCaption(ent.capBridge);
+    } else if (step === 3) {
+      addEvent(EVENTS[0]);
+      addEvent(EVENTS[1]);
+      setCaption('內核開始跑 agent loop，事件逐條追加進會話日誌。到這裏已經和入口沒有任何關係了。');
+    } else if (step === 4) {
+      addEvent(EVENTS[2]);
+      addEvent(EVENTS[3]);
+      setCaption('回答生成，輪次結束。這四條事件就是會話的唯一真源。');
+    } else if (step === 5) {
+      Array.prototype.forEach.call(coreEl.children, function (c) { c.classList.remove('hot'); });
+      sameEl.className = 'de-same show';
+      sameEl.textContent = playedOnce
+        ? '對比一下：和你上一個入口播出來的四條事件一字不差。入口只改左邊，右邊永遠不變。'
+        : '現在換一個入口標籤，再播一遍：左邊的皮和報文全變，右邊這四條事件一字不差。';
+      setCaption('播完了。回程時同一份事件流按各協議的方言送回去：Web 走 SSE，ACP 和 SDK 走 stdio 通知，headless 直接列印結果。');
+      playedOnce = true;
+    }
+
+    if (timer !== null && idx < STEP_COUNT) {
+      var rid = runId;
+      timer = setTimeout(function () { if (rid === runId) doStep(); }, 2200);
+    } else if (idx >= STEP_COUNT) {
+      timer = null;
+    }
+  }
+
+  function play() {
+    if (timer !== null) return;
+    if (idx >= STEP_COUNT) reset();
+    timer = setTimeout(function () {}, 0);
+    doStep();
+  }
+  function stepOnce() {
+    clearTimeout(timer);
+    timer = null;
+    if (idx >= STEP_COUNT) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-entry .tab'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-entry .tab'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-ent');
+      reset();
+    });
+  });
+  document.getElementById('dePlay').addEventListener('click', play);
+  document.getElementById('deStep').addEventListener('click', stepOnce);
+  document.getElementById('deReset').addEventListener('click', reset);
+
+  reset();
+  if (typeof window.lessonOnView === 'function') {
+    window.lessonOnView(document.getElementById('demo-entry'), play);
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

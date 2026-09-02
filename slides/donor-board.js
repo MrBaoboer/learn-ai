@@ -19,8 +19,8 @@
     try {
       if (window.XUEAI_I18N && window.XUEAI_I18N.lang) return window.XUEAI_I18N.lang;
       var f = location.pathname.split('/').pop();
-      if (/\.en\.html$/.test(f)) return 'en';
-      if (/\.ko\.html$/.test(f)) return 'ko';
+      var lm = f && f.match(/\.(en|ko|tw|hk)\.html$/);
+      if (lm) return lm[1];
     } catch (e) {}
     return 'zh';
   })();
@@ -60,6 +60,76 @@
       errBig: '这张图太大了，换一张小一点的截图试试',
       errName: '请填一个想显示在榜上的名字',
       errProject: '请填写这笔捐赠的项目名称'
+    },
+    hk: {
+      heading: '已經獻出愛心的朋友',
+      sub: '謝謝你們，讓這份善意繼續傳下去',
+      add: '我也捐了',
+      empty: '還沒有人上榜，歡迎你做第一個',
+      modalTitle: '把你的愛心記在這裏',
+      modalSub: '上傳你在騰訊公益的捐贈證書截圖，識別通過後由站長確認上榜。\n榜上只顯示名字和項目，不顯示金額。',
+      dropTitle: '按一下或拖放上傳捐贈證書截圖',
+      dropHint: '騰訊公益捐贈成功後，在證書頁點「保存圖片」即可 · 支持 jpg / png，8MB 以內',
+      recognizing: '正在識別證書…',
+      recognized: '識別成功，確認一下資訊',
+      fProject: '捐贈項目',
+      fProjectPh: '請照證書上的項目名填寫',
+      fProjectHint: '這張截圖上沒露出項目名，麻煩你補一句',
+      fDate: '捐贈時間',
+      fName: '想顯示在榜上的名字',
+      fNamePh: '例如：白川',
+      fAvatar: '頭像（可選）',
+      avatarUpload: '上傳圖片',
+      avatarFetchPh: '或粘貼 GitHub / X 主頁',
+      avatarFetch: '抓取',
+      submit: '提交上榜',
+      submitting: '提交中…',
+      doneTitle: '收到了，謝謝你',
+      doneSub: '站長核對證書後就會把你放上愛心榜，通常一天之內。',
+      close: '關閉',
+      checking: '正在確認登入狀態…',
+      loginTip: '登入米羊帳號後就能上傳證書',
+      loginBtn: '登入米羊帳號',
+      errPick: '請先選一張證書截圖',
+      errNet: '網絡不太順，請稍後再試',
+      errBig: '這張圖太大了，換一張小一點的截圖試試',
+      errName: '請填一個想顯示在榜上的名字',
+      errProject: '請填寫這筆捐贈的項目名稱'
+    },
+    tw: {
+      heading: '已經獻出愛心的朋友',
+      sub: '謝謝你們，讓這份善意繼續傳下去',
+      add: '我也捐了',
+      empty: '還沒有人上榜，歡迎你做第一個',
+      modalTitle: '把你的愛心記在這裡',
+      modalSub: '上傳你在騰訊公益的捐贈證書截圖，識別透過後由站長確認上榜。\n榜上只顯示名字和專案，不顯示金額。',
+      dropTitle: '點一下或拖曳上傳捐贈證書截圖',
+      dropHint: '騰訊公益捐贈成功後，在證書頁點「儲存圖片」即可 · 支援 jpg / png，8MB 以內',
+      recognizing: '正在識別證書…',
+      recognized: '識別成功，確認一下資訊',
+      fProject: '捐贈專案',
+      fProjectPh: '請照證書上的專案名填寫',
+      fProjectHint: '這張截圖上沒露出專案名，麻煩你補一句',
+      fDate: '捐贈時間',
+      fName: '想顯示在榜上的名字',
+      fNamePh: '例如：白川',
+      fAvatar: '頭像（可選）',
+      avatarUpload: '上傳圖片',
+      avatarFetchPh: '或貼上 GitHub / X 主頁',
+      avatarFetch: '抓取',
+      submit: '提交上榜',
+      submitting: '提交中…',
+      doneTitle: '收到了，謝謝你',
+      doneSub: '站長核對證書後就會把你放上愛心榜，通常一天之內。',
+      close: '關閉',
+      checking: '正在確認登入狀態…',
+      loginTip: '登入米羊帳號後就能上傳證書',
+      loginBtn: '登入米羊帳號',
+      errPick: '請先選一張證書截圖',
+      errNet: '網路不太順，請稍後再試',
+      errBig: '這張圖太大了，換一張小一點的截圖試試',
+      errName: '請填一個想顯示在榜上的名字',
+      errProject: '請填寫這筆捐贈的專案名稱'
     },
     en: {
       heading: 'People who gave',
@@ -489,6 +559,7 @@
     subEl.textContent = T.loginTip;
     var a = el('a', 'dnm-submit', T.loginBtn);
     a.href = loginUrl();
+    a.rel = 'nofollow';
     a.style.display = 'block';
     a.style.textAlign = 'center';
     a.style.textDecoration = 'none';

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>輸入主導：62:1 的 I/O Ratio | Token 降本增效</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<!-- SEO Start -->
+<meta name="description" content="Chatbot 是一問一答，Agent 是循環執行：每一輪的 Input 都包含全部歷史，輪次越多成本累積膨脹。逐輪拆解一個 Excel 分析任務，看 I/O Ratio 怎麼變成 62:1。">
+<meta name="keywords" content="Agent 成本,I/O Ratio,ReAct 循環,輸入主導,Token 膨脹,SWE-bench">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/cost-7.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/cost-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/cost-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/cost-7.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/cost-7.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/cost-7.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/cost-7.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/cost-7.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="輸入主導：62:1 的 I/O Ratio">
+<meta property="og:description" content="為了得到 270 個字的結果，你付了 16,790 個字的閲讀費。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/cost-7.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/cost-7.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="輸入主導：62:1 的 I/O Ratio">
+<meta name="twitter:description" content="為了得到 270 個字的結果，你付了 16,790 個字的閲讀費。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl td.hi{color:var(--warn);font-weight:800}
+.tbl-wrap{overflow-x:auto}
+
+/* 逐轮播放器 */
+.rp{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.rp-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.rp-title{font-size:14.5px;font-weight:800;color:var(--text)}
+.rp-btn{padding:9px 24px;border-radius:999px;border:none;background:var(--ct);color:#fff;font-family:inherit;font-size:13.5px;font-weight:800;cursor:pointer}
+.rp-btn:disabled{background:#c4c8cf;cursor:not-allowed}
+.rp-rounds{display:flex;flex-direction:column;gap:9px}
+.rr{display:flex;gap:12px;align-items:flex-start;border:1.5px solid var(--border);border-radius:11px;padding:12px 14px;opacity:.32;transition:opacity .3s,border-color .3s}
+.rr.show{opacity:1;border-color:var(--ct-line)}
+.rr-num{width:26px;height:26px;border-radius:8px;background:var(--ct-soft);color:var(--ct-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;flex-shrink:0;margin-top:2px}
+.rr-body{flex:1;min-width:0}
+.rr-act{font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:6px}
+.rr-bar{height:20px;background:rgba(0,0,0,.045);border-radius:6px;overflow:hidden;margin-bottom:5px}
+.rr-fill{height:100%;background:var(--warn);border-radius:6px;width:0;transition:width .5s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:7px;font-size:11px;font-weight:800;color:#fff;min-width:34px}
+.rr-meta{font-size:12px;color:var(--sub)}
+.rr-meta b{color:var(--ct-deep)}
+.rp-sum{margin-top:14px;background:rgba(0,0,0,.03);border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.8;color:var(--text);display:none}
+.rp-sum b{color:var(--warn)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"輸入主導：62:1 的 I/O Ratio","name":"輸入主導：62:1 的 I/O Ratio","url":"https://xueai.miyang.cn/slides/cost-7.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 的帳單","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Chatbot 是一問一答，Agent 是循環執行：每一輪的 Input 都包含全部歷史，輪次越多成本累積膨脹。逐輪拆解一個 Excel 分析任務，看 I/O Ratio 怎麼變成 62:1。","datePublished":"2026-08-10","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 降本增效 · 7 / 13</div>
+    <h1>輸入主導：62:1 的 I/O Ratio</h1>
+    <p class="subtitle">普通 Chatbot 是一問一答；Agent 是「思考 → 行動 → 觀察 → 再思考」的循環。關鍵認知：每一輪的 Input 都包含了全部歷史資訊——輪次越多，Input 越長，成本累積膨脹。</p>
+    <div class="chips"><span class="chip">ReAct 循環</span><span class="chip">輸入主導</span><span class="chip">I/O Ratio</span><span class="chip">累積膨脹</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>Agent 每一輪都要重讀全部歷史。逐輪點開一個 Excel 任務，看 Input 怎麼滾到 31,460 Token</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">Chatbot vs Agent：計費結構完全不同</div>
+    <p class="desc">普通 Chatbot 問「講個笑話」（10 Token），答 150 Token——<b>I/O Ratio ≈ 1:15，輸出主導</b>。而 Agent 做一個程式碼修復任務：System Prompt、工具返回、歷史輸出，全都要在每一輪裏重新讀一遍。三輪下來，總 Input 16,790、總 Output 270——<b>I/O Ratio 62:1，輸入主導</b>。</p>
+    <div class="quote-card" style="margin-top:12px">
+      為了得到 270 個字的結果，你付了 <b>16,790 個字的「閲讀費」</b>。這就是 Agent 的輸入主導特性。
+    </div>
+    <div class="fig-wrap">
+      <img src="images/cost/chatbot-vs-agent.webp" alt="普通 Chatbot 一問一答與 Agent 循環執行的對比" loading="lazy">
+      <div class="fig-cap">Chatbot 單輪互動結束；Agent 的每一輪入口都帶着全部歷史，Input 累計膨脹。（圖：作者分享原稿）</div>
+    </div>
+    <div class="fig-wrap">
+      <img src="images/cost/io-ratio.webp" alt="I/O Ratio：Agent 的輸入主導特性" loading="lazy">
+      <div class="fig-cap">程式碼修復任務的三輪拆解：總 Input 16,790，總 Output 270，I/O Ratio 62:1。（圖：作者分享原稿）</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">互動演示 · 一個「簡單」任務的真實帳單</div>
+    <p class="desc">任務：「幫我分析吓呢個 Excel 表格，搵出銷售額最高嘅產品，然後生成一個圖表。」點「下一輪」，看每一輪的累計 Input 怎麼滾起來。</p>
+    <div class="rp" id="rp">
+      <div class="rp-head">
+        <span class="rp-title">Excel 分析任務 · 5 輪執行</span>
+        <button class="rp-btn" id="rpBtn" type="button">開始執行 ▶</button>
+      </div>
+      <div class="rp-rounds" id="rpRounds"></div>
+      <div class="rp-sum" id="rpSum"></div>
+    </div>
+    <div class="fig-wrap">
+      <img src="images/cost/excel-bill.webp" alt="Excel 任務的輪次拆解與真實帳單" loading="lazy">
+      <div class="fig-cap">五輪累計 Input 31,460、Output 450，合計約 0.014–0.026 元。注意：這只是一次成功的執行，隱形成本還有失敗重試、調試、迭代。（圖：作者分享原稿）</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">膨脹的數學：為什麼是平方級</div>
+    <p class="desc">假設任務要 N 輪完成，System Prompt 長度 S，每輪新增（輸出 + 工具返回）約 Δ。第 N 輪的 Input ≈ S + Q + Δ×(N-1)，而<b>總 Input 是所有輪次的累加</b>——裏面藏着一個 1+2+3+…+(N-1) 的等差數列。每輪新增 500 Token 的話，5 輪循環的總 Input 就有 15,000+；輪次翻倍，成本接近翻兩番。</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>Agent 框架（SWE-bench 實測）</th><th>平均 I/O Ratio</th><th>説明</th></tr>
+      <tr><td>簡單 RAG Agent</td><td>10:1 ~ 20:1</td><td>檢索 + 回答</td></tr>
+      <tr><td>OpenHands</td><td>20:1 ~ 50:1</td><td>程式碼修復任務</td></tr>
+      <tr><td>AutoGPT 類</td><td class="hi">30:1 ~ 100:1</td><td>開放式任務，循環多</td></tr>
+    </table></div>
+    <p class="desc" style="margin-top:12px">這解釋了為什麼 <b>KV Cache（第 11 節）對 Agent 是決定性的</b>：既然每輪都要重讀同樣的前綴，能不能命中緩存，就是 5 倍的價差。也解釋了為什麼要監控 I/O Ratio——<b>比率超過 50:1，往往説明 Agent 在「空轉」</b>，該優化流程或降級任務了。</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Agent 是輸入主導的：</b>每輪 Input 都帶全部歷史，總量按輪次的平方級膨脹。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>單次執行看着便宜，規模化才見真章：</b>0.02 元的任務 × 失敗重試 × 百萬調用，就是帳單窒息現場。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>把 I/O Ratio 當健康指標監控：</b>&gt;50:1 説明 Agent 在空轉，先查流程再談省錢。</p></div>
+    </div>
+    <p class="src-note">
+      <b>內容來源：</b>整理自作者團隊內部分享《AI Token 降本增效策略分享》「Agentic 應用的計費機制」。行業數據參考 SWE-bench 上的 Agent Token 消耗實證研究（見收官節閲讀材料）。Agent 循環的原理詳見<a href="7-3.html">動手實戰篇</a>。
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ── 逐轮账单播放器 ── */
+var ROUNDS = [
+  {act:'理解任務，調用「讀取 Excel」工具', add:'S+Q = 2,100', cum:2100, out:70},
+  {act:'讀取 Excel 返回 5,000 行數據', add:'+5,070', cum:7170, out:100},
+  {act:'分析數據，找到 Top 產品', add:'+100', cum:7270, out:150},
+  {act:'調用繪圖工具', add:'+150', cum:7420, out:80},
+  {act:'圖表生成完成，返回結果', add:'+80', cum:7500, out:50}
+];
+var MAXC = 7500, rpI = 0;
+var wrap = document.getElementById('rpRounds');
+ROUNDS.forEach(function(r,i){
+  var d = document.createElement('div');
+  d.className = 'rr'; d.id = 'rr'+i;
+  d.innerHTML = '<span class="rr-num">'+(i+1)+'</span><div class="rr-body">'
+    + '<div class="rr-act">'+r.act+'</div>'
+    + '<div class="rr-bar"><div class="rr-fill" id="rrF'+i+'"></div></div>'
+    + '<div class="rr-meta">新增 Input：'+r.add+' ｜ 本輪累計 Input：<b>'+r.cum.toLocaleString()+'</b> ｜ Output：'+r.out+'</div></div>';
+  wrap.appendChild(d);
+});
+var btn = document.getElementById('rpBtn');
+btn.onclick = function(){
+  if (rpI >= ROUNDS.length) return;
+  var r = ROUNDS[rpI];
+  var el = document.getElementById('rr'+rpI);
+  el.classList.add('show');
+  var f = document.getElementById('rrF'+rpI);
+  requestAnimationFrame(function(){
+    f.style.width = Math.max(8, Math.round(r.cum/MAXC*100)) + '%';
+    f.textContent = r.cum.toLocaleString();
+  });
+  rpI++;
+  if (rpI >= ROUNDS.length) {
+    btn.disabled = true; btn.textContent = '執行完成';
+    var sum = document.getElementById('rpSum');
+    sum.style.display = 'block';
+    sum.innerHTML = '總 Input：<b>31,460 Tokens</b>（2,100+7,170+7,270+7,420+7,500）｜總 Output：450 Tokens<br>'
+      + '帳單（Qwen-Plus 非思考）：Input ¥0.013~0.025 + Output ¥0.00045 ≈ <b>¥0.014 ~ 0.026</b><br>'
+      + '注意：紅條几乎每一輪都在變長——你為同一份 System Prompt 和歷史付了 5 次錢。這就是 KV Cache 緩存價存在的意義（第 11 節見）。';
+  } else {
+    btn.textContent = '下一輪 ▶（' + (rpI+1) + '/5）';
+  }
+};
+lessonOnView(document.getElementById('rp'), function(){});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

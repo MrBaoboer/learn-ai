@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>往模型上下文裡塞東西，先給它造一個型別 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root,.lesson{--accent:#414b5a;--accent-deep:#262d38;--accent-soft:rgba(65,75,90,.085)}
+/* 变量挂在 .lesson 上：nav-inject.js 会在页面样式之后再注入一次 :root 主色，
+   靠就近继承才能保住专题色。 */
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(65,75,90,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(65,75,90,.04),0 0 0 52px rgba(65,75,90,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(65,75,90,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.q-tag{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font-size:13px;font-weight:800;margin:28px 0 14px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.visual{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin:24px 0 0;max-width:100%;min-width:0}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto;max-width:100%}.source code{color:var(--text);font:12.5px/1.85 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0;white-space:pre;word-break:normal}
+.snapshot{margin:14px 0 0;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text);background:rgba(0,0,0,.05)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eff1f5,var(--card));border:1px solid rgba(65,75,90,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.9}.exercise p:last-child{margin:0}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);color:var(--text);display:flex;gap:14px;font-size:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.compare{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h4{margin:0;font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}.cmp-card h4 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:12px 0 0}
+.cmp-card .cmp-tag{display:inline-block;margin-top:14px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent-deep);border:1px solid rgba(65,75,90,.25)}
+/* ── 交互演示 ── */
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card)}
+.demo-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo-ctrl button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;min-height:44px;min-width:44px;border:1px solid rgba(65,75,90,.35);border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font:600 14px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:filter .15s}
+.demo-ctrl button:active{filter:brightness(.92)}
+.dm-budget{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:20px;padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-budget .dm-b-label{font-size:13px;font-weight:700;color:var(--text);padding-top:10px}
+.dm-budget .dm-b-hint{font-size:12px;color:var(--sub);line-height:1.7;flex:1 1 180px;padding-top:10px}
+.dm-seg{display:flex;gap:8px;flex-wrap:wrap}
+.dm-seg button{min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--sub);font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all .15s cubic-bezier(.4,0,.2,1)}
+.dm-seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dm-cols{display:grid;grid-template-columns:1.15fr .85fr;gap:24px}
+.dm-col{border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+.dm-head{padding:14px 16px;background:var(--card);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.dm-head .dm-name{font-size:13px;font-weight:800;color:var(--text)}
+.dm-meter{font-size:11px;font-weight:600;color:var(--sub)}
+.dm-meter b{color:var(--accent-deep);font-variant-numeric:tabular-nums}
+.dm-body{padding:18px;display:flex;flex-direction:column;gap:12px;min-height:280px}
+.dm-msg{border:1px solid var(--border);border-radius:10px;background:var(--card);padding:12px 14px;display:flex;flex-direction:column;gap:8px;opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-msg.ghost{border-style:dashed;opacity:.45}
+.dm-msg.reject{border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.05)}
+.dm-msg.reject.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+#dm-envelope.is-focus .dm-msg{opacity:.4;transform:scale(.98)}
+#dm-envelope.is-focus .dm-msg.on{opacity:1;transform:scale(1)}
+.dm-msg.is-enter,#dm-envelope.is-focus .dm-msg.is-enter{opacity:0;transform:translateY(8px)}
+.dm-msg.is-enter.in,#dm-envelope.is-focus .dm-msg.is-enter.in{opacity:1;transform:none;transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-msg-role{font-size:11px;font-weight:800;color:var(--accent-deep);letter-spacing:.02em}
+.dm-chip{padding:10px 12px;border-radius:8px;border:1px solid rgba(65,75,90,.28);background:var(--accent-soft);display:flex;flex-direction:column;gap:4px;transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-chip b{font-size:13px;color:var(--accent-deep);font-weight:700}
+.dm-chip span{font-size:11.5px;color:var(--sub);line-height:1.6;word-break:break-all}
+.dm-chip.markless{background:var(--card);border-style:dashed}
+.dm-chip.firing{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+#dm-envelope.is-focus .dm-chip{opacity:.4;transform:scale(.98)}
+#dm-envelope.is-focus .dm-chip.on{opacity:1;transform:scale(1)}
+.dm-chip.is-enter,#dm-envelope.is-focus .dm-chip.is-enter{opacity:0;transform:translateY(8px)}
+.dm-chip.is-enter.in,#dm-envelope.is-focus .dm-chip.is-enter.in{opacity:1;transform:none;transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-empty{max-height:80px;overflow:hidden;padding:28px 12px;text-align:center;font-size:13px;color:var(--faint);line-height:1.8;transition:max-height .4s ease,padding .4s ease}
+.dm-empty.gone{max-height:0;padding-top:0;padding-bottom:0}
+.dm-id{display:flex;flex-direction:column;gap:10px}
+.dm-id-row{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:8px;background:var(--card);border:1px solid var(--border);font-size:12.5px;line-height:1.7;color:var(--sub);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-id-row b{color:var(--accent-deep);font-weight:700}
+.dm-id-row.on{background:var(--accent-soft);border-color:rgba(65,75,90,.35);color:var(--accent-deep);font-weight:600}
+.dm-id-row.is-enter{opacity:0;transform:translateY(8px)}
+.dm-id-row.is-enter.in{opacity:1;transform:none;transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-bins{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.dm-bin{padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:12px;line-height:1.7;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-bin.on{background:var(--accent-soft);border-color:rgba(65,75,90,.4);color:var(--accent-deep);font-weight:600}
+.dm-bins.is-focus .dm-bin{opacity:.4;transform:scale(.98)}
+.dm-bins.is-focus .dm-bin.on{opacity:1;transform:scale(1)}
+.dm-bin.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-bin b{display:block;font-size:12.5px;margin-bottom:2px;color:var(--text)}
+.dm-bin-bar{display:block;height:3px;margin-top:8px;border-radius:99px;background:var(--accent);transform:scaleX(0);transform-origin:left center;transition:transform .5s cubic-bezier(.25,1,.5,1)}
+.dm-trace{margin-top:24px;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.dm-trace-tag{padding:12px 18px;background:var(--card);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--sub)}
+.dm-trace ol{margin:0;padding:10px 0;list-style:none}
+.dm-trace li{display:flex;justify-content:space-between;gap:16px;padding:9px 18px;font-size:12.5px;line-height:1.7;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-trace.is-live li{opacity:.4;transform:scale(.98)}
+.dm-trace.is-live li.on{opacity:1;transform:scale(1);background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-trace li.on{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-trace li.firing{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-trace li span.ln{flex:0 0 auto;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)}
+.dm-trace li.on span.ln{color:var(--accent-deep)}
+.dm-caption{margin-top:20px;min-height:56px;display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.dm-caption svg{flex:0 0 auto;color:var(--accent)}
+#dm-caption-text{transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-summary{display:flex;flex-direction:column;gap:14px;max-height:0;overflow:hidden;opacity:0;margin-top:0;padding:0 22px;border:1px solid transparent;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),var(--card));transition:max-height .5s cubic-bezier(.25,1,.5,1),opacity .4s cubic-bezier(.4,0,.2,1)}
+.dm-summary.on{max-height:400px;opacity:1;margin-top:20px;padding:20px 22px;border-color:rgba(65,75,90,.3)}
+.dm-summary .dm-s{font-size:13px;line-height:1.8;color:var(--sub)}.dm-summary .dm-s b{display:block;font-size:13.5px;color:var(--accent-deep);margin-bottom:2px}
+.demo-caption{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.7}
+@keyframes flashPop{0%{transform:scale(.8)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(65,75,90,.3)}50%{box-shadow:0 0 20px 6px rgba(65,75,90,.2)}100%{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.demo,.demo *{transition-duration:0s!important;animation-duration:0s!important}}
+@media(max-width:760px){.lesson{overflow-x:hidden}.compare{grid-template-columns:1fr}.dm-cols{grid-template-columns:1fr}.objective{grid-template-columns:1fr}.lesson-header:after{display:none}.demo{padding:18px}.demo-ctrl{width:100%}.demo-ctrl button{flex:1}.dm-body{min-height:0}.visual{padding:14px}.dm-trace li{flex-direction:column;gap:4px}.dm-budget .dm-b-label{padding-top:0}.source,.demo,.visual,.cmp-card{max-width:100%;min-width:0}.source pre{overflow-x:auto}.lesson code{overflow-wrap:anywhere;word-break:break-word}}
+</style>
+<meta name="description" content="Codex 往模型上下文裡塞東西之前，先給每一種注入造一個型別：型別自己知道 role、marker 和 body，組裝按欄位分揀，事後靠同一對 marker 認回">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/codex-06.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/codex-06.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/codex-06.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/codex-06.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/codex-06.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/codex-06.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/codex-06.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/codex-06.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_TW">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"往模型上下文裡塞東西，先給它造一個型別","name":"往模型上下文裡塞東西，先給它造一個型別","url":"https://xueai.miyang.cn/slides/codex-06.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 上下文","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Codex 往模型上下文裡塞東西之前，先給每一種注入造一個型別：型別自己知道 role、marker 和 body，組裝按欄位分揀，事後靠同一對 marker 認回","datePublished":"2026-08-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="往模型上下文裡塞東西，先給它造一個型別"><meta property="og:description" content="Codex 往模型上下文裡塞東西之前，先給每一種注入造一個型別：型別自己知道 role、marker 和 body，組裝按欄位分揀，事後靠同一對 marker 認回"><meta property="og:url" content="https://xueai.miyang.cn/slides/codex-06.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/codex-06.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>OpenAI Codex · 程式碼模式</div>
+    <h1>往模型上下文裡塞東西，先給它造一個型別</h1>
+    <p class="subtitle">批准字首、工作區、AGENTS.md、被中斷的 turn，全是告訴模型一件它自己看不到的事實。Codex 先給每一種注入造一個型別，型別自己知道 role、marker 和 body。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>每一種注入都是一個型別，自己知道 role、marker 和 body；組裝按欄位分揀，事後靠同一對 marker 認回</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5" fill="none"/></svg>
+    <span><b>課程目標</b>讀完能說清三件事。第一，往模型上下文裡塞的每一段文字，為什麼要先收成一個型別。第二，有標和無標差在哪，壓縮和恢復靠什麼認回。第三，一條發給模型的訊息按什麼欄位分揀，順序從哪來。</span>
+  </div>
+
+  <div class="sec-label">先玩一遍 · 開哪些開關，信封裡就有哪些塊</div>
+  <div class="demo reveal" id="demo-assemble">
+    <div class="demo-top">
+      <div class="demo-title">同一輪輸入：五個 fragment 開關，看訊息怎麼被拼出來</div>
+      <div class="demo-ctrl">
+        <button id="dm-play" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="none"/></svg>播放</button>
+        <button id="dm-step" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z" fill="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>單步</button>
+        <button id="dm-reset" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" fill="none"/><path d="M3 3v5h5" fill="none"/></svg>重置</button>
+      </div>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">開啟</span>
+      <div class="dm-seg" id="dm-seg">
+        <button type="button" data-id="env" class="on">環境資訊</button>
+        <button type="button" data-id="agents" class="on">AGENTS.md</button>
+        <button type="button" data-id="win">視窗身份</button>
+        <button type="button" data-id="pref">批准字首</button>
+        <button type="button" data-id="abort">中斷通知</button>
+      </div>
+      <span class="dm-b-hint">開關一變，左邊信封立刻重排。點播放，看每一塊怎麼被問 role、問 marker、再分進三條訊息。</span>
+    </div>
+    <div class="dm-cols">
+      <div class="dm-col">
+        <div class="dm-head"><span class="dm-name">發給模型的信封</span><span class="dm-meter"><b id="dm-msg-n">0</b> 條訊息 · <b id="dm-frag-n">0</b> 塊</span></div>
+        <div class="dm-body" id="dm-envelope"></div>
+      </div>
+      <div class="dm-col">
+        <div class="dm-head"><span class="dm-name">產地標籤</span><span class="dm-meter" id="dm-id-type">先問型別</span></div>
+        <div class="dm-body">
+          <div class="dm-id" id="dm-idcard"></div>
+          <div class="dm-bins" id="dm-bins"></div>
+        </div>
+      </div>
+    </div>
+    <div class="dm-trace">
+      <div class="dm-trace-tag">邏輯軌跡 · 動畫每一步對應原始碼裡的哪一段</div>
+      <ol id="dm-trace">
+        <li><span>取 role，決定進 user 還是 developer</span><span class="ln">fragment.rs L15</span></li>
+        <li><span>問要不要單獨成條</span><span class="ln">fragment.rs L18</span></li>
+        <li><span>例項要 marker，拿去 render</span><span class="ln">fragment.rs L22</span></li>
+        <li><span>空 marker 只輸出 body，且永不匹配</span><span class="ln">fragment.rs L41</span></li>
+        <li><span>視窗身份在迴圈前推進單獨組</span><span class="ln">session/mod.rs L3661</span></li>
+        <li><span>其餘 fragment 按 role 和 marker 分揀</span><span class="ln">session/mod.rs L3677</span></li>
+        <li><span>user 側按登錄表 .any() 認回</span><span class="ln">contextual_user_message.rs L18</span></li>
+        <li><span>developer 側按前綴表認回</span><span class="ln">event_mapping.rs L40</span></li>
+      </ol>
+    </div>
+    <div class="dm-caption" id="dm-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none"/></svg><span id="dm-caption-text">開啟或關掉開關，看最終注入模型的內容由哪幾塊構成。點播放，看它們怎麼被分揀。</span></div>
+    <div class="dm-summary" id="dm-summary">
+      <div class="dm-s"><b>構成從哪來</b>可合併的 developer 段先收成一條訊息，必須單獨成條的各成一條，user 段再收成一條。順序寫在型別欄位上，字串裡有沒有某個詞幫不上忙。</div>
+      <div class="dm-s"><b>事後能不能認</b>有標的靠首尾 marker 認回。無標的預設認不回，developer 側用前綴表補了一部分。</div>
+      <div class="dm-s"><b>為什麼要先有型別</b>組裝入口收的是已實現 trait 的 fragment。隨手 format 出來的標籤進不去，matcher 列表也認不出沒登記的標籤。</div>
+    </div>
+    <div class="demo-caption">教學示意：開關組合與正文措辭為課程化設定，分揀順序對齊 <code>build_initial_context_with_world_state</code>。邏輯軌跡右側行號對應 openai/codex 倉庫 commit 4f39251a01。</div>
+  </div>
+
+  <div class="sec-label">思路一 · 注入先變成型別</div>
+
+  <div class="q-tag reveal">它解決什麼問題</div>
+  <p class="reveal">你給 agent 加過這類功能：使用者剛批准了 <code>npm *</code>，下一輪模型還在問要不要跑 npm test。或者壓縮剛結束，模型突然忘了工作區在哪、沙箱是只讀還是可寫。再或者 fork 一條會話，舊的 AGENTS.md 還在，新的目錄提示疊上去，模型同時看見兩套互相打架的規則。</p>
+  <p class="reveal">這三件事的共同來源是同一類操作：執行時往模型上下文裡塞了一段文字。批准前綴、工作區、權限檔案、被中斷的 turn、當前 UTC 時間，全是告訴模型一件它自己看不到的事實。一段 <code>format!</code> 就能寫出來。</p>
+  <p class="reveal">問題出在事後。這段文字進了歷史之後，壓縮要不要留它、會話恢復要不要認它、UI 要不要把它藏起來、world state 要不要拿它當模型已經知道了的證據，全都依賴一件事：你還能從純文字裡把它認回來。各處再寫一遍 <code>startsWith</code>，過幾週四處會漂。未知標籤還會漏進使用者訊息解析。</p>
+
+  <div class="q-tag reveal">思路是什麼</div>
+  <p class="reveal">Codex 把每一種注入收成一個實現 <code>ContextualUserFragment</code> 的型別。trait 不在 <code>codex-core</code> 裡，而在獨立 crate <code>codex-context-fragments</code>。每個實現必須同時回答：這段以 user 還是 developer 進 Responses API，頭尾 marker 是什麼，中間 body 怎麼寫，要不要單獨成一條訊息。</p>
+  <p class="reveal"><code>render()</code> 把頭尾 marker 和 body 直接首尾相接，中間不加分隔符。空白和換行算 body 的。空 marker 只輸出 body。<code>into()</code> 把渲染結果收成一條 <code>ResponseItem::Message</code>，content 只有一個 <code>InputText</code>。注入的終點是協議物件。</p>
+  <div class="source reveal">
+    <div class="source-head"><span>codex-rs/context-fragments/src/fragment.rs</span><span>第 38 至 46 行</span></div>
+    <pre><code>    fn render(&self) -> String {
+        let (start_marker, end_marker) = self.markers();
+        let body = self.body();
+        if start_marker.is_empty() && end_marker.is_empty() {
+            return body;
+        }
+
+        format!("{start_marker}{body}{end_marker}")
+    }</code></pre>
+  </div>
+  <div class="snapshot">原始碼快照說明：依據本地倉庫 <code>openai/codex</code>，核對檔案 <code>codex-rs/context-fragments/src/fragment.rs</code>，commit <code>4f39251a01</code>，核對日期 2026-08-22。程式碼塊保留原始碼原文，這段就是型別把自己收成一段可注入文字的全部規則。</div>
+  <p class="reveal" style="margin-top:20px"><code>markers()</code> 帶 <code>self</code>，渲染走例項。<code>type_markers()</code> 不帶 <code>self</code>，識別走型別。手裡只有歷史文字、沒有原物件時，仍然能問這段像不像某某 fragment。<code>dyn ContextualUserFragment</code> 調不了 <code>matches_text</code>，反向識別必須點到具體型別。</p>
+  <p class="reveal paywall-locked xa-peek">加一種注入要新建檔案、實現 trait、掛進 <code>core/src/context/mod.rs</code>。目錄裡 39 個模組。這個摩擦力本身就是治理：臨時 <code>format!</code> 走不通，因為組裝函式收的是 <code>Box&lt;dyn ContextualUserFragment&gt;</code>。<span class="src-note">出處：<code>codex-rs/core/src/context/mod.rs</code> 第 3 至 41 行；<code>codex-rs/core/src/session/mod.rs</code> 第 3677 至 3707 行</span></p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 300" role="img" aria-label="注入先變成型別，渲染和識別共用 marker">
+      <defs><marker id="arrA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="36" width="160" height="70" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="120" y="66" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">執行時事實</text>
+      <text x="120" y="88" fill="#6b7280" text-anchor="middle" font-size="13">工作區、指令、中斷</text>
+      <path fill="none" d="M208 71H276" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="284" y="28" width="200" height="86" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="384" y="56" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">fragment 型別</text>
+      <text x="384" y="80" fill="#6b7280" text-anchor="middle" font-size="13">role · markers · body</text>
+      <path fill="none" d="M492 71H560" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="568" y="36" width="150" height="70" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="643" y="66" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">render</text>
+      <text x="643" y="88" fill="#6b7280" text-anchor="middle" font-size="13">首尾相接</text>
+      <path fill="none" d="M726 71H794" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="802" y="36" width="98" height="70" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="851" y="77" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Message</text>
+      <path fill="none" d="M851 114V168" stroke="#414b5a" stroke-width="2"/>
+      <path fill="none" d="M851 168H384" stroke="#414b5a" stroke-width="2"/>
+      <path fill="none" d="M384 168V122" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="40" y="196" width="860" height="72" rx="12" fill="#ffffff" stroke="rgba(65,75,90,.35)"/>
+      <text x="470" y="226" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">事後只剩一段 InputText</text>
+      <text x="470" y="250" fill="#6b7280" text-anchor="middle" font-size="13">用 type_markers 問具體型別，matches_text 看首尾，沒有例項也能認回</text>
+    </svg>
+    <div class="visual-caption">教學化結構圖：渲染走例項，識別走型別，兩套呼叫讀同一對 marker。</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">為什麼長期成立</div>
+  <p class="reveal paywall-locked">渲染和識別共用一份定義。換個語言重寫，最小形態仍是一份介面、一份登錄表、同一對 marker。組裝函式的參數寫成 fragment 型別，業務側就失去了隨手拼 XML 的呼叫點。識別函式只從登錄表做匹配，不許再寫一套 <code>text.startsWith</code>。</p>
+
+  <div class="sec-label paywall-locked">思路二 · 有標和無標要寫清楚</div>
+
+  <div class="q-tag reveal paywall-locked">它解決什麼問題</div>
+  <p class="reveal paywall-locked">所有注入都帶標，一次性通知也會在壓縮後被重認、再喂一遍。所有注入都不帶標，壓縮後的歷史裡分不清使用者原話和執行時塞進去的說明。fork 會把過期的 <code>&lt;environment_context&gt;</code> 當成使用者輸入重新提交。</p>
+
+  <div class="q-tag reveal paywall-locked">思路是什麼</div>
+  <p class="reveal paywall-locked">視窗身份、環境、中斷、圖片縮放、管理側開發者指令，事後要認、要 diff、要在壓縮後決定是否重注，所以帶 begin 和 end。一次性通知，比如批准前綴、網路規則入冊、剩餘 token 一句提醒，<code>type_markers()</code> 返回兩個空串。預設 <code>matches_text</code> 恆為 false。</p>
+  <p class="reveal paywall-locked">匹配規則只看整段文字的首尾。先 trim 開頭比前綴，再 trim 結尾比字尾，ASCII 大小寫不敏感，兩個都中才算命中。中間夾什麼不管。無標 fragment 主動放棄可逆性。<span class="src-note">出處：<code>codex-rs/context-fragments/src/fragment.rs</code> 第 89 至 103 行</span></p>
+  <p class="reveal paywall-locked">developer 側另有一張前綴表，在 <code>event_mapping.rs</code>，用來補一部分無標識別。覆蓋面比 user 側 matcher 列表窄。前綴表裡至今留著 <code>&lt;token_budget&gt;</code> 舊標籤，註釋寫明是為了認舊版本持久化下來的包裝。marker 一旦寫進 rollout，就變成恢復合同的一部分。改標籤等於改協議。</p>
+  <p class="reveal paywall-locked"><code>UserInstructions</code> 有一處容易看走眼。它的 begin marker 是 Markdown 標題 <code># AGENTS.md instructions</code>，end marker 是 <code>&lt;/INSTRUCTIONS&gt;</code>。協議裡另有 <code>&lt;user_instructions&gt;</code> 那對標籤，這個 struct 沒用。按協議常量去寫 <code>matches_text</code>，會認漏倉庫裡真實渲染出來的文字。<span class="src-note">出處：<code>codex-rs/core/src/context/user_instructions.rs</code> 第 18 至 19 行；<code>codex-rs/protocol/src/protocol.rs</code> 第 112 至 113 行</span></p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 280" role="img" aria-label="有標可逆與無標一次性的兩條路">
+      <defs><marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <text x="40" y="36" fill="#262d38" font-size="14" font-weight="800">有標 · 事後要認</text>
+      <rect x="40" y="52" width="200" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="140" y="86" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">環境 / 視窗 / 中斷</text>
+      <path fill="none" d="M248 80H318" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="326" y="52" width="240" height="56" rx="10" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="446" y="86" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">begin + body + end</text>
+      <path fill="none" d="M574 80H644" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="652" y="52" width="248" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="776" y="86" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">matches_text 能認回</text>
+      <text x="40" y="160" fill="#262d38" font-size="14" font-weight="800">無標 · 只當時說一聲</text>
+      <rect x="40" y="176" width="200" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="140" y="210" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">批准字首 / 網路規則</text>
+      <path fill="none" d="M248 204H318" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="326" y="176" width="240" height="56" rx="10" fill="#ffffff" stroke="#414b5a" stroke-width="2" stroke-dasharray="7 5"/>
+      <text x="446" y="210" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">只輸出 body</text>
+      <path fill="none" d="M574 204H644" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="652" y="176" width="248" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="776" y="200" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">預設識別放棄</text>
+      <text x="776" y="220" fill="#6b7280" text-anchor="middle" font-size="12">developer 靠前綴表補</text>
+    </svg>
+    <div class="visual-caption">教學化對照：需要壓縮後重認的做成協議，一次性通知主動放棄可逆。</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">為什麼長期成立</div>
+  <p class="reveal paywall-locked">需要事後認的做成協議，一次性的主動放棄，並且在型別上寫清楚。壓縮後要重認的強制 begin 和 end，一次性通知可以無標，但要在註釋裡寫放棄可逆。</p>
+
+  <div class="sec-label paywall-locked">思路三 · 組裝按型別欄位分揀</div>
+
+  <div class="q-tag reveal paywall-locked">它解決什麼問題</div>
+  <p class="reveal paywall-locked">各處隨手 push 字串，順序靠約定，單獨成條靠註釋。<code>TokenBudgetContext</code> 會和權限說明擠在同一條 developer 訊息裡。壓縮濾網沒法按條處理。混裝之後回滾也拆不開。<code>event_mapping.rs</code> 的註釋承認：<code>build_initial_context</code> 可能把 contextual fragment 和持久 developer 文字捆在一起。<span class="src-note">出處：<code>codex-rs/core/src/event_mapping.rs</code> 第 69 至 71 行</span></p>
+
+  <div class="q-tag reveal paywall-locked">思路是什麼</div>
+  <p class="reveal paywall-locked">第一次組裝發生在 <code>Session::build_initial_context_with_world_state</code>。它把 fragment 按 <code>role()</code>、<code>markers()</code> 的開頭、<code>requires_separate_message()</code> 分進幾組：可合併的 developer 段、必須單獨成條的 developer 段、user 段，以及要置頂或置底的特殊段。</p>
+  <p class="reveal paywall-locked">視窗身份這一條有點特別。<code>Feature::TokenBudget</code> 開啟且模型有 context window 時，它在 world_state 迴圈之前就被推進單獨組。輸出順序是：先一條合併好的 developer 訊息，再一條條單獨的 developer 訊息，再一條 contextual user 訊息。分揀依據是型別欄位。<span class="src-note">出處：<code>codex-rs/core/src/session/mod.rs</code> 第 3630 至 3728 行</span></p>
+  <p class="reveal paywall-locked"><code>requires_separate_message()</code> 把能不能和別人擠在同一條 developer 訊息裡也收進型別。<code>TokenBudgetContext</code>、<code>ImageResizeNotice</code>、<code>ManagedDeveloperInstructions</code> 選擇單獨成條。單獨成條的代價是多佔一條訊息、多一次 role 切換。好處是壓縮濾網可以按條處理。</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 300" role="img" aria-label="fragment 按型別欄位分進三條訊息">
+      <defs><marker id="arrC" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="40" width="170" height="220" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="125" y="78" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">已開啟的型別</text>
+      <text x="125" y="112" fill="#6b7280" text-anchor="middle" font-size="13">批准字首</text>
+      <text x="125" y="140" fill="#6b7280" text-anchor="middle" font-size="13">視窗身份</text>
+      <text x="125" y="168" fill="#6b7280" text-anchor="middle" font-size="13">環境資訊</text>
+      <text x="125" y="196" fill="#6b7280" text-anchor="middle" font-size="13">AGENTS.md</text>
+      <text x="125" y="224" fill="#6b7280" text-anchor="middle" font-size="13">中斷通知</text>
+      <path fill="none" d="M218 150H290" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <rect x="298" y="40" width="220" height="220" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="408" y="78" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">分揀</text>
+      <text x="408" y="118" fill="#6b7280" text-anchor="middle" font-size="13">role()</text>
+      <text x="408" y="146" fill="#6b7280" text-anchor="middle" font-size="13">markers().0</text>
+      <text x="408" y="174" fill="#6b7280" text-anchor="middle" font-size="13">requires_separate</text>
+      <text x="408" y="214" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">看欄位，不掃正文</text>
+      <path fill="none" d="M526 90H598" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <path fill="none" d="M526 150H598" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <path fill="none" d="M526 210H598" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <rect x="606" y="40" width="294" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="753" y="74" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">developer · 可合併成一條</text>
+      <rect x="606" y="122" width="294" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="753" y="156" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">developer · 各成一條</text>
+      <rect x="606" y="204" width="294" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="753" y="238" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">user · 收成一條 contextual</text>
+    </svg>
+    <div class="visual-caption">教學化分揀圖：輸出順序是合併 developer、單獨 developer、contextual user。</div>
+  </div>
+
+  <div class="key-line reveal paywall-locked">點進模型輸入的任意一段，都能回到某個 fragment 型別。</div>
+
+  <div class="q-tag reveal paywall-locked">為什麼長期成立</div>
+  <p class="reveal paywall-locked">組裝入口只收已登記型別。這是把沒登記的注入擋在門外的通用形狀。型別擋得住沒登記，擋不住登記了但每輪塞 40KB。那一層是評審規則，下一章展開。</p>
+
+  <div class="sec-label paywall-locked">橫向對比 · 同一道題的另一種答法</div>
+  <div class="compare paywall-locked">
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>閘開在哪：DeepSeek Harness 選擇發請求時對帳</h4>
+      <p>DSH 寫在倉庫根 <code>AGENTS.md</code> 第 107 行，中文原則收成「模型可見即已記錄」。抵達模型請求的一切都必須能從會話日誌重建，新增一項模型可見輸入就需要新增一個會話事件。</p>
+      <p>執行面是 <code>invariant.ts</code>。它在 <code>llm/stream</code> 上掛監聽，從 session 日誌 <code>deriveMessages()</code> 得到期望值，再和即將發出的 <code>options.messages</code> 做 <code>JSON.stringify</code> 比較，對不上就 <code>fail</code>。閘開在崩潰點，能抓住組裝之後又改了 messages 這類只有執行時才出現的漂移。關掉 invariants 服務，這道閘就沒了。</p>
+      <span class="cmp-tag">兩側均已核對原始碼 · 2026-08-22 · <a href="dsh-2.html">DSH · Model-visible ⟺ logged</a></span>
+    </div>
+    <div class="cmp-card reveal">
+      <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h7" fill="none"/></svg>真源不同：事件日誌，還是封閉的型別集合</h4>
+      <p>DSH 可以沒有 fragment trait，因為它的真源是事件日誌，messages 是投影。Codex 把能出現在上下文裡的東西先收成封閉的型別集合，再用 marker 做事後識別。</p>
+      <p>代價也不同。Codex 的型別擋得住沒實現 trait 就塞進 <code>render_full</code>，擋不住 impl 裡面 <code>format!</code> 出來的動態字串。<code>matches_text</code> 認的是文字形狀。兩邊都為可追溯付錢，一個付在每次請求的斷言，一個付在每次加註入的型別摩擦。</p>
+      <span class="cmp-tag">兩側均已核對原始碼 · 2026-08-22</span>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">課堂練習</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div>
+      <h3>認漏的會是哪一段</h3>
+      <p><code>UserInstructions</code> 的 begin marker 是 <code># AGENTS.md instructions</code>，協議常量卻是 <code>&lt;user_instructions&gt;</code>。如果有人按協議常量去寫 <code>matches_text</code>，會認漏現在倉庫裡真實渲染出來的哪一種文字？</p>
+      <p>再推一步：把上面演示裡的批准前綴開啟，壓縮之後預設 <code>matches_text</code> 還能不能把它認回來。developer 側要靠哪張表補這一刀，改錯常量時編譯器會不會響。</p>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/></svg>
+    <span><b>Takeaway：</b>往模型上下文裡塞的每一段，先收成一個型別，型別自己知道 role、marker 和 body。需要事後認的帶 begin 和 end，一次性通知主動放棄可逆。組裝按型別欄位分揀，沒登記的字串進不了信封。</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function(){
+  var FRAGS = [
+    { id: 'env', name: '環境資訊', type: 'RenderedEnvironments', role: 'user', separate: false, marked: true,
+      start: '<environment_context>', end: '</environment_context>',
+      body: 'cwd · 時區 · 網路 · 檔案系統檔案',
+      why: '首次全量渲染，或 cwd、網路、檔案系統檔案相對上一份快照有變化。' },
+    { id: 'agents', name: 'AGENTS.md', type: 'UserInstructions', role: 'user', separate: false, marked: true,
+      start: '# AGENTS.md instructions', end: '</INSTRUCTIONS>',
+      body: 'for /tmp · 專案指令正文',
+      why: '協議裡的 <user_instructions> 並不是這個型別在用的標籤。' },
+    { id: 'win', name: '視窗身份', type: 'TokenBudgetContext', role: 'developer', separate: true, marked: true,
+      start: '<context_window>', end: '</context_window>',
+      body: 'agent 路徑 · 視窗 id',
+      why: 'Feature::TokenBudget 開啟且模型有 context window 時，迴圈前推進單獨組。' },
+    { id: 'pref', name: '批准字首', type: 'ApprovedCommandPrefixSaved', role: 'developer', separate: false, marked: false,
+      start: '', end: '',
+      body: 'Approved command prefix saved: npm *',
+      why: 'type_markers 為空，預設 matches_text 恆假，event_mapping 靠前綴表認。' },
+    { id: 'abort', name: '中斷通知', type: 'TurnAborted', role: 'user', separate: false, marked: true,
+      start: '<turn_aborted>', end: '</turn_aborted>',
+      body: '上一輪是使用者主動打斷的',
+      why: '不告訴模型，下一輪會以為上一輪的命令跑完了。' }
+  ];
+  var on = { env: true, agents: true, win: false, pref: false, abort: false };
+  var steps = [], idx = 0, autoId = null, pauseUntil = 0, played = false;
+  var envelope = document.getElementById('dm-envelope');
+  var idcard = document.getElementById('dm-idcard');
+  var bins = document.getElementById('dm-bins');
+  var msgN = document.getElementById('dm-msg-n');
+  var fragN = document.getElementById('dm-frag-n');
+  var idType = document.getElementById('dm-id-type');
+  var traceBox = document.querySelector('.dm-trace');
+  var traceRows = Array.prototype.slice.call(document.querySelectorAll('#dm-trace li'));
+  var captionText = document.getElementById('dm-caption-text');
+  var summary = document.getElementById('dm-summary');
+  var IDLE = '開啟或關掉開關，看最終注入模型的內容由哪幾塊構成。點播放，看它們怎麼被分揀。';
+
+  function motionOk(){
+    return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  function enabled(){ return FRAGS.filter(function(f){ return on[f.id]; }); }
+  function byId(id){ return FRAGS.filter(function(f){ return f.id === id; })[0]; }
+  function binOf(f){
+    if (f.role === 'developer' && f.separate) return 'sep';
+    if (f.role === 'developer') return 'merge';
+    return 'user';
+  }
+  function groups(list){
+    var g = { merge: [], sep: [], user: [] };
+    list.forEach(function(f){ g[binOf(f)].push(f); });
+    return g;
+  }
+
+  function esc(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function chipHtml(f, activeId){
+    var mark = f.marked ? (f.start + ' … ' + f.end) : '無標 · 只輸出 body';
+    return '<div class="dm-chip' + (f.marked ? '' : ' markless') + (activeId === f.id ? ' on' : '') + '" data-id="' + f.id + '"><b>' + esc(f.name) + '</b><span>' + esc(mark) + '</span></div>';
+  }
+  function msgHtml(role, tag, list, extraClass, slot, highlight, activeId){
+    if (!list.length && extraClass !== 'reject') return '';
+    var inner = extraClass === 'reject'
+      ? '<div class="dm-chip markless"><b>&lt;project_context&gt;</b><span>沒實現 trait，信封不收</span></div>'
+      : list.map(function(f){ return chipHtml(f, activeId); }).join('');
+    var cls = 'dm-msg';
+    if (extraClass) cls += ' ' + extraClass;
+    if (highlight) cls += ' on';
+    return '<div class="' + cls + '" data-slot="' + slot + '"><div class="dm-msg-role">' + role + ' · ' + tag + '</div>' + inner + '</div>';
+  }
+  function rollNum(el, to, animate){
+    var from = parseInt(el.textContent, 10);
+    if (isNaN(from)) from = 0;
+    if (!animate || from === to) { el.textContent = String(to); return; }
+    var token = (el._roll = (el._roll || 0) + 1);
+    var start = null;
+    var dur = 480;
+    function frame(ts){
+      if (el._roll !== token) return;
+      if (start === null) start = ts;
+      var t = Math.min(1, (ts - start) / dur);
+      var eased = 1 - (1 - t) * (1 - t) * (1 - t);
+      el.textContent = String(Math.round(from + (to - from) * eased));
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+  function renderEnvelope(placed, reject, activeId, animate){
+    var oldChip = {};
+    var oldMsg = {};
+    if (animate) {
+      Array.prototype.slice.call(envelope.querySelectorAll('[data-id]')).forEach(function(el){
+        oldChip[el.getAttribute('data-id')] = el.getBoundingClientRect();
+      });
+      Array.prototype.slice.call(envelope.querySelectorAll('[data-slot]')).forEach(function(el){
+        oldMsg[el.getAttribute('data-slot')] = el.getBoundingClientRect();
+      });
+    }
+    var list = FRAGS.filter(function(f){ return placed.indexOf(f.id) !== -1; });
+    var g = groups(list);
+    var focus = !!(activeId || reject);
+    var html = '';
+    html += msgHtml('developer', '可合併', g.merge, '', 'merge', activeId && binOf(byId(activeId)) === 'merge', activeId);
+    html += msgHtml('developer', '單獨成條', g.sep, '', 'sep', activeId && binOf(byId(activeId)) === 'sep', activeId);
+    html += msgHtml('user', 'contextual', g.user, '', 'user', activeId && binOf(byId(activeId)) === 'user', activeId);
+    if (reject) {
+      html += '<div class="dm-msg reject on" data-slot="reject"><div class="dm-msg-role">未登記</div><div class="dm-chip markless"><b>&lt;project_context&gt;</b><span>沒實現 trait，信封不收</span></div></div>';
+    }
+    if (!html) html = '<div class="dm-empty">信封是空的。開啟上面的開關，塊才會進來。</div>';
+    envelope.innerHTML = html;
+    envelope.classList.toggle('is-focus', focus);
+    var nMsg = (g.merge.length ? 1 : 0) + g.sep.length + (g.user.length ? 1 : 0);
+    rollNum(msgN, nMsg, animate);
+    rollNum(fragN, list.length, animate);
+    if (!animate) return;
+    var chips = Array.prototype.slice.call(envelope.querySelectorAll('.dm-chip[data-id]'));
+    var msgs = Array.prototype.slice.call(envelope.querySelectorAll('[data-slot]'));
+    chips.forEach(function(el){
+      var id = el.getAttribute('data-id');
+      var old = oldChip[id];
+      if (!old) {
+        el.classList.add('is-enter');
+        return;
+      }
+      var now = el.getBoundingClientRect();
+      var dx = old.left - now.left;
+      var dy = old.top - now.top;
+      if (!dx && !dy) return;
+      el.style.transition = 'none';
+      el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    });
+    msgs.forEach(function(el){
+      var slot = el.getAttribute('data-slot');
+      var old = oldMsg[slot];
+      if (!old) {
+        el.classList.add('is-enter');
+        return;
+      }
+      var now = el.getBoundingClientRect();
+      var dx = old.left - now.left;
+      var dy = old.top - now.top;
+      if (!dx && !dy) return;
+      el.style.transition = 'none';
+      el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    });
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        chips.forEach(function(el){
+          if (el.classList.contains('is-enter')) {
+            el.classList.add('in');
+            if (el.getAttribute('data-id') === activeId) el.classList.add('firing');
+          }
+          el.style.transition = '';
+          el.style.transform = '';
+        });
+        msgs.forEach(function(el){
+          if (el.classList.contains('is-enter')) {
+            el.classList.add('in');
+            if (el.getAttribute('data-slot') === 'reject') el.classList.add('firing');
+          }
+          el.style.transition = '';
+          el.style.transform = '';
+        });
+      });
+    });
+  }
+  function renderId(f, highlightBin, animate){
+    if (!f) {
+      idcard.innerHTML =
+        '<div class="dm-id-row"><span>struct</span><b>待定</b></div>' +
+        '<div class="dm-id-row"><span>role</span><b>待定</b></div>' +
+        '<div class="dm-id-row"><span>marker</span><b>待定</b></div>' +
+        '<div class="dm-id-row"><span>單獨成條</span><b>待定</b></div>';
+      idType.textContent = '先問型別';
+    } else {
+      idcard.innerHTML =
+        '<div class="dm-id-row on"><span>struct</span><b>' + esc(f.type) + '</b></div>' +
+        '<div class="dm-id-row on"><span>role</span><b>' + esc(f.role) + '</b></div>' +
+        '<div class="dm-id-row on"><span>marker</span><b>' + esc(f.marked ? f.start : '空') + '</b></div>' +
+        '<div class="dm-id-row on"><span>單獨成條</span><b>' + (f.separate ? '是' : '否') + '</b></div>';
+      idType.textContent = f.type;
+    }
+    var g = groups(enabled());
+    var labels = [
+      { k: 'merge', t: '可合併 developer', n: g.merge.length },
+      { k: 'sep', t: '單獨 developer', n: g.sep.length },
+      { k: 'user', t: 'user / contextual', n: g.user.length }
+    ];
+    if (bins.children.length !== 3) {
+      bins.innerHTML = labels.map(function(x){
+        return '<div class="dm-bin" data-bin="' + x.k + '"><b>' + x.t + '</b><span class="dm-bin-n">0</span> 塊<i class="dm-bin-bar"></i></div>';
+      }).join('');
+    }
+    bins.classList.toggle('is-focus', !!highlightBin);
+    labels.forEach(function(x){
+      var el = bins.querySelector('[data-bin="' + x.k + '"]');
+      var wasOn = el.classList.contains('on');
+      el.classList.toggle('on', highlightBin === x.k);
+      if (animate && highlightBin === x.k && !wasOn) {
+        el.classList.remove('firing');
+        void el.offsetWidth;
+        el.classList.add('firing');
+      }
+      rollNum(el.querySelector('.dm-bin-n'), x.n, animate);
+      var bar = el.querySelector('.dm-bin-bar');
+      if (bar) bar.style.transform = 'scaleX(' + (x.n / 5) + ')';
+    });
+    if (animate && f) {
+      var rows = Array.prototype.slice.call(idcard.children);
+      rows.forEach(function(k){ k.classList.add('is-enter'); });
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          rows.forEach(function(k){ k.classList.add('in'); });
+        });
+      });
+    }
+  }
+
+  function capFor(f){
+    if (f.id === 'env') return '環境資訊的 role 是 user，marker 是 environment_context 那一對。它進 user 箱。這段是 RenderedEnvironments 渲染出來的，使用者沒有打過這些字。';
+    if (f.id === 'agents') return 'AGENTS.md 也是 user。begin marker 是 Markdown 標題，協議裡的 user_instructions 標籤這個 struct 沒用。';
+    if (f.id === 'win') return '視窗身份的 role 是 developer，requires_separate_message 為 true。它在 world_state 迴圈之前就被推進單獨組。';
+    if (f.id === 'pref') return '批准前綴是 developer，type_markers 為空。render 只輸出 body。預設 matches_text 恆為 false。';
+    return '中斷通知是 user，帶著 turn_aborted 標籤。不告訴模型，下一輪會以為上一輪的命令跑完了。';
+  }
+  function traceFor(f){
+    if (f.id === 'win') return 4;
+    if (!f.marked) return 3;
+    if (f.separate) return 1;
+    return 0;
+  }
+
+  function buildSteps(){
+    var list = enabled();
+    var out = [];
+    out.push({
+      cap: list.length
+        ? 'WorldState 交出當前開啟的 ' + list.length + ' 個 fragment。組裝入口先問型別，再拼訊息。'
+        : '一個開關都沒開。組裝函式仍然會跑，只是三組都是空的，items 一條都沒有。',
+      trace: 5, placed: [], active: null, bin: null, reject: false
+    });
+    list.forEach(function(f, i){
+      out.push({
+        cap: capFor(f),
+        trace: traceFor(f),
+        placed: list.slice(0, i + 1).map(function(x){ return x.id; }),
+        active: f.id,
+        bin: binOf(f),
+        reject: false
+      });
+    });
+    var g = groups(list);
+    out.push({
+      cap: '分揀結束。可合併的 developer 收成一條，單獨的各成一條，user 再收成一條 contextual。順序寫在型別欄位上。',
+      trace: 5,
+      placed: list.map(function(x){ return x.id; }),
+      active: null, bin: null, reject: false
+    });
+    var hasMark = list.some(function(f){ return f.marked; });
+    var hasBare = list.some(function(f){ return !f.marked; });
+    out.push({
+      cap: hasBare && hasMark
+        ? '事後認回。有標的靠首尾 marker。無標的預設認不回，developer 側用前綴表補一刀。'
+        : hasBare
+          ? '信封裡只有無標塊。預設 matches_text 恆假，要認只能走 developer 前綴表。'
+          : hasMark
+            ? '信封裡都是有標塊。user 側走 matcher 列表的 .any()，先註冊的型別先贏。'
+            : '信封是空的，沒有可認的文字。',
+      trace: hasBare ? 7 : 6,
+      placed: list.map(function(x){ return x.id; }),
+      active: null, bin: null, reject: false
+    });
+    out.push({
+      cap: '有人想 format 一段 project_context。組裝入口不收字串，matcher 列表也認不出這個標籤。信封不收。',
+      trace: 6,
+      placed: list.map(function(x){ return x.id; }),
+      active: null, bin: null, reject: true, fin: true
+    });
+    return out;
+  }
+
+  function paint(st, animate){
+    if (animate && !motionOk()) animate = false;
+    renderEnvelope(st.placed, st.reject, st.active, animate);
+    renderId(st.active ? byId(st.active) : null, st.bin, animate);
+    traceBox.classList.add('is-live');
+    if (st.trace !== null && st.trace !== undefined) {
+      traceRows.forEach(function(el, n){
+        var next = n === st.trace;
+        var was = el.classList.contains('on');
+        el.classList.toggle('on', next);
+        if (animate && next && !was) {
+          el.classList.remove('firing');
+          void el.offsetWidth;
+          el.classList.add('firing');
+        }
+      });
+    }
+    if (animate) {
+      captionText.style.opacity = '0';
+      requestAnimationFrame(function(){
+        captionText.textContent = st.cap;
+        requestAnimationFrame(function(){ captionText.style.opacity = '1'; });
+      });
+    } else {
+      captionText.textContent = st.cap;
+    }
+    if (st.fin) summary.classList.add('on');
+    else summary.classList.remove('on');
+  }
+
+  function holdFor(i){
+    var st = steps[i];
+    if (!st) return 1100;
+    if (st.fin) return 2600;
+    if (st.active === 'pref' || st.active === 'win') return 2000;
+    if (st.active === 'agents' || st.active === 'abort') return 1800;
+    if (st.active === 'env') return 1600;
+    if (st.trace === 6 || st.trace === 7) return 2200;
+    if (st.active === null && st.placed && st.placed.length) return 1800;
+    return 1200;
+  }
+  function tick(){
+    if (idx >= steps.length) { stop(); return; }
+    paint(steps[idx], true);
+    idx++;
+    if (idx >= steps.length) stop();
+  }
+  function stop(){
+    if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+    pauseUntil = 0;
+  }
+  function loop(ts){
+    if (idx >= steps.length) { autoId = null; return; }
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(loop); return; }
+    paint(steps[idx], true);
+    var wait = holdFor(idx);
+    idx++;
+    pauseUntil = ts + wait;
+    if (idx >= steps.length) { autoId = null; return; }
+    autoId = requestAnimationFrame(loop);
+  }
+  function showIdle(){
+    var list = enabled();
+    envelope.classList.remove('is-focus');
+    bins.classList.remove('is-focus');
+    traceBox.classList.remove('is-live');
+    renderEnvelope(list.map(function(f){ return f.id; }), false, null, false);
+    renderId(null, null, false);
+    traceRows.forEach(function(el){ el.classList.remove('on'); el.classList.remove('firing'); });
+    summary.classList.remove('on');
+    captionText.style.opacity = '1';
+    captionText.textContent = IDLE;
+  }
+  function reset(){
+    stop(); idx = 0;
+    steps = buildSteps();
+    showIdle();
+  }
+  function play(){
+    if (idx >= steps.length) reset();
+    if (autoId) return;
+    if (idx === 0) {
+      renderEnvelope([], false, null, false);
+      renderId(null, null, false);
+    }
+    pauseUntil = 0;
+    autoId = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('dm-play').addEventListener('click', play);
+  document.getElementById('dm-step').addEventListener('click', function(){ stop(); tick(); });
+  document.getElementById('dm-reset').addEventListener('click', reset);
+  document.getElementById('dm-seg').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    var id = b.getAttribute('data-id');
+    on[id] = !on[id];
+    b.classList.toggle('on', on[id]);
+    reset();
+  });
+
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(document.getElementById('demo-assemble'), function(){
+      if (played) return; played = true; play();
+    });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

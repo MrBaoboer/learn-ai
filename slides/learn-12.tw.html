@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>讓 AI 給每條判斷標出原文位置 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* 变量挂在 .lesson 上：nav-inject.js 会在页面样式之后再注入一次 :root 主色，
+   靠就近继承才能保住专题色。 */
+:root,.lesson{--accent:#b45309;--accent-deep:#7c3d06;--accent-soft:rgba(180,83,9,.085)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(180,83,9,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(180,83,9,.04),0 0 0 52px rgba(180,83,9,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson strong{font-weight:700;color:var(--accent-deep)}
+.lesson mark{background:rgba(180,83,9,.14);color:var(--accent-deep);font-weight:700;padding:2px 5px;border-radius:5px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.lesson .clause{display:block;margin:6px 0;padding:14px 18px;background:var(--accent-soft);border-radius:10px;font-size:14.5px;line-height:1.95;color:var(--text)}
+ol.four{margin:0 0 20px;padding:0;list-style:none;counter-reset:f}
+ol.four li{counter-increment:f;position:relative;padding-left:32px;margin-bottom:12px;font-size:15px;line-height:2}
+ol.four li:last-child{margin-bottom:0}
+ol.four li:before{content:counter(f);position:absolute;left:0;top:5px;width:20px;height:20px;border-radius:50%;background:var(--accent-soft);border:1px solid rgba(180,83,9,.3);color:var(--accent-deep);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+ol.four li b{font-weight:700;color:var(--accent-deep)}
+.tpl{background:var(--card);border:1px dashed rgba(180,83,9,.42);border-radius:12px;padding:24px 26px;margin:0 0 20px}
+.tpl>span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.4px;color:var(--accent-deep);margin-bottom:16px}
+.tpl-lead{margin:0 0 16px;font-size:14px;line-height:1.9;color:var(--text)}
+.tpl ol{margin:0;padding:0;list-style:none;counter-reset:tpl}
+.tpl li{counter-increment:tpl;position:relative;padding-left:34px;margin-bottom:16px;font-size:13.5px;line-height:1.9}
+.tpl li:last-child{margin-bottom:0}
+.tpl li:before{content:counter(tpl);position:absolute;left:0;top:3px;width:21px;height:21px;border-radius:50%;background:var(--accent-soft);border:1px solid rgba(180,83,9,.3);color:var(--accent-deep);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.tpl-note{font-size:13px;line-height:1.9;color:var(--sub);margin:20px 0 0;padding:13px 16px;background:var(--accent-soft);border-radius:8px}
+.lesson .sec-label{margin:56px 0 20px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(180,83,9,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card)}
+.demo-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo-ctrl button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;min-height:44px;min-width:44px;border:1px solid rgba(180,83,9,.35);border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font:600 14px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:filter .15s}
+.demo-ctrl button:active{filter:brightness(.92)}
+.dm-budget{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:20px;padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-budget .dm-b-label{font-size:13px;font-weight:700;color:var(--text);padding-top:10px}
+.dm-budget .dm-b-hint{font-size:12px;color:var(--sub);line-height:1.7;flex:1 1 180px;padding-top:10px}
+.dm-seg{display:flex;gap:8px;flex-wrap:wrap}
+.dm-seg button{min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--sub);font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all .3s cubic-bezier(.4,0,.2,1)}
+.dm-seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dm-note{padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-bottom:20px}
+.dm-note .dm-note-tag{display:block;font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--accent-deep);margin-bottom:8px}
+.dm-note p{margin:0;font-size:14px;line-height:1.85;color:var(--text)}
+.source{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:0 0 20px}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:16px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.85 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.dm-meters{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.dm-m{padding:14px 12px;border-radius:12px;border:1px solid var(--border);background:var(--bg);text-align:center;transition:box-shadow .3s cubic-bezier(.4,0,.2,1)}
+.dm-m b{display:block;font-size:22px;line-height:1.15;font-variant-numeric:tabular-nums;color:var(--accent-deep)}
+.dm-m.hot b{color:var(--danger)}
+.dm-m-bar{display:block;height:4px;margin:10px auto 0;width:48px;border-radius:99px;background:var(--accent);transform:scaleX(0);transform-origin:left center;transition:transform .5s cubic-bezier(.25,1,.5,1)}
+.dm-m.hot .dm-m-bar{background:var(--danger)}
+.dm-m span{display:block;margin-top:6px;font-size:12px;font-weight:600;color:var(--sub)}
+.dm-m.pop b{animation:flashPop .8s ease}
+@keyframes flashPop{0%{transform:scale(.8)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
+.dm-track{height:4px;border-radius:99px;background:var(--border);margin:0 0 20px;overflow:hidden}
+.dm-bar{height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .6s cubic-bezier(.25,1,.5,1)}
+.dm-refs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.dm-ref{display:block;width:100%;text-align:left;min-height:72px;padding:14px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font:400 13px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-refs.is-live .dm-ref{opacity:.42;transform:scale(.98)}
+.dm-refs.is-live .dm-ref.on,.dm-refs.is-live .dm-ref.ok,.dm-refs.is-live .dm-ref.bad,.dm-refs.is-live .dm-ref.eye{opacity:1;transform:scale(1)}
+.dm-ref b{display:block;font-size:13px;color:var(--text);margin-bottom:5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.dm-ref i{display:block;font-style:normal;font-size:12px;line-height:1.7;color:var(--sub)}
+.dm-ref.on{border-color:rgba(180,83,9,.42);background:var(--accent-soft)}
+.dm-ref.eye{border-color:rgba(180,83,9,.28)}
+.dm-ref.ok{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.07)}
+.dm-ref.ok i{color:var(--success);font-weight:600}
+.dm-ref.bad{border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.05)}
+.dm-ref.bad i{color:var(--danger);font-weight:600}
+.dm-ref.firing{animation:fireGlow .9s ease}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(220,38,38,.3)}50%{box-shadow:0 0 18px 5px rgba(220,38,38,.16)}100%{box-shadow:none}}
+.dm-ref-body{display:block;max-height:0;overflow:hidden;padding:0;font-size:12px;line-height:1.75;color:var(--text);transition:max-height .4s cubic-bezier(.25,1,.5,1),padding .4s cubic-bezier(.25,1,.5,1)}
+.dm-ref-body.open{max-height:130px;padding:9px 0 1px}
+.dm-compare{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.dm-cmp-col{border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden;min-width:0}
+.dm-cmp-h{padding:14px 16px;background:var(--card);border-bottom:1px solid var(--border);font-size:13px;font-weight:800;color:var(--text)}
+.dm-code{padding:16px;font:12.5px/1.85 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);min-height:176px;overflow-wrap:anywhere;word-break:break-word}
+.dm-line{display:grid;grid-template-columns:34px 1fr;gap:8px;padding:2px 6px;border-radius:6px;opacity:0;transform:translateY(8px)}
+.dm-line.in{opacity:1;transform:none;transition:opacity .4s cubic-bezier(.25,1,.5,1),transform .4s cubic-bezier(.25,1,.5,1)}
+.dm-line .ln{color:var(--faint);font-variant-numeric:tabular-nums}
+.dm-line .ln+span{white-space:pre-wrap}
+.dm-line.ok{background:rgba(22,163,74,.07)}
+.dm-line.bad{background:rgba(220,38,38,.06)}
+.dm-line.hi{background:var(--accent-soft)}
+.dm-line.miss{background:rgba(220,38,38,.06);color:var(--danger)}
+.dm-ch{display:inline-block;padding:0 3px;border-radius:4px;background:none;color:inherit;font-weight:700;transition:background .5s cubic-bezier(.25,1,.5,1),color .5s cubic-bezier(.25,1,.5,1)}
+.dm-ch.lit{background:rgba(220,38,38,.16);color:var(--danger)}
+.dm-ch.lit.good{background:rgba(22,163,74,.16);color:var(--success)}
+.dm-ch.beat{animation:softPulse 1.4s ease infinite}
+@keyframes softPulse{0%,100%{opacity:1}50%{opacity:.5}}
+.dm-empty{color:var(--sub);font:13px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+.dm-caption{margin-top:20px;min-height:56px;display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(180,83,9,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.dm-caption svg{flex:0 0 auto;color:var(--accent)}
+#dm-caption-text{transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-summary{display:flex;flex-direction:column;gap:14px;max-height:0;overflow:hidden;opacity:0;margin-top:0;padding:0 22px;border:1px solid transparent;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),var(--card));transition:max-height .5s cubic-bezier(.25,1,.5,1),opacity .4s cubic-bezier(.25,1,.5,1),padding .4s cubic-bezier(.25,1,.5,1),margin-top .4s cubic-bezier(.25,1,.5,1)}
+.dm-summary.on{max-height:260px;opacity:1;margin-top:20px;padding:20px 22px;border-color:rgba(180,83,9,.3)}
+.dm-summary .dm-s{font-size:13px;line-height:1.85;color:var(--sub)}
+.dm-summary .dm-s b{display:block;font-size:13.5px;color:var(--accent-deep);margin-bottom:2px}
+.demo-caption{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.7}
+@media(max-width:760px){.lesson{overflow-x:hidden}.dm-compare,.dm-refs,.dm-meters{grid-template-columns:1fr}.lesson-header:after{display:none}.demo{padding:18px}.demo-ctrl{width:100%}.demo-ctrl button{flex:1}.demo,.dm-cmp-col{max-width:100%;min-width:0}.lesson code{overflow-wrap:anywhere;word-break:break-word}.dm-budget .dm-b-label{padding-top:0}}
+@media(prefers-reduced-motion:reduce){.dm-seg button,.dm-ref,.dm-ref-body,.dm-line,.dm-line.in,.dm-ch,.dm-bar,.dm-m,.dm-m-bar,.dm-summary,#dm-caption-text{transition-duration:0s;animation-duration:0s;animation-iteration-count:1}}
+</style>
+<meta name="description" content="寫一句技術判斷之前先開啟那個檔案，讀到那一行。引用帶上路徑與起止行，程式碼塊和原始檔逐位元組一致，別人才能驗你。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/learn-12.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/learn-12.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/learn-12.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/learn-12.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/learn-12.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/learn-12.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/learn-12.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/learn-12.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_TW">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"讓 AI 給每條判斷標出原文位置","name":"讓 AI 給每條判斷標出原文位置","url":"https://xueai.miyang.cn/slides/learn-12.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 啃硬材料：從條款到原始碼","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"寫一句技術判斷之前先開啟那個檔案，讀到那一行。引用帶上路徑與起止行，程式碼塊和原始檔逐位元組一致，別人才能驗你。","datePublished":"2026-08-23","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="讓 AI 給每條判斷標出原文位置"><meta property="og:description" content="寫一句技術判斷之前先開啟那個檔案，讀到那一行。引用帶上路徑與起止行，程式碼塊和原始檔逐位元組一致，別人才能驗你。"><meta property="og:url" content="https://xueai.miyang.cn/slides/learn-12.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/learn-12.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;vertical-align:-2px;margin-right:6px"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" fill="none"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="none"/><path d="M8 7h8M8 11h5" fill="none"/></svg>AI 教我學習 · 核對原文</div>
+    <h1>讓 AI 給每條判斷標出原文位置</h1>
+    <p class="subtitle">寫下一句判斷之前，先讓 AI 指出原材料的確切位置。找不到對應原文的內容，先不要拿來做決定。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>AI 的每一條判斷都要能指回原文的確切位置。指不回去的那幾條，先別拿來做決定。</p></aside><!--seo:end-->  <p class="reveal"><span class="clause">「您提交的 7 月差旅單已退回：網約車費用缺少發票，暫不能報銷。」</span></p>
+  <p class="reveal">出差前，你收到一份<strong>13 頁的差旅費用規定</strong>。第二天要去外地，你把檔案交給 AI，讓它歸納住宿、打車和報銷憑證。它列出四條，其中一條寫著：晚上 10 點以後從辦公地點回酒店可以打車，<mark>無須再附發票</mark>。</p>
+  <p class="reveal">這份總結還準確寫出了每晚 500 元的住宿上限、22:00 的時間門檻和不得重複領取交通補貼。三個事實都能在檔案裡找到，你也就把第四條一起記進了手機備忘錄。那晚 11:20，你讓酒店代叫了一輛車，支付<strong>386 元</strong>，手裡只有支付截圖。</p>
+  <p class="reveal">一週後，報銷單被退回。你重新開啟那 13 頁，在相關段落裡只找到「網約車費用憑平臺行程單及發票據實報銷」。那句無須發票，前後兩頁都沒有。酒店代叫的車又開不出你的抬頭，這 386 元只能自己承擔。</p>
+  <p class="reveal">你當時會信，是因為錯誤被夾在三個準確事實中間，語氣、編號和數字都很像原文。AI 給了你一份讀起來連貫的總結，卻沒有交代每句話從哪裡來。現在的問題很具體：那句無須發票，<strong>到底對應原材料哪一行</strong>？</p>
+
+  <div class="sec-label">為什麼通順的總結裡會混進一句假的</div>
+  <p class="reveal">只問「幫我總結這份檔案」，任務終點是產出一段好讀的話。AI 會合並相鄰段落，也可能順著常見做法補齊一個聽起來合理的條件。讀者看到的是完整句子，看不到它取材的邊界。</p>
+  <p class="reveal">把終點改成「每寫一個判斷，都交出原文位置和原句」，事情就變了。<mark>判斷寫完，證據要同時出現</mark>。位置對不上，或者摘錄裡缺少結論的關鍵半句，這條判斷就先停在待核實狀態。</p>
+
+  <div class="sec-label">讓 AI 逐條交出證據</div>
+  <p class="reveal">一份長材料可以按同一條路徑檢查。連續的四個動作適合分開做，避免 AI 在一大段回答末尾只掛一個含糊的出處。</p>
+  <ol class="four reveal">
+    <li><b>先給原文逐行編號</b>，讓後面的每個位置都能直接回看。</li>
+    <li><b>把總結拆成單獨的判斷</b>，一句只放一個可檢查的意思。</li>
+    <li><b>給每個判斷配位置和原句</b>，位置負責找到，摘錄負責核對。</li>
+    <li><b>明確標出沒有出處的內容</b>，不要讓 AI 用相近段落代替證據。</li>
+  </ol>
+  <p class="reveal">下面仍是那份差旅規定。先只讀 AI 的總結，再切換到逐條回原文。初始態就檢查開頭那個疑問：無須發票這句話，材料裡有沒有。</p>
+
+  <div class="sec-label paywall-locked xa-peek">先玩一遍 · 哪些結論真的能在原文裡找到</div>
+  <div class="demo reveal paywall-locked" id="demo-cite">
+    <div class="demo-top">
+      <div class="demo-title">同一份差旅總結，用兩種方式核對</div>
+      <div class="demo-ctrl">
+        <button id="dm-play" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="none"/></svg>播放</button>
+        <button id="dm-step" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z" fill="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>單步</button>
+        <button id="dm-reset" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" fill="none"/><path d="M3 3v5h5" fill="none"/></svg>重置</button>
+      </div>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">你準備怎麼核對這份總結</span>
+      <div class="dm-seg" id="dm-seg">
+        <button type="button" data-mode="eye" class="on">只看總結是否通順</button>
+        <button type="button" data-mode="byte">逐條回到原文核對</button>
+      </div>
+      <span class="dm-b-hint">先看通順的總結會漏掉什麼，再逐條開啟對應原文。</span>
+    </div>
+    <div class="dm-note">
+      <span class="dm-note-tag">AI 根據差旅規定寫出的總結（示意）</span>
+      <p>住宿每晚不超過 500 元；22:00 後可乘網約車回酒店，無須附發票；非工作地點出發也能報銷；同一行程不能重複領取交通補貼。</p>
+    </div>
+    <div class="source">
+      <div class="source-head"><span>差旅費用報銷規定.pdf</span><span>第 40 至 46 行</span></div>
+      <pre><code>40  住宿費每晚不超過 500 元，憑酒店發票據實報銷。
+41  因工作安排在 22:00 後離開辦公地點，可乘網約車返回酒店。
+42  申請人須在報銷單中填寫出發時間和專案名稱。
+43  網約車費用憑平臺行程單及發票據實報銷。
+44  行程起點或終點為非工作地點的，須說明與出差任務的關係。
+45  無法說明的部分由個人承擔。
+46  同一行程不得與交通補貼重複報銷。</code></pre>
+    </div>
+    <div class="dm-meters">
+      <div class="dm-m" id="dm-m-check"><b id="dm-checked">0</b><i class="dm-m-bar"></i><span>已經檢查了幾條</span></div>
+      <div class="dm-m" id="dm-m-pass"><b id="dm-pass">0</b><i class="dm-m-bar"></i><span>能夠對應到原文</span></div>
+      <div class="dm-m" id="dm-m-fail"><b id="dm-fail">0</b><i class="dm-m-bar"></i><span>沒有對應的原文</span></div>
+    </div>
+    <div class="dm-track"><div class="dm-bar" id="dm-bar"></div></div>
+    <div class="dm-refs" id="dm-refs">
+      <button class="dm-ref" type="button" data-ref="1"><b>結論 1 · 第 40 行</b><i>住宿上限和憑證要求</i><i class="dm-ref-body"></i></button>
+      <button class="dm-ref" type="button" data-ref="2"><b>結論 2 · 第 43 行</b><i>晚間打車是否需要發票</i><i class="dm-ref-body"></i></button>
+      <button class="dm-ref" type="button" data-ref="3"><b>結論 3 · 第 44 至 46 行</b><i>從非工作地點出發怎麼處理</i><i class="dm-ref-body"></i></button>
+      <button class="dm-ref" type="button" data-ref="4"><b>結論 4 · 第 43 至 45 行</b><i>交通補貼對應的原文位置</i><i class="dm-ref-body"></i></button>
+    </div>
+    <div class="dm-compare">
+      <div class="dm-cmp-col">
+        <div class="dm-cmp-h">AI 說自己的結論來自這些行</div>
+        <div class="dm-code" id="dm-left"><div class="dm-empty">播放後，這裡會出現 AI 給出的原文位置。</div></div>
+      </div>
+      <div class="dm-cmp-col">
+        <div class="dm-cmp-h">材料在這個位置實際寫了什麼</div>
+        <div class="dm-code" id="dm-right"><div class="dm-empty">播放後，這裡會按行號取出原文。</div></div>
+      </div>
+    </div>
+    <div class="dm-caption" id="dm-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none"/></svg><span id="dm-caption-text">先選擇一種核對方式，再點播放查看四條結論。</span></div>
+    <div class="dm-summary" id="dm-summary">
+      <div class="dm-s"><b>只讀總結時，四條都顯得合理</b>錯誤結論帶著準確的時間和數字，讀起來沒有破綻。</div>
+      <div class="dm-s"><b>逐條回到原文後，三條被攔下</b>一條加了原文沒有的話，一條漏了限制條件，還有一條標錯了位置。</div>
+    </div>
+    <div class="demo-caption">教學示意：差旅規定與總結均為本課編寫，不對應任何單位的真實制度。</div>
+  </div>
+
+  <div class="sec-label paywall-locked">把這段要求直接貼給 AI</div>
+  <p class="reveal paywall-locked">下面這段可以接在任何長材料後面。合同、會議紀要、產品手冊和政策檔案都能用，材料名稱不需要改。</p>
+  <div class="tpl reveal paywall-locked">
+    <span>可以整段複製</span>
+    <p class="tpl-lead">請只依據我貼出的材料回答，不要補充材料之外的常識或推測。</p>
+    <ol>
+      <li>先給原文連續編號，保留標題、表格說明和例外條件。</li>
+      <li>每寫一個判斷，句末標出對應的「第 X 至 Y 行」，緊接著逐字摘錄支援這個判斷的原句。</li>
+      <li>解釋摘錄中的哪幾個字直接支援了判斷；如果判斷包含兩個意思，拆成兩句分別找證據。</li>
+      <li>找不到直接支援的原文時，寫「未找到對應原文」，並列出你檢查過的關鍵詞。不要用意思相近的段落代替。</li>
+    </ol>
+    <p class="tpl-note">輸出順序固定為：判斷 → 原文位置 → 逐字摘錄 → 這句為什麼能支援判斷。</p>
+  </div>
+  <p class="reveal paywall-locked">第二句裡的「<strong>緊接著逐字摘錄</strong>」是關鍵。只有行號，AI 仍可能給出一個看起來接近的位置；把那幾行原句同時擺出來，你當場就能看到「憑發票」有沒有被改成「無須發票」。</p>
+  <p class="reveal paywall-locked">第三句裡的「如果判斷包含兩個意思，拆成兩句」也很重要。開頭那條總結同時說了「22:00 後可以打車」和「無須發票」。前半句有原文，後半句沒有。拆開以後，準確的半句不會替錯誤的半句作擔保。</p>
+
+  <div class="sec-label paywall-locked">核對完以後，哪些內容可以留下</div>
+  <p class="reveal paywall-locked">位置能開啟，摘錄也完整包含判斷所需的條件，這句話才進入筆記。原文寫著「可以」，總結就不能寫成「一律可以」；原文帶著「須說明與任務的關係」，總結也要把這個限制一起帶走。</p>
+  <p class="reveal paywall-locked"><mark>沒有對應原文的句子，先從筆記裡拿掉</mark>。它可能碰巧是對的，也可能只是常見做法。等你找到另一份來源，再把它作為另一條有出處的判斷加回來。</p>
+  <p class="reveal paywall-locked">這是一套核對經驗，沒有對應的實驗文獻。它解決的是一個可以直接檢查的問題：別人沿著你給的位置回去，能不能看到同一句話。</p>
+
+  <div class="key-line reveal paywall-locked">判斷能回到原文，才有資格留下。</div>
+
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function(){
+  var mode = 'eye';
+  var steps = [], idx = 0, autoId = null, pauseUntil = 0, playing = false, played = false;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var demoEl = document.getElementById('demo-cite');
+  var refsBox = document.getElementById('dm-refs');
+  var refs = Array.prototype.slice.call(refsBox.querySelectorAll('.dm-ref'));
+  var segEl = document.getElementById('dm-seg');
+  var leftEl = document.getElementById('dm-left');
+  var rightEl = document.getElementById('dm-right');
+  var captionText = document.getElementById('dm-caption-text');
+  var summary = document.getElementById('dm-summary');
+  var barEl = document.getElementById('dm-bar');
+  var meters = {
+    checked: { box: document.getElementById('dm-m-check'), num: document.getElementById('dm-checked') },
+    pass: { box: document.getElementById('dm-m-pass'), num: document.getElementById('dm-pass') },
+    fail: { box: document.getElementById('dm-m-fail'), num: document.getElementById('dm-fail') }
+  };
+  var timers = [];
+  var IDLE = '先選擇一種核對方式，再點播放查看四條結論。';
+  var IDLE_TAG = { 1: '住宿上限和憑證要求', 2: '晚間打車是否需要發票', 3: '從非工作地點出發怎麼處理', 4: '交通補貼對應的原文位置' };
+
+  function ln(no, html, cls){
+    return '<div class="dm-line' + (cls ? ' ' + cls : '') + '"><span class="ln">' + no + '</span><span>' + html + '</span></div>';
+  }
+  function ch(t, good){ return '<span class="dm-ch' + (good ? ' good' : '') + '">' + t + '</span>'; }
+
+  var SRC = {
+    40: '住宿費每晚不超過 500 元，憑酒店發票據實報銷。',
+    41: '因工作安排在 22:00 後離開辦公地點，可乘網約車返回酒店。',
+    42: '申請人須在報銷單中填寫出發時間和專案名稱。',
+    43: '網約車費用憑平臺行程單及發票據實報銷。',
+    44: '行程起點或終點為非工作地點的，須說明與出差任務的關係。',
+    45: '無法說明的部分由個人承擔。',
+    46: '同一行程不得與交通補貼重複報銷。'
+  };
+  function srcBlock(from, to, cls){
+    var out = '';
+    for (var i = from; i <= to; i++) out += ln(i, SRC[i], cls);
+    return out;
+  }
+
+  function eyeSteps(){
+    return [
+      {
+        ref: 0, checked: 0, pass: 0, fail: 0, marks: {},
+        cap: '先按平常的讀法看總結。四條都帶著具體數字和條件，句子也都很完整。',
+        left: '<div class="dm-empty">先把四條結論連起來讀一遍。</div>',
+        right: '<div class="dm-empty">這一遍先不開啟差旅規定。</div>',
+        fin: false
+      },
+      {
+        ref: 0, checked: 4, pass: 4, fail: 0,
+        marks: { 1: 'eye', 2: 'eye', 3: 'eye', 4: 'eye' },
+        label: '整句話讀起來很通順',
+        cap: '四條挨個讀過去，沒有一處卡頓。左邊那句把準確的時間和錯誤的憑證要求放在一起，只看總結很難發現問題。',
+        left: ln(41, SRC[41]) + ln(42, SRC[42]) + ln(43, '網約車費用無須提供平臺行程單及發票。'),
+        right: '<div class="dm-empty">原文依然沒有開啟，這一遍只能判斷句子順不順。</div>',
+        fin: false
+      },
+      {
+        ref: 0, checked: 4, pass: 4, fail: 0,
+        marks: { 1: 'eye', 2: 'eye', 3: 'eye', 4: 'eye' },
+        label: '整句話讀起來很通順',
+        cap: '結果是四條都被放行，一條也沒攔下。現在切到逐條回原文，同樣四條再檢查一次。',
+        left: '<div class="dm-empty">四條結論看起來都很合理。</div>',
+        right: '<div class="dm-empty">換一種核對方式，再檢查一次。</div>',
+        fin: true
+      }
+    ];
+  }
+
+  function byteSteps(){
+    return [
+      {
+        ref: 0, checked: 0, pass: 0, fail: 0, marks: {},
+        cap: '按 AI 給的位置開啟差旅規定，把對應行和結論並排擺好，逐條查看原句。',
+        left: '<div class="dm-empty">四條結論都聲稱來自差旅費用報銷規定。</div>',
+        right: srcBlock(40, 46),
+        fin: false
+      },
+      {
+        ref: 1, checked: 1, pass: 1, fail: 0, marks: { 1: 'ok' },
+        label: '原句完整支援這個結論',
+        body: '第 40 行同時寫了每晚 500 元和憑酒店發票，這條可以留下。',
+        cap: '結論 1 指向第 40 行。住宿上限和發票要求都在同一句裡，這條通過。',
+        left: srcBlock(40, 40, 'ok'),
+        right: srcBlock(40, 40, 'ok'),
+        fin: false
+      },
+      {
+        ref: 2, checked: 2, pass: 1, fail: 1, marks: { 1: 'ok', 2: 'bad' },
+        label: '關鍵說法和原文相反',
+        body: '總結寫無須發票，原文寫憑行程單及發票，兩句話直接衝突。',
+        cap: '結論 2 指向第 43 行。總結裡的「無須附發票」在原文中找不到，原句要求同時提供行程單和發票。',
+        left: ln(43, '網約車費用' + ch('無須提供發票') + '即可報銷。', 'bad'),
+        right: ln(43, '網約車費用' + ch('憑平臺行程單及發票據實報銷', true) + '。', 'ok'),
+        fin: false
+      },
+      {
+        ref: 3, checked: 3, pass: 1, fail: 2, marks: { 1: 'ok', 2: 'bad', 3: 'bad' },
+        label: '引用漏掉了限制條件',
+        body: '總結只留下可以報銷，刪掉了須說明任務關係和無法說明時個人承擔。',
+        cap: '結論 3 聲稱來自第 44 至 46 行，卻漏掉了第 45 行。少掉的正是無法說明與工作關係時，費用由誰承擔。',
+        left: ln(44, SRC[44]) + ln(46, SRC[46]),
+        right: ln(44, SRC[44]) + srcBlock(45, 45, 'miss') + ln(46, SRC[46]),
+        fin: false
+      },
+      {
+        ref: 4, checked: 4, pass: 1, fail: 3, marks: { 1: 'ok', 2: 'bad', 3: 'bad', 4: 'bad' },
+        label: '原文位置標錯了三行',
+        body: '同一行程不得重複報銷寫在第 46 行，給出的第 43 至 45 行裡沒有這句話。',
+        cap: '結論 4 本身能在材料裡找到，可 AI 把位置寫成第 43 至 45 行。按這個位置回看，只能看到發票和非工作地點的規定。',
+        left: ln(43, SRC[46], 'bad') + ln(44, '', 'bad') + ln(45, '', 'bad'),
+        right: srcBlock(43, 45, 'hi'),
+        fin: false
+      },
+      {
+        ref: 0, checked: 4, pass: 1, fail: 3,
+        marks: { 1: 'ok', 2: 'bad', 3: 'bad', 4: 'bad' },
+        cap: '四條裡只有一條完整對應原文。逐條交出位置和原句，才看見憑空新增、遺漏條件和位置錯誤。',
+        left: '<div class="dm-empty">一條有完整證據，三條需要刪除或改寫。</div>',
+        right: '<div class="dm-empty">這三條被攔下，因為位置和摘錄沒有同時支援結論。</div>',
+        fin: true
+      }
+    ];
+  }
+
+  function buildSteps(){ return mode === 'byte' ? byteSteps() : eyeSteps(); }
+
+  function clearTimers(){ timers.forEach(function(t){ clearTimeout(t); }); timers = []; }
+
+  // 新插進來的行要 double-rAF 才會播進場，直接加 class 會被瀏覽器合併掉
+  function fill(box, html, beat){
+    box.innerHTML = html;
+    var lines = Array.prototype.slice.call(box.querySelectorAll('.dm-line'));
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        lines.forEach(function(el, i){
+          var t = setTimeout(function(){ el.classList.add('in'); }, reduce ? 0 : i * 70);
+          timers.push(t);
+        });
+        var marks = box.querySelectorAll('.dm-ch');
+        Array.prototype.forEach.call(marks, function(el){
+          var t = setTimeout(function(){
+            el.classList.add('lit');
+            if (beat) el.classList.add('beat');
+          }, reduce ? 0 : 420);
+          timers.push(t);
+        });
+      });
+    });
+  }
+
+  function paintRefs(st){
+    var live = st.checked > 0 || st.ref > 0;
+    refsBox.classList.toggle('is-live', live);
+    refs.forEach(function(el){
+      var id = el.getAttribute('data-ref');
+      var mk = (st.marks || {})[id] || '';
+      var wasBad = el.classList.contains('bad');
+      el.className = 'dm-ref' + (mk ? ' ' + mk : '') + (String(st.ref) === id ? ' on' : '');
+      var tag = el.querySelector('i');
+      var body = el.querySelector('.dm-ref-body');
+      if (mk && String(st.ref) === id) tag.textContent = st.label || IDLE_TAG[id];
+      else if (mk === 'ok') tag.textContent = '對得上';
+      else if (mk === 'bad') tag.textContent = '對不上';
+      else if (mk === 'eye') tag.textContent = st.label || IDLE_TAG[id];
+      else tag.textContent = IDLE_TAG[id];
+      if (String(st.ref) === id && st.body) {
+        body.textContent = st.body;
+        body.classList.add('open');
+        if (mk === 'bad' && !wasBad) {
+          requestAnimationFrame(function(){
+            requestAnimationFrame(function(){ el.classList.add('firing'); });
+          });
+        }
+      } else {
+        body.textContent = '';
+        body.classList.remove('open');
+      }
+    });
+  }
+
+  function setMeter(key, value, hot){
+    var m = meters[key];
+    var was = m.num.textContent;
+    m.num.textContent = value;
+    m.box.classList.toggle('hot', !!hot && value > 0);
+    m.box.querySelector('.dm-m-bar').style.transform = 'scaleX(' + (value / 4) + ')';
+    if (was !== String(value)) {
+      m.box.classList.remove('pop');
+      void m.box.offsetWidth;
+      m.box.classList.add('pop');
+    }
+  }
+
+  function paint(st){
+    clearTimers();
+    paintRefs(st);
+    setMeter('checked', st.checked);
+    setMeter('pass', st.pass);
+    setMeter('fail', st.fail, true);
+    barEl.style.width = (st.checked / 4 * 100) + '%';
+    fill(leftEl, st.left, false);
+    fill(rightEl, st.right, true);
+    captionText.textContent = st.cap;
+    if (st.fin) summary.classList.add('on');
+    else summary.classList.remove('on');
+  }
+
+  function stop(){
+    playing = false;
+    if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+  }
+
+  function tick(){
+    if (idx >= steps.length) { reset(); return; }
+    paint(steps[idx]);
+    idx++;
+  }
+
+  // 節拍不勻速：每揪出一條對不上的就多停一會兒，收尾再停久一點
+  function loop(ts){
+    if (!playing) { autoId = null; return; }
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(loop); return; }
+    if (idx >= steps.length) { stop(); return; }
+    var st = steps[idx];
+    paint(st);
+    idx++;
+    pauseUntil = ts + (st.fin ? 3000 : (st.fail > 0 ? 2600 : 1500));
+    autoId = requestAnimationFrame(loop);
+  }
+
+  function reset(){
+    stop(); idx = 0; pauseUntil = 0;
+    steps = buildSteps();
+    clearTimers();
+    refsBox.classList.remove('is-live');
+    refs.forEach(function(el){
+      el.className = 'dm-ref';
+      el.querySelector('i').textContent = IDLE_TAG[el.getAttribute('data-ref')];
+      var body = el.querySelector('.dm-ref-body');
+      body.textContent = '';
+      body.classList.remove('open');
+    });
+    setMeter('checked', 0);
+    setMeter('pass', 0);
+    setMeter('fail', 0, true);
+    barEl.style.width = '0%';
+    leftEl.innerHTML = '<div class="dm-empty">播放後，這裡會出現 AI 給出的原文位置。</div>';
+    rightEl.innerHTML = '<div class="dm-empty">播放後，這裡會按行號取出原文。</div>';
+    summary.classList.remove('on');
+    captionText.textContent = IDLE;
+  }
+
+  function play(){
+    if (idx >= steps.length) reset();
+    if (playing) return;
+    playing = true;
+    pauseUntil = 0;
+    autoId = requestAnimationFrame(loop);
+  }
+
+  function setSeg(m){
+    mode = m;
+    Array.prototype.forEach.call(segEl.querySelectorAll('button'), function(el){
+      el.classList.toggle('on', el.getAttribute('data-mode') === m);
+    });
+  }
+
+  document.getElementById('dm-play').addEventListener('click', play);
+  document.getElementById('dm-step').addEventListener('click', function(){ stop(); tick(); });
+  document.getElementById('dm-reset').addEventListener('click', reset);
+  segEl.addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    setSeg(b.getAttribute('data-mode'));
+    reset();
+  });
+  refsBox.addEventListener('click', function(e){
+    var b = e.target.closest('.dm-ref');
+    if (!b) return;
+    stop();
+    if (mode !== 'byte') { setSeg('byte'); }
+    steps = buildSteps();
+    var i = parseInt(b.getAttribute('data-ref'), 10);
+    paint(steps[i]);
+    idx = i + 1;
+  });
+
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(demoEl, function(){
+      if (played) return; played = true; play();
+    });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice-learn-more.js?v=20260827a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

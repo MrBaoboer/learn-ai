@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>訓練數據規模：大模型是怎麼被餵出來的 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+.big-num {
+  font-size: 64px; font-weight: 900; color: var(--accent);
+  line-height: 1; letter-spacing: -3px;
+  transition: transform 0.2s;
+}
+.big-num.pop { transform: scale(1.06); }
+.big-label { font-size: 15px; font-weight: 700; color: var(--sub); margin-top: 6px; }
+
+/* corpus bars */
+.corpus-list { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.corpus-row  { display: flex; align-items: center; gap: 10px; }
+.corpus-name { width: 70px; font-size: 13px; font-weight: 700; color: var(--sub); text-align: right; flex-shrink: 0; }
+.corpus-track { flex: 1; height: 24px; background: rgba(0,0,0,0.05); border-radius: 7px; overflow: hidden; }
+.corpus-fill {
+  height: 100%; border-radius: 7px; width: 0;
+  display: flex; align-items: center; padding-left: 10px;
+  transition: width 0.9s cubic-bezier(0.25,1,0.5,1);
+}
+.corpus-fill span { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.95); }
+.corpus-pct { width: 38px; font-size: 13px; font-weight: 800; text-align: right; flex-shrink: 0; }
+
+.insight {
+  background: rgba(217,119,6,0.06); border: 1.5px solid rgba(217,119,6,0.2);
+  border-radius: var(--radius); padding: 16px 20px;
+  font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.7;
+  margin-top: 18px;
+}
+.insight span { font-size: 13px; font-weight: 400; color: var(--sub); }
+
+/* slider */
+.slider-wrap {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px;
+  box-shadow: var(--shadow-card);
+}
+.slider-val { font-size: 18px; font-weight: 900; color: var(--accent); min-width: 72px; }
+.slider-mode-badge {
+  font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 8px;
+  white-space: nowrap; transition: all 0.3s;
+}
+input[type=range] {
+  flex: 1; accent-color: var(--accent); cursor: pointer; height: 28px;
+  min-width: 0;
+}
+
+.right-panels {
+  display: flex; flex-direction: column; gap: 14px; margin-top: 14px;
+}
+
+/* 规模感受卡 */
+.vis-box {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: var(--shadow-card);
+}
+.vis-analogy {
+  font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.5;
+}
+.vis-analogy b { color: var(--accent); }
+.vis-analogy .sub { font-size: 12px; font-weight: 400; color: var(--sub); margin-top: 2px; }
+.vis-analogy .tier-same { color: var(--amber); font-weight: 600; margin-top: 6px; }
+
+/* icon grid */
+.icon-grid {
+  display: flex; flex-wrap: wrap;
+  align-content: flex-start; gap: 3px;
+  max-height: 60px; overflow: hidden;
+}
+.icon-unit {
+  font-size: 17px; line-height: 1;
+  opacity: 0; transform: scale(0.5);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.icon-unit.in { opacity: 1; transform: scale(1); }
+
+/* scale bar */
+.scale-bar-track {
+  height: 8px; background: rgba(0,0,0,0.06); border-radius: 8px; overflow: hidden;
+}
+.scale-bar-fill {
+  height: 100%; border-radius: 8px; background: var(--accent);
+  transition: width 0.5s cubic-bezier(0.25,1,0.5,1);
+}
+.scale-bar-labels {
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: var(--sub); margin-top: 3px; font-weight: 600;
+}
+
+/* ── 实测卡片 ── */
+.model-card {
+  border-radius: var(--radius); border: 2px solid var(--border);
+  padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;
+  transition: border-color 0.3s, background 0.3s;
+  background: var(--card);
+}
+.model-card.is-hallucination { border-color: rgba(229,62,62,0.45); background: rgba(229,62,62,0.03); }
+.model-card.is-unknown       { border-color: rgba(217,119,6,0.45);  background: rgba(217,119,6,0.03); }
+.model-card.is-correct       { border-color: rgba(22,163,74,0.5);   background: rgba(22,163,74,0.04); }
+
+.model-card-header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.model-size-big {
+  font-size: 28px; font-weight: 900; line-height: 1;
+  transition: color 0.3s;
+}
+.is-hallucination .model-size-big { color: var(--danger); }
+.is-unknown       .model-size-big { color: var(--amber); }
+.is-correct       .model-size-big { color: var(--success); }
+
+.model-card-meta { flex: 1; }
+.model-card-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.model-card-tag  { font-size: 11px; color: var(--sub); margin-top: 1px; }
+
+.verdict-badge {
+  font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 8px;
+  flex-shrink: 0;
+}
+.is-hallucination .verdict-badge { background: var(--danger); color: white; }
+.is-unknown       .verdict-badge { background: var(--amber);  color: white; }
+.is-correct       .verdict-badge { background: var(--success); color: white; }
+
+.model-card-q {
+  font-size: 12px; font-weight: 700; color: var(--sub);
+}
+.model-card-answer {
+  font-size: 14px; color: var(--text); line-height: 1.7;
+  border-radius: 10px; padding: 12px 16px;
+  transition: background 0.3s;
+}
+.is-hallucination .model-card-answer { background: rgba(229,62,62,0.05); }
+.is-unknown       .model-card-answer { background: rgba(217,119,6,0.05); }
+.is-correct       .model-card-answer { background: rgba(22,163,74,0.05); }
+
+.model-card-answer .wrong { color: var(--danger); font-weight: 700; }
+.model-card-answer .right { color: var(--success); font-weight: 700; }
+.model-card-answer b { color: var(--success); font-weight: 700; }
+
+.model-card-tip {
+  font-size: 13px; color: var(--sub); line-height: 1.6;
+}
+.model-card-tip b { color: var(--text); }
+
+@media (max-width: 768px) {
+  .big-num { font-size: 48px; letter-spacing: -2px; }
+  .slider-wrap { flex-wrap: wrap; }
+  .slider-val { min-width: 60px; }
+  .scale-bar-labels { font-size: 8px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="深入了解大模型訓練數據的規模與質素：萬億級 Token 語料、數據清洗流程、Common Crawl、Books、程式碼數據的比例配比，理解數據規模如何決定模型能力邊界。">
+<meta name="keywords" content="大模型訓練數據,Token,語料規模,Common Crawl,預訓練數據">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/training-data.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/training-data.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/training-data.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/training-data.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/training-data.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/training-data.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/training-data.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/training-data.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="訓練數據規模：大模型是怎麼被餵出來的">
+<meta property="og:description" content="深入了解大模型訓練數據的規模與質素：萬億級 Token 語料、數據清洗流程、Common Crawl、Books、程式碼數據的比例配比，理解數據規模如何決定模型能力邊界。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/training-data.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/training-data.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="訓練數據規模：大模型是怎麼被餵出來的">
+<meta name="twitter:description" content="深入了解大模型訓練數據的規模與質素：萬億級 Token 語料、數據清洗流程、Common Crawl、Books、程式碼數據的比例配比，理解數據規模如何決定模型能力邊界。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"AI 的食物：訓練數據","name":"AI 的食物：訓練數據","url":"https://xueai.miyang.cn/slides/training-data.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 基礎原理","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":true,"description":"深入了解大模型訓練數據的規模與質素：萬億級 Token 語料、數據清洗流程、Common Crawl、Books、程式碼數據的比例配比，理解數據規模如何決定模型能力邊界。","datePublished":"2026-04-12","dateModified":"2026-08-27"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">基礎原理</div>
+    <h1>AI 的食物：訓練數據</h1>
+    <p class="subtitle">想讓 AI 學會説話，先要餵給它數以萬億計的文字。它讀了人類寫過的絕大多數內容。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>15T Token 是什麼概念？語料構成可視化 + 數據規模直覺滑塊</p></aside><!--seo:end-->  <div class="sec-label">數據規模與構成</div>
+
+  <div class="l-card">
+    <div class="big-num" id="bigNum">~1B</div>
+    <div class="big-label" id="bigSubLabel">Tokens（詞元）· 小模型訓練數據量級</div>
+
+    <div class="corpus-list" id="corpusList"></div>
+  </div>
+
+  <div class="insight" id="insight">
+    讀了多少，就能説多少。<br>
+    <span>訓練數據的質素和多樣性，決定了模型世界觀的上限。</span>
+  </div>
+
+  <div class="sec-label">拖動滑條 · 感受不同參數量模型的能力差異</div>
+
+  <div class="slider-wrap">
+    <span class="slider-val" id="sliderVal">270M</span>
+    <input type="range" min="0" max="8" step="1" value="0" id="scaleSlider" oninput="updateScale(this.value)" style="flex:1">
+    <span class="slider-mode-badge" id="modeBadge">幻覺</span>
+  </div>
+
+  <div class="right-panels">
+
+    <!-- 上：规模感受小卡 -->
+    <div class="vis-box">
+      <div class="vis-analogy" id="visAnalogy"></div>
+      <div class="icon-grid" id="iconGrid"></div>
+      <div class="scale-bar-wrap">
+        <div class="scale-bar-track">
+          <div class="scale-bar-fill" id="scaleBarFill" style="width:2%"></div>
+        </div>
+      <div class="scale-bar-labels">
+        <span>270M</span><span>0.6B</span><span>1.8B</span><span>30B</span><span>70B</span><span>120B</span><span>235B</span><span>1T</span><span>5T+</span>
+      </div>
+      </div>
+    </div>
+
+    <!-- 下：实测大卡（随 slider 切换） -->
+    <div class="model-card" id="modelCard">
+      <div class="model-card-header">
+        <div class="model-size-big" id="cardSize">270M</div>
+        <div class="model-card-meta">
+          <div class="model-card-name" id="cardName">Gemma-4-e2b</div>
+          <div class="model-card-tag" id="cardTag">Google · 本地推理</div>
+        </div>
+        <div class="verdict-badge" id="cardVerdict">幻覺</div>
+      </div>
+      <div class="model-card-q">問：李知恩是誰？請介紹一下她的生平和代表作品。</div>
+      <div class="model-card-answer" id="cardAnswer"></div>
+      <div class="model-card-tip" id="cardTip"></div>
+    </div>
+
+  </div>
+
+</article>
+
+<script>
+// ── 語料條 ──
+const CORPUS = [
+  { name:'網頁文本', pct:70, color:'#0066ff' },
+  { name:'書籍',     pct:12, color:'#7c3aed' },
+  { name:'程式碼',     pct:8,  color:'#16a34a' },
+  { name:'學術論文', pct:5,  color:'#d97706' },
+  { name:'對話數據', pct:5,  color:'#e53e3e' },
+];
+const list = document.getElementById('corpusList');
+CORPUS.forEach(c => {
+  list.innerHTML += `
+    <div class="corpus-row">
+      <div class="corpus-name">${c.name}</div>
+      <div class="corpus-track">
+        <div class="corpus-fill" style="background:${c.color}" data-w="${c.pct}">
+          <span>${c.pct}%</span>
+        </div>
+      </div>
+      <div class="corpus-pct" style="color:${c.color}">${c.pct}%</div>
+    </div>`;
+});
+setTimeout(() => {
+  list.querySelectorAll('.corpus-fill').forEach(el => el.style.width = el.dataset.w + '%');
+}, 200);
+
+// ── 模型檔位數據（參數量 + 實測結果）──
+const SCALES = [
+  {
+    // slider 左側
+    num: '270M',
+    sublabel: 'Tokens（詞元）· 超小模型，約 ~1B Tokens 訓練',
+    // 右上規模感受
+    analogy: '訓練數據約 <b>75 萬本</b> 普通小説',
+    sub: '一座小型城市圖書館的館藏',
+    icon: '📚', count: 8, pct: 2,
+    // 實測卡
+    verdict: 'hallucination',
+    verdictLabel: '幻覺',
+    modelName: 'Gemma-4-e2b (270M)',
+    modelTag: 'Google · LMStudio 本地實測',
+    answer: '李知恩是一位中國著名<b class="wrong">教育ólogo</b>和<b class="wrong">教育家</b>。儘管目前沒有公開信息，但根據一些記錄，可以推斷她是<b class="wrong">中國教育教育家</b>。代表作品：<b class="wrong">《教育家》《教育與教育家》</b>，描述了中國教育教育家的生活和工作。',
+    tip: '270M 完全不知道李知恩是誰，直接捏造了一個「中國教育家」身份，還把 educólogo 這個詞拼錯了。這就是參數太少、訓練數據太稀疏的結果：隨機拼湊，毫無根據。',
+  },
+  {
+    num: '0.6B',
+    sublabel: 'Tokens（詞元）· 超小模型，約 ~1B Tokens 訓練',
+    analogy: '訓練數據約 <b>75 萬本</b> 普通小説',
+    sub: '知識覆蓋極度稀疏，只記得常識級內容',
+    icon: '📚', count: 8, pct: 5,
+    verdict: 'hallucination',
+    verdictLabel: '幻覺',
+    modelName: 'Qwen3-0.6B',
+    modelTag: 'Alibaba · LMStudio 本地實測',
+    answer: '李知恩（<b class="wrong">Lee Ji-hoon</b>）是韓國著名的女演員，出生於1993年，目前擔任<b class="wrong">韓國國家大百科全書的編委</b>。她的職業生涯始於韓國演藝圈，並在多個影視作品中展現了獨特的魅力。早期經歷：李知恩在青少年時期便展現出對表演的熱情，後來進入娛樂圈發展。',
+    tip: '0.6B 知道韓國女藝人這個大方向，但藝名拼成了 Lee Ji-hoon（錯），還捏造了「國家百科全書編委」這個根本不存在的職位。方向對了，細節全錯。',
+  },
+  {
+    num: '1.8B',
+    sublabel: 'Tokens（詞元）· 小模型，約 ~2B Tokens 訓練',
+    analogy: '訓練數據約 <b>150 萬本</b> 書',
+    sub: '略懂大眾知識，但稍微小眾的事實容易空白',
+    icon: '📖', count: 12, pct: 12,
+    verdict: 'unknown',
+    verdictLabel: '拒絕回答',
+    modelName: 'HunYuan-1.8B',
+    modelTag: 'Tencent · LMStudio 本地實測',
+    answer: '關於「李知恩」這一名字，目前<b class="wrong">沒有廣泛知名或公開的權威資料</b>記錄其生平及代表作品，可能是特定領域的從業者或非公眾人物。若您所指的是某個地區或特定圈子裏的個體，建議提供更多背景信息（如所在領域、成就或相關事件），以便進一步核實。',
+    tip: '1.8B 比幻覺稍好，至少沒有捏造身份，但也不知道李知恩是誰，只能推給用戶説「請提供更多信息」。相當於「這本書我沒讀到過」。',
+  },
+  {
+    num: '30B',
+    sublabel: 'Tokens（詞元）· 大型模型，約 ~15T Tokens 訓練',
+    analogy: '相當於把整個互聯網 <b>讀了兩三遍</b>',
+    sub: '知識覆蓋已相當全面，主流事實基本準確',
+    icon: '🚀', count: 26, pct: 56,
+    verdict: 'correct',
+    verdictLabel: '正確詳細',
+    modelName: 'Qwen3-Coder-30B',
+    modelTag: 'Alibaba · LMStudio 本地實測',
+    answer: '李知恩（藝名 <b>IU</b>），1993年5月16日出生於韓國首爾，是韓國著名女歌手、詞曲創作人和演員。2008年出道，2010年憑藉《Good Day》獲得廣泛關注，被譽為「國民妹妹」。代表音樂作品：《Good Day》《Through the Night》《Palette》《LILAC》；代表演藝作品：《我的大叔》《鬼怪》《德魯納酒店》。',
+    tip: '30B 已經能給出完整、有條理的介紹：藝名、生日、出道時間、代表作都準確。到這個量級，主流公眾人物的事實基本不再幻覺。',
+  },
+  {
+    num: '70B',
+    sublabel: 'Tokens（詞元）· 大型模型，約 ~15T Tokens 訓練',
+    analogy: '相當於把整個互聯網 <b>讀了兩三遍</b>',
+    sub: '大參數量不等於沒有幻覺，稍微小眾的事實照樣出錯',
+    icon: '🚀', count: 32, pct: 65,
+    verdict: 'hallucination',
+    verdictLabel: '嚴重幻覺',
+    modelName: 'Llama-3.3-70B-Instruct',
+    modelTag: 'Meta · OpenRouter 雲端實測',
+    answer: '李知恩是一位韓國女演員，生於<b class="wrong">1987年2月9日</b>。她在2010年因出演電視劇<b class="wrong">《秘密花園》</b>而獲得關注，在那裏她扮演了一個名叫<b class="wrong">尹瑟的富家子弟</b>。代表作品包括《信號》《Architecture 101》《當惡魔呼喚你的名字時》等。',
+    tip: '70B 完全答錯！把李知恩（歌手/IU）認成了另一個同名女演員，出生年份差了6年，代表作全部是另一個人的。參數量大不代表不幻覺，這正是訓練數據覆蓋決定知識邊界的體現。',
+  },
+  {
+    num: '120B',
+    sublabel: 'Tokens（詞元）· 超大模型，約 ~15T+ Tokens 訓練',
+    analogy: '相當於把整個互聯網 <b>反覆啃了好幾遍</b>',
+    sub: '知識極為密集，能處理細節、跨語言、深度推理',
+    icon: '🤯', count: 38, pct: 78,
+    verdict: 'correct',
+    verdictLabel: '專家級',
+    modelName: 'GPT-OSS-120B',
+    modelTag: 'OpenAI · LMStudio 本地實測',
+    answer: '李知恩（Lee Ji‑eun），藝名 <b>IU</b>，1993年5月16日生於韓國首爾江南區，父親是音樂教師，母親是美術老師。2008年以單曲《Lost Child》正式出道，簽約 LOEN（現 Kakao M）。2010年發行專輯《IU…i\'m IU》，主打《Marshmallow》首獲音樂節目冠軍；同年《Good Day》以三段式高音一舉奠定「國民妹妹」地位。代表專輯：《Last Fantasy》《Modern Times》《Palette》《Lilac》；代表曲：《Through the Night》《Eight》《Coin》；主演電視劇：《我的大叔》《德魯納酒店》《我的解憂方案》。',
+    tip: '120B 的回答近乎維基百科：連父母職業、公司名稱、出道單曲都準確。和 70B 的嚴重幻覺相比，這個跨越感極強。',
+  },
+  {
+    num: '235B',
+    sublabel: 'Tokens（詞元）· MoE 巨型模型，約 ~20T Tokens 訓練',
+    analogy: '訓練數據已超過人類 <b>所有文字的總量</b>',
+    sub: '2000 億參數池，22B 動態激活，推理與知識兼顧',
+    icon: '🌌', count: 48, pct: 86,
+    verdict: 'correct',
+    verdictLabel: '百科級',
+    modelName: 'Qwen3-235B-A22B（MoE）',
+    modelTag: 'Alibaba · OpenRouter 雲端實測',
+    answer: '李知恩（1993年5月16日－），韓國創作女歌手、音樂製作人及演員，以藝名 <b>IU</b>（아이유）聞名。13歲參加選秀未果，後成為LOEN Entertainment（現Kakao Music）練習生。2008年9月正式出道，2010年《Good Day》以三段高音橫掃榜單，奠定「國民級」地位。代表專輯：《Last Fantasy》《Modern Times》《Palette》《Lilac》；代表曲：《Good Day》《Through the Night》《BBIBBI》《Love Scenario》；影視代表：《我的大叔》《鬼怪》《德魯納酒店》。',
+    tip: '235B MoE 切換到完全正確：藝名、出道背景、代表作品全部準確，説明參數池足夠大之後，稍微小眾的知識點就能被正確覆蓋。',
+  },
+  {
+    num: '1T',
+    sublabel: 'Tokens（詞元）· 萬億參數 MoE，約 ~20T Tokens 訓練',
+    analogy: '人類語言文字的 <b>數倍總量</b>',
+    sub: '萬億參數 MoE，專家並行激活，極限知識密度',
+    icon: '🛸', count: 58, pct: 95,
+    verdict: 'correct',
+    verdictLabel: '超越百科',
+    modelName: 'Kimi K2（~1T MoE）',
+    modelTag: 'Moonshot AI · OpenRouter 雲端實測',
+    answer: '李知恩（이지은，Lee Ji-eun），藝名 <b>IU</b>（아이유，「我與你」的縮寫），1993年5月16日生，韓國創作型女歌手、演員、詞曲作者、製作人。K-Pop史上首位同時達成「Melon日榜、周榜、年榜All-Kill」與「音源累計破百次PAK（Perfect All-Kill）」的藝人。2007年15歲簽約LOEN Entertainment，2008年出道，2010年《좋은 날（好日子）》三段高音爆紅。代表專輯：《Real》《Last Fantasy》《Modern Times》《Palette》《Lilac》《The Winning》；代表曲：《Through the Night》《Eight》《Coin》《Celebrity》《Love wins all》；影視：《我的大叔》《德魯納酒店》《我的解憂方案》。',
+    tip: 'Kimi K2 連 Melon 音源紀錄、PAK 次數、韓文歌名都記準了。這是萬億參數體量帶來的知識密度，幾乎等同於一個即時可查的專業數據庫。',
+  },
+  {
+    num: '5T+',
+    sublabel: 'Tokens（詞元）· 頂級閉源旗艦，約 ~20T+ Tokens 訓練',
+    analogy: '人類所有文字的 <b>數十倍等效覆蓋</b>',
+    sub: '參數量未公開，業內推測超 5T，行業天花板',
+    icon: '🌠', count: 72, pct: 100,
+    verdict: 'correct',
+    verdictLabel: '行業天花板',
+    modelName: 'Claude Opus 4.6',
+    modelTag: 'Anthropic · OpenRouter 代理實測',
+    answer: '李知恩（이지은）藝名 <b>IU</b>（아이유），1993年5月16日出生於韓國首爾。藝名"IU"取自"I"與"You"的組合，寓意通過音樂將人與人連接。年僅15歲以歌曲《迷兒》出道，簽約LOEN Entertainment（後更名Kakao Entertainment）。2010年《좋은 날（好日子）》連續三個高音引發轟動，奠定「國民妹妹」地位。代表專輯：《Modern Times》《Palette》（與G-Dragon合作）《Lilac》；代表曲：《Through the Night》《BBIBBI》《Celebrity》《Love wins all》（與V合拍MV）；影視：《Dream High》《我的大叔》（演技獲高度認可）《德魯納酒店》《月之戀人-步步驚心：麗》。',
+    tip: 'Claude Opus 4.6 回答結構清晰如維基百科：連藝名語源、童年家境、練習生經歷、合作歌手細節都完整記錄，這是頂級閉源模型的知識廣度與表達能力的綜合體現。',
+  },
+];
+
+let currentScale = 0;
+
+// 類型 → 樣式映射
+const VERDICT_CLASS = {
+  hallucination: 'is-hallucination',
+  unknown:       'is-unknown',
+  correct:       'is-correct',
+};
+const BADGE_COLORS = {
+  hallucination: { bg: 'var(--danger)', text: 'white' },
+  unknown:       { bg: 'var(--amber)',  text: 'white' },
+  correct:       { bg: 'var(--success)', text: 'white' },
+};
+
+function updateScale(v) {
+  const s = SCALES[+v];
+  currentScale = +v;
+
+  // 左側大數字 pop 動畫
+  const bigNum = document.getElementById('bigNum');
+  bigNum.textContent = s.num;
+  bigNum.classList.remove('pop');
+  void bigNum.offsetWidth;
+  bigNum.classList.add('pop');
+  setTimeout(() => bigNum.classList.remove('pop'), 300);
+
+  // 左側副標籤
+  document.getElementById('bigSubLabel').textContent = s.sublabel;
+
+  // slider val + mode badge
+  document.getElementById('sliderVal').textContent = s.num;
+  const badge = document.getElementById('modeBadge');
+  badge.textContent = s.verdictLabel;
+  const bc = BADGE_COLORS[s.verdict];
+  badge.style.background = bc.bg;
+  badge.style.color = bc.text;
+
+  /* 规模感受（右上小卡）
+     背景：滑块推的是参数量，这张小卡讲的是训练数据量，两者本来就不一一对应。
+     270M→0.6B、30B→70B 这两跳的训练数据处在同一量级，卡面文字一字不变，
+     零基础学员会以为滑块坏了或者数字写错了（吐槽 #37）。
+     设计意图：与上一档撞车时明说「这一跳变的是参数量」，把沉默的重复变成一个教学点，
+     顺带纠正「参数量涨，喂的数据就一定跟着涨」这个常见误解。
+     约束：靠比对相邻两档的 analogy 自动判定，新增档位无需额外标注；
+     analogy 含 <b> 标签，只能整串比对，不要改成比对纯文本。 */
+  const prev = +v > 0 ? SCALES[+v - 1] : null;
+  const sameTier = prev && prev.analogy === s.analogy;
+  document.getElementById('visAnalogy').innerHTML =
+    s.analogy + `<div class="sub">${s.sub}</div>`
+    + (sameTier ? `<div class="sub tier-same">訓練數據量和上一檔同級，這一跳變的是參數量</div>` : '');
+  document.getElementById('scaleBarFill').style.width = s.pct + '%';
+
+  // 圖標格
+  const grid = document.getElementById('iconGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < s.count; i++) {
+    const span = document.createElement('span');
+    span.className = 'icon-unit';
+    span.textContent = s.icon;
+    grid.appendChild(span);
+    setTimeout(() => span.classList.add('in'), i * 15);
+  }
+
+  // 實測大卡（右下）
+  const card = document.getElementById('modelCard');
+  card.className = 'model-card ' + VERDICT_CLASS[s.verdict];
+
+  document.getElementById('cardSize').textContent    = s.num;
+  document.getElementById('cardName').textContent    = s.modelName;
+  document.getElementById('cardTag').textContent     = s.modelTag;
+  document.getElementById('cardVerdict').textContent = s.verdictLabel;
+  document.getElementById('cardAnswer').innerHTML    = s.answer;
+  document.getElementById('cardTip').innerHTML       = s.tip;
+}
+
+// 初始化
+updateScale(0);
+document.getElementById('scaleSlider').value = 0;
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice-principles.js?v=20260827a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

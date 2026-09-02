@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Think Tool：讓 AI 先想後做 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8;margin-bottom:8px}
+
+/* 问题场景卡 */
+.scenario-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px}
+@media(max-width:768px){.scenario-grid{grid-template-columns:1fr}}
+.scenario-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:10px}
+.scenario-card .sc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.scenario-card .sc-icon.red{background:rgba(220,38,38,.08);color:var(--danger)}
+.scenario-card .sc-icon.amber{background:rgba(217,119,6,.08);color:var(--amber)}
+.scenario-card .sc-icon.purple{background:rgba(124,58,237,.08);color:var(--purple)}
+.scenario-card h4{font-size:15px;font-weight:800;color:var(--text);margin:0}
+.scenario-card p{font-size:13.5px;color:var(--sub);line-height:1.7;margin:0}
+
+/* 思考模式对比 */
+.think-compare{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px}
+@media(max-width:768px){.think-compare{grid-template-columns:1fr}}
+.think-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:14px}
+.think-box h3{font-size:17px;font-weight:800;margin:0;display:flex;align-items:center;gap:8px}
+.think-box.ext h3{color:var(--purple)}
+.think-box.tool h3{color:var(--accent)}
+.think-tag{font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;letter-spacing:.5px}
+.think-tag.ext{background:rgba(124,58,237,.1);color:var(--purple)}
+.think-tag.tool{background:rgba(0,102,255,.1);color:var(--accent)}
+
+/* 时间线 */
+.timeline{display:flex;flex-direction:column;gap:0;position:relative;padding-left:24px}
+.timeline::before{content:'';position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:var(--border)}
+.tl-node{position:relative;padding:8px 0 8px 16px;font-size:13px;line-height:1.5}
+.tl-node::before{content:'';position:absolute;left:-20px;top:12px;width:10px;height:10px;border-radius:50%;border:2px solid var(--border);background:var(--card)}
+.tl-node.think::before{background:rgba(0,102,255,.15);border-color:var(--accent)}
+.tl-node.ext-think::before{background:rgba(124,58,237,.15);border-color:var(--purple)}
+.tl-node.action::before{background:rgba(22,163,74,.15);border-color:var(--success)}
+.tl-node .tl-label{font-weight:700;font-size:12px;letter-spacing:.3px;margin-bottom:2px}
+.tl-node.think .tl-label{color:var(--accent)}
+.tl-node.ext-think .tl-label{color:var(--purple)}
+.tl-node.action .tl-label{color:var(--success)}
+.tl-node .tl-content{color:var(--sub)}
+
+/* 代码块 */
+.code-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);margin-top:8px}
+.code-header{padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg);font-size:13px;font-weight:700;color:var(--sub);display:flex;align-items:center;gap:8px}
+.code-body{padding:16px 20px;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;line-height:1.7;color:var(--text);overflow-x:auto;white-space:pre-wrap}
+.code-body .hl-key{color:var(--accent);font-weight:700}
+.code-body .hl-str{color:var(--success)}
+.code-body .hl-comment{color:var(--sub);font-style:italic}
+
+/* 数据卡 */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+@media(max-width:768px){.stat-grid{grid-template-columns:1fr}}
+.stat-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);text-align:center;display:flex;flex-direction:column;gap:8px}
+.stat-card .stat-label{font-size:13px;font-weight:700;color:var(--sub);letter-spacing:.3px}
+.stat-card .stat-row{display:flex;align-items:baseline;justify-content:center;gap:12px;flex-wrap:wrap}
+.stat-card .stat-before{font-size:22px;font-weight:700;color:var(--sub);text-decoration:line-through;opacity:.6}
+.stat-card .stat-arrow{color:var(--sub)}
+.stat-card .stat-after{font-size:28px;font-weight:900;color:var(--success)}
+.stat-card .stat-delta{font-size:15px;font-weight:800;color:var(--success);background:rgba(22,163,74,.08);padding:3px 12px;border-radius:6px;display:inline-block}
+
+/* 场景列表 */
+.use-cases{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+@media(max-width:768px){.use-cases{grid-template-columns:1fr}}
+.use-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-card)}
+.use-card h4{font-size:15px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.use-card.good h4{color:var(--success)}
+.use-card.bad h4{color:var(--danger)}
+.use-card ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.use-card li{font-size:13.5px;color:var(--sub);line-height:1.6;padding-left:20px;position:relative}
+.use-card.good li::before{content:'';position:absolute;left:0;top:7px;width:8px;height:8px;border-radius:50%;background:rgba(22,163,74,.2);border:2px solid var(--success)}
+.use-card.bad li::before{content:'';position:absolute;left:0;top:7px;width:8px;height:8px;border-radius:50%;background:rgba(220,38,38,.2);border:2px solid var(--danger)}
+
+/* takeaway */
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:20px}
+.takeaway b{color:var(--accent)}
+
+/* 更新标记 */
+.update-badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(217,119,6,.1);color:var(--amber);margin-left:6px;vertical-align:2px}
+
+/* ===== 交互演示 ===== */
+.sim-demo{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.sim-tabs{display:flex;border-bottom:1.5px solid var(--border);background:var(--bg)}
+.sim-tab{flex:1;padding:12px 16px;font-size:14px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--sub);transition:all .2s}
+.sim-tab.active{color:var(--accent);background:var(--card);box-shadow:inset 0 -2.5px 0 var(--accent)}
+.sim-tab:hover:not(.active){background:rgba(0,102,255,.03)}
+.sim-scene{padding:12px 20px;background:rgba(0,102,255,.03);border-bottom:1px solid var(--border)}
+.sim-scene-label{font-size:13px;color:var(--sub);display:flex;align-items:center;gap:8px;line-height:1.6}
+.sim-chat{padding:20px;min-height:120px;display:flex;flex-direction:column;gap:12px}
+.sim-msg{padding:12px 16px;border-radius:12px;font-size:13.5px;line-height:1.7;max-width:88%;opacity:0;transform:translateY(12px);transition:opacity .3s ease,transform .3s ease}
+.sim-msg.show{opacity:1;transform:translateY(0)}
+.sim-msg.user{background:var(--bg);border:1px solid var(--border);align-self:flex-end;color:var(--text)}
+.sim-msg.agent{background:rgba(0,102,255,.06);border:1px solid rgba(0,102,255,.15);align-self:flex-start;color:var(--text)}
+.sim-msg.think{background:rgba(234,179,8,.06);border:2px dashed rgba(234,179,8,.4);align-self:flex-start;color:var(--text)}
+.sim-msg.tool{background:rgba(22,163,74,.04);border:1px solid rgba(22,163,74,.2);align-self:flex-start;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px;color:var(--text)}
+.sim-msg.result-bad{background:rgba(220,38,38,.05);border:2px solid rgba(220,38,38,.4);align-self:flex-start;color:var(--danger);font-weight:600}
+.sim-msg.result-good{background:rgba(22,163,74,.05);border:2px solid rgba(22,163,74,.4);align-self:flex-start;color:var(--success);font-weight:600}
+.sim-msg-label{font-size:11px;font-weight:700;letter-spacing:.3px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.sim-msg.user .sim-msg-label{color:var(--sub)}
+.sim-msg.agent .sim-msg-label{color:var(--accent)}
+.sim-msg.think .sim-msg-label{color:rgba(180,130,0,1)}
+.sim-msg.tool .sim-msg-label{color:var(--success)}
+.sim-msg.result-bad .sim-msg-label{color:var(--danger)}
+.sim-msg.result-good .sim-msg-label{color:var(--success)}
+.sim-controls{padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--bg)}
+.sim-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:8px;border:1.5px solid var(--accent);background:rgba(0,102,255,.06);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s}
+.sim-btn:hover{background:var(--accent);color:#fff}
+.sim-btn:disabled{opacity:.4;cursor:not-allowed}
+.sim-btn:disabled:hover{background:rgba(0,102,255,.06);color:var(--accent)}
+.sim-btn-reset{border-color:var(--border);background:none;color:var(--sub)}
+.sim-btn-reset:hover{background:var(--border);color:var(--text)}
+.sim-step-count{font-size:12px;color:var(--sub);margin-left:auto}
+</style>
+<meta name="description" content="Think Tool 是一種特殊工具：沒有副作用，只讓 Agent 在行動中暫停思考。在複雜工具鏈和策略密集場景中，效果提升 54%。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/10-6.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/10-6.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/10-6.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/10-6.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/10-6.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/10-6.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/10-6.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/10-6.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="Think Tool：讓 AI 先想後做">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/10-6.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/10-6.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Think Tool：讓 AI 先想後做","name":"Think Tool：讓 AI 先想後做","url":"https://xueai.miyang.cn/slides/10-6.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 工具設計的藝術","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Think Tool 是一種特殊工具：沒有副作用，只讓 Agent 在行動中暫停思考。在複雜工具鏈和策略密集場景中，效果提升 54%。","datePublished":"2026-07-04","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:description" content="Think Tool 是一種特殊工具：沒有副作用，只讓 Agent 在行動中暫停思考。在複雜工具鏈和策略密集場景中，效果提升 54%。"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">工具設計的藝術</div>
+    <h1>Think Tool：讓 AI 先想後做</h1>
+    <p class="subtitle">Agent 在執行長工具鏈時，經常忘記前面的信息，或者在需要權衡多條規則時犯錯。實踐證明，給 Agent 一個停下來想一想的工具，就能大幅提升準確率。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>在複雜工具鏈中給 Agent 一個暫停思考的空間，τ-bench 性能提升 54%</p></aside><!--seo:end-->  <!-- ===== 问题场景 ===== -->
+  <div class="sec-label">問題場景：Agent 為什麼會犯錯</div>
+
+  <div class="scenario-grid">
+    <div class="scenario-card reveal">
+      <div class="sc-icon red">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <h4>信息在工具鏈中丟失</h4>
+      <p>Agent 調用了 5 個工具後，早期工具返回的關鍵信息被後續的大量上下文淹沒，模型不再關注它。</p>
+    </div>
+    <div class="scenario-card reveal">
+      <div class="sc-icon amber">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      </div>
+      <h4>策略密集型決策</h4>
+      <p>客服場景有 20 條退款政策、6 種例外情況。Agent 需要同時考慮多條規則才能做出正確判斷，但它常常只看到了最近的幾條。</p>
+    </div>
+    <div class="scenario-card reveal">
+      <div class="sc-icon purple">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+      </div>
+      <h4>串行依賴決策</h4>
+      <p>每一步都基於前一步的結果。Agent 在第 3 步做決策時，需要回憶第 1 步的上下文，但那已經在 2000 個 Token 之前了。</p>
+    </div>
+  </div>
+
+  <!-- ===== Think Tool 是什么 ===== -->
+  <div class="sec-label">什麼是 Think Tool</div>
+
+  <div class="l-callout reveal">
+    <b>一句話：</b>Think Tool 是一個沒有副作用的特殊工具。它不會查數據庫、不會調 API、不會改任何狀態。它唯一的作用是讓 Agent <b>把思考過程寫下來</b>，強制自己想清楚再行動。
+  </div>
+
+  <div class="think-compare" style="margin-top:16px">
+    <div class="think-box ext reveal">
+      <h3><span class="think-tag ext">Extended Thinking</span></h3>
+      <div style="font-size:14px;color:var(--sub);line-height:1.7">模型在<b>生成回覆之前</b>進行深度思考。適合需要一次性想清楚的複雜推理問題。</div>
+      <div class="timeline">
+        <div class="tl-node ext-think"><div class="tl-label">THINK</div><div class="tl-content">深度思考，規劃方案</div></div>
+        <div class="tl-node action"><div class="tl-label">ACTION</div><div class="tl-content">調用工具 A</div></div>
+        <div class="tl-node action"><div class="tl-label">ACTION</div><div class="tl-content">調用工具 B</div></div>
+        <div class="tl-node action"><div class="tl-label">ACTION</div><div class="tl-content">生成回覆</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--purple);font-weight:600">思考發生在開頭，之後一路執行</div>
+    </div>
+    <div class="think-box tool reveal">
+      <h3><span class="think-tag tool">Think Tool</span></h3>
+      <div style="font-size:14px;color:var(--sub);line-height:1.7">Agent 在<b>執行過程中</b>隨時暫停思考。適合需要中途整理信息、重新評估策略的長鏈場景。</div>
+      <div class="timeline">
+        <div class="tl-node action"><div class="tl-label">ACTION</div><div class="tl-content">調用工具 A，獲取用戶訂單</div></div>
+        <div class="tl-node think"><div class="tl-label">THINK</div><div class="tl-content">結合政策 3 和 7，這種情況...</div></div>
+        <div class="tl-node action"><div class="tl-label">ACTION</div><div class="tl-content">調用工具 B，查退款記錄</div></div>
+        <div class="tl-node think"><div class="tl-label">THINK</div><div class="tl-content">用戶已退過 2 次，觸發規則 12...</div></div>
+        <div class="tl-node action"><div class="tl-label">ACTION</div><div class="tl-content">做出最終決策</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--accent);font-weight:600">思考穿插在行動之間，步步為營</div>
+    </div>
+  </div>
+
+  <!-- ===== 实现 ===== -->
+  <div class="sec-label">實現：極其簡單</div>
+
+  <p class="desc reveal">Think Tool 的實現簡單到令人驚訝：它就是一個只接受一段文字、什麼都不做的工具。</p>
+
+  <div class="code-panel reveal paywall-locked xa-peek">
+    <div class="code-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      Think Tool 定義 (JSON)
+    </div>
+    <div class="code-body">{
+  <span class="hl-key">"name"</span>: <span class="hl-str">"think"</span>,
+  <span class="hl-key">"description"</span>: <span class="hl-str">"Use the tool to think about something.
+    It will not obtain new information or change
+    the database, but just append the thought
+    to the log."</span>,
+  <span class="hl-key">"input_schema"</span>: {
+    <span class="hl-key">"type"</span>: <span class="hl-str">"object"</span>,
+    <span class="hl-key">"properties"</span>: {
+      <span class="hl-key">"thought"</span>: {
+        <span class="hl-key">"type"</span>: <span class="hl-str">"string"</span>,
+        <span class="hl-key">"description"</span>: <span class="hl-str">"A thought to think about."</span>
+      }
+    },
+    <span class="hl-key">"required"</span>: [<span class="hl-str">"thought"</span>]
+  }
+}</div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:16px">
+    <b>為什麼不直接在 System Prompt 裏説「請先想清楚」？</b>因為 Agent 在工具調用模式下，思考和調用工具是兩種不同的輸出格式。把思考包裝成一個工具調用，能讓 Agent 在工具鏈的流程中自然地插入一段思考，保持工具調用的節奏。
+  </div>
+
+  <!-- ===== 效果数据 ===== -->
+  <div class="sec-label paywall-locked">效果：有多好用數據説話</div>
+
+  <p class="desc reveal paywall-locked">在 <b>&tau;-bench</b>（一個模擬真實客服場景的 Agent 評測基準）上測試 Think Tool 的效果：</p>
+
+  <div class="stat-grid paywall-locked">
+    <div class="stat-card reveal">
+      <div class="stat-label">&tau;-bench Airline（航空客服）</div>
+      <div class="stat-row">
+        <span class="stat-before">0.570</span>
+        <span class="stat-arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        <span class="stat-after">0.878</span>
+      </div>
+      <div class="stat-delta">+54% 提升</div>
+    </div>
+    <div class="stat-card reveal">
+      <div class="stat-label">&tau;-bench Retail（零售客服）</div>
+      <div class="stat-row">
+        <span class="stat-before">0.812</span>
+        <span class="stat-arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        <span class="stat-after">0.904</span>
+      </div>
+      <div class="stat-delta">+11% 提升</div>
+    </div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:16px">
+    <b>注意航空場景的提升幅度。</b>航空退改簽政策比零售複雜得多（不同艙位、不同時段、不同會員等級），策略密度越高，Think Tool 的價值越大。
+  </div>
+
+  <!-- ===== 交互演示 ===== -->
+  <div class="sec-label paywall-locked">動手試試：模擬客服 Agent</div>
+
+  <p class="desc reveal paywall-locked">點擊下方 Tab 切換模式，然後逐步展開 Agent 的處理過程。看看有沒有 Think Tool，結果會有多大差異。</p>
+
+  <div class="sim-demo reveal paywall-locked">
+    <div class="sim-tabs">
+      <button class="sim-tab active" data-tab="no-think">無 Think Tool</button>
+      <button class="sim-tab" data-tab="with-think">有 Think Tool</button>
+    </div>
+    <div class="sim-scene">
+      <div class="sim-scene-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        場景：用戶要退一張 36 小時前購買的機票（政策：24 小時內全額退款，超過扣手續費）
+      </div>
+    </div>
+    <div class="sim-chat" id="sim-chat">
+      <!-- messages injected by JS -->
+    </div>
+    <div class="sim-controls">
+      <button class="sim-btn" id="sim-next">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        下一步
+      </button>
+      <button class="sim-btn sim-btn-reset" id="sim-reset">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        重置
+      </button>
+      <span class="sim-step-count" id="sim-step-count"></span>
+    </div>
+  </div>
+
+  <!-- ===== 适用场景 ===== -->
+  <div class="sec-label paywall-locked">什麼時候用 Think Tool <span class="update-badge">2025.12 更新</span></div>
+
+  <div class="use-cases paywall-locked">
+    <div class="use-card good reveal">
+      <h4>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        適用場景
+      </h4>
+      <ul>
+        <li><b>複雜工具鏈</b>：調用 5+ 個工具，中途需要整理和重新評估</li>
+        <li><b>策略密集環境</b>：需要同時考慮多條業務規則（如客服政策、審批流程）</li>
+        <li><b>串行依賴決策</b>：每步決策依賴前一步結果，需要承上啓下的思考</li>
+        <li><b>多輪信息聚合</b>：從多個工具返回中拼湊完整圖景</li>
+      </ul>
+    </div>
+    <div class="use-card bad reveal">
+      <h4>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        不適用場景
+      </h4>
+      <ul>
+        <li><b>簡單工具調用</b>：查天氣、讀檔案這類一步到位的操作，Think Tool 是多餘的開銷</li>
+        <li><b>非序列任務</b>：各步驟相互獨立、不需要前後關聯的場景</li>
+        <li><b>已有 Extended Thinking 的場景</b>：如果模型支持深度思考，簡單任務用 Extended Thinking 更直接</li>
+        <li><b>純生成任務</b>：寫文章、翻譯等不涉及工具調用的場景</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:16px">
+    <b>2025 年 12 月更新：</b>業界進一步明確了 Think Tool 和 Extended Thinking 的分工：簡單任務直接用 Extended Thinking，<b>Think Tool 的真正價值在於長鏈路中的中途暫停</b>，讓 Agent 在行動之間重新整理思路。
+  </div>
+
+  <!-- ===== Takeaway ===== -->
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>有時候最有用的工具就是停下來想一想。</b>Think Tool 不取得資訊、不改變狀態，但它給了 Agent 一個在行動鏈中暫停、整理、反思的機會。越複雜的任務，這種暫停的價值越大。</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){
+  var ob = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); ob.unobserve(e.target); }});
+  }, {threshold:0.15});
+  ob.observe(el);
+});
+
+(function(){
+  var BULB_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>';
+  var TOOL_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>';
+  var USER_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+  var AGENT_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+  var WARN_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  var CHECK_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+
+  var flows = {
+    'no-think': [
+      {type:'user', label:USER_SVG+' 用戶', text:'我要退昨天買的機票，訂單號 BK-1234'},
+      {type:'agent', label:AGENT_SVG+' Agent', text:'好的，正在為您取消訂單並退款...'},
+      {type:'tool', label:TOOL_SVG+' 工具調用', text:'cancel_booking(booking_id="BK-1234")'},
+      {type:'tool', label:TOOL_SVG+' 工具返回', text:'{"status": "cancelled", "refund": "$450", "message": "全額退款成功"}'},
+      {type:'result-bad', label:WARN_SVG+' 違規結果', text:'實際購買時間：36 小時前，超出 24 小時全額退款窗口。正確退款應為 $315（$450 - $135 手續費）。Agent 多退了 $135，違反退款政策。'}
+    ],
+    'with-think': [
+      {type:'user', label:USER_SVG+' 用戶', text:'我要退昨天買的機票，訂單號 BK-1234'},
+      {type:'think', label:BULB_SVG+' Think Tool', text:'think("用戶説「昨天」買的票，但「昨天」是模糊表述。退款政策要求24小時內全額退款，超過則扣手續費。我需要先查詢訂單的確切購買時間，不能直接取消。")'},
+      {type:'tool', label:TOOL_SVG+' 工具調用', text:'get_booking(booking_id="BK-1234")'},
+      {type:'tool', label:TOOL_SVG+' 工具返回', text:'{"booking_id": "BK-1234", "price": "$450", "purchased_at": "36 hours ago", "status": "active"}'},
+      {type:'think', label:BULB_SVG+' Think Tool', text:'think("購買時間是 36 小時前，超過了 24 小時的全額退款窗口。根據政策，需要扣除 30% 手續費：$450 x 30% = $135。應退金額 = $450 - $135 = $315。")'},
+      {type:'tool', label:TOOL_SVG+' 工具調用', text:'cancel_booking(booking_id="BK-1234", refund_amount=315)'},
+      {type:'result-good', label:CHECK_SVG+' 正確結果', text:'退款 $315（已扣除 $135 手續費）。符合 24 小時退款政策，正確執行。'}
+    ]
+  };
+
+  var currentTab = 'no-think';
+  var currentStep = 0;
+  var chatEl = document.getElementById('sim-chat');
+  var nextBtn = document.getElementById('sim-next');
+  var resetBtn = document.getElementById('sim-reset');
+  var countEl = document.getElementById('sim-step-count');
+
+  function render(){
+    chatEl.innerHTML = '';
+    var flow = flows[currentTab];
+    for(var i = 0; i < currentStep; i++){
+      var msg = flow[i];
+      var div = document.createElement('div');
+      div.className = 'sim-msg ' + msg.type;
+      div.innerHTML = '<div class="sim-msg-label">' + msg.label + '</div><div>' + msg.text + '</div>';
+      chatEl.appendChild(div);
+      (function(d){
+        setTimeout(function(){ d.classList.add('show'); }, 50);
+      })(div);
+    }
+    countEl.textContent = currentStep + ' / ' + flow.length;
+    nextBtn.disabled = currentStep >= flow.length;
+  }
+
+  function switchTab(tab){
+    currentTab = tab;
+    currentStep = 0;
+    document.querySelectorAll('.sim-tab').forEach(function(t){
+      t.classList.toggle('active', t.getAttribute('data-tab') === tab);
+    });
+    render();
+  }
+
+  document.querySelectorAll('.sim-tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      switchTab(this.getAttribute('data-tab'));
+    });
+  });
+
+  nextBtn.addEventListener('click', function(){
+    var flow = flows[currentTab];
+    if(currentStep < flow.length){
+      currentStep++;
+      var msg = flow[currentStep - 1];
+      var div = document.createElement('div');
+      div.className = 'sim-msg ' + msg.type;
+      div.innerHTML = '<div class="sim-msg-label">' + msg.label + '</div><div>' + msg.text + '</div>';
+      chatEl.appendChild(div);
+      setTimeout(function(){ div.classList.add('show'); }, 30);
+      countEl.textContent = currentStep + ' / ' + flow.length;
+      nextBtn.disabled = currentStep >= flow.length;
+    }
+  });
+
+  resetBtn.addEventListener('click', function(){
+    currentStep = 0;
+    render();
+  });
+
+  render();
+})();
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>chat/completions 之謎：為什麼 API 叫補全而不叫對話 | xueai.miyang.cn</title>
+<script src="../global-attn.js"></script>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* ── API 对比行 ── */
+.api-compare { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.api-row {
+  display: flex; align-items: stretch; gap: 0;
+  border-radius: var(--radius-sm); overflow: hidden;
+  border: 1px solid var(--border);
+}
+.api-brand {
+  width: 110px; padding: 14px 16px;
+  font-size: 14px; font-weight: 800;
+  display: flex; align-items: center; flex-shrink: 0;
+}
+.brand-openai { background: rgba(0,0,0,0.05); color: #374151; }
+.brand-anthropic { background: rgba(124,58,237,0.08); color: var(--purple); }
+.api-endpoint {
+  flex: 1; padding: 14px 16px;
+  font-size: 17px; font-weight: 700;
+  font-family: 'SF Mono', Menlo, monospace;
+  display: flex; align-items: center;
+  background: var(--card);
+}
+.api-note {
+  padding: 14px 16px; width: 150px;
+  font-size: 13px; color: var(--sub);
+  display: flex; align-items: center;
+  background: var(--card); border-left: 1px solid var(--border);
+}
+
+/* ── 解读卡片 ── */
+.answer-card {
+  border-radius: var(--radius-sm); padding: 16px 18px;
+  margin-top: 14px;
+}
+.answer-card.amber { background: rgba(217,119,6,0.06); border: 1px solid rgba(217,119,6,0.25); }
+.answer-card.blue { background: rgba(0,102,255,0.05); border: 1px solid rgba(0,102,255,0.18); }
+.answer-card .label { font-size: 13px; font-weight: 700; color: var(--sub); margin-bottom: 6px; }
+.answer-card .val { font-size: 15px; color: var(--text); line-height: 1.8; }
+
+/* ── 补全视角演示 ── */
+.completion-demo {
+  background: var(--card); border-radius: var(--radius); padding: 22px 24px;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-card);
+  position: relative;
+}
+.cd-label { font-size: 13px; font-weight: 700; color: var(--sub); letter-spacing: 0.3px; margin-bottom: 10px; }
+.cd-text {
+  font-size: 17px; line-height: 1.95; color: var(--text);
+  font-family: 'SF Mono', Menlo, monospace;
+  word-break: break-all;
+}
+.cd-user { color: var(--accent); font-weight: 700; }
+.cd-ai { color: var(--success); font-weight: 700; }
+.cd-system { color: var(--amber); font-weight: 700; }
+.cd-blank {
+  display: inline-block; width: 2px; height: 1em;
+  background: var(--success); vertical-align: text-bottom;
+  animation: blink 0.9s step-start infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.cd-segment {
+  opacity: 0; transform: translateY(4px);
+  transition: all 0.35s ease;
+}
+.cd-segment.show { opacity: 1; transform: translateY(0); }
+
+/* ── 三点洞察 ── */
+.insight-row {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+  margin-top: 22px;
+}
+.insight-item {
+  background: rgba(0,0,0,0.03); border-radius: var(--radius-sm);
+  padding: 14px 15px;
+}
+.ii-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+.ii-desc { font-size: 13px; color: var(--sub); line-height: 1.65; }
+
+/* ── 世界影响收尾 ── */
+.world-impact {
+  display: flex; align-items: stretch; gap: 0;
+  background: linear-gradient(135deg, rgba(0,102,255,0.06) 0%, rgba(124,58,237,0.06) 100%);
+  border: 1.5px solid rgba(0,102,255,0.2);
+  border-radius: var(--radius); overflow: hidden;
+  margin-top: 22px;
+}
+.wi-left {
+  padding: 18px 22px; display: flex; flex-direction: column; justify-content: center; gap: 8px;
+  min-width: 230px; flex-shrink: 0;
+}
+.wi-tag {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--accent);
+}
+.wi-title {
+  font-size: 19px; font-weight: 900; color: var(--text); line-height: 1.4;
+}
+.wi-divider {
+  width: 1px; background: rgba(0,102,255,0.15); flex-shrink: 0; margin: 10px 0;
+}
+.wi-right {
+  flex: 1; padding: 18px 22px; display: flex; flex-direction: column; justify-content: center; gap: 10px;
+}
+.wi-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 14px; color: var(--text); line-height: 1.55;
+}
+.wi-item-icon {
+  width: 22px; height: 22px; border-radius: 6px;
+  background: rgba(22,163,74,0.1); color: var(--success);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+}
+
+/* ── 重播按钮 ── */
+.btn-replay {
+  position: absolute; top: 14px; right: 16px;
+  background: var(--card); color: var(--sub); border: 1px solid rgba(0,0,0,0.12);
+  padding: 5px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+}
+.btn-replay:hover { background: rgba(0,0,0,0.05); color: var(--text); }
+
+@media (max-width: 768px) {
+  .api-note { display: none; }
+  .api-endpoint { font-size: 15px; }
+  .insight-row { grid-template-columns: 1fr; }
+  .world-impact { flex-direction: column; }
+  .wi-divider { width: auto; height: 1px; margin: 0 22px; }
+  .wi-left { min-width: 0; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="OpenAI 的 chat/completions 接口為什麼叫補全？理解對話 API 的本質：每次請求都是獨立的文本補全，多輪對話是靠客戶端拼接上下文實現的，不是服務端記憶。">
+<meta name="keywords" content="chat completions,OpenAI API,大模型API,對話接口,補全接口">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/1-2-api.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/1-2-api.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/1-2-api.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/1-2-api.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/1-2-api.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/1-2-api.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/1-2-api.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/1-2-api.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="chat/completions 之謎：為什麼 API 叫補全而不叫對話">
+<meta property="og:description" content="OpenAI 的 chat/completions 接口為什麼叫補全？理解對話 API 的本質：每次請求都是獨立的文本補全，多輪對話是靠客戶端拼接上下文實現的，不是服務端記憶。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/1-2-api.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/1-2-api.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="chat/completions 之謎：為什麼 API 叫補全而不叫對話">
+<meta name="twitter:description" content="OpenAI 的 chat/completions 接口為什麼叫補全？理解對話 API 的本質：每次請求都是獨立的文本補全，多輪對話是靠客戶端拼接上下文實現的，不是服務端記憶。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"chat/completions 之謎","name":"chat/completions 之謎","url":"https://xueai.miyang.cn/slides/1-2-api.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 從補全到對話","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"OpenAI 的 chat/completions 接口為什麼叫補全？理解對話 API 的本質：每次請求都是獨立的文本補全，多輪對話是靠客戶端拼接上下文實現的，不是服務端記憶。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+  <header class="lesson-header">
+    <div class="kicker">從補全到對話</div>
+    <h1>chat/completions 之謎</h1>
+    <p class="subtitle">明明是在和大模型對話，為什麼 OpenAI 的 API 路徑裏寫的是「補全」？這個命名背後，藏着對大模型本質的理解。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>明明是對話，為什麼 API 叫「補全」？打字機動畫解讀</p></aside><!--seo:end-->  <div class="sec-label">一個有意思的問題</div>
+
+  <p style="font-size:17px; font-weight:700; line-height:1.6;">
+    明明是「聊天」，為什麼叫「<span style="color:var(--accent);">補全</span>」？
+  </p>
+  <p style="font-size:15px; color:var(--sub); margin-top:8px;">兩家公司，兩個截然不同的命名，背後藏着對大模型本質的不同理解。</p>
+
+  <div class="api-compare" id="apiCompare">
+    <div class="api-row reveal" id="apiRow0">
+      <div class="api-brand brand-openai">OpenAI</div>
+      <div class="api-endpoint">/chat/<span style="color:var(--accent);">completions</span></div>
+      <div class="api-note">聊天 / <strong style="color:var(--accent);">補全</strong></div>
+    </div>
+    <div class="api-row reveal" id="apiRow1">
+      <div class="api-brand brand-anthropic">Anthropic</div>
+      <div class="api-endpoint">/v1/<span style="color:var(--purple);">messages</span></div>
+      <div class="api-note">正兒八經的消息</div>
+    </div>
+  </div>
+
+  <div class="answer-card amber reveal" id="cardAmber">
+    <div class="label">OpenAI 的隱含邏輯</div>
+    <div class="val">
+      大模型的本質是<strong>補全</strong>：給它一段文字，它接着往下寫。
+      聊天，不過是把對話格式化成「待補全的文本」，<strong>本質還是在做 Token 補全。</strong>
+    </div>
+  </div>
+
+  <div class="answer-card blue reveal paywall-locked xa-peek" id="cardBlue">
+    <div class="label">PM 需要懂的關鍵點</div>
+    <div class="val">
+      你傳給大模型的每一條消息，都會被拼成一段文本，
+      然後模型從這段文本的末尾開始<strong>繼續生成</strong>。
+      對話只是人類為了方便而加的外殼。
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">從補全視角看一次對話</div>
+
+  <div class="completion-demo reveal paywall-locked" id="completionDemo">
+    <button class="btn-replay" id="replayBtn" onclick="replayDemo()" style="display:none;">↺ 重播</button>
+    <div class="cd-label">模型實際「看到」的內容（拼接後的文本）</div>
+    <div class="cd-text">
+      <span class="cd-segment" id="seg0">
+        <span class="cd-system">[system]</span> 你是一個有幫助的助手。<br>
+      </span>
+      <span class="cd-segment" id="seg1">
+        <span class="cd-user">[user]</span> 紫霞仙子是誰？<br>
+      </span>
+      <span class="cd-segment" id="seg2">
+        <span class="cd-ai">[assistant]</span> <span id="aiOutput"></span><span class="cd-blank" id="cursor" style="display:none;"></span>
+      </span>
+    </div>
+  </div>
+
+  <div class="insight-row reveal paywall-locked" id="insightRow">
+    <div class="insight-item">
+      <div class="ii-title">模型做的事</div>
+      <div class="ii-desc">從 [assistant] 標記之後，預測下一個概率最高的 Token，一直到生成終止符</div>
+    </div>
+    <div class="insight-item">
+      <div class="ii-title">chat 是假象</div>
+      <div class="ii-desc">你以為在「對話」，模型只是在「把這段文本補全完整」，這就是 completions 的真相</div>
+    </div>
+    <div class="insight-item">
+      <div class="ii-title">為什麼 PM 要知道</div>
+      <div class="ii-desc">System Prompt、上下文、歷史消息全部拼在一起送給模型，Token 數量就是成本和質素的關鍵</div>
+    </div>
+  </div>
+
+  <div class="world-impact reveal paywall-locked" id="worldImpact">
+    <div class="wi-left">
+      <div class="wi-tag">OpenAI 的設計決策</div>
+      <div class="wi-title">這個「望文生義」的命名，<br>影響了全世界。</div>
+    </div>
+    <div class="wi-divider"></div>
+    <div class="wi-right">
+      <div class="wi-item">
+        <div class="wi-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div>GPT + <code>/chat/completions</code> 這套範式，率先引爆了市場</div>
+      </div>
+      <div class="wi-item">
+        <div class="wi-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div>全球開發者、框架、工具鏈全部對齊這套接口設計</div>
+      </div>
+      <div class="wi-item">
+        <div class="wi-item-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div>理解「對話 = 補全」，是讀懂所有 AI 工程化的起點</div>
+      </div>
+    </div>
+  </div>
+
+</article>
+
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+const AI_ANSWER = '紫霞仙子是電影《大話西遊》中的角色，由朱茵飾演，是至尊寶的愛人。';
+let typingTimer = null;
+
+function playDemo() {
+  if (typingTimer) { clearInterval(typingTimer); typingTimer = null; }
+  document.getElementById('replayBtn').style.display = 'none';
+  ['seg0', 'seg1', 'seg2'].forEach(id => document.getElementById(id).classList.remove('show'));
+  const output = document.getElementById('aiOutput');
+  output.textContent = '';
+  document.getElementById('cursor').style.display = 'none';
+
+  document.getElementById('seg0').classList.add('show');
+  setTimeout(() => document.getElementById('seg1').classList.add('show'), 350);
+  setTimeout(() => {
+    document.getElementById('seg2').classList.add('show');
+    document.getElementById('cursor').style.display = 'inline-block';
+    let idx = 0;
+    typingTimer = setInterval(() => {
+      if (idx >= AI_ANSWER.length) {
+        clearInterval(typingTimer);
+        typingTimer = null;
+        document.getElementById('cursor').style.display = 'none';
+        document.getElementById('replayBtn').style.display = 'inline-block';
+        return;
+      }
+      output.textContent += AI_ANSWER[idx];
+      idx++;
+    }, 38);
+  }, 700);
+}
+
+function replayDemo() { playDemo(); }
+
+lessonOnView(document.getElementById('completionDemo'), playDemo);
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

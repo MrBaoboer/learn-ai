@@ -21,11 +21,12 @@
     try {
       if (window.XUEAI_I18N && window.XUEAI_I18N.lang) return window.XUEAI_I18N.lang;
       var f = location.pathname.split('/').pop();
-      if (/\.en\.html$/.test(f)) return 'en';
-      if (/\.ko\.html$/.test(f)) return 'ko';
+      var lm = f && f.match(/\.(en|ko|tw|hk)\.html$/);
+      if (lm) return lm[1];
     } catch (e) {}
     return 'zh';
   })();
+  var ELDER_MODE = document.documentElement.hasAttribute('data-alice-elder');
 
   var DICT = {
     zh: {
@@ -81,6 +82,11 @@
       toolSearch: function (q) { return '正在搜索：' + q; },
       toolRead: '正在阅读网页',
       toolSummary: function (n) { return '查阅了 ' + n + ' 次资料'; },
+      thinking: function (s) { return '正在思考… ' + s + ' 秒'; },
+      // 折叠后不报时长：重连重放时思考事件是一瞬间灌进来的，按本地时间算会得出
+      // 「已思考 1 秒」这种假数字
+      thought: '思考过程',
+      thoughtToggle: '展开或收起思考过程',
       greetings: {
         night: ['夜深了，有什么心事吗?', '夜深了，还在学习吗？'],
         morning: ['早上好，今天想学点什么？', '新的一天，从一个好问题开始吧'],
@@ -120,6 +126,204 @@
       yesterday: '昨天',
       // 引用块的 callout 标记（> [!tip] 等），标签沿用客户端 BlockquoteBlock
       callout: { note: '注意', info: '提示', tip: '技巧', success: '成功', warning: '警告', danger: '危险' },
+      loggedInAs: function (n) { return n; }
+    },
+    hk: {
+      ask: '問問 Alice', copy: '複製', copied: '已複製', copyFail: '複製失敗',
+      popFb: '吐槽',
+      askCourse: function (q) { return '課程裏哪裏講過「' + q + '」？'; },
+      title: 'Alice', subtitle: '課程助教',
+      fabNudge: '有不懂的，歡迎按一下這裏問我～',
+      tabChat: '對話', tabDiscover: '朋友圈',
+      mYou: '你', mLoading: '正在翻她的朋友圈…',
+      mEmpty: '她的朋友圈還沒有內容。在 Alice 桌面版登入同一帳號，她的日常動態、你們的互動都會同步到這裏。',
+      mMore: function (n) { return '網頁展示最近 ' + n + ' 條。更早的動態，請在 Alice 客户端查看。'; },
+      mLike: '讚好', mComment: '評論', mReply: '回覆', mSend: '發送',
+      mCmtPh: '説點什麼…', mReplyPh: '回覆 {name}…',
+      mLikeMore: '等 {n} 人', mCmtFail: '發送失敗，稍後再試',
+      mBanned: '帳號暫時不能發言',
+      tabNotes: '筆記',
+      popClip: '摘抄', clipSaved: '已存入筆記', clipDup: '筆記裏已有這條',
+      clipToast: '已摘抄，按一下右下角 Alice 頭像查看',
+      clipDupToast: '這條已在筆記中，按一下右下角 Alice 頭像查看',
+      clipFail: '沒存上，再試一次？', saveAnswer: '存入筆記',
+      ntLoading: '正在翻你的筆記本…',
+      ntEmpty: '還沒有筆記。劃選課件裏的內容點「摘抄」，或在 Alice 的回答下點「存入筆記」，把值得記住的都收進來。',
+      ntAnswer: 'Alice 的回答', ntClip: '摘抄',
+      ntDelConfirm: '刪除這條筆記？',
+      ntHint: '這些筆記 Alice 在以後的對話裏會記得；登入 Alice 桌面版後，它們還會出現在 Wiki 的「學習」目錄。',
+      ntMoreLoading: '正在翻更早的筆記…', ntFull: '筆記本滿了，刪幾條再存',
+      ntLoginTip: '登入米羊帳號後，劃詞摘抄和 Alice 的回答都能存進筆記，她以後聊天也會記得它們。',
+      ntExportAll: '導出所有筆記', ntExporting: '打包中…',
+      ntDl: '下載這條筆記', ntExportSrc: '來源',
+      newChat: '新對話', sessions: '歷史對話', noSessions: '還沒有歷史對話',
+      closePanel: '收起面板',
+      send: '發送', placeholder: '有什麼不懂的，儘管問我…',
+      quoteLabel: '劃選內容',
+      pageRef: '已帶上當前頁',
+      fuHint: '接着問',
+      fuToggle: '追問建議',
+      // 劃選後點「問問 Alice」：給三種問法（原來只預填第一句）
+      askSamplesHint: '想問什麼？點一句，也可以自己改',
+      askSamples: ['這段話是什麼意思？幫我講講。',
+                   '這段能舉個具體例子嗎？',
+                   '這段和前面講的有什麼關係？'],
+      loginTip: '登入米羊帳號即可提問，對話用你帳戶裏的米粒計費，並保存在 Alice 的伺服器裏，換設備也不會丟。',
+      loginBtn: '登入米羊帳號',
+      reloginTip: '計費憑據需要刷新一次，重新登入米羊帳號即可繼續提問，對話記錄不會丟。',
+      reloginBtn: '重新登入',
+      riceLabel: function (n) { return '米粒 ' + n; },
+      noRice: '米粒快用完啦，充值後就能繼續和我聊。',
+      banned: function (d) { return '由於多次發送惡意內容，這個帳號暫時不能和 Alice 對話了，' + d + ' 後自動恢復。'; },
+      rechargeBtn: '去充值',
+      netErr: 'Alice 暫時聯繫不上，請稍後再試。',
+      del: '刪除', delConfirm: '刪除這個對話？',
+      toolSearch: function (q) { return '正在搜索：' + q; },
+      toolRead: '正在閲讀網頁',
+      toolSummary: function (n) { return '查閲了 ' + n + ' 次資料'; },
+      thinking: function (s) { return '正在思考… ' + s + ' 秒'; },
+      // 摺疊後不報時長：重連重放時思考事件是一瞬間灌進來的，按本地時間算會得出
+      // 「已思考 1 秒」這種假數字
+      thought: '思考過程',
+      thoughtToggle: '展開或收起思考過程',
+      greetings: {
+        night: ['夜深了，有什麼心事嗎?', '夜深了，還在學習嗎？'],
+        morning: ['早上好，今天想學點什麼？', '新的一天，從一個好問題開始吧'],
+        noon: ['午後了，來聊聊課程吧', '吃過飯了嗎？我們繼續'],
+        afternoon: ['下午好，學到哪裏了？', '有什麼想深挖的嗎？'],
+        evening: ['晚上好，今晚想弄懂什麼？', '晚間是學習的好時候']
+      },
+      qFallback: function (t) {
+        return ['用一個例子解釋「' + t + '」', '「' + t + '」裏最重要的概念是什麼？', '這一頁最容易被誤解的地方是哪裏？'];
+      },
+      qImage: '用一張圖向我解釋這一頁。',
+      qInterview: function (t) {
+        return t ? '模擬面試：圍繞「' + t + '」' : '模擬面試：圍繞這一頁';
+      },
+      discoverIntro: 'Alice 不只是課程助教。在 Alice 桌面版裏，她是一個有自己生活的 AI 夥伴——會發朋友圈、寫遊記、搭配衣櫥，還能幫你幹活。',
+      dGallery: 'Alice 畫廊', dGalleryDesc: '看看大家和 Alice 一起創作的作品',
+      dMoments: '朋友圈 · 遊記 · 衣櫥', dMomentsDesc: 'Alice 的生活系統，在桌面版裏體驗',
+      dDownload: '下載 Alice 桌面版', dDownloadDesc: '手機號帳號首次登入送 1000 米粒 · 這裏的對話記憶會跟着你',
+      downloadFull: '下載體驗完整版 Alice',
+      scopeCtaTitle: '想聊點課程之外的？',
+      scopeCtaDesc: '去 Alice 客户端找我。生活、工作、心事，都可以在那裏慢慢聊。',
+      scopeCtaButton: '去 Alice 客户端繼續聊',
+      feedbackTip: '對課件有意見？直接跟我説',
+      fbPlaceholder: '哪裏有問題？直接説，截圖也能粘進來…',
+      fbSamplesHint: '不知道從哪説起？點一句接着寫',
+      fbSamples: ['對於這一頁的設計，我有這些意見：',
+                  '這一頁的內容，我覺得有個地方寫錯了：',
+                  '對這節課，我有個建議：'],
+      fbImgErr: '這張圖沒傳上去，再試一次？',
+      fbTooMany: '最多帶 5 張圖哦',
+      fbAttach: '帶張截圖（也可以直接粘貼）',
+      imgLoginTip: '要帶圖給我看，得先登入米羊帳號——我才知道這是誰發的。寫了一半的內容我幫你留着，登入回來接着説。',
+      aiNote: '以上內容均由 AI 生成，請注意甄別',
+      expandSide: '展開為側邊欄', dockFloat: '收回懸浮窗',
+      resizeSide: '拖動調整側邊欄寬度，雙擊恢復預設',
+      resizeFloat: '拖動調整窗口大小，雙擊恢復預設',
+      yesterday: '昨天',
+      // 引用塊的 callout 標記（> [!tip] 等），標籤沿用客户端 BlockquoteBlock
+      callout: { note: '注意', info: '提示', tip: '技巧', success: '成功', warning: '警告', danger: '危險' },
+      loggedInAs: function (n) { return n; }
+    },
+    tw: {
+      ask: '問問 Alice', copy: '複製', copied: '已複製', copyFail: '複製失敗',
+      popFb: '吐槽',
+      askCourse: function (q) { return '課程裡哪裡講過「' + q + '」？'; },
+      title: 'Alice', subtitle: '課程助教',
+      fabNudge: '有不懂的，歡迎點選這裡問我～',
+      tabChat: '對話', tabDiscover: '朋友圈',
+      mYou: '你', mLoading: '正在翻她的朋友圈…',
+      mEmpty: '她的朋友圈還沒有內容。在 Alice 桌面版登入同一帳號，她的日常動態、你們的互動都會同步到這裡。',
+      mMore: function (n) { return '網頁展示最近 ' + n + ' 條。更早的動態，請在 Alice 客戶端檢視。'; },
+      mLike: '按讚', mComment: '評論', mReply: '回覆', mSend: '傳送',
+      mCmtPh: '說點什麼…', mReplyPh: '回覆 {name}…',
+      mLikeMore: '等 {n} 人', mCmtFail: '傳送失敗，稍後再試',
+      mBanned: '帳號暫時不能發言',
+      tabNotes: '筆記',
+      popClip: '摘抄', clipSaved: '已存入筆記', clipDup: '筆記裡已有這條',
+      clipToast: '已摘抄，點選右下角 Alice 頭像檢視',
+      clipDupToast: '這條已在筆記中，點選右下角 Alice 頭像檢視',
+      clipFail: '沒存上，再試一次？', saveAnswer: '存入筆記',
+      ntLoading: '正在翻你的筆記本…',
+      ntEmpty: '還沒有筆記。劃選課件裡的內容點「摘抄」，或在 Alice 的回答下點「存入筆記」，把值得記住的都收進來。',
+      ntAnswer: 'Alice 的回答', ntClip: '摘抄',
+      ntDelConfirm: '刪除這條筆記？',
+      ntHint: '這些筆記 Alice 在以後的對話裡會記得；登入 Alice 桌面版後，它們還會出現在 Wiki 的「學習」目錄。',
+      ntMoreLoading: '正在翻更早的筆記…', ntFull: '筆記本滿了，刪幾條再存',
+      ntLoginTip: '登入米羊帳號後，劃詞摘抄和 Alice 的回答都能存進筆記，她以後聊天也會記得它們。',
+      ntExportAll: '匯出所有筆記', ntExporting: '打包中…',
+      ntDl: '下載這條筆記', ntExportSrc: '來源',
+      newChat: '新對話', sessions: '歷史對話', noSessions: '還沒有歷史對話',
+      closePanel: '收起面板',
+      send: '傳送', placeholder: '有什麼不懂的，儘管問我…',
+      quoteLabel: '劃選內容',
+      pageRef: '已帶上當前頁',
+      fuHint: '接著問',
+      fuToggle: '追問建議',
+      // 劃選後點「問問 Alice」：給三種問法（原來只預填第一句）
+      askSamplesHint: '想問什麼？點一句，也可以自己改',
+      askSamples: ['這段話是什麼意思？幫我講講。',
+                   '這段能舉個具體例子嗎？',
+                   '這段和前面講的有什麼關係？'],
+      loginTip: '登入米羊帳號即可提問，對話用你帳戶裡的米粒計費，並儲存在 Alice 的伺服器裡，換裝置也不會丟。',
+      loginBtn: '登入米羊帳號',
+      reloginTip: '計費憑據需要重新整理一次，重新登入米羊帳號即可繼續提問，對話記錄不會丟。',
+      reloginBtn: '重新登入',
+      riceLabel: function (n) { return '米粒 ' + n; },
+      noRice: '米粒快用完啦，儲值後就能繼續和我聊。',
+      banned: function (d) { return '由於多次傳送惡意內容，這個帳號暫時不能和 Alice 對話了，' + d + ' 後自動恢復。'; },
+      rechargeBtn: '去儲值',
+      netErr: 'Alice 暫時聯絡不上，請稍後再試。',
+      del: '刪除', delConfirm: '刪除這個對話？',
+      toolSearch: function (q) { return '正在搜尋：' + q; },
+      toolRead: '正在閱讀網頁',
+      toolSummary: function (n) { return '查閱了 ' + n + ' 次資料'; },
+      thinking: function (s) { return '正在思考… ' + s + ' 秒'; },
+      // 摺疊後不報時長：重連重放時思考事件是一瞬間灌進來的，按本地時間算會得出
+      // 「已思考 1 秒」這種假數字
+      thought: '思考過程',
+      thoughtToggle: '展開或收起思考過程',
+      greetings: {
+        night: ['夜深了，有什麼心事嗎?', '夜深了，還在學習嗎？'],
+        morning: ['早安，今天想學點什麼？', '新的一天，從一個好問題開始吧'],
+        noon: ['午後了，來聊聊課程吧', '吃過飯了嗎？我們繼續'],
+        afternoon: ['下午好，學到哪裡了？', '有什麼想深挖的嗎？'],
+        evening: ['晚上好，今晚想弄懂什麼？', '晚間是學習的好時候']
+      },
+      qFallback: function (t) {
+        return ['用一個例子解釋「' + t + '」', '「' + t + '」裡最重要的概念是什麼？', '這一頁最容易被誤解的地方是哪裡？'];
+      },
+      qImage: '用一張圖向我解釋這一頁。',
+      qInterview: function (t) {
+        return t ? '模擬面試：圍繞「' + t + '」' : '模擬面試：圍繞這一頁';
+      },
+      discoverIntro: 'Alice 不只是課程助教。在 Alice 桌面版裡，她是一個有自己生活的 AI 夥伴——會發朋友圈、寫遊記、搭配衣櫥，還能幫你幹活。',
+      dGallery: 'Alice 畫廊', dGalleryDesc: '看看大家和 Alice 一起創作的作品',
+      dMoments: '朋友圈 · 遊記 · 衣櫥', dMomentsDesc: 'Alice 的生活系統，在桌面版裡體驗',
+      dDownload: '下載 Alice 桌面版', dDownloadDesc: '手機號帳號首次登入送 1000 米粒 · 這裡的對話記憶會跟著你',
+      downloadFull: '下載體驗完整版 Alice',
+      scopeCtaTitle: '想聊點課程之外的？',
+      scopeCtaDesc: '去 Alice 客戶端找我。生活、工作、心事，都可以在那裡慢慢聊。',
+      scopeCtaButton: '去 Alice 客戶端繼續聊',
+      feedbackTip: '對課件有意見？直接跟我說',
+      fbPlaceholder: '哪裡有問題？直接說，截圖也能貼進來…',
+      fbSamplesHint: '不知道從哪說起？點一句接著寫',
+      fbSamples: ['對於這一頁的設計，我有這些意見：',
+                  '這一頁的內容，我覺得有個地方寫錯了：',
+                  '對這節課，我有個建議：'],
+      fbImgErr: '這張圖沒傳上去，再試一次？',
+      fbTooMany: '最多帶 5 張圖哦',
+      fbAttach: '帶張截圖（也可以直接貼上）',
+      imgLoginTip: '要帶圖給我看，得先登入米羊帳號——我才知道這是誰發的。寫了一半的內容我幫你留著，登入回來接著說。',
+      aiNote: '以上內容均由 AI 生成，請注意甄別',
+      expandSide: '展開為側邊欄', dockFloat: '收回懸浮窗',
+      resizeSide: '拖動調整側邊欄寬度，雙擊恢復預設',
+      resizeFloat: '拖動調整視窗大小，雙擊恢復預設',
+      yesterday: '昨天',
+      // 引用塊的 callout 標記（> [!tip] 等），標籤沿用客戶端 BlockquoteBlock
+      callout: { note: '注意', info: '提示', tip: '技巧', success: '成功', warning: '警告', danger: '危險' },
       loggedInAs: function (n) { return n; }
     },
     en: {
@@ -174,6 +378,9 @@
       toolSearch: function (q) { return 'Searching: ' + q; },
       toolRead: 'Reading a webpage',
       toolSummary: function (n) { return 'Looked up ' + n + ' source' + (n > 1 ? 's' : ''); },
+      thinking: function (s) { return 'Thinking… ' + s + 's'; },
+      thought: 'Thinking',
+      thoughtToggle: 'Show or hide the thinking',
       greetings: {
         night: ['It\'s late. What\'s on your mind?'],
         morning: ['Good morning. What shall we learn today?'],
@@ -266,6 +473,9 @@
       toolSearch: function (q) { return '검색 중: ' + q; },
       toolRead: '웹페이지 읽는 중',
       toolSummary: function (n) { return '자료 ' + n + '회 조회'; },
+      thinking: function (s) { return '생각 중… ' + s + '초'; },
+      thought: '생각 과정',
+      thoughtToggle: '생각 과정 펼치기 또는 접기',
       greetings: {
         night: ['밤이 깊었네요. 무슨 생각 하세요?'],
         morning: ['좋은 아침이에요. 오늘은 뭘 배워볼까요?'],
@@ -310,6 +520,37 @@
   var T = DICT[LANG] || DICT.zh;
 
   var ALICE_SITE = 'https://alice.miyang.cn';
+  if (ELDER_MODE && LANG === 'zh') {
+    T.ask = '问问白艾莉';
+    T.title = '白艾莉';
+    T.subtitle = '爸妈版课程助手';
+    T.fabNudge = '有不懂的，点这里问白艾莉';
+    T.thinking = function (s) { return '白艾莉正在想… ' + s + ' 秒'; };
+    T.thought = '白艾莉想的过程';
+    T.thoughtToggle = '看看白艾莉是怎么想的';
+    T.placeholder = '想继续修改，直接告诉白艾莉…';
+    T.loginTip = '登录米羊账号即可使用白艾莉创作，对话会保存，换课也不会丢。';
+    T.noRice = '可用权益不足，充值后就能继续创作。';
+    T.netErr = '白艾莉暂时联系不上，请稍后再试。';
+    T.greetings = {
+      night: ['夜深了，别累着。还有哪里想让我慢慢讲？', '夜深了，如果还想看，我陪您慢慢来。'],
+      morning: ['早上好，今天想从哪一步开始？', '早上好，有哪里想让我慢慢讲？'],
+      noon: ['中午好，累了就歇一会儿。', '中午好，想让我帮您做什么？'],
+      afternoon: ['下午好，哪一步还没弄明白？', '下午好，我们慢慢学，不着急。'],
+      evening: ['晚上好，今天还有哪里想弄懂？', '晚上好，需要我一步一步陪您练吗？']
+    };
+    T.qFallback = function () {
+      return [
+        '请用最简单的话告诉我，这一课要学什么。',
+        '请举一个日常生活中会遇到的例子。',
+        '请告诉我下一步应该点哪里。'
+      ];
+    };
+    T.qImage = '请用一张简单的图帮我看懂这一页。';
+    T.qInterview = function () {
+      return '请一步一步带我练一次，每次只说一步。';
+    };
+  }
   var RECHARGE_URL = 'https://miyang.cn/console/recharge';   // 米粒充值页
   // 与 miyang_alice/src/public/avatars/avatar_512.png 同源：黑微卷 + 淡金发带 + 星星项链。
   // 曾用 Image2 另生「老师脸」会漂成另一个人，不合规；UI 圆裁由 CSS border-radius 完成。
@@ -320,8 +561,15 @@
   // 模拟面试是唯一**跨轮**的标记：她出题、他答、她判分，整场都得带着（见 state.interview）
   var MOCK_INTERVIEW_INTENT = 'mock_interview';
   var pendingIntent = '';
+  var activeExternalContext = null;
   var PAGE_FILE = location.pathname.split('/').pop();
   var PAGE_TITLE = (document.title || '').replace(/\s*\|\s*xueai\.app\s*$/, '');
+  function currentPageContext() {
+    var page = window.__ELDER_ALICE_PAGE__;
+    return page && page.file
+      ? { file: String(page.file), title: String(page.title || PAGE_TITLE) }
+      : { file: PAGE_FILE, title: PAGE_TITLE };
+  }
   // 上报 IANA 时区：后端给每条消息注【消息时间】，韩文学员按首尔报时
   var TZ_NAME = '';
   try { TZ_NAME = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
@@ -371,10 +619,10 @@
   var ACCT_KEY = 'alice_account_last';
   var ACCT_SEED_TTL = 12 * 60 * 60 * 1000;
   var SIDE_W_KEY = 'alice_side_w';   // localStorage：侧边栏宽度（px）
-  var SIDE_W_MIN = 300;
+  var SIDE_W_MIN = ELDER_MODE ? 400 : 300;
   // 比旧默认（约 36vw）克制，但也不能太窄：现在是首访就铺开的（PRD 24a），
   // 用户没主动拖过，这个数就是绝大多数人看到的唯一宽度——代码块和配图得放得下。
-  var SIDE_W_DEF = 420;
+  var SIDE_W_DEF = ELDER_MODE ? 480 : 420;
   var FLOAT_W_KEY = 'alice_float_w';
   var FLOAT_H_KEY = 'alice_float_h';
   var FLOAT_W_DEF = 420;
@@ -386,6 +634,7 @@
   var MOMENTS_KEY = 'alice_moments_cache'; // localStorage：朋友圈快照（跨课件/语言页秒显）
   var NOTES_KEY = 'alice_notes_cache';     // localStorage：学习笔记快照（同上，本地秒开）
   var SESSIONS_KEY = 'alice_sessions_cache'; // localStorage：历史会话目录（点历史秒开）
+  var ELDER_COURSE_SESSIONS_KEY = 'alice_elder_course_sessions';
   var DL_CARD_DAY_KEY = 'alice_download_card_day'; // 下载好处卡：每账号每天至多主动展示一次
   var GEN_KEY = 'alice_gen_pending';  // localStorage：进行中的生成 {gen_id,session_id,ts}
   var EN_KEY = 'alice_enabled';       // localStorage：上次 /alice/me 的 enabled（切页秒显用）
@@ -414,6 +663,22 @@
       return localStorage.getItem(SID_KEY);
     } catch (e) { return null; }
   }
+  function elderCourseSession(file) {
+    if (!ELDER_MODE || !state.accountKey || !file) return '';
+    try {
+      var all = JSON.parse(localStorage.getItem(ELDER_COURSE_SESSIONS_KEY) || '{}');
+      return String((all[state.accountKey] && all[state.accountKey][file]) || '');
+    } catch (e) { return ''; }
+  }
+  function rememberElderCourseSession(file, sid) {
+    if (!ELDER_MODE || !state.accountKey || !file || !sid) return;
+    try {
+      var all = JSON.parse(localStorage.getItem(ELDER_COURSE_SESSIONS_KEY) || '{}');
+      all[state.accountKey] = all[state.accountKey] || {};
+      all[state.accountKey][file] = sid;
+      localStorage.setItem(ELDER_COURSE_SESSIONS_KEY, JSON.stringify(all));
+    } catch (e) {}
+  }
   // 账号摘要种子：me 每次确认后写一遍，入口处读回来给首帧的快照校验用。
   function rememberAccountKey(key) {
     try {
@@ -430,7 +695,8 @@
   // 同浏览器换号的现实路径只有「点退出再登另一个」。退出那一刻把账号级痕迹全清掉，
   // 下一位登录时首帧就无可恢复，不必赌 me 回来得够快。
   function dropAccountScopedCaches() {
-    [MSGS_KEY, MOMENTS_KEY, NOTES_KEY, SESSIONS_KEY, SID_KEY, SID_ACCOUNT_KEY,
+    [MSGS_KEY, MOMENTS_KEY, NOTES_KEY, SESSIONS_KEY, ELDER_COURSE_SESSIONS_KEY,
+      SID_KEY, SID_ACCOUNT_KEY,
       GEN_KEY, ACCT_KEY, DL_CARD_DAY_KEY].forEach(function (k) {
         try { localStorage.removeItem(k); } catch (e) {}
       });
@@ -738,6 +1004,19 @@
     '.al-thinking i{width:6px;height:6px;border-radius:50%;background:var(--al-faint);animation:al-bounce 1.2s infinite}',
     '.al-thinking i:nth-child(2){animation-delay:.15s}.al-thinking i:nth-child(3){animation-delay:.3s}',
     '@keyframes al-bounce{0%,60%,100%{transform:none;opacity:.35}30%{transform:translateY(-4px);opacity:1}}',
+    // 思考过程：思考型模型在写正文前会沉默十几秒，这里把 reasoning_content 摊出来
+    // 顶着，正文一到就折成一行标题。max-height 而不是 auto——长思考不能把提问
+    // 顶出可视区，用户要看的始终是最新的正文
+    '.al-reason{align-items:flex-start}',
+    '.al-reason .al-rbox{min-width:0;flex:1;background:var(--al-soft);border-radius:14px;padding:8px 12px}',
+    '.al-rhead{display:flex;align-items:center;gap:6px;width:100%;padding:0;background:none;border:none;',
+      'cursor:pointer;font-family:inherit;font-size:12px;line-height:1.6;color:var(--al-faint);text-align:left}',
+    '.al-rhead .al-rchev{flex-shrink:0;transition:transform .15s}',
+    '.al-reason.folded .al-rhead .al-rchev{transform:rotate(-90deg)}',
+    '.al-reason:not(.folded) .al-rhead{margin-bottom:6px}',
+    '.al-rbody{max-height:8.5em;overflow-y:auto;font-size:12px;line-height:1.7;color:var(--al-sub);',
+      'white-space:pre-wrap;word-break:break-word}',
+    '.al-reason.folded .al-rbody{display:none}',
     // 空态：衬线大问候居中 + 推荐 chips（对照截图首页）
     '.al-empty{margin:auto 0;padding:28px 14px;display:flex;flex-direction:column;align-items:stretch}',
     '.al-greet{font-family:var(--al-serif);font-size:24px;font-weight:700;line-height:1.5;color:var(--al-text);text-align:center;margin:0 0 22px;letter-spacing:.5px}',
@@ -752,6 +1031,13 @@
     // 提示条
     '.al-note{margin:0 14px 8px;padding:10px 12px;border-radius:12px;background:var(--al-soft);border:none;font-size:12px;line-height:1.7;color:var(--al-sub);flex-shrink:0}',
     '.al-note a{color:var(--al-text);font-weight:700;text-decoration:underline;text-underline-offset:2px}',
+    '.al-login-cta{display:inline-flex;align-items:center;justify-content:center;margin:6px 0 2px 6px;',
+      'min-height:34px;padding:0 14px;border-radius:999px;background:var(--al-accent);color:#fff!important;',
+      'font-size:12px;font-weight:750;line-height:1;text-decoration:none!important;',
+      'box-shadow:0 5px 14px color-mix(in srgb,var(--al-accent) 24%,transparent);',
+      'transition:transform .15s,filter .15s,box-shadow .15s}',
+    '.al-login-cta:hover{filter:brightness(.94);transform:translateY(-1px)}',
+    '.al-login-cta:focus-visible{outline:3px solid color-mix(in srgb,var(--al-accent) 30%,transparent);outline-offset:2px}',
     '.al-rice-msg{margin-top:4px}',
     '.al-rice-msg .al-mtext{display:flex;flex-direction:column;align-items:flex-start;gap:10px}',
     '.al-recharge-cta{display:inline-flex;align-items:center;padding:7px 13px;border-radius:999px;',
@@ -977,6 +1263,29 @@
     // 大图灯箱会 Portal 到 learn.html 顶层 document；样式由 ensureLightboxStyle
     // 注入顶层，不能写在当前课件 iframe 的 style 里。
   ].join('\n');
+  if (ELDER_MODE) {
+    style.textContent += [
+      'html[data-alice-elder] #alice-win .al-head{min-height:72px;padding:12px 16px}',
+      'html[data-alice-elder] #alice-win .al-avatar{width:46px;height:46px}',
+      'html[data-alice-elder] #alice-win .al-head-name{font-size:21px}',
+      'html[data-alice-elder] #alice-win .al-head-sub{font-size:15px}',
+      'html[data-alice-elder] #alice-win .al-headbtn,html[data-alice-elder] #alice-win .al-iconbtn{min-height:46px;font-size:16px}',
+      'html[data-alice-elder] #alice-win .al-msg-user,html[data-alice-elder] #alice-win .al-mtext{font-size:18px;line-height:1.85}',
+      'html[data-alice-elder] #alice-win .al-input{font-size:18px;line-height:1.7}',
+      'html[data-alice-elder] #alice-win .al-send{width:52px;height:52px}',
+      'html[data-alice-elder] #alice-win .al-tab{min-height:48px;font-size:16px}',
+      'html[data-alice-elder] #alice-win .al-chip{min-height:44px;font-size:15px}',
+      'html[data-alice-elder] #alice-win .al-greet{font-size:28px;line-height:1.55;margin-bottom:24px}',
+      'html[data-alice-elder] #alice-win .al-qs{gap:10px}',
+      'html[data-alice-elder] #alice-win .al-q{min-height:62px;padding:14px 16px;border-radius:14px;font-size:18px;line-height:1.65;color:var(--al-text)}',
+      'html[data-alice-elder] #alice-win .al-samples{align-items:stretch;gap:10px}',
+      'html[data-alice-elder] #alice-win .al-samples-hint{font-size:16px;line-height:1.6;color:var(--al-sub)}',
+      'html[data-alice-elder] #alice-win .al-sample{width:100%;min-height:58px;padding:12px 16px;border-radius:14px;font-size:20px;line-height:1.55;color:var(--al-text)}',
+      'html[data-alice-elder] #alice-win .al-fb-link{min-height:42px;font-size:15px;padding:8px 14px}',
+      'html[data-alice-elder] #alice-fab{width:66px;height:66px}',
+      '@media(max-width:640px){html[data-alice-elder] #alice-win .al-msg-user,html[data-alice-elder] #alice-win .al-mtext{font-size:18px}}'
+    ].join('\n');
+  }
   document.head.appendChild(style);
 
   // ── 工具 ─────────────────────────────────────────────────────────────
@@ -1017,10 +1326,13 @@
       .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,
         function (_, label, href) { return link(href, label, 'external'); })
       // 课件互链：模型按目录写 [《标题》](learn.html#文件名)（或裸文件名），
-      // 统一落到阅读器外壳并新标签打开；对方页面会自己恢复当前对话
-      .replace(/\[([^\]]+)\]\(((?:learn\.html#)?[\w][\w.-]*\.html)\)/g,
+      // 统一落到阅读器外壳并新标签打开。模型偶尔会把显式 learn.html# 后面的
+      // .html 省掉；这里容错补全，否则整段 Markdown 会原样露给用户。
+      .replace(/\[([^\]]+)\]\((learn\.html#[\w][\w.-]*|[\w][\w.-]*\.html)\)/g,
         function (_, label, target) {
-          return link('learn.html#' + target.replace(/^learn\.html#/, ''), label, 'course');
+          var file = target.replace(/^learn\.html#/, '');
+          if (!/\.html$/.test(file)) file += '.html';
+          return link('learn.html#' + file, label, 'course');
         })
       // GFM autolink literals：显式链接已经扣走，剩下的裸地址才在这里成链。
       // 结尾的中英文标点不吃进 URL，否则「见 https://x.com。」会连句号一起跳
@@ -1655,6 +1967,12 @@
   }
 
   function maybeShowFabNudge() {
+    // 敬老课已经在正文里安排了明确的“请白艾莉”按钮；再弹每日引导气泡会
+    // 和当前唯一操作争抢注意力。头像保留，气泡不主动催。
+    if (isElderEmbedded()) {
+      hideFabNudge();
+      return;
+    }
     if (!state.enabled || state.open || fab.classList.contains('hidden')) {
       hideFabNudge();
       if (state.open && !autoOpened) consumeFabNudgeToday();
@@ -1831,20 +2149,20 @@
   // NPC 朋友：名字与客户端 DATA_I18N.tts.agentVoiceInfo 同源，头像取自
   // 客户端 src/public/agents 压到 96px 的副本（slides/friends/）
   var FRIENDS = {
-    alice:      { zh: '白艾莉', en: 'Alice', ko: '백아이리' },
-    researcher: { zh: '陈知远', en: 'Ken', ko: '첸즈위안', av: 'researcher' },
-    translator: { zh: '林晓雨', en: 'Sherry', ko: '린샤오위', av: 'translator' },
-    writer:     { zh: '方以南', en: 'Yinan', ko: '팡이난', av: 'writer' },
-    voice:      { zh: '苏墨', en: 'Mo', ko: '수모', av: 'voice' },
-    designer:   { zh: '周念', en: 'Nina', ko: '주녠', av: 'designer' },
-    artist:     { zh: '叶初', en: 'Chu', ko: '예초', av: 'artist' },
-    analyst:    { zh: '魏博', en: 'Bo', ko: '웨이보', av: 'analyst' },
-    quant:      { zh: '邢斐', en: 'Faye', ko: '싱페이', av: 'quant' },
-    novelist:   { zh: '沈遥', en: 'Yao', ko: '선야오', av: 'novelist' },
-    developer:  { zh: '张予', en: 'Ray', ko: '장위', av: 'developer' },
-    docsmith:   { zh: '陆析', en: 'Lu Xi', ko: '루시', av: 'docsmith' },
-    critic:     { zh: '顾辛', en: 'Xin', ko: '고신', av: 'critic' },
-    scholar:    { zh: '谢清', en: 'Qing', ko: '셰칭', av: 'scholar' }
+    alice:      { zh: '白艾莉', hk: '白艾莉', tw: '白艾莉', en: 'Alice', ko: '백아이리' },
+    researcher: { zh: '陈知远', hk: '陳知遠', tw: '陳知遠', en: 'Ken', ko: '첸즈위안', av: 'researcher' },
+    translator: { zh: '林晓雨', hk: '林曉雨', tw: '林曉雨', en: 'Sherry', ko: '린샤오위', av: 'translator' },
+    writer:     { zh: '方以南', hk: '方以南', tw: '方以南', en: 'Yinan', ko: '팡이난', av: 'writer' },
+    voice:      { zh: '苏墨', hk: '蘇墨', tw: '蘇墨', en: 'Mo', ko: '수모', av: 'voice' },
+    designer:   { zh: '周念', hk: '周念', tw: '周念', en: 'Nina', ko: '주녠', av: 'designer' },
+    artist:     { zh: '叶初', hk: '葉初', tw: '葉初', en: 'Chu', ko: '예초', av: 'artist' },
+    analyst:    { zh: '魏博', hk: '魏博', tw: '魏博', en: 'Bo', ko: '웨이보', av: 'analyst' },
+    quant:      { zh: '邢斐', hk: '邢斐', tw: '邢斐', en: 'Faye', ko: '싱페이', av: 'quant' },
+    novelist:   { zh: '沈遥', hk: '沈遙', tw: '沈遙', en: 'Yao', ko: '선야오', av: 'novelist' },
+    developer:  { zh: '张予', hk: '張予', tw: '張予', en: 'Ray', ko: '장위', av: 'developer' },
+    docsmith:   { zh: '陆析', hk: '陸析', tw: '陸析', en: 'Lu Xi', ko: '루시', av: 'docsmith' },
+    critic:     { zh: '顾辛', hk: '顧辛', tw: '顧辛', en: 'Xin', ko: '고신', av: 'critic' },
+    scholar:    { zh: '谢清', hk: '謝清', tw: '謝清', en: 'Qing', ko: '셰칭', av: 'scholar' }
   };
 
   function momentAuthorName(a) {
@@ -2417,7 +2735,7 @@
     var src = [];
     if (n.page_title) src.push('\u300a' + n.page_title + '\u300b');
     if (n.created_at) src.push(new Date(n.created_at * 1000).toLocaleString());
-    return body + '\n\n---\n' + T.ntExportSrc + ': xueai.app' +
+    return body + '\n\n---\n' + T.ntExportSrc + ': xueai.miyang.cn' +
       (src.length ? ' \u00b7 ' + src.join(' \u00b7 ') : '') + '\n';
   }
 
@@ -3162,7 +3480,21 @@
   // 小头像后面，绝大多数人整门课都不会点开一次。
   // 只在「一次都没表过态」时生效——用户叉掉过就再也不自动展开（关窗写 '0'）。
   // 手机上面板是整屏覆盖，自动展开等于把课件挡没了，所以只给桌面端。
+  function isElderEmbedded() {
+    if (!ELDER_MODE) return false;
+    try { return window.self !== window.top; }
+    catch (e) { return true; }
+  }
+  function isElderValueGate() {
+    return isElderEmbedded() && (
+      document.documentElement.hasAttribute('data-elder-value-pending') ||
+      document.documentElement.hasAttribute('data-elder-value-gated')
+    );
+  }
   function wantsAutoOpen() {
+    // 敬老阅读器先交付课程价值，再由学员主动开始；Alice 自动铺开会制造第二焦点，
+    // 还会和外壳的侧栏让位互相触发 resize。课程按钮仍可按需正常打开她。
+    if (isElderValueGate()) return false;
     var pref = null;
     try { pref = localStorage.getItem(OPEN_KEY); } catch (e) { return false; }
     return pref === null && window.innerWidth > 640;
@@ -3184,7 +3516,9 @@
       // 自动展开不写偏好：写了就等于替用户表态，此后每页都要走「恢复」分支，
       // 他真去叉掉时反而弹不出引导气泡。
       if (!auto) { try { localStorage.setItem(OPEN_KEY, '1'); } catch (e) {} }
-      if (!state.messages.length) renderMessages();
+      // 断线续流可能已经在关窗期间创建了实时消息 DOM；此时开窗不能用空态
+      // 重绘把它清掉，否则最后只剩「存入笔记」按钮，看起来像面板内容消失。
+      if (!state.messages.length && !state.streaming) renderMessages();
       autoGrow();   // 关窗期间存的草稿（吐槽/预填提问）现在才量得到高度
     }
   }
@@ -3209,6 +3543,20 @@
     else consumeFabNudgeToday();
   }
   win.querySelector('#al-btn-close').addEventListener('click', closeWin);
+
+  // 新课的价值开场会暂时隐藏正文和 Alice。此时不能提前打开并通知外壳占位，
+  // 否则右侧只剩一块看似空白的保留区；点「开始本课」移除闸门后再恢复。
+  if (isElderEmbedded() && window.MutationObserver) {
+    new MutationObserver(function () {
+      if (isElderValueGate() || state.open || !state.enabled) return;
+      var reopen = false;
+      try { reopen = localStorage.getItem(OPEN_KEY) === '1'; } catch (e) {}
+      if (reopen) openWin(true);
+    }).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-elder-value-pending', 'data-elder-value-gated']
+    });
+  }
 
   // 灰度闸门：enabled=false 时整套 UI 消失（含已打开的窗与划词浮层）
   function applyEnabled(on) {
@@ -3239,12 +3587,13 @@
     if (!was && !state.open) {
       var reopen = false;
       try { reopen = localStorage.getItem(OPEN_KEY) === '1'; } catch (e) {}
+      // 用户明确打开过的面板跨课照常恢复；价值开场只阻止首次自动铺开。
       if (reopen) { openWin(true); return; }
       // 首次拿到白名单资格的那一刻也算「进来」，同样按默认铺开。这条走的是
       // 网络回来之后的分支，只有第一次会命中——此后 EN_KEY 有缓存，首帧就决策完了。
       // 形态不在这儿定：初始化那段已按 SIDE_KEY 摆好 state.side，改了反而会
       // 盖掉「自动铺开后又自己折回悬浮窗」的选择。
-      if (wantsAutoOpen()) { openWin(true, true); return; }
+      if (!isElderValueGate() && wantsAutoOpen()) { openWin(true, true); return; }
     }
     if (!state.open) {
       fab.classList.remove('hidden');
@@ -3573,7 +3922,7 @@
       if (file) {
         var base = (window.XUEAI_I18N && window.XUEAI_I18N.baseFile)
           ? window.XUEAI_I18N.baseFile(file)
-          : file.replace(/\.(en|ko)\.html$/, '.html');
+          : file.replace(/\.(en|ko|tw|hk)\.html$/, '.html');
         var reader = LANG === 'zh' ? 'learn.html' : 'learn.' + LANG + '.html';
         next = '/slides/' + reader + '#' + base;
       }
@@ -3582,7 +3931,7 @@
   }
 
   function loginLink(label) {
-    return '<a href="' + loginUrl() + '"' +
+    return '<a class="al-login-cta" rel="nofollow" href="' + loginUrl() + '"' +
       (window.self !== window.top ? ' target="_top"' : '') + '>' + esc(label) + '</a>';
   }
 
@@ -3724,6 +4073,11 @@
 
   function loadQuestions() {
     if (state.pageQuestions !== null) return Promise.resolve(state.pageQuestions);
+    // 敬老版固定使用短、具体、能直接行动的问法；服务端按课题生成的“核心概念 /
+    // 容易误解 / 模拟面试”更适合正式版学习者，不应重新覆盖适老文案。
+    if (ELDER_MODE) {
+      return Promise.resolve(finishQuestions(T.qFallback('')));
+    }
     // openWin + 初始化可能在同一帧各 render 一次。复用进行中的请求，否则两个
     // Promise 都往当前 #al-qs 追加，换一页就会从 3 条膨胀成 6 条。
     if (questionsPromise) return questionsPromise;
@@ -3868,7 +4222,7 @@
             // send() 这条正路，长期记忆、画像、笔记召回、计费、审核全都照常。
             // 「这一场在面试中」由 send() 在请求真的发出去时才立（未登录被拦下的
             // 那次不算）。
-            if (q === iv) pendingIntent = MOCK_INTERVIEW_INTENT;
+            if (!ELDER_MODE && q === iv) pendingIntent = MOCK_INTERVIEW_INTENT;
             inputEl.value = q;
             send();
           });
@@ -4290,6 +4644,7 @@
     state.messages = [];
     state.followups = [];
     state.interview = false;   // 换一轮对话就是退出面试；空态那条题在原地等着再点
+    activeExternalContext = null;
     rememberSessionId(null);
     stashMessages();
     renderMessages();
@@ -4474,6 +4829,7 @@
   // 对话流保持时间顺序，绝不把后到的字灌回胶囊上方的旧气泡。
   function makeStreamUI() {
     var thinkingEl = appendThinking();
+    var reason = null;            // 当前思考块，见 pushReasoning
     var msgRow = null, msgText = null;
     var firstRow = null;          // 本轮第一个气泡：收尾时工具摘要插在它前面（与历史重渲染同位）
     var toolEls = [];
@@ -4497,6 +4853,59 @@
       }
     }
 
+    // 思考流（服务端 on_reasoning）：思考型模型写正文前会先沉默十几秒，只盯 delta
+    // 的话界面就三点空转，用户只能理解为卡住了。这段文字**永不进 acc**——acc 是入库
+    // 和存笔记的口，思维链进去就会被桌面端当正文镜像出来（PRD 16o 的原事故）。
+    // msgRow 在时不插队：正文已经在写了，思考块不能跑到活字下面去。
+    function pushReasoning(piece) {
+      if (msgRow) return;
+      if (thinkingEl) { thinkingEl.remove(); thinkingEl = null; }
+      if (!reason || reason.done) {
+        var row = document.createElement('div');
+        row.className = 'al-msg-alice al-reason';
+        row.innerHTML = avatarHtml('al-mini' + (firstRow ? ' ghost' : '')) +
+          '<div class="al-rbox">' +
+            '<button class="al-rhead" type="button" aria-expanded="true" aria-label="' +
+              esc(T.thoughtToggle) + '">' + svg('chevron', 'al-rchev') +
+              '<span class="al-rlabel"></span></button>' +
+            '<div class="al-rbody"></div>' +
+          '</div>';
+        bodyEl.appendChild(row);
+        var head = row.querySelector('.al-rhead');
+        head.addEventListener('click', function () {
+          head.setAttribute('aria-expanded',
+            row.classList.toggle('folded') ? 'false' : 'true');
+        });
+        reason = {
+          row: row, head: head,
+          label: row.querySelector('.al-rlabel'),
+          body: row.querySelector('.al-rbody'),
+          t0: Date.now(), done: false, timer: 0
+        };
+        // 秒数自己走：服务端对思考流有总量封顶（REASONING_STREAM_CAP），到顶后
+        // 文字不再更新，只剩这个计时告诉用户「还在跑，没死」
+        reason.tick = function () {
+          reason.label.textContent =
+            T.thinking(Math.max(1, Math.round((Date.now() - reason.t0) / 1000)));
+        };
+        reason.tick();
+        reason.timer = setInterval(reason.tick, 1000);
+      }
+      reason.body.textContent += piece;
+      reason.body.scrollTop = reason.body.scrollHeight;
+      bodyEl.scrollTop = bodyEl.scrollHeight;
+    }
+
+    // 正文（或工具、收尾）到了：思考折成一行「已思考 N 秒」，仍可点开回看
+    function foldReasoning() {
+      if (!reason || reason.done) return;
+      reason.done = true;
+      clearInterval(reason.timer);
+      reason.label.textContent = T.thought;
+      reason.row.classList.add('folded');
+      reason.head.setAttribute('aria-expanded', 'false');
+    }
+
     // 封段：去光标定稿当前气泡，让之后的文字另起一个新气泡
     function closeSegment() {
       if (!msgRow) return;
@@ -4511,12 +4920,17 @@
         if (obj.session_id) {
           state.sessionId = obj.session_id;
           rememberSessionId(obj.session_id);
+          if (activeExternalContext && activeExternalContext.file) {
+            rememberElderCourseSession(activeExternalContext.file, obj.session_id);
+          }
         }
         if (obj.gen_id) saveGenPending(obj.gen_id);
         // 追问随回答一起来（服务端已把哨兵那段从正文里摘掉，delta 是干净的）
         if (obj.followups) setFollowups(obj.followups);
+        if (obj.reasoning) pushReasoning(obj.reasoning);
         if (obj.tool) {
           if (thinkingEl) { thinkingEl.remove(); thinkingEl = null; }
+          foldReasoning();
           // Alice 自己动了笔记本：本地快照立刻作废（内存 + localStorage 一起标脏，
           // 见 invalidateNotesCache），否则 TTL 内打开「笔记」页签看到的还是旧的，
           // 又变成「她说存了其实没存」。工具一 done 就后台重拉——不必等用户打开页签。
@@ -4547,6 +4961,7 @@
           }
         }
         if (obj.delta) {
+          foldReasoning();
           ensureMsgEl();
           acc += obj.delta;
           segAcc += obj.delta;
@@ -4554,6 +4969,7 @@
           bodyEl.scrollTop = bodyEl.scrollHeight;
         }
         if (obj.error) {
+          foldReasoning();
           ensureMsgEl();
           acc = acc || obj.error;
           segAcc = segAcc || obj.error;
@@ -4562,6 +4978,7 @@
       },
       finalize: function () {
         if (thinkingEl) { thinkingEl.remove(); thinkingEl = null; }
+        foldReasoning();
         if (msgText) msgText.innerHTML = renderMd(segAcc);
         // 工具胶囊折叠为一条摘要，放在本轮第一个气泡上方——切页回来后
         // 历史重渲染（renderMessage 的 toolCount 分支）就是这个位置，直播态对齐它
@@ -4596,6 +5013,62 @@
     send();
   }
 
+  function askFromCourse(payload) {
+    if (!state.enabled || state.streaming) return false;
+    var text = String((payload && payload.message) || '').trim();
+    if (!text) return false;
+    openWin();
+    showTab('chat');
+    if (!state.side && window.innerWidth > 640) {
+      state.side = true;
+      try { localStorage.setItem(SIDE_KEY, '1'); } catch (e) {}
+      applySide();
+    }
+    var currentPage = currentPageContext();
+    var nextContext = {
+      file: String(payload.file || currentPage.file),
+      title: String(payload.title || currentPage.title),
+      intent: String(payload.intent || ''),
+      action: String(payload.action || 'text')
+    };
+    function sendCoursePrompt() {
+      activeExternalContext = nextContext;
+      inputEl.value = text;
+      autoGrow();
+      send();
+    }
+    if (payload.new_chat !== false) {
+      startNewChat();
+      sendCoursePrompt();
+      return true;
+    }
+    var courseSid = elderCourseSession(nextContext.file);
+    if (courseSid && courseSid !== state.sessionId) {
+      loadSession(courseSid).then(function () {
+        if (state.sessionId !== courseSid) startNewChat();
+        sendCoursePrompt();
+      });
+    } else if (!courseSid &&
+               (!activeExternalContext ||
+                activeExternalContext.file !== nextContext.file)) {
+      // 本课还没有会话时宁可新建，也不能续到其他章节最后打开的对话里。
+      startNewChat();
+      sendCoursePrompt();
+    } else {
+      sendCoursePrompt();
+    }
+    return true;
+  }
+
+  window.XueaiAlice = window.XueaiAlice || {};
+  window.XueaiAlice.openWithPrompt = askFromCourse;
+  window.addEventListener('message', function (event) {
+    if (event.origin !== location.origin) return;
+    var detail = event.data;
+    if (!detail || detail.type !== 'elder-alice-prompt') return;
+    askFromCourse(detail);
+  });
+
   function send() {
     if (state.streaming) return;
     var text = inputEl.value.trim();
@@ -4613,6 +5086,7 @@
     // 面试是这里唯一不清的一种：它跟着会话，直到新对话/换会话（见 state.interview）。
     // 一次性标记优先——面试中划词点「吐槽」，这一条该按意见处理。
     var intent = pendingIntent ||
+      (activeExternalContext && activeExternalContext.intent) ||
       (state.interview ? MOCK_INTERVIEW_INTENT : '');
     // 面试从这一条起就立住了，一直带到新对话/换会话为止
     if (intent === MOCK_INTERVIEW_INTENT) state.interview = true;
@@ -4630,6 +5104,8 @@
     autoGrow();
     syncPlaceholder();
 
+    // 气泡显示的必须就是发出去的那段话：生图请求带着画风与画面描述，
+    // 缩写成「请白艾莉生成“XX”」会让学员以为细节没提交（服务端历史也存全文）。
     var userContent = quote
       ? '【划选内容】\n' + quote + '\n\n【我的问题】\n' + text
       : text;
@@ -4654,9 +5130,17 @@
     }
     stashMessages();   // 提问先落快照：回答生成中切页也不会丢掉这一问
 
+    var externalContext = activeExternalContext;
+    var currentPage = currentPageContext();
     var body = {
       message: text,
-      context: { file: PAGE_FILE, title: PAGE_TITLE, selection: quote, lang: LANG, tz: TZ_NAME }
+      context: {
+        file: externalContext ? externalContext.file : currentPage.file,
+        title: externalContext ? externalContext.title : currentPage.title,
+        selection: quote,
+        lang: LANG,
+        tz: TZ_NAME
+      }
     };
     // 截图她看不见画面，但要知道「有几张」：判断这是不是在报问题时算一份证据，
     // 转交给作者时后端把这些 URL 原样带进 submit_feedback
@@ -4664,6 +5148,9 @@
     if (social) body.context.social_url = social;
     // 本轮任务标记只对这一条生效（发送开头已清，这里用当时的快照）
     if (intent) body.context.intent = intent;
+    if (externalContext && externalContext.action) {
+      body.context.action = externalContext.action;
+    }
     if (state.sessionId) body.session_id = state.sessionId;
 
     state.streaming = true;
@@ -4770,6 +5257,20 @@
       }
       stashMessages();
       refreshMe();
+      if (ELDER_MODE) {
+        var lessonFrame = document.getElementById('lessonFrame');
+        if (lessonFrame && lessonFrame.contentWindow) {
+          lessonFrame.contentWindow.postMessage({
+            type: 'elder-alice-complete',
+            action: externalContext ? externalContext.action : 'text'
+          }, location.origin);
+        } else {
+          window.postMessage({
+            type: 'elder-alice-complete',
+            action: externalContext ? externalContext.action : 'text'
+          }, location.origin);
+        }
+      }
     }
   }
 
@@ -4868,13 +5369,16 @@
   var sidePref = null;
   try {
     sidePref = localStorage.getItem(SIDE_KEY);
-    bootOpen = bootAuto || localStorage.getItem(OPEN_KEY) === '1';
+    var savedOpen = localStorage.getItem(OPEN_KEY) === '1';
+    bootOpen = savedOpen || (!isElderValueGate() && bootAuto);
     bootEnabled = localStorage.getItem(EN_KEY) === '1';
     bootTab = localStorage.getItem(TAB_KEY) || 'chat';
   } catch (e) {}
   // 形态跟着走：没表过态时默认就是侧栏；表过态的一律照他上次选的来，
   // 包括「折回悬浮窗」（记的是 '0'）。
-  state.side = sidePref === null ? bootAuto : sidePref === '1';
+  state.side = sidePref === null
+    ? (isElderEmbedded() || bootAuto)
+    : sidePref === '1';
   // 账号级快照要在首帧就恢复，否则每次刷新都先转一圈 loading（PRD 24n）。摘要来自
   // 上次 me 的确认，12 小时内有效；本次 me 回来若发现换了人，上面那段会立刻清干净。
   state.accountKey = readAccountSeed();

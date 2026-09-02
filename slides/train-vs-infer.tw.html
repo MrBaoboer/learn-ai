@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>訓練 vs 推理：兩個完全不同的過程 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* ── 类比条 ── */
+.analogy-bar {
+  background: var(--card); border-radius: var(--radius); padding: 16px 20px;
+  border: 1.5px solid var(--border); font-size: 15px; color: var(--text); line-height: 1.7;
+  box-shadow: var(--shadow-card);
+}
+.analogy-bar b { color: var(--accent); }
+
+/* ── 对比双列 ── */
+.cmp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.cmp-col {
+  border-radius: var(--radius); padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.cmp-col.train { background: rgba(8,145,178,0.05);  border: 1.5px solid rgba(8,145,178,0.2); }
+.cmp-col.infer { background: rgba(22,163,74,0.05);  border: 1.5px solid rgba(22,163,74,0.2); }
+
+.cmp-title { font-size: 17px; font-weight: 800; }
+.train .cmp-title { color: var(--cyan); }
+.infer .cmp-title { color: var(--success); }
+.cmp-desc { font-size: 13px; color: var(--sub); line-height: 1.7; }
+
+.metrics { display: flex; flex-direction: column; gap: 8px; }
+.m-row { display: flex; align-items: center; gap: 8px; }
+.m-lbl { font-size: 13px; font-weight: 700; color: var(--sub); width: 64px; flex-shrink: 0; }
+.m-val { font-size: 13px; font-weight: 700; padding: 3px 12px; border-radius: 20px; }
+.train .m-val { background: rgba(8,145,178,0.1); color: var(--cyan); }
+.infer .m-val { background: rgba(22,163,74,0.1); color: var(--success); }
+
+/* ── 互动实验 ── */
+.experiment {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* 输入行 */
+.input-row { display: flex; gap: 8px; }
+.chat-input {
+  flex: 1; border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; font-size: 14px; font-family: inherit; color: var(--text);
+  background: var(--card); outline: none; resize: none;
+  transition: border-color 0.2s;
+}
+.chat-input:focus { border-color: var(--accent); }
+.send-btn {
+  background: var(--accent); color: white; border: none;
+  border-radius: 10px; padding: 0 20px; font-size: 14px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  min-height: 44px;
+}
+.send-btn:hover { filter: brightness(1.1); }
+
+/* 可视化区 */
+.vis-area {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+
+/* context window */
+.ctx-box {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ctx-title { font-size: 11px; font-weight: 800; color: var(--sub); text-transform: uppercase; letter-spacing: 0.4px; }
+.ctx-messages {
+  height: 220px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.msg {
+  padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5;
+  max-width: 90%; opacity: 0; transform: translateY(6px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.msg.in { opacity: 1; transform: translateY(0); }
+.msg.user { background: rgba(0,102,255,0.08); color: var(--text); align-self: flex-end; border: 1px solid rgba(0,102,255,0.15); }
+.msg.ai   { background: rgba(22,163,74,0.07); color: var(--text); align-self: flex-start; border: 1px solid rgba(22,163,74,0.15); }
+.msg-role { font-size: 10px; font-weight: 800; margin-bottom: 3px; }
+.user .msg-role { color: var(--accent); }
+.ai   .msg-role { color: var(--success); }
+
+/* params box */
+.params-box {
+  background: var(--card); border-radius: var(--radius);
+  border: 1.5px solid var(--border); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.params-title { font-size: 11px; font-weight: 800; color: var(--sub); text-transform: uppercase; letter-spacing: 0.4px; }
+.params-grid {
+  flex: 1; display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start;
+  min-height: 140px;
+}
+.param-dot {
+  width: 12px; height: 12px; border-radius: 3px;
+  background: rgba(0,102,255,0.15);
+  transition: background 0.3s;
+}
+.param-dot.frozen { background: rgba(8,145,178,0.2); }
+
+.frozen-badge {
+  background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.2);
+  border-radius: 8px; padding: 10px 12px;
+  font-size: 13px; font-weight: 700; color: var(--danger); line-height: 1.5; text-align: center;
+}
+
+/* conclusion */
+.conclusion-bar {
+  background: rgba(220,38,38,0.04); border: 1.5px solid rgba(220,38,38,0.18);
+  border-radius: var(--radius); padding: 16px 20px;
+  font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.7;
+}
+.conclusion-bar b { color: var(--danger); }
+
+/* shake animation */
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-5px)}
+  40%{transform:translateX(5px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}
+.shake { animation: shake 0.4s ease; }
+
+@media (max-width: 768px) {
+  .cmp-cols { grid-template-columns: 1fr; }
+  .vis-area { grid-template-columns: 1fr; }
+  .ctx-messages { height: 180px; }
+  .params-grid { min-height: 100px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="訓練和推理是大模型的兩個截然不同的階段。詳解訓練階段的梯度下降與權重更新，以及推理階段的自迴歸生成，幫你區分兩者的本質差異與資源消耗。">
+<meta name="keywords" content="大模型訓練,大模型推理,自迴歸生成,梯度下降,預訓練">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/train-vs-infer.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/train-vs-infer.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/train-vs-infer.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/train-vs-infer.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/train-vs-infer.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/train-vs-infer.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/train-vs-infer.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/train-vs-infer.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="訓練 vs 推理：兩個完全不同的過程">
+<meta property="og:description" content="訓練和推理是大模型的兩個截然不同的階段。詳解訓練階段的梯度下降與權重更新，以及推理階段的自迴歸生成，幫你區分兩者的本質差異與資源消耗。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/train-vs-infer.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/train-vs-infer.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="訓練 vs 推理：兩個完全不同的過程">
+<meta name="twitter:description" content="訓練和推理是大模型的兩個截然不同的階段。詳解訓練階段的梯度下降與權重更新，以及推理階段的自迴歸生成，幫你區分兩者的本質差異與資源消耗。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"訓練 vs 推理：兩個不同的過程","name":"訓練 vs 推理：兩個不同的過程","url":"https://xueai.miyang.cn/slides/train-vs-infer.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 基礎原理","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":true,"description":"訓練和推理是大模型的兩個截然不同的階段。詳解訓練階段的梯度下降與權重更新，以及推理階段的自迴歸生成，幫你區分兩者的本質差異與資源消耗。","datePublished":"2026-04-12","dateModified":"2026-08-27"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">基礎原理</div>
+    <h1>訓練 vs 推理：兩個完全不同的過程</h1>
+    <p class="subtitle">很多人以為 AI 每次回答都在學習。實際上完全不是這麼回事。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>對話不是學習，參數凍結，按 Token 計費，這些是 AI 產品必懂的底層邏輯</p></aside><!--seo:end-->  <div class="sec-label">對比</div>
+
+  <div class="analogy-bar">
+    類比學生考試：<b>訓練</b> = 多年備考，反覆刷題，記住知識 &nbsp;→&nbsp; <b>推理</b> = 上考場作答，參數凍結，不再學習新東西
+  </div>
+
+  <div class="cmp-cols">
+    <div class="cmp-col train reveal" id="colTrain">
+      <div class="cmp-title">訓練（Training）</div>
+      <div class="cmp-desc">在海量資料上調整數十億個參數，讓模型記住世界知識。</div>
+      <div class="metrics">
+        <div class="m-row"><span class="m-lbl">執行頻率</span><span class="m-val">一次性</span></div>
+        <div class="m-row"><span class="m-lbl">算力需求</span><span class="m-val">千～萬塊 GPU</span></div>
+        <div class="m-row"><span class="m-lbl">參數狀態</span><span class="m-val">持續更新</span></div>
+        <div class="m-row"><span class="m-lbl">成本</span><span class="m-val">數億美元</span></div>
+        <div class="m-row"><span class="m-lbl">時長</span><span class="m-val">數週～數月</span></div>
+      </div>
+    </div>
+
+    <div class="cmp-col infer reveal" id="colInfer">
+      <div class="cmp-title">推理（Inference）</div>
+      <div class="cmp-desc">用固定參數，針對你的輸入生成回答。每次對話參數完全不變。</div>
+      <div class="metrics">
+        <div class="m-row"><span class="m-lbl">執行頻率</span><span class="m-val">每次對話</span></div>
+        <div class="m-row"><span class="m-lbl">算力需求</span><span class="m-val">1～數塊 GPU</span></div>
+        <div class="m-row"><span class="m-lbl">參數狀態</span><span class="m-val">完全凍結</span></div>
+        <div class="m-row"><span class="m-lbl">計費</span><span class="m-val">按 Token 計費</span></div>
+        <div class="m-row"><span class="m-lbl">時長</span><span class="m-val">1～10 秒/次</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">互動實驗：你說的話會改變參數嗎？</div>
+
+  <div class="experiment">
+
+    <div class="input-row">
+      <textarea class="chat-input" id="chatInput" rows="1"
+        placeholder="輸入一句話發給 AI，看看參數會不會變化…"
+        onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" onclick="sendMsg()">傳送</button>
+    </div>
+
+    <div class="vis-area">
+
+      <!-- 上下文窗口 -->
+      <div class="ctx-box">
+        <div class="ctx-title">Context Window（上下文視窗）</div>
+        <div class="ctx-messages" id="msgList">
+          <div class="msg ai in">
+            <div class="msg-role">AI</div>
+            你好！有什麼我可以幫你的？
+          </div>
+        </div>
+      </div>
+
+      <!-- 参数区 -->
+      <div class="params-box">
+        <div class="params-title">模型參數（示意）</div>
+        <div class="params-grid" id="paramGrid"></div>
+        <div class="frozen-badge" id="frozenBadge">
+          🔒 參數完全凍結<br>
+          <span style="font-weight:400;color:var(--sub);font-size:11px;">對話不改變任何權重</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="conclusion-bar reveal" id="concl">
+      你和 AI 說的話，<b>不會修改任何參數</b>。今天告訴它「你叫小明」，明天重開對話它不記得，因為對話只存在於上下文，<b>對話不是學習。</b>
+    </div>
+
+  </div>
+
+</article>
+
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+// ── 參數格初始化 ──
+const grid = document.getElementById('paramGrid');
+const PARAM_COUNT = 80;
+for (let i = 0; i < PARAM_COUNT; i++) {
+  const d = document.createElement('div');
+  d.className = 'param-dot frozen';
+  d.id = 'p' + i;
+  grid.appendChild(d);
+}
+
+// ── 鍵盤傳送 ──
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent?.isComposing) {
+    e.preventDefault();
+    sendMsg();
+  }
+}
+
+const AI_REPLIES = [
+  '我明白你說的，已經記錄在這次對話裡了。',
+  '好的！不過請注意，重新整理頁面後我就會忘記這段對話。',
+  '收到！這些內容存在上下文視窗中，參數沒有任何變化。',
+  '嗯！我的參數依然是訓練結束時的狀態，沒有因為你的輸入而改變。',
+  '瞭解！每次推理我都只讀取當前對話的內容，不會學習新東西。',
+];
+let replyIdx = 0;
+
+function sendMsg() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  // 新增使用者訊息
+  addMsg('user', text);
+
+  // 參數"抖動"但不變色 → shake 動畫
+  const badge = document.getElementById('frozenBadge');
+  badge.classList.remove('shake');
+  void badge.offsetWidth;
+  badge.classList.add('shake');
+
+  // 短暫閃爍幾個 param dot（假裝在處理），但顏色馬上恢復
+  const dots = grid.querySelectorAll('.param-dot');
+  const flashIdx = Array.from({length: 8}, () => Math.floor(Math.random() * PARAM_COUNT));
+  flashIdx.forEach(i => {
+    dots[i].style.background = 'rgba(22,163,74,0.5)';
+    setTimeout(() => dots[i].style.background = '', 400);
+  });
+
+  // AI 回覆
+  setTimeout(() => {
+    const reply = AI_REPLIES[replyIdx % AI_REPLIES.length];
+    replyIdx++;
+    addMsg('ai', reply);
+  }, 600);
+}
+
+function addMsg(role, text) {
+  const list = document.getElementById('msgList');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="msg-role">${role === 'user' ? '你' : 'AI'}</div>${text}`;
+  list.appendChild(div);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => div.classList.add('in'));
+  });
+  list.scrollTop = list.scrollHeight;
+}
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice.js?v=20260827b"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

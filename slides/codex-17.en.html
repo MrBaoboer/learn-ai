@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>execpolicy: Let the Policy File Carry Its Own Tests | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root,.lesson{--accent:#414b5a;--accent-deep:#262d38;--accent-soft:rgba(65,75,90,.085)}
+/* 变量挂在 .lesson 上：nav-inject.js 会在页面样式之后再注入一次 :root 主色，
+   靠就近继承才能保住专题色。 */
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(65,75,90,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(65,75,90,.04),0 0 0 52px rgba(65,75,90,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(65,75,90,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.q-tag{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font-size:13px;font-weight:800;margin:28px 0 14px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.visual{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eff1f5,var(--card));border:1px solid rgba(65,75,90,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.9}.exercise p:last-child{margin:0}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);color:var(--text);display:flex;gap:14px;font-size:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.compare{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h4{margin:0;font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}.cmp-card h4 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:12px 0 0}
+.cmp-card .cmp-tag{display:inline-block;margin-top:14px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent-deep);border:1px solid rgba(65,75,90,.25)}
+/* ── 交互演示 ── */
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card)}
+.demo-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo-ctrl button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;min-height:44px;min-width:44px;border:1px solid rgba(65,75,90,.35);border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font:600 14px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:filter .15s}
+.demo-ctrl button:active{filter:brightness(.92)}
+.dm-bar{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-bar .dm-b-label{font-size:13px;font-weight:700;color:var(--text);padding-top:10px}
+.dm-bar .dm-b-hint{font-size:12px;color:var(--sub);line-height:1.7;flex:1 1 180px}
+.dm-seg{display:flex;gap:8px;flex-wrap:wrap}
+.dm-seg button{min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--sub);font:600 13px/1.3 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all .15s cubic-bezier(.4,0,.2,1)}
+.dm-seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dm-input{display:flex;gap:10px;flex:1 1 220px;min-width:200px}
+.dm-input input{flex:1;min-height:44px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+.dm-input button{min-height:44px;padding:10px 16px;border-radius:10px;border:1px solid rgba(65,75,90,.35);background:var(--accent-soft);color:var(--accent-deep);font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer}
+.dm-stages{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.dm-st{padding:16px 12px;border-radius:12px;border:1px solid var(--border);background:var(--bg);text-align:center;min-height:86px;opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-stages.is-live .dm-st{opacity:.4;transform:scale(.98)}
+.dm-stages.is-live .dm-st.now{opacity:1;transform:scale(1)}
+.dm-st .dm-st-k{display:block;font-size:11px;font-weight:700;color:var(--faint);letter-spacing:.04em;margin-bottom:8px}
+.dm-st .dm-st-v{font-size:13px;font-weight:700;color:var(--sub);line-height:1.5;transition:color .35s cubic-bezier(.4,0,.2,1)}
+.dm-st.on{border-color:rgba(65,75,90,.45);background:var(--accent-soft)}
+.dm-st.on .dm-st-v{color:var(--accent-deep)}
+.dm-st.ok{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.07)}
+.dm-st.ok .dm-st-v{color:var(--success)}
+.dm-st.warn{border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.05)}
+.dm-st.warn .dm-st-v{color:var(--danger)}
+.dm-st.dim{border-color:var(--border);background:var(--bg)}
+.dm-st.dim .dm-st-v{color:var(--faint)}
+.dm-st.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-board{display:grid;grid-template-columns:1.15fr .85fr;gap:20px;margin-bottom:4px}
+.dm-panel{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:18px;min-height:168px}
+.dm-panel h5{margin:0 0 12px;font-size:12px;font-weight:700;color:var(--sub)}
+.dm-tokens{display:flex;flex-wrap:wrap;gap:8px;min-height:40px}
+.dm-tok{padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-tokens.has-hit .dm-tok{opacity:.4;transform:scale(.98)}
+.dm-tokens.has-hit .dm-tok.hit{opacity:1;transform:scale(1)}
+.dm-tok.on{border-color:rgba(65,75,90,.45);background:var(--accent-soft);color:var(--accent-deep);font-weight:700}
+.dm-tok.hit{border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.06);color:var(--danger);font-weight:700}
+.dm-tok.is-enter{opacity:0;transform:translateY(8px)}
+.dm-tok.is-enter.in{opacity:1;transform:none;transition:opacity .35s cubic-bezier(.4,0,.2,1),transform .35s cubic-bezier(.4,0,.2,1)}
+.dm-tok.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-note{margin-top:12px;font-size:12.5px;line-height:1.75;color:var(--sub);min-height:40px;transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-cases{display:flex;flex-direction:column;gap:10px}
+.dm-case{padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-cases.is-live .dm-case{opacity:.4;transform:scale(.98)}
+.dm-cases.is-live .dm-case.now{opacity:1;transform:scale(1)}
+.dm-case .dm-c-h{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:4px}
+.dm-case .dm-c-t{font-size:12px;font-weight:700;color:var(--text)}
+.dm-case .dm-c-s{font-size:11px;font-weight:700;color:var(--faint);transition:color .35s cubic-bezier(.4,0,.2,1)}
+.dm-case .dm-c-x{font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub)}
+.dm-case.pass{border-color:rgba(22,163,74,.35);background:rgba(22,163,74,.06)}
+.dm-case.pass .dm-c-s{color:var(--success)}
+.dm-case.fail{border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.05)}
+.dm-case.fail .dm-c-s{color:var(--danger)}
+.dm-case.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-case.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-verdict{margin-top:20px;padding:16px 18px;border-radius:12px;border:1px dashed var(--border);background:var(--bg);min-height:64px;font-size:13.5px;line-height:1.75;color:var(--sub);transition:opacity .3s cubic-bezier(.4,0,.2,1),background .35s cubic-bezier(.4,0,.2,1),border-color .35s cubic-bezier(.4,0,.2,1),color .35s cubic-bezier(.4,0,.2,1)}
+.dm-verdict.ok{border-style:solid;border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.07);color:var(--success);font-weight:600}
+.dm-verdict.warn{border-style:solid;border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.05);color:var(--danger);font-weight:600}
+.dm-verdict.hold{border-style:solid;border-color:rgba(65,75,90,.4);background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-verdict.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-trace{margin-top:24px;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.dm-trace-tag{padding:12px 18px;background:var(--card);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--sub)}
+.dm-trace ol{margin:0;padding:10px 0;list-style:none}
+.dm-trace li{display:flex;justify-content:space-between;gap:16px;padding:9px 18px;font-size:12.5px;line-height:1.7;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-trace.is-live li{opacity:.4;transform:scale(.98)}
+.dm-trace li.on,.dm-trace.is-live li.on{background:var(--accent-soft);color:var(--accent-deep);font-weight:600;opacity:1;transform:scale(1)}
+.dm-trace li.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-trace li span.ln{flex:0 0 auto;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)}
+.dm-trace li.on span.ln{color:var(--accent-deep)}
+.dm-caption{margin-top:20px;min-height:56px;display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.dm-caption svg{flex:0 0 auto;color:var(--accent)}
+#dm-caption-text{transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-summary{display:flex;flex-direction:column;gap:14px;max-height:0;overflow:hidden;opacity:0;margin-top:0;padding:0 22px;border:1px solid transparent;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),var(--card));transition:max-height .5s cubic-bezier(.25,1,.5,1),opacity .4s cubic-bezier(.4,0,.2,1)}
+.dm-summary.on{max-height:400px;opacity:1;margin-top:20px;padding:20px 22px;border-color:rgba(65,75,90,.3)}
+.dm-summary .dm-s{font-size:13px;line-height:1.8;color:var(--sub)}.dm-summary .dm-s b{display:block;font-size:13.5px;color:var(--accent-deep);margin-bottom:2px}
+.demo-caption{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.7}
+@keyframes flashPop{0%{transform:scale(.8)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(65,75,90,.3)}50%{box-shadow:0 0 20px 6px rgba(65,75,90,.2)}100%{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.demo,.demo *{transition-duration:0s!important;animation-duration:0s!important}}
+@media(max-width:760px){.compare{grid-template-columns:1fr}.dm-board{grid-template-columns:1fr}.dm-stages{grid-template-columns:1fr 1fr}.objective{grid-template-columns:1fr}.lesson-header:after{display:none}.demo{padding:18px}.demo-ctrl{width:100%}.demo-ctrl button{flex:1}.visual{padding:14px}.dm-trace li{flex-direction:column;gap:4px}.dm-bar{flex-direction:column}.dm-bar .dm-b-label{padding-top:0}.dm-input{width:100%}.dm-summary.on{max-height:640px}}
+</style>
+<meta name="description" content="Codex writes positive and negative examples into the rule itself: how a command is split, prefix-matched, and judged at the strictest level, and how load-time tests pin down false hits">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"execpolicy: Let the Policy File Carry Its Own Tests","name":"execpolicy: Let the Policy File Carry Its Own Tests","url":"https://xueai.miyang.cn/slides/codex-17.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Sandbox","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Codex writes positive and negative examples into the rule itself: how a command is split, prefix-matched, and judged at the strictest level, and how load-time tests pin down false hits","datePublished":"2026-08-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="execpolicy: Let the Policy File Carry Its Own Tests"><meta property="og:description" content="Codex writes positive and negative examples into the rule itself: how a command is split, prefix-matched, and judged at the strictest level, and how load-time tests pin down false hits"><meta property="og:url" content="https://xueai.miyang.cn/slides/codex-17.en.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/codex-17.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.miyang.cn/slides/codex-17.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/codex-17.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/codex-17.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/codex-17.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/codex-17.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/codex-17.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/codex-17.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/codex-17.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI Product Manager Training">
+<meta property="og:locale" content="en_US">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>OpenAI Codex · Code Mode</div>
+    <h1>execpolicy: Let the Policy File Carry Its Own Tests</h1>
+    <p class="subtitle">A whitelist gone wrong usually only shows up in production. Codex writes the examples into the rule itself and runs them on load. If the rule and the examples fight, that policy never enters the session.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>Examples live in the rule itself and run at load time; prefix match is exact, and multiple rules take the strictest</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5" fill="none"/></svg>
+    <span><b>Course goal</b>After this lesson you can explain two things. How a command is split after it enters the policy, how it hits by prefix, and how it ends up allow, prompt, or forbidden. And why the examples next to a rule can pin down false hits at load time.</span>
+  </div>
+
+  <div class="sec-label">Try it first · One command through the policy</div>
+  <div class="demo reveal" id="demo-policy">
+    <div class="demo-top">
+      <div class="demo-title">One policy, four commands, three writings</div>
+      <div class="demo-ctrl">
+        <button id="dm-play" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="none"/></svg>Play</button>
+        <button id="dm-step" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z" fill="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Step</button>
+        <button id="dm-reset" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" fill="none"/><path d="M3 3v5h5" fill="none"/></svg>Reset</button>
+      </div>
+    </div>
+    <div class="dm-bar">
+      <span class="dm-b-label">Cmd</span>
+      <div class="dm-seg" id="dm-cmds">
+        <button type="button" data-cmd="ls" class="on">ls -l</button>
+        <button type="button" data-cmd="hard">git reset --hard</button>
+        <button type="button" data-cmd="keep">git reset --keep</button>
+        <button type="button" data-cmd="wrap">bash -lc wrap</button>
+      </div>
+      <span class="dm-b-hint">Safe, dangerous-flagged, looks dangerous, wrapped as a disguise. Pick one, then play.</span>
+    </div>
+    <div class="dm-bar">
+      <span class="dm-b-label">Policy</span>
+      <div class="dm-seg" id="dm-modes">
+        <button type="button" data-mode="ok" class="on">Correct rule</button>
+        <button type="button" data-mode="short">Prefix too short</button>
+        <button type="button" data-mode="badneg">Bad negative</button>
+      </div>
+      <div class="dm-input">
+        <input id="dm-custom" type="text" spellcheck="false" autocomplete="off" placeholder="Try a command, press Enter">
+        <button id="dm-go" type="button">Judge</button>
+      </div>
+    </div>
+    <div class="dm-stages" id="dm-stages">
+      <div class="dm-st" data-st="split"><span class="dm-st-k">1 Split</span><span class="dm-st-v" id="dm-st-split">Waiting</span></div>
+      <div class="dm-st" data-st="load"><span class="dm-st-k">2 Load check</span><span class="dm-st-v" id="dm-st-load">Waiting</span></div>
+      <div class="dm-st" data-st="match"><span class="dm-st-k">3 Prefix match</span><span class="dm-st-v" id="dm-st-match">Waiting</span></div>
+      <div class="dm-st" data-st="judge"><span class="dm-st-k">4 Strictest call</span><span class="dm-st-v" id="dm-st-judge">Waiting</span></div>
+    </div>
+    <div class="dm-board">
+      <div class="dm-panel">
+        <h5>argv this step sees</h5>
+        <div class="dm-tokens" id="dm-tokens"></div>
+        <div class="dm-note" id="dm-tok-note">No tokens yet.</div>
+      </div>
+      <div class="dm-panel">
+        <h5>Tests the policy carries</h5>
+        <div class="dm-cases">
+          <div class="dm-case" id="dm-pos">
+            <div class="dm-c-h"><span class="dm-c-t">Positive must hit</span><span class="dm-c-s" id="dm-pos-s">Not run</span></div>
+            <div class="dm-c-x" id="dm-pos-x">git reset --hard</div>
+          </div>
+          <div class="dm-case" id="dm-neg">
+            <div class="dm-c-h"><span class="dm-c-t">Negative must miss</span><span class="dm-c-s" id="dm-neg-s">Not run</span></div>
+            <div class="dm-c-x" id="dm-neg-x">git reset --keep</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dm-verdict" id="dm-verdict">Hit Play to see how this command is split, which rule it hits, and what grade it gets.</div>
+    <div class="dm-trace">
+      <div class="dm-trace-tag">Logic trail · each animation step maps to a stretch of source</div>
+      <ol id="dm-trace">
+        <li><span>Read the policy text and start parse</span><span class="ln">parser.rs L57</span></li>
+        <li><span>Starlark evaluates prefix_rule; missing decision defaults to allow</span><span class="ln">parser.rs L348</span></li>
+        <li><span>Rules and examples go onto the pending-check queue</span><span class="ln">parser.rs L405</span></li>
+        <li><span>Run negatives first; a hit reports ExampleDidMatch</span><span class="ln">parser.rs L145</span></li>
+        <li><span>Then positives; a miss reports ExampleDidNotMatch</span><span class="ln">parser.rs L147</span></li>
+        <li><span>Wrapped commands are split into inner argv first</span><span class="ln">exec_policy.rs L831</span></li>
+        <li><span>Exact-lookup the rule bucket by the first token</span><span class="ln">policy.rs L334</span></li>
+        <li><span>Multiple rules or a compound command take the strictest</span><span class="ln">policy.rs L403</span></li>
+        <li><span>The call maps to Skip, NeedsApproval, or Forbidden</span><span class="ln">exec_policy.rs L375</span></li>
+      </ol>
+    </div>
+    <div class="dm-caption" id="dm-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none"/></svg><span id="dm-caption-text">Hit Play to see how a command clears the policy, and how built-in examples pin the call down.</span></div>
+    <div class="dm-summary" id="dm-summary">
+      <div class="dm-s"><b>It dies at load time</b>When the prefix is too short or the negative is wrong, none of the four commands get a chance at allow or forbidden. The policy hasn’t been handed over; the bad example already aborted load.</div>
+      <div class="dm-s"><b>Why --keep survives</b>The correct rule writes the pattern as three tokens. The third token doesn’t match --keep, so the ban stays dark. That isn’t a heuristic miss — the author pinned the boundary with a negative.</div>
+      <div class="dm-s"><b>Wrapping doesn’t save it</b>Wrap it in bash -lc: if it splits, judge the inner argv. Only a failed split falls back to the whole line. This demo wrap does split, so it’s still forbidden.</div>
+    </div>
+    <div class="demo-caption">Teaching sketch: the stage only demos two sample rules — ban git reset --hard, allow ls. No real shell is run. Line numbers on the logic trail match openai/codex commit 4f39251a01.</div>
+  </div>
+
+  <div class="sec-label">Idea 1 · Keep the rule and the examples in one place</div>
+
+  <div class="q-tag reveal">What problem it solves</div>
+  <p class="reveal">You write a ban for the team, pattern as git plus reset. You meant to stop <code>--hard</code>. A week later someone reports <code>--keep</code> is blocked too. Shorten the prefix and anything after it hits the same rule.</p>
+  <p class="reveal">Another week on, the model wraps it in <code>bash -lc</code>. The ban matches literal argv against <code>bash</code>, the first token misses, and the command slides into the heuristic path.</p>
+  <p class="reveal">Every whitelist line is betting two things. One, the pattern covers what you meant to stop. Two, it won’t false-hit what you meant to let through. You usually only learn that in production. The next person who edits the pattern also can’t see which command the author was afraid of clipping.</p>
+
+  <div class="q-tag reveal">What the idea is</div>
+  <p class="reveal">Codex writes the examples into the rule itself. <code>match</code> is the command this rule must hit; <code>not_match</code> is the one it must miss. <code>prefix_rule</code> doesn’t run examples on the spot — it queues the rule and the examples. After the whole Starlark file evaluates, <code>parse</code> checks them together.</p>
+  <p class="reveal">Order is fixed. Negatives first, then positives. A false hit on a negative reports <code>ExampleDidMatch</code>. If no positive hits, it reports <code>ExampleDidNotMatch</code>. Either error makes <code>parse</code> fail, and <code>Policy</code> is never <code>build</code>ed out.<span class="src-note">Source: <code>codex-rs/execpolicy/src/parser.rs</code> lines 57–78 and 133–151</span></p>
+  <p class="reveal paywall-locked xa-peek">The crate README puts it in one line: they are sample invocations checked at load time, and you can treat them as unit tests. Both the string form and the token-array form become a token list in the parser; strings go through <code>shlex</code>. During the check the heuristic callback is empty, so a positive must hit a real prefix rule — it can’t ride a heuristic.</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 280" role="img" aria-label="On load, run examples first, then decide whether to hand the policy over">
+      <defs><marker id="arrA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker><marker id="arrR" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#dc2626"/></marker></defs>
+      <rect x="36" y="88" width="150" height="72" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="111" y="120" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">Starlark eval</text>
+      <text x="111" y="142" fill="#6b7280" text-anchor="middle" font-size="13">Attach rules and examples</text>
+      <path fill="none" d="M194 124H250" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="258" y="88" width="168" height="72" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="342" y="120" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">Negatives first</text>
+      <text x="342" y="142" fill="#6b7280" text-anchor="middle" font-size="13">Must hit none</text>
+      <path fill="none" d="M434 124H490" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="498" y="88" width="168" height="72" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="582" y="120" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">Then positives</text>
+      <text x="582" y="142" fill="#6b7280" text-anchor="middle" font-size="13">Must hit at least one</text>
+      <path fill="none" d="M674 108H730" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <path fill="none" d="M674 140H730" stroke="#dc2626" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="738" y="52" width="166" height="62" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="821" y="88" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">Hand over Policy</text>
+      <rect x="738" y="142" width="166" height="62" rx="12" fill="#fdeaea" stroke="rgba(220,38,38,.4)"/>
+      <text x="821" y="178" fill="#dc2626" text-anchor="middle" font-size="14" font-weight="700">Load failed</text>
+      <text x="470" y="230" fill="#6b7280" text-anchor="middle" font-size="13">If examples don’t line up, it stops before the policy is handed over</text>
+      <text x="470" y="256" fill="#6b7280" text-anchor="middle" font-size="13">The error carries the prefix_rule call’s line and column</text>
+    </svg>
+    <div class="visual-caption">Teaching timeline: eval only collects; the check happens before build.</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">The typical whitelist failure is the author thinking the pattern means one thing. Write that belief down as examples and the machine can disagree. This doesn’t depend on Starlark — copy it into JSON or YAML and it still holds.</p>
+  <p class="reveal paywall-locked">Keep the rule and the examples together, and when the policy file is copied into a user directory or shipped as an overlay, the examples travel with it. The loader has no branch that reads rules and skips examples. Skipping examples is skipping tests. The loader won’t invent examples for you; if you wrote them, it will enforce them.</p>
+
+  <div class="sec-label paywall-locked">Idea 2 · Prefix match; multiple rules take the strictest</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">A regex can say <code>git reset</code> plus anything, and it can also write exceptions the author can no longer read. If stacked rules take the widest, one loose user-level allow can cover a system-level forbidden.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">The rule body is a prefix. Matching is exact string equality — no glob, no regex. <code>git reset --hard</code> will eat a command that then adds <code>origin/main</code>, because extra tokens don’t join the compare. It will not eat a <code>--config</code> stuffed in the middle, because the second token misses.<span class="src-note">Source: <code>codex-rs/execpolicy/src/rule.rs</code> lines 46–59</span></p>
+  <p class="reveal paywall-locked">Rules go into buckets by the first token. Lookup exact-matches argv[0] first. If that misses, it may fold an absolute path down to a basename. On multiple hits it takes <code>max</code> of <code>decision</code>. <code>Decision</code> derives <code>Ord</code>; variant write order is severity: Allow &lt; Prompt &lt; Forbidden.</p>
+  <p class="reveal paywall-locked">Compound commands are split, flattened, then <code>max</code>ed again. One segment <code>git status</code> is Prompt, one <code>git commit</code> is Forbidden, and the whole pipe is still Forbidden.<span class="src-note">Source: <code>codex-rs/execpolicy/src/policy.rs</code> lines 265–287 and 402–411</span></p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 260" role="img" aria-label="When several rules hit, the only move is stricter">
+      <defs><marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="40" width="200" height="70" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="140" y="70" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">git prefix</text>
+      <text x="140" y="92" fill="#6b7280" text-anchor="middle" font-size="13">decision = prompt</text>
+      <rect x="40" y="132" width="200" height="70" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="140" y="162" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">git commit prefix</text>
+      <text x="140" y="184" fill="#6b7280" text-anchor="middle" font-size="13">decision = forbidden</text>
+      <path fill="none" d="M250 75H360" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <path fill="none" d="M250 167H360" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="368" y="86" width="220" height="70" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="478" y="116" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">git commit -m hi</text>
+      <text x="478" y="138" fill="#6b7280" text-anchor="middle" font-size="13">Both enter matchedRules</text>
+      <path fill="none" d="M596 121H700" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="708" y="86" width="192" height="70" rx="12" fill="#fdeaea" stroke="rgba(220,38,38,.4)"/>
+      <text x="804" y="116" fill="#dc2626" text-anchor="middle" font-size="14" font-weight="700">max = Forbidden</text>
+      <text x="804" y="138" fill="#6b7280" text-anchor="middle" font-size="13">Allow &lt; Prompt &lt; Forbidden</text>
+      <text x="470" y="236" fill="#6b7280" text-anchor="middle" font-size="13">Stacking can only tighten. The order lives on the enum variants; there is no second priority table</text>
+    </svg>
+    <div class="visual-caption">Teaching contrast: one command hits two rules; the outside only sees the stricter one.</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">Stacking can only tighten, never loosen. That order lives on the enum variants; runtime has no second priority table to get wrong. Rewrite it in another language: three strings as an ordered enum, one <code>max</code> to fold them.</p>
+  <p class="reveal paywall-locked">A prefix forces you to land intent as a token sequence. The cost: a flag stuffed in the middle kills the rule, so the author must shorten the prefix or write another. The examples are there to catch that cost: write it too short and the negative dies at load time.</p>
+
+  <div class="sec-label paywall-locked">Idea 3 · Unwrap first; if it won’t unwrap, fall back to the whole line</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">The ban is written as <code>git reset --hard</code>. The model wraps it in <code>bash -lc</code>. Match literal argv and the first token is <code>bash</code> — the ban stays dark.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">Before judging, it runs <code>parse_shell_lc_plain_commands</code>. The script may only be plain-word commands plus <code>&amp;&amp;</code>, <code>||</code>, semicolons, and pipes — no redirects, substitutions, parens, or control flow. Once it passes, command nodes become argv segments. <code>bash -lc</code> wrapping <code>git reset --hard</code> splits into those three inner tokens, then those go to prefix match.<span class="src-note">Source: <code>codex-rs/core/src/exec_policy.rs</code> lines 831–858</span></p>
+  <p class="reveal paywall-locked">If it won’t split, the whole argv is one command, handed to heuristics and the later sandbox. Empty quotes in an argument can still be recovered. Empty quotes in the command name fail word-only parse, the prefix rule never sees <code>git</code>, and the command drops into heuristics.</p>
+  <div class="key-line reveal paywall-locked">If you can’t swallow the script, don’t pretend you already understood it.</div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">The parser admits what it can’t swallow, so it doesn’t pretend it already understood the script. That’s the generic fail-closed shape. It stops a successful parse that dropped a dangerous segment. After a failed split, heuristics and the sandbox are still there.</p>
+
+  <div class="sec-label paywall-locked">Side-by-side · Another answer to the same question</div>
+  <div class="compare paywall-locked">
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness: two knobs and a dropdown</h4>
+      <p>DSH doesn’t write command-level patterns. Permission presets bundle sandbox mode and approval policy. The default table has two rows: <code>workspace-write</code> with <code>ask</code>, <code>danger-full-access</code> with <code>never</code>. Approval policy itself is only <code>ask</code> and <code>never</code>.</p>
+      <p>The knobs are easy. You cannot write a preset that only bans <code>git reset --hard</code> and leaves other git alone. That exception either goes to the escalate-after-sandbox-deny path, or to a custom knob combo shown under the reserved name <code>custom</code>. The dropdown covers everyday switches; the long tail of named bans it cannot cover.</p>
+      <span class="cmp-tag">Both sides verified against source · 2026-08-22 · <a href="dsh-15.html">DSH · Approvals &amp; Permissions</a></span>
+    </div>
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code: tool name plus an optional-content allowlist</h4>
+      <p>A rule string looks like <code>Bash</code>, or <code>Bash(npm install)</code>, or <code>Bash(git *)</code>. The parser splits tool name and content on the parens. Shell rules then split into exact, prefix, and glob.</p>
+      <p>Search <code>match</code>, <code>not_match</code>, <code>example</code> as rule fields: there is no load-time example check. Once <code>git *</code> is in allow, <code>git reset --hard</code> is eaten by that glob unless you write a more specific deny. Codex pins exceptions at load time with a shorter exact prefix plus a negative. Claude Code leaves exceptions to rule stacking order and a runtime confirm.</p>
+      <span class="cmp-tag">Both sides verified against source · 2026-08-22</span>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div>
+      <h3>Prefix too short: load or judge?</h3>
+      <p>Shorten the ban on <code>git reset --hard</code> to git plus reset, and leave <code>not_match</code> as <code>--keep</code>. At load, do you get <code>ExampleDidMatch</code> or <code>ExampleDidNotMatch</code>, and does the command still get a chance to be judged?</p>
+      <p>A harder follow-up: under that same bad rule, does <code>ls -l</code> still get allow first? In the demo, switch the policy to “Prefix too short” and play it again — check it against your reasoning.</p>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/></svg>
+    <span><b>Takeaway:</b>Keep the rule and the examples in one place, and run them on load. A positive must hit, a negative must miss; if they fight, refuse to load. Prefix compare is exact; multiple rules take the strictest. Unwrap first; if it won’t unwrap, fall back to the whole line.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function(){
+  var cmdId = 'ls', mode = 'ok', custom = null;
+  var steps = [], idx = 0, autoId = null, pauseUntil = 0, played = false;
+  var prevToks = {}, prevStages = {}, prevStageTxt = {}, prevPos = '', prevNeg = '', prevVKind = '', prevTrace = null, prevNote = '';
+  var stagesBox = document.getElementById('dm-stages');
+  var casesBox = document.querySelector('.dm-cases');
+  var traceBox = document.querySelector('.dm-trace');
+  var stageEls = {
+    split: document.getElementById('dm-st-split').parentNode,
+    load: document.getElementById('dm-st-load').parentNode,
+    match: document.getElementById('dm-st-match').parentNode,
+    judge: document.getElementById('dm-st-judge').parentNode
+  };
+  var stageTxt = {
+    split: document.getElementById('dm-st-split'),
+    load: document.getElementById('dm-st-load'),
+    match: document.getElementById('dm-st-match'),
+    judge: document.getElementById('dm-st-judge')
+  };
+  var tokensEl = document.getElementById('dm-tokens');
+  var tokNote = document.getElementById('dm-tok-note');
+  var posEl = document.getElementById('dm-pos');
+  var negEl = document.getElementById('dm-neg');
+  var posS = document.getElementById('dm-pos-s');
+  var negS = document.getElementById('dm-neg-s');
+  var posX = document.getElementById('dm-pos-x');
+  var negX = document.getElementById('dm-neg-x');
+  var verdict = document.getElementById('dm-verdict');
+  var traceRows = Array.prototype.slice.call(document.querySelectorAll('#dm-trace li'));
+  var captionText = document.getElementById('dm-caption-text');
+  var summary = document.getElementById('dm-summary');
+  var IDLE = 'Hit Play to see how a command clears the policy, and how built-in examples pin the call down.';
+
+  var PRESET = {
+    ls: { raw: 'ls -l', argv: ['ls', '-l'] },
+    hard: { raw: 'git reset --hard', argv: ['git', 'reset', '--hard'] },
+    keep: { raw: 'git reset --keep', argv: ['git', 'reset', '--keep'] },
+    wrap: { raw: "bash -lc 'git reset --hard'", argv: ['bash', '-lc', 'git reset --hard'], inner: ['git', 'reset', '--hard'] }
+  };
+
+  function tokenize(s){
+    return String(s || '').trim().split(/\s+/).filter(Boolean);
+  }
+  function parseCustom(s){
+    s = String(s || '').trim();
+    if (!s) return null;
+    var m = s.match(/^bash\s+-lc\s+['"]([\s\S]+)['"]$/);
+    if (m) return { raw: s, argv: ['bash', '-lc', m[1]], inner: tokenize(m[1]) };
+    return { raw: s, argv: tokenize(s) };
+  }
+  function currentCmd(){
+    if (cmdId === 'custom' && custom) return custom;
+    return PRESET[cmdId] || PRESET.ls;
+  }
+  function prefixHit(pattern, argv){
+    if (!argv || argv.length < pattern.length) return false;
+    for (var i = 0; i < pattern.length; i++) if (argv[i] !== pattern[i]) return false;
+    return true;
+  }
+  function decide(argv){
+    if (prefixHit(['git', 'reset', '--hard'], argv)) return { name: 'forbidden', prefix: 'git reset --hard' };
+    if (prefixHit(['ls'], argv)) return { name: 'allow', prefix: 'ls' };
+    return { name: 'nomatch', prefix: '' };
+  }
+
+  function buildSteps(){
+    var cmd = currentCmd();
+    var raw = cmd.raw;
+    var argv = cmd.argv.slice();
+    var inner = cmd.inner ? cmd.inner.slice() : null;
+    var work = inner || argv;
+    var out = [];
+    var modeName = mode === 'ok' ? 'Correct rule' : mode === 'short' ? 'Prefix too short' : 'Bad negative';
+    var loadFail = mode !== 'ok';
+    var failWhy = mode === 'short'
+      ? 'The prefix became git reset, so the negative git reset --keep hit it too.'
+      : 'The negative was written as the positive itself, so git reset --hard must both hit and miss.';
+    var d = decide(work);
+    var tokOn = work.map(function(t){ return { t: t, k: 'on' }; });
+    var tokHit = work.map(function(t, i){
+      var hitLen = d.name === 'forbidden' ? 3 : d.name === 'allow' ? 1 : 0;
+      return { t: t, k: i < hitLen ? 'hit' : 'on' };
+    });
+
+    out.push({
+      cap: 'Look at this command first: ' + raw + '. Policy gear is “' + modeName + '”. Examples have not run yet.',
+      trace: 0,
+      stages: { split: ['', 'Waiting'], load: ['', 'Waiting'], match: ['', 'Waiting'], judge: ['', 'Waiting'] },
+      tokens: [], note: 'No tokens yet.',
+      pos: ['', 'Not run'], neg: ['', 'Not run'],
+      vKind: '', v: 'Waiting to split.'
+    });
+    out.push({
+      cap: inner
+        ? 'Outer is bash -lc. It splits; inner becomes git, reset, --hard. Wrapping cannot dodge the prefix rule.'
+        : 'The command splits into ' + argv.join(', ') + '. No wrap; the whole line is one command.',
+      trace: 5,
+      stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['', 'Waiting'], match: ['', 'Waiting'], judge: ['', 'Waiting'] },
+      tokens: tokOn,
+      note: inner ? 'After the split, keep going on the inner argv.' : 'Match rules against this token list.',
+      pos: ['', 'Not run'], neg: ['', 'Not run'],
+      vKind: '', v: 'Split done. Next: load the policy.'
+    });
+    out.push({
+      cap: 'Starlark evaluates prefix_rule. Rules and examples go onto the pending-check queue; nothing is handed over yet.',
+      trace: 2,
+      stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['on', 'Collect examples'], match: ['', 'Waiting'], judge: ['', 'Waiting'] },
+      tokens: tokOn, note: 'Policy is still loading; the command waits to the side.',
+      pos: ['', 'Queued'], neg: ['', 'Queued'],
+      vKind: 'hold', v: 'Run the examples first. Judging comes after.'
+    });
+
+    if (loadFail) {
+      out.push({
+        cap: failWhy + ' Reports ExampleDidMatch; the policy is refused on the spot.',
+        trace: 3,
+        stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['warn', 'Load failed'], match: ['dim', 'Not reached'], judge: ['dim', 'Not reached'] },
+        tokens: tokOn, note: 'Later matching will not happen.',
+        pos: ['', 'Not run'], neg: ['fail', 'False hit'],
+        vKind: 'warn', v: 'Load failed. None of the four commands get a chance at allow or forbidden.',
+        fin: true
+      });
+      return out;
+    }
+
+    out.push({
+      cap: 'Negatives first. git reset --keep misses the three-token prefix, so it is let through.',
+      trace: 3,
+      stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['on', 'Run negatives'], match: ['', 'Waiting'], judge: ['', 'Waiting'] },
+      tokens: tokOn, note: 'A negative must miss every rule.',
+      pos: ['', 'Queued'], neg: ['pass', 'Missed'],
+      vKind: 'hold', v: 'Negative passed. Next, the positive.'
+    });
+    out.push({
+      cap: 'Then the positive. git reset --hard hits the ban. Load passes; the policy can be handed over.',
+      trace: 4,
+      stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['ok', 'Check passed'], match: ['', 'Waiting'], judge: ['', 'Waiting'] },
+      tokens: tokOn, note: 'A positive must hit a real prefix. It cannot ride a heuristic.',
+      pos: ['pass', 'Hit'], neg: ['pass', 'Missed'],
+      vKind: 'hold', v: 'Policy loaded. Start matching argv.'
+    });
+
+    if (d.name === 'forbidden') {
+      out.push({
+        cap: 'Exact-lookup the git bucket by the first token; prefix git reset --hard hits. Extra tokens do not join the compare.',
+        trace: 6,
+        stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['ok', 'Check passed'], match: ['on', 'Hit the ban'], judge: ['', 'Waiting'] },
+        tokens: tokHit, note: 'Hit prefix git reset --hard.',
+        pos: ['pass', 'Hit'], neg: ['pass', 'Missed'],
+        vKind: 'hold', v: 'Hit a forbidden rule.'
+      });
+      out.push({
+        cap: 'Only this one hit, so max is still Forbidden. Mapped to refuse execution.',
+        trace: 8,
+        stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['ok', 'Check passed'], match: ['on', 'Hit the ban'], judge: ['warn', 'forbidden'] },
+        tokens: tokHit, note: 'The call is pinned.',
+        pos: ['pass', 'Hit'], neg: ['pass', 'Missed'],
+        vKind: 'warn', v: 'forbidden. justification: destructive operation.',
+        fin: true
+      });
+      return out;
+    }
+
+    if (d.name === 'allow') {
+      out.push({
+        cap: 'Exact-lookup the ls bucket by the first token; it hits the default allow. Extra -l does not join the compare.',
+        trace: 6,
+        stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['ok', 'Check passed'], match: ['on', 'Hit allow'], judge: ['', 'Waiting'] },
+        tokens: tokHit, note: 'Hit prefix ls.',
+        pos: ['pass', 'Hit'], neg: ['pass', 'Missed'],
+        vKind: 'hold', v: 'Hit an allow rule.'
+      });
+      out.push({
+        cap: 'Call is Allow, mapped to Skip. This command can run straight through.',
+        trace: 8,
+        stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['ok', 'Check passed'], match: ['on', 'Hit allow'], judge: ['ok', 'allow'] },
+        tokens: tokHit, note: 'Safe commands take the allow bucket.',
+        pos: ['pass', 'Hit'], neg: ['pass', 'Missed'],
+        vKind: 'ok', v: 'allow. A real prefix allow, so Skip is fine.',
+        fin: true
+      });
+      return out;
+    }
+
+    out.push({
+      cap: 'Lookup the bucket by the first token: git reset --hard misses, ls misses. Prefix rules go empty.',
+      trace: 6,
+      stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['ok', 'Check passed'], match: ['on', 'No hit'], judge: ['', 'Waiting'] },
+      tokens: tokOn, note: 'Without a heuristic the CLI returns empty matchedRules.',
+      pos: ['pass', 'Hit'], neg: ['pass', 'Missed'],
+      vKind: 'hold', v: 'No prefix hit.'
+    });
+    out.push({
+      cap: 'The demo stops at no-hit. Only at runtime does the empty result go to heuristics. --keep survives because the author pinned the boundary with a negative.',
+      trace: 8,
+      stages: { split: ['on', inner ? 'Inner argv' : 'Whole line'], load: ['ok', 'Check passed'], match: ['on', 'No hit'], judge: ['hold', 'no match'] },
+      tokens: tokOn, note: 'This is exactly the line not_match is meant to lock.',
+      pos: ['pass', 'Hit'], neg: ['pass', 'Missed'],
+      vKind: 'hold', v: 'no match. By design the negative must not hit a prefix rule.',
+      fin: true
+    });
+    return out;
+  }
+
+  function bump(el, cls){
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+  function fadeText(el, text, animate){
+    if (!el) return;
+    if (!animate || el.textContent === text) { el.textContent = text; el.style.opacity = '1'; return; }
+    el.style.opacity = '0';
+    requestAnimationFrame(function(){
+      el.textContent = text;
+      requestAnimationFrame(function(){ el.style.opacity = '1'; });
+    });
+  }
+  function setStage(name, pair, animate){
+    var kind = pair[0] || '';
+    var text = pair[1];
+    var el = stageEls[name];
+    var prevKind = prevStages[name] || '';
+    var prevText = prevStageTxt[name] || '';
+    var changed = kind !== prevKind || text !== prevText;
+    el.className = 'dm-st' + (kind ? ' ' + kind : '');
+    if (changed && kind && kind !== 'dim' && text !== 'Waiting') el.classList.add('now');
+    stageTxt[name].textContent = text;
+    if (animate && changed && (kind === 'ok' || kind === 'warn')) bump(el, 'firing');
+    prevStages[name] = kind;
+    prevStageTxt[name] = text;
+  }
+  function setCase(el, sEl, pair, prevKey, animate){
+    var kind = pair[0] || '';
+    var mark = kind + '|' + pair[1];
+    var changed = mark !== prevKey;
+    el.className = 'dm-case' + (kind ? ' ' + kind : '');
+    if (changed && pair[1] !== 'Not run') el.classList.add('now');
+    sEl.textContent = pair[1];
+    if (animate && changed && (kind === 'pass' || kind === 'fail')) {
+      bump(el, kind === 'fail' ? 'firing' : 'pop');
+    }
+    return mark;
+  }
+  function paintTokens(tokens, animate){
+    var oldRects = {};
+    var nodes = {};
+    Array.prototype.slice.call(tokensEl.querySelectorAll('.dm-tok')).forEach(function(el){
+      var id = el.getAttribute('data-id');
+      nodes[id] = el;
+      oldRects[id] = el.getBoundingClientRect();
+    });
+    var keep = {};
+    var hasHit = false;
+    (tokens || []).forEach(function(item, i){
+      var key = String(i) + ':' + item.t;
+      keep[key] = true;
+      if (item.k === 'hit') hasHit = true;
+      var d = nodes[key];
+      var isNew = !d;
+      if (!d) {
+        d = document.createElement('span');
+        d.setAttribute('data-id', key);
+        d.textContent = item.t;
+        var order = (tokens || []).map(function(t, n){ return String(n) + ':' + t.t; });
+        var at = order.indexOf(key);
+        var nxt = null;
+        var j;
+        for (j = at + 1; j < order.length; j++) {
+          nxt = tokensEl.querySelector('[data-id="' + order[j] + '"]');
+          if (nxt) break;
+        }
+        if (nxt) tokensEl.insertBefore(d, nxt);
+        else tokensEl.appendChild(d);
+      }
+      var prev = prevToks[key] || '';
+      d.className = 'dm-tok' + (item.k ? ' ' + item.k : '');
+      if (animate && isNew) {
+        d.classList.add('is-enter');
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){ d.classList.add('in'); });
+        });
+      }
+      if (animate && !isNew && item.k === 'hit' && prev !== 'hit') bump(d, 'pop');
+    });
+    Object.keys(nodes).forEach(function(id){
+      if (!keep[id]) nodes[id].remove();
+    });
+    if (animate) {
+      Array.prototype.slice.call(tokensEl.querySelectorAll('.dm-tok')).forEach(function(el){
+        var id = el.getAttribute('data-id');
+        var old = oldRects[id];
+        if (!old) return;
+        var now = el.getBoundingClientRect();
+        var dx = old.left - now.left;
+        var dy = old.top - now.top;
+        if (!dx && !dy) return;
+        el.style.transition = 'none';
+        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        requestAnimationFrame(function(){
+          el.style.transition = '';
+          el.style.transform = '';
+        });
+      });
+    }
+    tokensEl.classList.toggle('has-hit', hasHit);
+    prevToks = {};
+    (tokens || []).forEach(function(item, i){ prevToks[String(i) + ':' + item.t] = item.k; });
+  }
+  function paint(st, animate){
+    var anyStage = ['split', 'load', 'match', 'judge'].some(function(k){ return st.stages[k][0]; });
+    stagesBox.classList.toggle('is-live', anyStage);
+    setStage('split', st.stages.split, animate);
+    setStage('load', st.stages.load, animate);
+    setStage('match', st.stages.match, animate);
+    setStage('judge', st.stages.judge, animate);
+    paintTokens(st.tokens || [], animate);
+    fadeText(tokNote, st.note, animate && prevNote !== st.note);
+    prevNote = st.note;
+    var casesLive = st.pos[1] !== 'Not run' || st.neg[1] !== 'Not run';
+    casesBox.classList.toggle('is-live', casesLive);
+    prevPos = setCase(posEl, posS, st.pos, prevPos, animate);
+    prevNeg = setCase(negEl, negS, st.neg, prevNeg, animate);
+    var vCls = 'dm-verdict' + (st.vKind ? ' ' + st.vKind : '');
+    verdict.className = vCls;
+    if (animate && st.vKind && st.vKind !== prevVKind && (st.vKind === 'ok' || st.vKind === 'warn')) bump(verdict, 'firing');
+    prevVKind = st.vKind || '';
+    verdict.textContent = st.v;
+    if (st.trace !== null && st.trace !== undefined) {
+      traceBox.classList.add('is-live');
+      traceRows.forEach(function(el, n){
+        el.classList.toggle('on', n === st.trace);
+        if (animate && n === st.trace && st.trace !== prevTrace) bump(el, 'firing');
+      });
+      prevTrace = st.trace;
+    }
+    fadeText(captionText, st.cap, animate);
+    if (st.fin) summary.classList.add('on');
+    else summary.classList.remove('on');
+  }
+
+  function idleBoard(){
+    prevToks = {}; prevStages = {}; prevStageTxt = {}; prevPos = ''; prevNeg = ''; prevVKind = ''; prevTrace = null; prevNote = '';
+    stagesBox.classList.remove('is-live');
+    casesBox.classList.remove('is-live');
+    traceBox.classList.remove('is-live');
+    tokensEl.classList.remove('has-hit');
+    ['split', 'load', 'match', 'judge'].forEach(function(k){ setStage(k, ['', 'Waiting'], false); });
+    tokensEl.innerHTML = '';
+    tokNote.style.opacity = '1';
+    tokNote.textContent = 'No tokens yet.';
+    setCase(posEl, posS, ['', 'Not run'], '', false);
+    setCase(negEl, negS, ['', 'Not run'], '', false);
+    posX.textContent = 'git reset --hard';
+    negX.textContent = mode === 'badneg' ? 'git reset --hard' : 'git reset --keep';
+    verdict.className = 'dm-verdict';
+    verdict.style.opacity = '1';
+    verdict.textContent = 'Hit Play to see how this command is split, which rule it hits, and what grade it gets.';
+    traceRows.forEach(function(el){ el.classList.remove('on'); el.classList.remove('firing'); });
+    summary.classList.remove('on');
+    captionText.style.opacity = '1';
+    captionText.textContent = IDLE;
+  }
+
+  function holdFor(i){
+    var st = steps[i];
+    if (!st) return 1100;
+    if (st.fin) return 2400;
+    if (st.neg && st.neg[0] === 'fail') return 2200;
+    if (st.neg && st.neg[0] === 'pass' && st.pos && st.pos[0] !== 'pass') return 1900;
+    if (st.pos && st.pos[0] === 'pass' && st.stages.load && st.stages.load[0] === 'ok' && !st.stages.match[0]) return 1900;
+    if (st.trace === 6) return 1700;
+    if (st.trace === 5 && st.stages.split[1] === 'Inner argv') return 1700;
+    if (st.trace === 0) return 1100;
+    if (st.trace === 5 || st.trace === 2) return 1400;
+    return 1500;
+  }
+  function tick(){
+    if (idx >= steps.length) { stop(); return; }
+    paint(steps[idx], true);
+    idx++;
+    if (idx >= steps.length) stop();
+  }
+  function stop(){
+    if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+    pauseUntil = 0;
+  }
+  function loop(ts){
+    if (idx >= steps.length) { autoId = null; return; }
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(loop); return; }
+    paint(steps[idx], true);
+    var wait = holdFor(idx);
+    idx++;
+    pauseUntil = ts + wait;
+    if (idx >= steps.length) { autoId = null; return; }
+    autoId = requestAnimationFrame(loop);
+  }
+  function reset(){
+    stop(); idx = 0;
+    steps = buildSteps();
+    idleBoard();
+  }
+  function play(){
+    if (idx >= steps.length) reset();
+    if (autoId) return;
+    pauseUntil = 0;
+    autoId = requestAnimationFrame(loop);
+  }
+  function applyCustom(){
+    var parsed = parseCustom(document.getElementById('dm-custom').value);
+    if (!parsed) return;
+    custom = parsed;
+    cmdId = 'custom';
+    Array.prototype.forEach.call(document.getElementById('dm-cmds').querySelectorAll('button'), function(el){ el.classList.remove('on'); });
+    reset();
+    play();
+  }
+
+  document.getElementById('dm-play').addEventListener('click', play);
+  document.getElementById('dm-step').addEventListener('click', function(){ stop(); tick(); });
+  document.getElementById('dm-reset').addEventListener('click', reset);
+  document.getElementById('dm-cmds').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    Array.prototype.forEach.call(this.children, function(el){ el.classList.remove('on'); });
+    b.classList.add('on');
+    cmdId = b.getAttribute('data-cmd');
+    custom = null;
+    reset();
+  });
+  document.getElementById('dm-modes').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    Array.prototype.forEach.call(this.children, function(el){ el.classList.remove('on'); });
+    b.classList.add('on');
+    mode = b.getAttribute('data-mode');
+    reset();
+  });
+  document.getElementById('dm-go').addEventListener('click', applyCustom);
+  document.getElementById('dm-custom').addEventListener('keydown', function(e){
+    if (e.key !== 'Enter') return;
+    if (e.isComposing) return;
+    e.preventDefault();
+    applyCustom();
+  });
+
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(document.getElementById('demo-policy'), function(){
+      if (played) return; played = true; play();
+    });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KV Cache 是接口 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson .sec-label{margin:56px 0 20px}
+.lesson p.reveal{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.doc-quote{background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:20px 22px;margin:12px 0 20px;font-size:14px;line-height:1.9;color:var(--text)}
+.doc-quote .q-src{display:block;margin-top:8px;font-size:12px;color:var(--sub)}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eef1ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+
+/* ── 前缀稳定性显微镜 ── */
+#demo-kvcache{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:12px}
+.kv-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.kv-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(77,107,254,.4);background:var(--accent-soft);color:var(--accent-deep);border-radius:11px;padding:12px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px}
+.kv-btn svg{flex:0 0 auto}
+.kv-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.kv-mode{display:flex;gap:0;border:1px solid rgba(77,107,254,.35);border-radius:11px;overflow:hidden;margin-left:auto}
+.kv-mode button{border:none;background:var(--card);color:var(--sub);padding:12px 14px;font:700 12.5px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;min-height:48px}
+.kv-mode button.active{background:var(--accent);color:#fff}
+.kv-stage{display:grid;grid-template-columns:1fr 250px;gap:14px;align-items:start}
+.kv-ribbon-wrap{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px}
+.kv-ribbon-title{font-size:12px;font-weight:800;color:var(--sub);margin-bottom:10px}
+.kv-ribbon{display:flex;gap:2px;height:52px;border-radius:8px;overflow:hidden}
+.kv-seg{position:relative;display:grid;place-items:center;font:700 9.5px/1.2 ui-monospace,Menlo,monospace;color:#fff;text-align:center;overflow:hidden;transition:background .35s,flex-basis .45s;min-width:0;padding:0 2px}
+.kv-seg span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.kv-seg.s-id{background:#3450d4}
+.kv-seg.s-persona{background:#7c3aed}
+.kv-seg.s-tool{background:#0891b2}
+.kv-seg.s-tool.alt{background:#0aa5c9}
+.kv-seg.s-ctx{background:#d97706}
+.kv-seg.s-hist{background:#9ca3af}
+.kv-seg.hit{filter:saturate(.35) brightness(1.28)}
+.kv-seg.hit:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--success)}
+.kv-seg.miss{filter:none}
+.kv-seg.miss:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--danger)}
+.kv-seg.pulse{animation:kvpulse .6s ease}
+@keyframes kvpulse{50%{transform:translateY(-4px)}}
+.kv-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:11.5px;color:var(--sub)}
+.kv-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.kv-hitline{margin-top:10px;font:700 12px/1.6 ui-monospace,Menlo,monospace;color:var(--text);min-height:20px}
+.kv-hitline b.ok{color:var(--success)}
+.kv-hitline b.bad{color:var(--danger)}
+.kv-meter{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px}
+.kv-meter-title{font-size:12px;font-weight:800;color:var(--sub);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.kv-meter-title svg{color:var(--accent)}
+.kv-meter-num{font:800 30px/1.1 ui-monospace,Menlo,monospace;color:var(--danger)}
+.kv-meter-num.pop{animation:kvpop .45s ease}
+@keyframes kvpop{50%{transform:scale(1.22)}}
+.kv-meter-sub{font-size:11.5px;color:var(--sub);line-height:1.6;margin-top:6px}
+.kv-meter-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--text);margin-top:10px;padding-top:10px;box-shadow:0 -1px 0 var(--border)}
+.kv-meter-row b{font-family:ui-monospace,Menlo,monospace}
+.kv-caption{display:flex;gap:9px;align-items:flex-start;margin-top:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.8;color:var(--text);min-height:64px}
+.kv-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}
+  .kv-stage{grid-template-columns:1fr}
+  .kv-mode{margin-left:0;width:100%}
+  .kv-mode button{flex:1}
+  .source-head{flex-direction:column}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .kv-btn{flex:1 1 auto;justify-content:center}
+  .kv-ribbon{height:44px}
+}
+</style>
+<meta name="description" content="DSH 把 system prompt 的前綴穩定性當成相容性承諾來維護：215 個包文檔帶固定 KV Cache effect 章節，工具順序由中心列表規範化，插值格式錯誤寧可拋異常。">
+<meta name="author" content="洛小山">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/dsh-28.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/dsh-28.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/dsh-28.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/dsh-28.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/dsh-28.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/dsh-28.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/dsh-28.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/dsh-28.html">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"KV Cache 是接口","name":"KV Cache 是接口","url":"https://xueai.miyang.cn/slides/dsh-28.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 工程方法論","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"DSH 把 system prompt 的前綴穩定性當成相容性承諾來維護：215 個包文檔帶固定 KV Cache effect 章節，工具順序由中心列表規範化，插值格式錯誤寧可拋異常。","datePublished":"2026-08-13","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="KV Cache 是接口"><meta property="og:description" content="DSH 把 system prompt 的前綴穩定性當成相容性承諾來維護：215 個包文檔帶固定 KV Cache effect 章節，工具順序由中心列表規範化，插值格式錯誤寧可拋異常。"><meta property="og:url" content="https://xueai.miyang.cn/slides/dsh-28.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 工程方法論</div>
+    <h1>KV Cache 是接口</h1>
+    <p class="subtitle">prompt 前綴穩定性當成相容性承諾來維護。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>prompt 前綴穩定性當成相容性承諾來維護</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>課程目標</b>讀完你能説清三件事：為什麼改 prompt 前綴裏的一個字會讓後面所有 token 的緩存作廢、DSH 靠哪三件事把前綴穩定性當成相容性承諾來維護（文檔紀律、工具順序中心列表、嚴格插值）、以及 Claude Code 用一次 10.2% 的真金白銀教訓驗證了同一個道理。</span>
+  </div>
+
+  <div class="sec-label">互動演示 · 前綴穩定性顯微鏡</div>
+  <p class="reveal">先玩再講。下面的色帶是一條 system prompt 加工具 schema 的 token 序列（數值為教學化抽象）。點「播放」，演示會依次做幾個常見操作：原樣重發、改 persona 一個字、加一個工具、追加對話、插件加載順序抖動。每一步色帶上會標出緩存從第幾個 token 起失效，右邊的計價器累計你多付的重算 token。右上角可以切換 DSH 模式和對照模式，抖動那一步的結果完全不同。</p>
+  <div id="demo-kvcache" class="reveal">
+    <div class="kv-toolbar">
+      <button class="kv-btn primary" id="kvPlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>播放</button>
+      <button class="kv-btn" id="kvStep"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>單步</button>
+      <button class="kv-btn" id="kvReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>重置</button>
+      <div class="kv-mode">
+        <button id="kvModeDsh" class="active" type="button">DSH · 中心列表</button>
+        <button id="kvModeReg" type="button">對照 · 註冊順序</button>
+      </div>
+    </div>
+    <div class="kv-stage">
+      <div class="kv-ribbon-wrap">
+        <div class="kv-ribbon-title">發給模型的請求前綴（每格一段，寬度按 token 數）</div>
+        <div class="kv-ribbon" id="kvRibbon"></div>
+        <div class="kv-legend">
+          <span><i style="background:#3450d4"></i>harness 身份</span>
+          <span><i style="background:#7c3aed"></i>persona</span>
+          <span><i style="background:#0891b2"></i>工具 schema</span>
+          <span><i style="background:#d97706"></i>動態上下文</span>
+          <span><i style="background:#9ca3af"></i>對話歷史</span>
+        </div>
+        <div class="kv-hitline" id="kvHitline">尚未發出請求。</div>
+      </div>
+      <div class="kv-meter">
+        <div class="kv-meter-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>失效成本計價器</div>
+        <div class="kv-meter-num" id="kvCost">0</div>
+        <div class="kv-meter-sub">本該命中緩存、卻被迫重算的 token 累計。緩存命中的輸入價通常比未命中便宜一個數量級，這個數字直接乘在帳單上。</div>
+        <div class="kv-meter-row"><span>本次請求命中</span><b id="kvHitPct">–</b></div>
+        <div class="kv-meter-row"><span>請求次數</span><b id="kvReqN">0</b></div>
+      </div>
+    </div>
+    <div class="kv-caption">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      <span id="kvCaptionText">點「播放」開始。KV Cache（鍵值緩存）：模型對相同的 token 前綴可以複用上一次的注意力計算，前提是前綴逐字相同。</span>
+    </div>
+  </div>
+
+  <div class="sec-label">邏輯拆解 · 為什麼一個字能廢掉一整條緩存</div>
+  <p class="reveal">先把 KV Cache 説成人話。模型處理請求時，會為每個 token 算出一堆中間結果（鍵和值）緩存起來。下一條請求進來，只要開頭的 token 序列和上一條逐字相同，這段前綴的計算就能直接複用，provider 按命中給你打折。DeepSeek 的官方定價裏，命中緩存的輸入 token 比未命中便宜一個數量級（具體倍率以官方價目頁為準）。</p>
+  <p class="reveal">關鍵在逐字相同這四個字。緩存按前綴匹配：從第一個不同的 token 起，後面全部作廢。而 agent 請求的開頭是什麼？system prompt 加工具 schema，動輒幾千 token，每條請求都帶。改 persona 裏一個詞、換一下工具順序、在開頭塞個當前時間，緩存就從那個位置斷掉，之後的每條請求都全價重算。</p>
+  <p class="reveal">所以 DSH 得出一個結論：prompt 前綴是模型這個 API 的接口，它的穩定性是一種相容性承諾，要像維護公開 API 一樣維護。落到工程上是三件事。</p>
+  <p class="reveal"><b>第一件，寫進文檔紀律。</b>本地快照裏 packages 下 268 個包 README，有 215 個帶一個固定的 <code>#### KV Cache effect</code> 小節。任何會出現在模型請求裏的東西，文檔必須按三段式交代：模型看到什麼（What the model sees）、token 成本多少（Token effect）、對緩存有什麼影響（KV Cache effect）。以 <code>packages/core/tools/README.md</code> 的工具 schema 一節為例，第 145 行原文：</p>
+  <div class="doc-quote reveal">
+    Prefix-stable while visible definitions and their order are unchanged. Registration, disposal, or scoped restriction may invalidate reuse from the first changed schema token.<br>（只要可見的工具定義及其順序不變，前綴就穩定。註冊、卸載或按作用域限制工具，都可能從第一個變化的 schema token 起使緩存複用失效。）
+    <span class="q-src">出處：deepseek-harness-master 倉庫 <code>packages/core/tools/README.md</code> 第 145 行，核對日期 2026-08-13</span>
+  </div>
+  <p class="reveal">同一個文件第 186 到 188 行還有一句反向陳述：工具調用的歷史和結果是 append-only 的，新內容跟在可複用前綴後面，不會打翻已有的緩存。什麼傷緩存、什麼不傷，全部寫成可查的文檔條目。</p>
+  <p class="reveal"><b>第二件，工具順序由中心列表規範化。</b>工具 schema 是前綴的大頭，它的順序原本跟着插件註冊順序走。插件是併發加載的，註冊順序隨環境抖動，DSH 在 CI 裏實際觀察到了不同的請求頭（Agent Note <code>2026-07-06-explicit-tool-order</code> 的問題一節）。順序影響請求字節，請求字節影響緩存，於是它成了必須顯式治理的對象：配置裏的 <code>toolOrder</code> 列表統一定序，列表裏必須恰好有一個 <code>&lt;unlisted-tools&gt;</code> 其餘項標記，沒配列表就按字典序兜底。規範化發生在 <code>assemble()</code> 內部、waterfall 之前，註冊順序在任何可觀測的位置都不再出現。</p>
+  <p class="reveal paywall-locked xa-peek"><b>第三件，嚴格插值，寧可拋異常不交付壞 prompt。</b>persona 是模板，<code>{{model}}</code> 這樣的變數組嚴格按註冊表解釋：引用了未註冊的變數、變數本次沒有值、花括號組格式錯誤，一律拋異常，輪次直接失敗，一個請求都不會發出去。理由很直接：靜默容錯等於把一個悄悄變形的前綴發給模型，緩存悄悄失效，壞 prompt 還可能悄悄改變行為。大聲失敗反而便宜。</p>
+  <div class="facts paywall-locked">
+    <div class="fact reveal"><code>順序也是接口</code><p>兩組內容完全相同、只是順序不同的工具 schema，對緩存來説是兩個不同的前綴。所以工具順序不能交給加載時序這種環境噪聲決定。</p></div>
+    <div class="fact reveal"><code>失效從第一個變化 token 開始</code><p>緩存按前綴匹配，越靠前的內容越碰不得。把易變的東西（時間、動態狀態）往後放，把萬年不變的身份和 schema 往前放。</p></div>
+    <div class="fact reveal"><code>追加不傷緩存</code><p>對話歷史 append-only 地增長，舊前綴原樣保留，只為新增部分付全價。這也是會話日誌只追加設計在帳單上的紅利。</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked">關鍵證據 · 中心列表與嚴格插值的源碼</div>
+  <p class="reveal paywall-locked">下面這段是工具排序的核心邏輯。函式開頭（第 165 至 168 行）先做一道保留名檢查：工具提供方敢用 <code>&lt;unlisted-tools&gt;</code> 這個保留名直接拋異常。往下就是排序本體，看兩個失敗分支：沒配列表走字典序兜底，<code>toolOrder</code> 裏寫了沒註冊的工具名直接拋。拋異常的時機在組裝階段，請求發出之前。</p>
+  <div class="source reveal paywall-locked">
+    <div class="source-head"><span>packages/core/system-prompt/src/index.ts</span><span>第 169 至 178 行</span></div>
+    <pre><code>  <span class="kw">if</span> (toolOrder === <span class="kw">undefined</span>) <span class="kw">return</span> tools.<span class="fn">sort</span>(compareToolNames)
+  <span class="kw">const</span> unknown = toolOrder.<span class="fn">filter</span>(name =&gt; name !== TOOL_ORDER_REST &amp;&amp; !knownNames.<span class="fn">has</span>(name))
+  <span class="kw">if</span> (unknown.length &gt; <span class="kw">0</span>) {
+    <span class="kw">throw new</span> <span class="ty">Error</span>(<span class="str">`toolOrder lists unregistered tool${unknown.length &gt; 1 ? 's' : ''} ${unknown.map(name =&gt; `"${name}"`).join(', ')}; known tools: ${[...knownNames].sort().join(', ') || '(none)'}`</span>)
+  }
+  <span class="kw">const</span> listed = <span class="kw">new</span> <span class="ty">Set</span>(toolOrder)
+  <span class="kw">const</span> rest = tools.<span class="fn">filter</span>(tool =&gt; !listed.<span class="fn">has</span>(tool.name)).<span class="fn">sort</span>(compareToolNames)
+  <span class="kw">return</span> toolOrder.<span class="fn">flatMap</span>(name =&gt;
+    name === TOOL_ORDER_REST ? rest : tools.<span class="fn">filter</span>(tool =&gt; tool.name === name))
+}</code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>源碼快照説明：</b>依據本地倉庫 deepseek-harness-master，核對文件 <code>packages/core/system-prompt/src/index.ts</code>，核對日期 2026-08-13。程式碼塊保留源碼原文。</div>
+  <p class="reveal paywall-locked">兩個邊界條件值得記住，出處都在 Agent Note <code>2026-07-06-explicit-tool-order</code>。插件熱重載後註冊順序變了，工具順序會變嗎？不會，中心列表在 waterfall 之前規範化，註冊順序無處可觀測。<code>toolOrder</code> 裏寫了個拼錯的工具名會怎樣？該 Note 後果一節寫得很細：輪次在組裝時失敗，不開步驟、不記請求頭、不向適配器發請求，每個輪次都同樣失敗直到配置修好，進程本身保持運行。</p>
+  <p class="reveal paywall-locked">嚴格插值這邊是三個連着的拋異常分支，一個都不放過。第一個管格式：變數名不匹配命名正則就拋「malformed prompt variable reference」，連 <code>{{}}</code> 這種空名都被註釋點名，走的就是這條格式錯誤路徑。第二個管註冊：名字不在註冊表裏就拋「unknown prompt variable」，報錯順帶列出全部已註冊變數名。第三個管取值：註冊了但這次組裝沒給值，同樣拋異常。三個分支攔下的都是同一件事，一個悄悄變形的前綴。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>packages/core/system-prompt/src/index.ts</code> 第 277 至 290 行的插值分支，核對日期 2026-08-13。</p>
+  <p class="reveal paywall-locked">第 283 行的 <code>Object.hasOwn</code> 有個小心思：用普通屬性存取查 <code>{{constructor}}</code> 會順着原型鏈摸到 Object 的內建方法，被誤認為已註冊變數。查自有屬性，原型鏈上的名字一律算未註冊。防的就是這種悄悄放行的壞 prompt。</p>
+
+  <div class="sec-label paywall-locked">橫向對比 · 一個 10.2% 的教訓和一條靜態路綫</div>
+  <p class="reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg><b>Claude Code</b>：還原源碼 <code>restored-src/src/tools/AgentTool/prompt.ts</code> 第 57 到 64 行的註釋記錄了一次真實事故。子代理列表原本嵌在工具描述裏，MCP 異步連接、插件重載、權限模式切換都會改變這個列表，工具描述一變，整塊工具 schema 的緩存全部作廢。這一個問題佔了全球機羣 cache_creation token 的 10.2%。修法和 DSH 的思路殊途同歸：把易變的列表從靜態前綴裏挪出去，改成單獨的 attachment 消息注入，工具描述保持可緩存（材料出處：claude-code-sourcemap-main/study/chapters/05-multi-agent.md 第 106 至 121 行）。區別在時序：Claude Code 是帳單上看到 10.2% 之後修的，DSH 在 CI 抖動階段就把順序治理掉了，還把紀律鋪到了 215 份文檔裏。</p>
+  <p class="reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg><b>Grok Build</b>：走靜態模板路綫。system prompt 從預生成的模板解密渲染（<code>crates/codegen/xai-grok-agent/src/prompt/template.rs</code>），再拼上 AGENTS.md 和 skills 內容（同目錄 <code>mod.rs</code> 的模組劃分）。模板是編譯期固定的，前綴天然比動態組裝穩定，這是靜態路綫的先天優勢。代價是靈活性：DSH 那種插件隨時貢獻段、變數、工具的組裝模型，在這條路綫上不存在。至於 Grok 是否有等價的逐包緩存影響文檔，已核對的本地快照裏未見，這一條基於已公開證據保留未知。</p>
+
+  <div class="sec-label paywall-locked">課堂練習</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>找出你的 prompt 裏的緩存殺手</h3><p>假設你的 agent 在 system prompt 第二行寫了「當前時間：2026-08-13 22:04:35」，每秒都在變。推演：每條請求的緩存從第幾段開始失效？一天 1000 條請求多付多少重算 token？給出兩個修復方案並比較：把時間挪到 prompt 末尾的動態上下文裏，或者把精度降到天。提示：想想哪個方案在跨天的邊界上仍然會斷一次緩存。</p></div>
+  </div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">02</div>
+    <div><h3>給你的團隊寫一份 KV Cache effect 模板</h3><p>模仿 DSH 的三段式（模型看到什麼 / token 成本 / 緩存影響），為你項目裏「會進入模型請求的東西」列一張清單：system prompt、工具 schema、動態注入的上下文、RAG 檢索結果。逐項寫出它的緩存影響，標出哪幾項放錯了位置。寫完你很大機會會發現至少一個和 Claude Code 那 10.2% 同款的問題。</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway：</b>KV Cache 按前綴逐字匹配，從第一個變化的 token 起全部作廢，所以 prompt 前綴的穩定性是一種要維護的相容性承諾。DSH 的三件套：215 份文檔裏的固定 KV Cache effect 小節、toolOrder 中心列表消滅順序抖動、插值格式錯誤寧可拋異常。把易變的內容放到前綴末尾之後，是所有 harness 通用的省錢動作。</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  var demo = document.getElementById('demo-kvcache');
+  var ribbon = document.getElementById('kvRibbon');
+  var hitline = document.getElementById('kvHitline');
+  var caption = document.getElementById('kvCaptionText');
+  var costEl = document.getElementById('kvCost');
+  var hitPctEl = document.getElementById('kvHitPct');
+  var reqNEl = document.getElementById('kvReqN');
+  var mode = 'dsh';
+  var idx = 0, timer = null, playing = false, runId = 0;
+  var cost = 0, reqN = 0;
+  var segs = [];
+
+  function baseSegs() {
+    return [
+      { id: 'id', label: '身份 20', tok: 20, cls: 's-id' },
+      { id: 'persona', label: 'persona 50', tok: 50, cls: 's-persona' },
+      { id: 't-bash', label: 'bash 180', tok: 180, cls: 's-tool' },
+      { id: 't-edit', label: 'edit 180', tok: 180, cls: 's-tool alt' },
+      { id: 't-grep', label: 'grep 180', tok: 180, cls: 's-tool' },
+      { id: 't-read', label: 'read 180', tok: 180, cls: 's-tool alt' },
+      { id: 'ctx', label: '上下文 60', tok: 60, cls: 's-ctx' },
+      { id: 'hist', label: '歷史 150', tok: 150, cls: 's-hist' }
+    ];
+  }
+  function total() { return segs.reduce(function (s, x) { return s + x.tok; }, 0); }
+  function render(states) {
+    // states: map id -> 'hit'|'miss'|'' ; 未給的為中性
+    var t = total();
+    ribbon.innerHTML = '';
+    segs.forEach(function (s) {
+      var d = document.createElement('div');
+      d.className = 'kv-seg ' + s.cls + (states && states[s.id] ? ' ' + states[s.id] : '');
+      d.style.flex = (s.tok / t * 100) + ' 1 0';
+      d.innerHTML = '<span>' + s.label + '</span>';
+      ribbon.appendChild(d);
+    });
+  }
+  function pulse(id) {
+    var i = segs.findIndex(function (s) { return s.id === id; });
+    var el = ribbon.children[i];
+    if (el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+  }
+  function statesUpTo(missFromId) {
+    // missFromId 之前全 hit，之後（含自己）全 miss；null 表示全 hit
+    var st = {}, missing = false;
+    segs.forEach(function (s) {
+      if (missFromId !== null && s.id === missFromId) missing = true;
+      st[s.id] = missing ? 'miss' : 'hit';
+    });
+    return st;
+  }
+  function missTokens(missFromId) {
+    if (missFromId === null) return 0;
+    var m = 0, missing = false;
+    segs.forEach(function (s) {
+      if (s.id === missFromId) missing = true;
+      if (missing) m += s.tok;
+    });
+    return m;
+  }
+  function hitPrefix(missFromId) {
+    if (missFromId === null) return total();
+    var h = 0;
+    for (var i = 0; i < segs.length; i++) {
+      if (segs[i].id === missFromId) break;
+      h += segs[i].tok;
+    }
+    return h;
+  }
+  function request(missFromId, newTok) {
+    reqN++;
+    reqNEl.textContent = String(reqN);
+    var hit = hitPrefix(missFromId);
+    var miss = missTokens(missFromId);
+    render(statesUpTo(missFromId));
+    var t = total();
+    if (missFromId === null) {
+      hitline.innerHTML = '緩存命中到第 <b class="ok">' + t + '</b> / ' + t + ' 個 token' + (newTok ? '（新增 ' + newTok + ' token 正常付費）' : '，全前綴複用');
+      hitPctEl.textContent = '100%';
+    } else {
+      hitline.innerHTML = '緩存命中到第 <b class="ok">' + hit + '</b> 個 token，從第 <b class="bad">' + (hit + 1) + '</b> 個起失效，重算 <b class="bad">' + miss + '</b> token';
+      hitPctEl.textContent = Math.round(hit / t * 100) + '%';
+      cost += miss;
+      costEl.textContent = String(cost);
+      costEl.classList.remove('pop'); void costEl.offsetWidth; costEl.classList.add('pop');
+    }
+  }
+
+  function buildSteps() {
+    return [
+      { cap: '第一次請求。緩存是空的，全部 ' + '1000' + ' 個 token 老老實實算一遍。這筆錢省不掉，省的是後面每一次。', run: function () {
+        segs = baseSegs();
+        reqN++; reqNEl.textContent = String(reqN);
+        render(null);
+        hitline.innerHTML = '首次請求：無緩存可用，全量計算 ' + total() + ' token。';
+        hitPctEl.textContent = '0%（首次）';
+      } },
+      { cap: '原樣再發一次（比如模型回了話、你接着追問）。前綴逐字相同，全部命中，輸入幾乎按折扣價計。這是理想狀態。', run: function () { request(null, 0); } },
+      { cap: '有人把 persona 裏的 helpful 改成了 careful。就一個詞。緩存從 persona 的第一個變化 token 起斷掉，後面的工具 schema、上下文、歷史全部重算。', run: function () { segs[1].label = 'persona* 50'; request('persona'); pulse('persona'); } },
+      { cap: '新增一個工具 fetch。DSH 按 toolOrder 或字典序插入，這裏落在 edit 和 grep 之間：插入點之前照常命中，之後失效。位置越靠後，傷害越小。', run: function () { segs.splice(4, 0, { id: 't-fetch', label: 'fetch+ 170', tok: 170, cls: 's-tool' }); request('t-fetch'); pulse('t-fetch'); } },
+      { cap: '正常對話推進，歷史追加了一條新消息。append-only：舊前綴原樣保留全部命中，只為新增的 token 付全價。追加不傷緩存。', run: function () { segs[segs.length - 1].tok += 90; segs[segs.length - 1].label = '歷史 ' + segs[segs.length - 1].tok; request(null, 90); pulse('hist'); } },
+      { cap: '', run: function () {
+        if (mode === 'dsh') {
+          caption.textContent = '進程重啓，插件併發加載，註冊順序這次是亂的。DSH 模式：中心列表在組裝時統一規範化，工具順序紋絲不動，前綴原樣，全部命中。抖動被機制消滅了。';
+          request(null, 0);
+        } else {
+          caption.textContent = '進程重啓，插件併發加載，註冊順序這次是亂的。對照模式（順序跟隨註冊）：工具 schema 全體重排，從第一個 schema token 起全部失效。內容一個字沒變，只是順序變了，照樣賠錢。';
+          var a = segs[2]; segs[2] = segs[5]; segs[5] = a;
+          request('t-bash');
+        }
+      } },
+      { cap: '播完了。切換右上角的模式再放一遍，對比第 6 步的差異；或者點「單步」逐幀看。計價器上的數字，就是前綴穩定性這五個字的現金價值。', run: function () {} }
+    ];
+  }
+
+  var steps = [];
+  function reset() {
+    runId++;
+    playing = false;
+    clearTimeout(timer);
+    idx = 0;
+    cost = 0; reqN = 0;
+    costEl.textContent = '0';
+    reqNEl.textContent = '0';
+    hitPctEl.textContent = '–';
+    segs = baseSegs();
+    render(null);
+    hitline.textContent = '尚未發出請求。';
+    caption.textContent = '已重置。當前為' + (mode === 'dsh' ? ' DSH 中心列表' : '對照·註冊順序') + '模式，點「播放」運行。';
+    steps = buildSteps();
+  }
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.cap) caption.textContent = s.cap;
+    if (s.run) s.run();
+    if (playing) {
+      var rid = runId;
+      timer = setTimeout(function () { if (rid === runId) doStep(); }, 2800);
+    }
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true;
+    doStep();
+  }
+  function stepOnce() {
+    playing = false;
+    clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+  document.getElementById('kvPlay').addEventListener('click', play);
+  document.getElementById('kvStep').addEventListener('click', stepOnce);
+  document.getElementById('kvReset').addEventListener('click', reset);
+  document.getElementById('kvModeDsh').addEventListener('click', function () {
+    mode = 'dsh';
+    this.classList.add('active');
+    document.getElementById('kvModeReg').classList.remove('active');
+    reset();
+  });
+  document.getElementById('kvModeReg').addEventListener('click', function () {
+    mode = 'reg';
+    this.classList.add('active');
+    document.getElementById('kvModeDsh').classList.remove('active');
+    reset();
+  });
+
+  reset();
+  if (typeof window.lessonOnView === 'function') {
+    window.lessonOnView(demo, function () { if (!playing && idx === 0) play(); });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

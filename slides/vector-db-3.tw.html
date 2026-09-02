@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Milvus 實操 | xueai.miyang.cn</title>
+    <script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+    <link rel="stylesheet" href="lesson.css?v=20260827a">
+    <link rel="stylesheet" href="vector-db-course.css?v=20260825e">
+    <link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+    <style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+    <meta name="description" content="用當前 MilvusClient 風格完成連線、建表、插入、索引、載入、搜尋、查詢與刪除。">
+    <meta name="author" content="洛小山">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://xueai.miyang.cn/slides/vector-db-3.tw.html">
+<meta property="og:locale" content="zh_TW">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vector-db-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vector-db-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vector-db-3.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vector-db-3.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vector-db-3.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vector-db-3.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vector-db-3.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+    <meta property="og:title" content="Milvus 實操">
+    <meta property="og:description" content="一段自洽程式碼走完向量資料庫核心流程。">
+    <meta property="og:url" content="https://xueai.miyang.cn/slides/vector-db-3.tw.html">
+    <meta property="og:image" content="https://xueai.miyang.cn/slides/og/vector-db-3.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"name":"Milvus 實操","url":"https://xueai.miyang.cn/slides/vector-db-3.tw.html","inLanguage":"zh-Hant-TW","isAccessibleForFree":false}</script>
+    <style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:170px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(#000 20%,transparent);mask-image:linear-gradient(#000 20%,transparent)}</style>
+    <script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script>
+  <!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Milvus 實操","name":"Milvus 實操","url":"https://xueai.miyang.cn/slides/vector-db-3.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"用當前 MilvusClient 風格完成連線、建表、插入、索引、載入、搜尋、查詢與刪除。","datePublished":"2026-08-23","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+  <body>
+    <article class="lesson wide">
+      <header class="lesson-header">
+        <div class="kicker">Agent 工程</div>
+        <h1>Milvus 實操</h1>
+        <p class="subtitle">用一套一致的集合名和真實文字 Embedding，跑通寫入、檢索與刪除；程式碼假定本地 Milvus 已在 19530 埠執行。</p>
+      </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>連線、建表、批次寫入、索引、搜尋、查詢和刪除</p></aside><!--seo:end-->      <div class="vdb-note vdb-ok">先按 <a href="https://milvus.io/docs/install_standalone-docker.md" target="_blank" rel="noopener">Milvus 官方 Docker Standalone 指南</a>啟動服務，再安裝 <code>pymilvus</code> 與 <code>sentence-transformers</code>。示例使用公開文字模型並從實際輸出推導維數，不用隨機向量偽裝語義效果。</div>
+      <div class="sec-label">1. 連線、Embedding、Schema 與批次寫入</div>
+      <pre class="vdb-code"><span class="k">from</span> pymilvus <span class="k">import</span> MilvusClient, DataType
+<span class="k">from</span> sentence_transformers <span class="k">import</span> SentenceTransformer
+
+COLLECTION = <span class="s">"support_kb"</span>
+client = MilvusClient(uri=<span class="s">"http://localhost:19530"</span>)
+print(client.list_collections())  <span class="c"># 先確認服務可達；健康檢查常見於 9091/healthz</span>
+RESET_LAB = False  <span class="c"># 只有確認可丟棄舊練習資料時才改為 True</span>
+<span class="k">if</span> client.has_collection(collection_name=COLLECTION):
+    <span class="k">if not</span> RESET_LAB:
+        <span class="k">raise</span> RuntimeError(<span class="s">"support_kb 已存在；請換名稱，或確認後啟用 RESET_LAB"</span>)
+    client.drop_collection(collection_name=COLLECTION)  <span class="c"># 刪除整個集合</span>
+encoder = SentenceTransformer(<span class="s">"BAAI/bge-m3"</span>)
+docs = [
+  {<span class="s">"id"</span>: 1, <span class="s">"text"</span>: <span class="s">"退款通常在三個工作日內入帳"</span>, <span class="s">"category"</span>: <span class="s">"refund"</span>},
+  {<span class="s">"id"</span>: 2, <span class="s">"text"</span>: <span class="s">"修改密碼後需要重新登入"</span>, <span class="s">"category"</span>: <span class="s">"account"</span>},
+]
+vectors = encoder.encode([d[<span class="s">"text"</span>] for d in docs], normalize_embeddings=True).tolist()
+dim = len(vectors[0])
+
+schema = MilvusClient.create_schema(auto_id=False, enable_dynamic_field=False)
+schema.add_field(field_name=<span class="s">"id"</span>, datatype=DataType.INT64, is_primary=True)
+schema.add_field(field_name=<span class="s">"vector"</span>, datatype=DataType.FLOAT_VECTOR, dim=dim)
+schema.add_field(field_name=<span class="s">"text"</span>, datatype=DataType.VARCHAR, max_length=1000)
+schema.add_field(field_name=<span class="s">"category"</span>, datatype=DataType.VARCHAR, max_length=64)
+client.create_collection(collection_name=COLLECTION, schema=schema)
+
+rows = [{**d, <span class="s">"vector"</span>: v} for d, v in zip(docs, vectors)]
+client.insert(collection_name=COLLECTION, data=rows) <span class="c"># 資料較多時分批寫，並記錄失敗批次</span></pre>
+      <div class="sec-label paywall-locked xa-peek">2. 建索引、Load、Top-K Search 與 Filter</div>
+      <pre class="vdb-code paywall-locked">index = client.prepare_index_params()
+index.add_index(field_name=<span class="s">"vector"</span>, index_type=<span class="s">"HNSW"</span>, metric_type=<span class="s">"COSINE"</span>,
+                params={<span class="s">"M"</span>: 16, <span class="s">"efConstruction"</span>: 200})
+client.create_index(collection_name=COLLECTION, index_params=index)
+client.load_collection(collection_name=COLLECTION)
+
+query_vector = encoder.encode([<span class="s">"退的錢多久能回來？"</span>], normalize_embeddings=True).tolist()
+hits = client.search(
+  collection_name=COLLECTION, data=query_vector, anns_field=<span class="s">"vector"</span>, limit=3,
+  filter=<span class="s">'category == "refund"'</span>, output_fields=[<span class="s">"text"</span>, <span class="s">"category"</span>],
+  search_params={<span class="s">"metric_type"</span>: <span class="s">"COSINE"</span>, <span class="s">"params"</span>: {<span class="s">"ef"</span>: 64}},
+)
+<span class="k">for</span> hit <span class="k">in</span> hits[0]:
+    print(hit[<span class="s">"id"</span>], hit[<span class="s">"distance"</span>], hit[<span class="s">"entity"</span>][<span class="s">"text"</span>])</pre>
+      <div class="sec-label paywall-locked">3. Query 與 Delete</div>
+      <pre class="vdb-code paywall-locked"><span class="c"># Query 不做向量相似度計算</span>
+rows = client.query(collection_name=COLLECTION, filter=<span class="s">'category == "account"'</span>,
+                    output_fields=[<span class="s">"id"</span>, <span class="s">"text"</span>])
+client.delete(collection_name=COLLECTION, filter=<span class="s">"id == 2"</span>)
+
+<span class="c"># ⚠️ 僅用於可丟棄的練習環境；drop 會刪除整個集合</span>
+<span class="c"># client.drop_collection(collection_name=COLLECTION)</span></pre>
+      <div class="vdb-grid paywall-locked">
+        <div class="vdb-card">
+          <h3>寫入策略</h3>
+          <p>批次 insert；使用穩定主鍵，並用 upsert 或業務去重實現冪等（insert 本身不會自動去重）；保留模型名、模型版本與內容版本。更新內容時重新生成向量。</p>
+        </div>
+        <div class="vdb-card">
+          <h3>刪除策略</h3>
+          <p>需要可撤銷刪除時，可先用 <code>active=false</code> 做邏輯刪除，並在搜尋 filter 中排除；物理刪除後空間回收依賴 Compaction，不會立刻縮小檔案。</p>
+        </div>
+      </div>
+      <div class="l-callout paywall-locked">
+        <b>檢查點</b>　同一模型、同一維數、同一 COSINE metric、真實文字向量、先 load 後 search。先用 FLAT 做小規模正確性基線，再比較 HNSW 的 Recall 與延遲。</div>
+    </article>
+    <script src="i18n.js?v=20260903a"></script>
+    <script src="nav-inject.js?v=20260903a"></script>
+      <!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Esc 之後發生了什麼：取消、崩潰恢復與重入 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.25);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.05),0 0 0 52px rgba(77,107,254,.03)}
+.sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.prose{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.ask{font-size:15px;font-weight:800;color:var(--accent-deep);margin:32px 0 12px;display:flex;align-items:center;gap:8px}
+.ask svg{flex:none;color:var(--accent)}
+.src-note{font-size:12px;color:var(--sub);line-height:1.8;margin:0 0 20px}
+.src-note code{color:var(--sub)}
+.stress{margin:32px auto;padding:24px;max-width:640px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--accent-deep);font-size:18px;font-weight:800;text-align:center;line-height:1.8}
+.core-visual{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-card);margin:24px 0}
+.core-visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12px;color:var(--sub);text-align:center;margin-top:12px}
+.docquote{background:var(--card);border:1px solid rgba(77,107,254,.24);border-radius:12px;padding:20px 24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.docquote p{margin:0;font-size:14px;line-height:1.9;color:var(--text)}
+.docquote .dq-src{display:block;margin-top:10px;font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub)}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:24px 0}
+.compare-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:var(--shadow-card)}
+.compare-card h3{margin:0 0 10px;font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}.compare-card h3 svg{color:var(--accent)}
+.compare-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:0 0 10px}.compare-card p:last-child{margin-bottom:0}
+.compare-card .tag{display:inline-block;font-size:12px;font-weight:800;padding:3px 10px;border-radius:999px;margin-bottom:10px;background:var(--accent-soft);color:var(--accent-deep)}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,var(--accent-soft),var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:16px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0 0 10px;color:var(--sub);font-size:14px;line-height:1.9}.exercise p:last-child{margin-bottom:0}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9;font-size:14px}.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+/* ── 交互演示：中断时间线（浅色） ── */
+.demo{background:var(--card);border:1px solid rgba(77,107,254,.25);border-radius:18px;padding:24px;box-shadow:var(--shadow-card)}
+.demo-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:20px}
+.demo-bar .grow{flex:1}
+.demo button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:9px 15px;border-radius:11px;border:1px solid rgba(77,107,254,.3);background:var(--bg);color:var(--accent-deep);font:600 13px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all .2s}
+.demo button:hover{border-color:var(--accent)}
+.demo button.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(77,107,254,.3)}
+.demo button svg{flex:none}
+.demo-stage{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:start}
+.logpane{border:1.5px solid var(--border);border-radius:14px;background:var(--bg);overflow:hidden}
+.logpane-head{padding:9px 14px;background:var(--accent-soft);color:var(--accent-deep);font:700 11.5px ui-monospace,Menlo,monospace;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.logbody{padding:10px 12px;min-height:280px;max-height:340px;overflow-y:auto}
+.ev{display:flex;align-items:center;gap:9px;padding:5px 10px;border-radius:8px;margin-bottom:4px;font:11.5px/1.5 ui-monospace,Menlo,monospace;background:var(--card);border:1px solid var(--border);color:var(--text);opacity:0;transform:translateY(6px);transition:opacity .3s,transform .3s,background .3s,border-color .3s}
+.ev.in{opacity:1;transform:translateY(0)}
+.ev .seq{color:var(--sub);opacity:.6;min-width:24px;text-align:right;flex:none}
+.ev .note{margin-left:auto;font:600 10px sans-serif;color:var(--sub);white-space:nowrap}
+.ev.bd{background:var(--accent-soft);border-color:rgba(77,107,254,.35);font-weight:700}
+.ev.syn{background:rgba(217,119,6,.09);border-color:rgba(217,119,6,.45)}
+.ev.syn .note{color:var(--amber)}
+.ev.dead{background:rgba(220,38,38,.06);border-color:rgba(220,38,38,.35);text-decoration:line-through;opacity:.55!important}
+.ev.dead .note{color:var(--danger);text-decoration:none}
+.ev.mark{background:rgba(220,38,38,.08);border-color:var(--danger);border-style:dashed;font:700 11px sans-serif;color:var(--danger);justify-content:center;text-decoration:none}
+.statepane{border:1.5px solid var(--border);border-radius:14px;background:var(--bg);overflow:hidden}
+.statepane-head{padding:9px 14px;background:var(--accent-soft);color:var(--accent-deep);font:700 11.5px ui-monospace,Menlo,monospace}
+.statebody{padding:14px}
+.st-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.st-label{font:700 11px sans-serif;letter-spacing:.4px;color:var(--sub);min-width:110px}
+.st-value{font:700 12.5px ui-monospace,Menlo,monospace;color:var(--text)}
+.siglamp{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;border:1.5px solid var(--border);background:var(--card);font:700 11.5px ui-monospace,Menlo,monospace;color:var(--sub);transition:all .3s}
+.siglamp i{width:10px;height:10px;border-radius:50%;background:#c4c8cf;transition:background .3s;flex:none}
+.siglamp.live{border-color:rgba(22,163,74,.5);color:var(--success)}
+.siglamp.live i{background:var(--success)}
+.siglamp.aborted{border-color:rgba(220,38,38,.5);color:var(--danger)}
+.siglamp.aborted i{background:var(--danger)}
+.siglamp.off{opacity:.55}
+.proc{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;font:700 11.5px sans-serif;background:rgba(22,163,74,.1);color:var(--success);transition:all .3s}
+.proc.dead{background:rgba(220,38,38,.1);color:var(--danger)}
+.proc.idle{background:var(--accent-soft);color:var(--accent-deep)}
+.loss{margin-top:6px;padding:10px 12px;border-radius:10px;background:var(--card);border:1px solid var(--border);font-size:12px;line-height:1.7;color:var(--sub)}
+.loss b{color:var(--text)}
+.loss .bad{color:var(--danger);font-weight:800}
+.loss .good{color:var(--success);font-weight:800}
+.demo-caption{margin-top:20px;padding:14px 18px;border-radius:12px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.2);font-size:14px;line-height:1.8;color:var(--text);display:flex;gap:10px;align-items:flex-start;min-height:56px}
+.demo-caption svg{flex:0 0 auto;color:var(--accent);margin-top:3px}
+.demo-note{font-size:12px;color:var(--sub);margin-top:16px;line-height:1.8}
+@media(max-width:760px){
+  .compare{grid-template-columns:1fr}
+  .demo-stage{grid-template-columns:1fr}
+  .demo-bar{flex-direction:column;align-items:stretch}
+  .demo-bar .grow{display:none}
+  .demo button{width:100%}
+  .logbody{max-height:260px}
+  .objective{grid-template-columns:1fr}
+  .exercise{grid-template-columns:1fr}
+  .core-visual{padding:16px}
+  .stress{font-size:16px;padding:20px}
+  .lesson-header:after{display:none}
+}
+</style>
+<meta name="description" content="DSH 的取消與崩潰恢復：每輪一個 AbortSignal、中斷也要寫回 turn/end 日誌、冷加載合成 interrupted 配平，崩潰重啓不丟已持久化的勞動成果。">
+<meta name="author" content="洛小山">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/dsh-7.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/dsh-7.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/dsh-7.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/dsh-7.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/dsh-7.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/dsh-7.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/dsh-7.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/dsh-7.html">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Esc 之後發生了什麼：取消、崩潰恢復與重入","name":"Esc 之後發生了什麼：取消、崩潰恢復與重入","url":"https://xueai.miyang.cn/slides/dsh-7.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 會話與循環","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"DSH 的取消與崩潰恢復：每輪一個 AbortSignal、中斷也要寫回 turn/end 日誌、冷加載合成 interrupted 配平，崩潰重啓不丟已持久化的勞動成果。","datePublished":"2026-08-13","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Esc 之後發生了什麼：取消、崩潰恢復與重入"><meta property="og:description" content="DSH 的取消與崩潰恢復：每輪一個 AbortSignal、中斷也要寫回 turn/end 日誌、冷加載合成 interrupted 配平，崩潰重啓不丟已持久化的勞動成果。"><meta property="og:url" content="https://xueai.miyang.cn/slides/dsh-7.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 會話與循環</div>
+    <h1>Esc 之後發生了什麼：取消、崩潰恢復與重入</h1>
+    <p class="subtitle">每輪一個取消信號，中斷也要把賬記平，kill -9 之後重啓還能接着跑，已落盤的勞動成果一條不丟。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>每輪一個 AbortSignal，中斷也要寫回日誌，崩潰重啓還能接着跑</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>課程目標</b>讀完你能説清三件事：按下 Esc 之後取消信號怎麼從一個 AbortController 傳遍模型流和工具執行，為什麼取消權只管當前這一輪；被中斷的輪次為什麼也要寫一條 <code>turn/end</code> 回日誌；以及進程被 kill -9 之後，重啓的 DSH 靠什麼把半截會話救回來、又保住了哪些東西。</span>
+  </div>
+
+  <div class="sec-label">互動演示 · 中斷演練場</div>
+  <p class="reveal prose">下面是一條正在幹活的輪次：模型流式輸出中，還叫了一個長工具。左邊是會話日誌，右邊是運行狀態。三個情景按鈕對應三種事故：按 Esc、kill -9 後重啓、以及一個假想的截斷式恢復做對照。點播放，字幕會告訴你每一步日誌裏多了什麼、少了什麼。</p>
+
+  <div id="demo-cancel" class="demo reveal">
+    <div class="demo-bar">
+      <button class="scn active" data-scn="A" type="button">情景 A · 按 Esc 取消</button>
+      <button class="scn" data-scn="B" type="button">情景 B · kill -9 崩潰重啓</button>
+      <button class="scn" data-scn="C" type="button">情景 C · 對照：截斷式恢復</button>
+      <span class="grow"></span>
+      <button id="dx-play" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>播放</button>
+      <button id="dx-step" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>單步</button>
+      <button id="dx-reset" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>重置</button>
+    </div>
+    <div class="demo-stage">
+      <div class="logpane">
+        <div class="logpane-head"><span>會話事件日誌（僅追加 · 落盤即持久）</span><span id="dx-count"></span></div>
+        <div class="logbody" id="dx-log"></div>
+      </div>
+      <div class="statepane">
+        <div class="statepane-head">運行狀態</div>
+        <div class="statebody">
+          <div class="st-row"><span class="st-label">進程</span><span class="proc" id="dx-proc"><span>運行中</span></span></div>
+          <div class="st-row"><span class="st-label">本輪取消信號</span><span class="siglamp off" id="dx-sig"><i></i><span>未創建</span></span></div>
+          <div class="st-row"><span class="st-label">Inbox 排隊消息</span><span class="st-value" id="dx-inbox">0 條</span></div>
+          <div class="loss" id="dx-loss">日誌統計會顯示在這裏：哪些事件保住了，哪些丟了。</div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span id="dx-status">選一個情景點播放，或滾動到此處自動播放情景 A。</span></div>
+    <div class="demo-note">演示為教學化模擬：事件條目做了簡化，機制對應 <code>packages/core/agent-loop/src/agent.ts</code>（取消與 turn/end 落日誌）與 <code>packages/core/session/src/repair.ts</code>（崩潰恢復合成 closer）。情景 C 的截斷式恢復是教學假設，DSH 未實現該行為，用來對照數據損失。</div>
+  </div>
+
+  <div class="sec-label">設計思路一 · 取消權跟着輪次走</div>
+
+  <h3 class="ask reveal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>它解決什麼問題</h3>
+  <p class="prose reveal">想像取消做成一個全局開關：agent 身上掛一個布爾標誌位，誰都能設，各處程式碼自己抽空看一眼。翻車遲早發生：上一輪註冊的某個超時回調半夜甦醒，順手把正在跑的新一輪取消了；或者取消用 Promise.race 實現，race 輸掉的那個工具調用沒人善後，還在後台偷偷改文件、寫狀態，成了殭屍工作。</p>
+  <p class="prose reveal">取消這件事，難點是停得乾淨、只停該停的。這兩樣，全局開關都給不了。</p>
+
+  <h3 class="ask reveal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg>思路是什麼</h3>
+  <p class="prose reveal">DSH 的取消是一根顯式傳遞的綫，一頭拴在輪次上，另一頭拴在每個正在幹活的邊界上。驅動器每次醒來幹活，新建一個 AbortController（取消控制器）；一輪跑完、隊列裏還有活，就再換一個新的。任何時刻最多只有一個控制器有效，取消權的生命週期和輪次一樣長。</p>
+  <p class="prose reveal">Esc 只是拉了一下這根綫。介面把按鍵翻譯成 <code>agent.cancel({ kind: 'user' })</code>，子 agent 被父級打斷則是 <code>{ kind: 'parent' }</code>，取消自帶身份。cancel 的入口小到可以背下來，就兩個動作：預設先把 inbox 清空，排隊沒跑的消息全部作廢，想保住排隊工作就傳 keepInbox，只中斷當前活動；然後對當前控制器 <code>abort(cause)</code>。空閒時調 cancel 是空操作，不會給未來的工作預埋取消狀態。</p>
+  <p class="prose reveal">同一個 signal 顯式地發給 pre-step、提示詞組裝、模型請求、流式讀取、工具執行、審批這些環節，連 bash 工具都能順着它殺掉整個進程組。傳遞是協作式的：循環在每個 await 邊界前後檢查中斷，不用 Promise.race 半路丟棄一個還在跑的 Promise，所以不會有殭屍工作偷偷改狀態。</p>
+  <div class="core-visual reveal">
+    <svg viewBox="0 0 940 320" role="img" aria-label="取消信號從 Esc 傳到各個邊界的示意圖">
+      <defs><marker id="arc" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#4d6bfe"/></marker></defs>
+      <text x="470" y="36" fill="var(--sub)" text-anchor="middle" font-size="13">一根顯式的綫：從 Esc 到每個正在幹活的邊界</text>
+      <rect x="40" y="125" width="190" height="70" rx="13" fill="var(--accent-soft)" stroke="rgba(77,107,254,.4)"/>
+      <text x="135" y="155" fill="#3450d4" text-anchor="middle" font-size="14" font-weight="700">Esc 按下</text>
+      <text x="135" y="179" fill="var(--sub)" text-anchor="middle" font-size="13">翻譯成帶身份的 cancel</text>
+      <path d="M230 160 H262" stroke="#4d6bfe" stroke-width="2" fill="none" marker-end="url(#arc)"/>
+      <rect x="270" y="125" width="210" height="70" rx="13" fill="var(--card)" stroke="rgba(77,107,254,.4)"/>
+      <text x="375" y="155" fill="#3450d4" text-anchor="middle" font-size="14" font-weight="700">cancel 只做兩件事</text>
+      <text x="375" y="179" fill="var(--sub)" text-anchor="middle" font-size="13">清 inbox，再 abort(cause)</text>
+      <path d="M480 160 H512" stroke="#4d6bfe" stroke-width="2" fill="none" marker-end="url(#arc)"/>
+      <rect x="520" y="125" width="160" height="70" rx="13" fill="var(--card)" stroke="rgba(77,107,254,.4)"/>
+      <text x="600" y="155" fill="#3450d4" text-anchor="middle" font-size="14" font-weight="700">本輪唯一 signal</text>
+      <text x="600" y="179" fill="var(--sub)" text-anchor="middle" font-size="13">隨輪次生滅</text>
+      <path d="M680 160 H705 V75 H722" stroke="#4d6bfe" stroke-width="2" fill="none" marker-end="url(#arc)"/>
+      <path d="M680 160 H722" stroke="#4d6bfe" stroke-width="2" fill="none" marker-end="url(#arc)"/>
+      <path d="M680 160 H705 V245 H722" stroke="#4d6bfe" stroke-width="2" fill="none" marker-end="url(#arc)"/>
+      <rect x="730" y="48" width="180" height="54" rx="12" fill="var(--card)" stroke="rgba(77,107,254,.4)"/>
+      <text x="820" y="80" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">模型流停止讀取</text>
+      <rect x="730" y="133" width="180" height="54" rx="12" fill="var(--card)" stroke="rgba(77,107,254,.4)"/>
+      <text x="820" y="165" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">工具與 bash 進程組</text>
+      <rect x="730" y="218" width="180" height="54" rx="12" fill="var(--card)" stroke="rgba(77,107,254,.4)"/>
+      <text x="820" y="250" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">組裝與審批收手</text>
+      <text x="470" y="302" fill="var(--sub)" text-anchor="middle" font-size="13">turn/end 發佈之前收回取消權，下一輪換全新的 signal</text>
+    </svg>
+    <div class="visual-caption">信號是顯式參數，不靠全局狀態；每個邊界在 await 前後自己檢查，協作式收手。</div>
+  </div>
+  <p class="prose reveal">最後是權力交接。循環在發佈 turn/end 之前就清掉本輪的取消持有者，之後哪怕持久化刷新還沒結算完，誰也取消不了已經完成的輪次工作；下一輪拿到的是全新的 signal，舊回調想越權，連把手都摸不到。</p>
+  <p class="src-note reveal">出處：每輪新建 AbortController 在 <code>packages/core/agent-loop/src/agent.ts</code> 第 187 行，跑完換新在第 325 行，cancel 入口（可選清 inbox，再 abort 帶類型化 cause）在第 134 至 140 行；取消權不跨輪泄漏的設計記錄見項目 Agent Note 2026-07-16。</p>
+
+  <h3 class="ask reveal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>為什麼長期成立</h3>
+  <p class="prose reveal">顯式令牌加作用域綁定，是結構化併發的通則：Go 的 context、.NET 的 CancellationToken 走的都是這條路。令牌由創建者負責收回，活不過自己的作用域，越權自然無從談起。只要系統裏同時有流式 IO 和外部進程要停，換個語言重寫，這根顯式的綫還是得有。</p>
+
+  <div class="sec-label">設計思路二 · 中斷也要把賬記平</div>
+
+  <h3 class="ask reveal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>它解決什麼問題</h3>
+  <p class="prose reveal">假設被取消的輪次不寫終態：日誌停在半截，回放的人不知道這輪怎麼結束的；UI 沒法如實告訴用戶哪些排隊的活被扔了；下游拿到日誌，分不清這輪是被人有序停掉的，還是意外死掉的。中斷是正常業務，不記帳的中斷才是事故。</p>
+
+  <h3 class="ask reveal paywall-locked xa-peek"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg>思路是什麼</h3>
+  <p class="prose reveal paywall-locked">輪次的主體邏輯包在 try 裏。catch 分支發現 <code>signal.aborted</code>，就把結局定為 aborted；finally 裏無論如何寫一條 <code>turn/end</code> 回日誌。已經落盤的流式 chunk、工具輸出一個都不刪。</p>
+  <p class="prose reveal paywall-locked">於是日誌裏的死法只有兩種，各有專屬簽名。aborted 由循環親手寫下：有人調了 cancel，輪次有序收尾。interrupted 循環從來不發，它只在崩潰恢復時由持久化後端合成，是唯一一個非循環出品的結局。看一眼 reason，就知道這輪的結束方式。</p>
+  <p class="prose reveal paywall-locked">兩個配套細節。日誌只存粗粒度的 aborted，不存是誰按的，user 還是 parent 屬於運行時信息，回放不需要也不該知道。被清掉的排隊消息沒有任何 turn/end 描述它，<code>foldConsumedWork</code> 單遍掃日誌，靠 inbox 記錄裏的 outcome: 'canceled' 算出 droppedUnrun，UI 才能如實説有活被扔了、沒跑。</p>
+  <div class="stress reveal paywall-locked">體面告別和意外身亡，日誌裏一眼可辨。</div>
+  <p class="src-note reveal paywall-locked">出處：catch 定結局在 <code>packages/core/agent-loop/src/agent.ts</code> 第 302 至 305 行，finally 寫 turn/end 在第 316 至 323 行；droppedUnrun 的摺疊在 <code>consumed-work.ts</code> 第 87 行。</p>
+
+  <h3 class="ask reveal paywall-locked"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>為什麼長期成立</h3>
+  <p class="prose reveal paywall-locked">所有退出路徑都寫終態，是一切拿日誌當權威狀態的系統的底綫，數據庫事務日誌的 commit 和 abort 記錄同理。異常路徑和正常路徑出同樣的賬，重建現場的人才不用猜。模型換代、語言重寫，這條紀律都不變。</p>
+
+  <div class="sec-label paywall-locked">設計思路三 · 崩潰恢復補齊，不截斷</div>
+
+  <h3 class="ask reveal paywall-locked"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>它解決什麼問題</h3>
+  <p class="prose reveal paywall-locked">取消好歹有 finally 善後，kill -9 連善後的機會都沒有。進程死掉的瞬間，日誌停在半截：turn/start 開着，某個工具調用記了 tool/call，卻永遠等不到 tool/result。重啓後冷加載這份日誌，擺在面前的是一道選擇題：把沒寫完的輪次刪掉，還是補齊？</p>
+  <p class="prose reveal paywall-locked">刪掉看似乾淨，代價大得多。長週期任務的單個輪次可能非常龐大，幾十個步驟、大量工具輸出，這些在崩潰前都已經持久追加。截斷等於把用戶的勞動成果陪葬，演示的情景 C 算的就是這筆賬。</p>
+
+  <h3 class="ask reveal paywall-locked"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg>思路是什麼</h3>
+  <p class="prose reveal paywall-locked">DSH 選補齊。恢復邏輯生成幾條確定性的合成事件把尾巴關上：先給每個懸空的工具調用補一條錯誤佔位的 tool/result，再關掉開着的 step，最後合成 turn/end，結局標 interrupted。順序有講究：step 還開着就寫 turn/end 違反日誌不變式，所以先補 step 的邊界，再補 turn 的。</p>
+  <div class="core-visual reveal paywall-locked">
+    <svg viewBox="0 0 940 230" role="img" aria-label="崩潰恢復補齊半截日誌的示意圖">
+      <text x="470" y="36" fill="var(--sub)" text-anchor="middle" font-size="13">已落盤的真實事件一條不動，只在尾部補三條合成事件</text>
+      <text x="482" y="68" fill="#dc2626" text-anchor="middle" font-size="13" font-weight="700">kill -9</text>
+      <path d="M482 80 V180" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4" fill="none"/>
+      <rect x="40" y="110" width="95" height="46" rx="10" fill="var(--accent-soft)" stroke="rgba(77,107,254,.4)"/>
+      <text x="87" y="138" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">輪次開始</text>
+      <rect x="145" y="110" width="95" height="46" rx="10" fill="var(--accent-soft)" stroke="rgba(77,107,254,.4)"/>
+      <text x="192" y="138" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">用戶消息</text>
+      <rect x="250" y="110" width="95" height="46" rx="10" fill="var(--accent-soft)" stroke="rgba(77,107,254,.4)"/>
+      <text x="297" y="138" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">模型輸出</text>
+      <rect x="355" y="110" width="95" height="46" rx="10" fill="var(--accent-soft)" stroke="rgba(77,107,254,.4)"/>
+      <text x="402" y="138" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">工具啓動</text>
+      <rect x="515" y="110" width="90" height="46" rx="10" fill="rgba(217,119,6,.09)" stroke="rgba(217,119,6,.5)"/>
+      <text x="560" y="138" fill="#b45309" text-anchor="middle" font-size="13" font-weight="700">補佔位結果</text>
+      <rect x="613" y="110" width="90" height="46" rx="10" fill="rgba(217,119,6,.09)" stroke="rgba(217,119,6,.5)"/>
+      <text x="658" y="138" fill="#b45309" text-anchor="middle" font-size="13" font-weight="700">補步驟收尾</text>
+      <rect x="711" y="110" width="90" height="46" rx="10" fill="rgba(217,119,6,.09)" stroke="rgba(217,119,6,.5)"/>
+      <text x="756" y="138" fill="#b45309" text-anchor="middle" font-size="13" font-weight="700">補輪次終局</text>
+      <rect x="815" y="110" width="85" height="46" rx="10" fill="rgba(22,163,74,.08)" stroke="#16a34a"/>
+      <text x="857" y="138" fill="#16a34a" text-anchor="middle" font-size="13" font-weight="700">接着跑</text>
+      <text x="245" y="192" fill="var(--sub)" text-anchor="middle" font-size="13">崩潰前已持久化 · 全部保留</text>
+      <text x="658" y="192" fill="var(--sub)" text-anchor="middle" font-size="13">恢復時合成 · 終局標 interrupted</text>
+    </svg>
+    <div class="visual-caption">合成事件的時間戳複用最後一條真實事件的，絕不發明未來時間。</div>
+  </div>
+  <p class="prose reveal paywall-locked">給懸空工具調用補的那條佔位結果，措辭分兩種情況。工具記錄了啓動但結果沒落盤的，佔位文本告訴模型結果未知，只有只讀或冪等操作才可以重試，有副作用的要先核實外部狀態或問用戶，原文強調 <span style="white-space:nowrap">「Do not retry blindly」</span>。工具壓根沒啓動的，直接説需要就重試。</p>
+  <div class="docquote reveal paywall-locked">
+    <p>「它<b>不會</b>截斷日誌：在長週期任務中，單個輪次可能非常龐大（許多步驟、大量工具輸出），而這些事件在崩潰前已被持久追加。後端改為用一個合成的 <code>turn/end { reason: { kind: 'interrupted' } }</code> 關閉這個遺留輪次，在不改變其前後任何獨立事件的情況下配平被中斷的執行。」</p>
+    <span class="dq-src">docs/subsystems/persistence.zh.md · 崩潰恢復保留被中斷的輪次</span>
+  </div>
+  <p class="prose reveal paywall-locked">還有一條容易忽略的邊界：這套修復只對冷會話生效。會話還活着的時候，load 會等權威記憶體快照落盤、只在日誌配平時返回，活躍輪次沒閉合就直接拒絕，絕不給一個正在跑的輪次插入合成邊界。寫盤那頭也有講究：持久化插件批量落盤，循環在領取下一輪之前用 session/flush 做檢查點，把順序和寫盤錯誤都看在眼裏。</p>
+  <p class="src-note reveal paywall-locked">出處：佔位結果的兩種措辭在 <code>packages/core/session/src/repair.ts</code> 第 91 至 124 行，closer 的合成順序（先 step 後 turn）在第 126 至 132 行；只修冷會話在 <code>docs/subsystems/persistence.zh.md</code> 第 17 行，flush 檢查點見同文檔對應小節。</p>
+
+  <h3 class="ask reveal paywall-locked"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>為什麼長期成立</h3>
+  <p class="prose reveal paywall-locked">追加式日誌加讀取時修復，就是數據庫 WAL（預寫日誌）恢復的思路：崩潰後不改寫歷史，只補足讓狀態機能繼續走的最小事件。只要權威狀態放在事件日誌裏，恢復邏輯重寫多少遍都長這樣。反過來説，敢截斷日誌的系統，等於預設單輪工作便宜到可以隨便扔，這個假設在長任務時代不成立。</p>
+
+  <div class="sec-label paywall-locked">橫向對比 · 兩家怎麼面對中斷與崩潰</div>
+  <div class="compare paywall-locked">
+    <div class="compare-card reveal">
+      <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build</h3>
+      <span class="tag">進程級 · 專門的崩潰 crate</span>
+      <p>Grok 有一個專職 crate <code>xai-crash-handler</code>：用 sigaction 接住 SIGSEGV 和 SIGBUS，崩潰現場只用信號安全操作把二進制快照寫進 <code>last-crash.bin</code>，還順手用預計算的轉義序列把終端恢復原狀；下次啓動再解析符號、生成崩潰報告，保留最近 5 份（crate README 與 handler.rs）。</p>
+      <p>它回答的問題是進程怎麼死的、終端別留爛攤子。DSH 的 repair.ts 回答的是會話日誌怎麼活下來。兩家各佔一層，正面對比下 DSH 的獨特點在於把恢復語義做進了持久化契約：load 的接口註釋直接承諾補齊中斷尾部、不改寫已提交事件。在已核對的 Grok Build 材料中未見等價的會話日誌配平機制，這一條基於已公開源碼。</p>
+    </div>
+    <div class="compare-card reveal">
+      <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code</h3>
+      <span class="tag">任務級 · AbortController 掛在 task 上</span>
+      <p>後台 agent 的取消走 <code>killAsyncAgent</code>：從任務狀態裏取出 <code>abortController</code> 調 abort，把任務標成 killed（restored-src 的 LocalAgentTask.tsx 第 283 至 298 行，書稿第 6 章引用）。控制器的生命週期跟着任務走，一個任務一個。</p>
+      <p>DSH 把粒度再切細一檔：控制器跟着輪次走，同一個 agent 的下一輪自動拿新信號，舊回調想越權都拿不到把手。另外 DSH 明確不持久化取消原因，durable 日誌只留 aborted；Claude Code 的會話恢復與中斷記錄細節未在已核對的書稿章節展開，這裏保留未知項。</p>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">課堂練習</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div>
+      <h3>推演兩個時刻的日誌差異</h3>
+      <p>同一個輪次，取消發生在兩個不同時刻：a）模型流式輸出到一半；b）bash 工具正在執行。</p>
+      <p>問題一：分別寫出日誌從 <code>step/start</code> 到 <code>turn/end</code> 之間會出現哪些事件，<code>turn/end</code> 的 reason 是什麼。</p>
+      <p>問題二：把這兩種情況的事故換成 kill -9，重啓後 repair 分別要合成幾條 closer？提示：流式中斷時沒有懸空的 tool/call；工具執行中斷時有一條記錄了啓動的 tool/call，對應結果未知的佔位文本。</p>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway：</b>取消是一根顯式的綫：每輪一個 AbortController，cancel 清 inbox 再 abort，中斷的輪次照樣寫 turn/end { aborted }，取消權在 turn/end 發佈前收回、絕不跨輪。崩潰恢復不截斷：冷加載給懸空工具補錯誤佔位、合成 turn/end { interrupted } 配平，崩潰前已落盤的每一條事件都保留。體面告別和意外身亡，日誌裏一眼可辨。</span>
+  </div>
+</article>
+<script>
+(function () {
+  'use strict';
+  var logEl = document.getElementById('dx-log');
+  var countEl = document.getElementById('dx-count');
+  var procEl = document.getElementById('dx-proc');
+  var sigEl = document.getElementById('dx-sig');
+  var inboxEl = document.getElementById('dx-inbox');
+  var lossEl = document.getElementById('dx-loss');
+  var statusEl = document.getElementById('dx-status');
+  var steps = [];
+  var idx = 0;
+  var timer = null;
+  var playing = false;
+  var cur = 'A';
+  var runId = 0;
+  var seq = 41;
+
+  function setStatus(t) { statusEl.textContent = t; }
+  function setProc(mode, label) { procEl.className = 'proc ' + mode; procEl.innerHTML = '<span>' + label + '</span>'; }
+  function setSig(mode, label) { sigEl.className = 'siglamp ' + mode; sigEl.innerHTML = '<i></i><span>' + label + '</span>'; }
+  function setInbox(n) { inboxEl.textContent = n + ' 條'; }
+  function setLoss(html) { lossEl.innerHTML = html; }
+  function updateCount() {
+    var kept = logEl.querySelectorAll('.ev.in:not(.mark):not(.dead)').length;
+    var dead = logEl.querySelectorAll('.ev.dead').length;
+    countEl.textContent = '有效 ' + kept + ' 條' + (dead ? ' · 丟棄 ' + dead + ' 條' : '');
+  }
+  function addEv(text, cls, note, noSeq) {
+    var el = document.createElement('div');
+    el.className = 'ev' + (cls ? ' ' + cls : '');
+    var html = '';
+    if (!noSeq) html += '<span class="seq">' + (seq++) + '</span>';
+    html += '<span>' + text + '</span>';
+    if (note) html += '<span class="note">' + note + '</span>';
+    el.innerHTML = html;
+    logEl.appendChild(el);
+    void el.offsetWidth;
+    el.classList.add('in');
+    logEl.scrollTop = logEl.scrollHeight;
+    updateCount();
+    return el;
+  }
+  function killRows(fromIdx) {
+    var rows = Array.prototype.filter.call(logEl.children, function (el) { return !el.classList.contains('mark'); });
+    var n = 0;
+    for (var i = fromIdx; i < rows.length; i++) { rows[i].classList.add('dead'); n++; }
+    updateCount();
+    return n;
+  }
+
+  function commonOpening(list) {
+    list.push({ status: '一條新輪次開跑。驅動器為它新建了一個 AbortController：本輪取消信號點亮。', run: function () {
+      setProc('', '運行中'); setSig('live', 'turn 7 · 有效'); setInbox(0);
+      addEv('turn/start · turn 7', 'bd');
+    } });
+    list.push({ status: '進入第一個 step，用戶消息從 inbox 領出來落日誌。', run: function () {
+      addEv('step/start · step 1', 'bd');
+      addEv('user/message「幫我重構這個模組」');
+    } });
+    list.push({ status: '模型開始流式輸出。注意：每一片 chunk 先落日誌再進記憶體，落盤即持久。', run: function () {
+      addEv('assistant/chunk「先看下現有結構…」');
+    } });
+    list.push({ status: '輸出繼續，模型決定調一個長工具：跑測試。tool/call 記錄了工具已啓動。', run: function () {
+      addEv('assistant/chunk「我需要跑一下測試」');
+      addEv('tool/call · bash: pnpm test', '', '執行中…');
+    } });
+  }
+
+  function buildA() {
+    var list = [];
+    commonOpening(list);
+    list.push({ status: '等工具的空當，用戶又排了一條追問進 inbox。它還沒被任何輪次領走，先在隊列裏等着。', run: function () {
+      setInbox(1);
+    } });
+    list.push({ status: '測試跑到一半，用戶按下 Esc。介面把它翻譯成 agent.cancel({ kind: "user" })。', run: function () {
+      addEv('用戶按下 Esc', 'mark', '', true);
+    } });
+    list.push({ status: 'cancel 的第一件事：清空 inbox，剛才那條追問作廢、沒跑過就被扔掉（想保留可以傳 keepInbox）。第二件事：對本輪控制器 abort(cause)。', run: function () {
+      setInbox(0); setSig('aborted', 'turn 7 · 已中止');
+    } });
+    list.push({ status: '同一個 signal 傳遍所有幹活的邊界：模型流停止讀取，bash 順着信號殺掉整個進程組。已落盤的 chunk 一條不刪。', run: function () {
+      addEv('tool/result · bash（已中止）', '', '進程組已終止');
+    } });
+    list.push({ status: '中斷也要記帳：finally 裏寫 turn/end，reason 是 aborted。日誌配平，誰看都知道這輪是被人有序停掉的。', run: function () {
+      addEv('step/end · step 1', 'bd');
+      addEv('turn/end · reason: aborted', 'bd');
+      setLoss('<b>結算：</b><span class="good">取消前落盤的 6 條事件全部保留</span>，加 3 條收尾事件。被清掉的那條追問沒有 turn/end 描述它，靠 foldConsumedWork 從 inbox 記錄裏算出有活被扔了、沒跑。');
+    } });
+    list.push({ status: '收尾交接：發佈 turn/end 之前取消持有者已被清除，本輪的取消權到此失效。新消息進來，下一輪拿到全新的信號。', run: function () {
+      setSig('live', 'turn 8 · 全新信號'); setProc('', '運行中');
+      addEv('turn/start · turn 8', 'bd', '新一輪 · 新 AbortController');
+    } });
+    return list;
+  }
+
+  function buildB() {
+    var list = [];
+    commonOpening(list, true);
+    list.push({ status: '這次沒有 Esc：進程被 kill -9，一切戛然而止。沒有 catch，沒有 finally，日誌停在半截。', run: function () {
+      addEv('kill -9 · 進程消失', 'mark', '', true);
+      setProc('dead', '已死亡'); setSig('off', '隨進程消失'); 
+      setLoss('<b>此刻的日誌：</b>turn 開着、step 開着、tool/call 懸着沒有結果。但已落盤的 6 條事件安然無恙。');
+    } });
+    list.push({ status: '用戶重啓 DSH，重新打開這個會話。冷加載掃描日誌，發現 turn/start 沒有配對的 turn/end。', run: function () {
+      setProc('idle', '已重啓 · 冷加載');
+    } });
+    list.push({ status: '第一條合成事件：給懸空的 tool/call 補一條錯誤佔位結果。文本明説結果未知，只有冪等操作才能重試，不要盲目重試。', run: function () {
+      addEv('tool/result · 合成佔位（結果未知）', 'syn', '恢復合成');
+    } });
+    list.push({ status: '再合成 step/end 與 turn/end { interrupted } 關掉尾巴。interrupted 是唯一一個循環從不親手寫的結局，看到它就知道發生過崩潰。', run: function () {
+      addEv('step/end · step 1（合成）', 'syn', '恢復合成');
+      addEv('turn/end · reason: interrupted', 'syn', '恢復合成');
+    } });
+    list.push({ status: '日誌配平，會話可以接着跑。崩潰前已持久化的每一條勞動成果都在，模型下一輪能看到之前做到哪一步了。', run: function () {
+      setProc('', '恢復運行'); setSig('live', 'turn 8 · 全新信號');
+      addEv('turn/start · turn 8', 'bd', '接着跑');
+      setLoss('<b>結算：</b><span class="good">6 條真實事件全部保留</span> + 3 條合成 closer。數據損失：<span class="good">0 條</span>。');
+    } });
+    return list;
+  }
+
+  function buildC() {
+    var list = [];
+    commonOpening(list, true);
+    list.push({ status: '同樣的 kill -9，同樣的半截日誌。這次換一個假想的恢復策略：截斷式，把沒寫完的輪次整個丟掉。', run: function () {
+      addEv('kill -9 · 進程消失', 'mark', '', true);
+      setProc('dead', '已死亡'); setSig('off', '隨進程消失');
+    } });
+    list.push({ status: '截斷式恢復動手：從 turn/start 往後的事件全部刪除，日誌回退到上一輪的結尾。', run: function () {
+      var n = killRows(0);
+      setProc('idle', '已重啓 · 截斷恢復');
+      setLoss('<b>結算：</b><span class="bad">' + n + ' 條已持久化的事件被丟棄</span>：用戶消息、模型已經想清楚的思路、測試已經跑出的結果，全部陪葬。');
+    } });
+    list.push({ status: '對照結論：同一個事故時刻，DSH 的配平語義保住 6 條、丟 0 條；截斷語義丟 6 條。長任務單輪可能有幾十個步驟，這筆賬會大得多。', run: function () {} });
+    return list;
+  }
+
+  function build(k) { return k === 'A' ? buildA() : k === 'B' ? buildB() : buildC(); }
+
+  function reset() {
+    runId++;
+    playing = false;
+    clearTimeout(timer);
+    idx = 0;
+    seq = 41;
+    logEl.innerHTML = '';
+    setProc('idle', '空閒');
+    setSig('off', '未創建');
+    setInbox(0);
+    setLoss('日誌統計會顯示在這裏：哪些事件保住了，哪些丟了。');
+    countEl.textContent = '';
+    setStatus('已重置。點播放運行情景 ' + cur + '，或點單步逐幀推進。');
+    steps = build(cur);
+  }
+
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.status) setStatus(s.status);
+    if (s.run) s.run();
+    if (playing) timer = setTimeout(doStep, s.dur || 2300);
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true;
+    doStep();
+  }
+  function stepOnce() {
+    playing = false;
+    clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-cancel .scn'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-cancel .scn'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  document.getElementById('dx-play').addEventListener('click', play);
+  document.getElementById('dx-step').addEventListener('click', stepOnce);
+  document.getElementById('dx-reset').addEventListener('click', reset);
+
+  reset();
+  (function hookAutoplay(tries) {
+    if (typeof window.lessonOnView === 'function') {
+      window.lessonOnView(document.getElementById('demo-cancel'), play);
+    } else if (tries > 0) {
+      setTimeout(function () { hookAutoplay(tries - 1); }, 120);
+    }
+  })(50);
+})();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

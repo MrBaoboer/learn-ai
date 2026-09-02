@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>模型會掛，然後呢？ | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+.chain-wrap{display:flex;flex-direction:column;align-items:center;gap:0;margin-top:8px;position:relative}
+.chain-node{width:100%;max-width:520px;padding:16px 22px;border-radius:var(--radius);border:1.5px solid var(--border);background:var(--card);box-shadow:var(--shadow-card);display:flex;align-items:center;gap:14px;opacity:0;transform:translateX(-20px);transition:all .5s ease}
+.chain-node.active{opacity:1;transform:translateX(0)}
+.chain-node.fail{border-color:rgba(220,38,38,.4)}
+.chain-node.success{border-color:rgba(22,163,74,.4)}
+.chain-node.fallback{border-color:rgba(217,119,6,.4)}
+.chain-node.final{border-color:rgba(124,58,237,.4)}
+.chain-node .node-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+.chain-node .node-icon img{width:100%;height:100%;object-fit:cover;border-radius:12px}
+.chain-node.fail .node-icon{background:rgba(220,38,38,.08)}
+.chain-node.success .node-icon{background:rgba(22,163,74,.08)}
+.chain-node.fallback .node-icon{background:rgba(217,119,6,.08)}
+.chain-node.final .node-icon{background:rgba(124,58,237,.08)}
+.chain-node .node-text{flex:1}
+.chain-node .node-title{font-size:14px;font-weight:700;color:var(--text)}
+.chain-node .node-desc{font-size:12px;color:var(--sub);margin-top:2px}
+.chain-connector{width:2px;height:24px;background:var(--border);position:relative}
+.chain-connector::after{content:'↓';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);color:var(--sub);font-size:11px;background:var(--bg);padding:0 4px}
+
+.replay-btn{display:block;margin:20px auto 0;background:var(--accent);color:#fff;border:none;padding:10px 24px;border-radius:999px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px rgba(0,102,255,.25);transition:transform .15s,box-shadow .15s}
+.replay-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,102,255,.35)}
+.replay-btn:active{transform:translateY(0)}
+
+.state-imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px}
+@media(max-width:768px){.state-imgs{grid-template-columns:1fr}}
+.state-item{text-align:center;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-card)}
+.state-item img{max-width:120px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:10px}
+.state-item .s-label{font-size:13px;font-weight:700;color:var(--text)}
+.state-item .s-desc{font-size:12px;color:var(--sub);margin-top:4px;line-height:1.5}
+
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px}
+@media(max-width:768px){.concept-grid{grid-template-columns:1fr}}
+.concept-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.concept-card .c-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:10px}
+.concept-card .c-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.concept-card .c-desc{font-size:13px;color:var(--sub);line-height:1.6}
+
+.result-demo{display:flex;align-items:center;gap:16px;margin-top:20px;padding:20px;background:var(--card);border:1.5px solid rgba(22,163,74,.3);border-radius:var(--radius);box-shadow:var(--shadow-card)}
+@media(max-width:768px){.result-demo{flex-direction:column}}
+.result-demo img{max-width:200px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);flex-shrink:0}
+.result-demo .result-text{flex:1}
+.result-demo .result-text h4{font-size:16px;font-weight:800;color:var(--success);margin:0 0 8px}
+.result-demo .result-text p{font-size:14px;color:var(--sub);line-height:1.7;margin:0}
+
+.takeaway{background:rgba(217,119,6,.04);border:1.5px solid rgba(217,119,6,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--amber)}
+</style>
+<meta name="description" content="生圖模型會超時、限流、當機，降級鏈讓使用者永遠能拿到圖。用 Alice 的真實狀態展示錯誤處理的產品設計。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/9-4.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/9-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/9-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/9-4.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/9-4.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/9-4.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/9-4.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/9-4.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="模型會掛，然後呢？">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/9-4.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/9-4.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"模型會掛，然後呢？","name":"模型會掛，然後呢？","url":"https://xueai.miyang.cn/slides/9-4.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · AI 生圖","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"生圖模型會超時、限流、當機，降級鏈讓使用者永遠能拿到圖。用 Alice 的真實狀態展示錯誤處理的產品設計。","datePublished":"2026-07-03","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:description" content="生圖模型會超時、限流、當機，降級鏈讓使用者永遠能拿到圖。用 Alice 的真實狀態展示錯誤處理的產品設計。"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">AI 生圖</div>
+    <h1>模型會掛，然後呢？</h1>
+    <p class="subtitle">在 Alice 裡，使用者說「幫我畫一張圖」，但背後可能 Gemini 超時了、Seedream 限流了、GPT Image 也出錯了。使用者不關心哪個模型掛了，他只關心：圖到底能不能出來？</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>多模型降級鏈的產品邏輯：優先順序、白名單、探活、全掛時的體驗兜底</p></aside><!--seo:end-->  <div class="sec-label">Alice 的三種狀態</div>
+
+  <div class="state-imgs reveal">
+    <div class="state-item">
+      <img src="https://img.alice.miyang.cn/xueai/alice/thinking.png?imageMogr2/thumbnail/640x%3E/format/webp/quality/82" alt="Alice 思考中">
+      <div class="s-label">思考中</div>
+      <div class="s-desc">正在生圖，請稍候</div>
+    </div>
+    <div class="state-item">
+      <img src="https://img.alice.miyang.cn/xueai/alice/error.png?imageMogr2/thumbnail/640x%3E/format/webp/quality/82" alt="Alice 錯誤狀態">
+      <div class="s-label">出錯了</div>
+      <div class="s-desc">模型返回錯誤，正在切換備選</div>
+    </div>
+    <div class="state-item">
+      <img src="https://img.alice.miyang.cn/xueai/alice/empty.png?imageMogr2/thumbnail/640x%3E/format/webp/quality/82" alt="Alice 空狀態">
+      <div class="s-label">全部失敗</div>
+      <div class="s-desc">所有模型不可用，友好降級</div>
+    </div>
+  </div>
+
+  <div class="sec-label">降級鏈：Alice 的保險策略</div>
+
+  <div class="chain-wrap" id="chainWrap">
+    <div class="chain-node fail" id="n1">
+      <div class="node-icon"><img src="https://img.alice.miyang.cn/xueai/alice/error.png?imageMogr2/thumbnail/640x%3E/format/webp/quality/82" alt="失敗"></div>
+      <div class="node-text">
+        <div class="node-title">模型 A（Gemini）超時 15 秒</div>
+        <div class="node-desc">觸發超時熔斷 → 自動降級</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node fallback" id="n2">
+      <div class="node-icon" style="font-size:18px">⚡</div>
+      <div class="node-text">
+        <div class="node-title">切換到模型 B（Seedream）</div>
+        <div class="node-desc">備選模型接管，使用者無感知</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node fail" id="n3">
+      <div class="node-icon"><img src="https://img.alice.miyang.cn/xueai/alice/error.png?imageMogr2/thumbnail/640x%3E/format/webp/quality/82" alt="失敗"></div>
+      <div class="node-text">
+        <div class="node-title">模型 B 返回限流錯誤</div>
+        <div class="node-desc">併發上限，繼續降級</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node fallback" id="n4">
+      <div class="node-icon" style="font-size:18px">⚡</div>
+      <div class="node-text">
+        <div class="node-title">切換到模型 C（GPT Image）</div>
+        <div class="node-desc">第三備選頂上</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node success" id="n5">
+      <div class="node-icon"><img src="https://img.alice.miyang.cn/xueai/alice/thinking.png?imageMogr2/thumbnail/640x%3E/format/webp/quality/82" alt="成功"></div>
+      <div class="node-text">
+        <div class="node-title">模型 C 成功出圖 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success,#16a34a)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="node-desc">使用者拿到圖片，全程感知不到切換</div>
+      </div>
+    </div>
+    <div class="chain-connector"></div>
+    <div class="chain-node final paywall-locked xa-peek" id="n6">
+      <div class="node-icon"><img src="https://img.alice.miyang.cn/xueai/alice/empty.png?imageMogr2/thumbnail/640x%3E/format/webp/quality/82" alt="兜底"></div>
+      <div class="node-text">
+        <div class="node-title">全部失敗？友好降級</div>
+        <div class="node-desc">「抱歉服務繁忙，已加入佇列稍後通知您」</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="replay-btn paywall-locked" onclick="replayChain()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-1px;margin-right:3px"><polygon points="5 3 19 12 5 21 5 3"/></svg> 重新播放</button>
+
+  <div class="sec-label paywall-locked">最終結果：使用者看到的</div>
+
+  <div class="result-demo reveal paywall-locked">
+    <img src="https://img.alice.miyang.cn/xueai/alice/life_thinking_rainy.png?imageMogr2/thumbnail/640x%3E/format/webp/quality/82" alt="Alice 雨天思考 - 最終生圖結果">
+    <div class="result-text">
+      <h4>雖然經歷了兩次模型失敗，使用者依然拿到了圖</h4>
+      <p>使用者只看到「Alice 正在畫…」的等待狀態，然後收到結果。背後模型 A 超時、模型 B 限流、模型 C 頂上，這些對使用者完全透明。這就是降級鏈的價值。</p>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">三個產品思路</div>
+
+  <div class="concept-grid paywall-locked">
+    <div class="concept-card reveal">
+      <div class="c-icon" style="background:rgba(217,119,6,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+      <div class="c-title">優先順序排序 + 白名單</div>
+      <div class="c-desc">預設模型優先順序。不同場景可以指定不同的模型組合：比如角色出鏡優先用效果最好的模型，純背景可以用便宜快速的。</div>
+    </div>
+    <div class="concept-card reveal">
+      <div class="c-icon" style="background:rgba(22,163,74,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="c-title">探活機制</div>
+      <div class="c-desc">定時檢測每個模型的健康狀態。已確認當機的直接跳過，恢復後自動上線。不浪費使用者的等待時間在已死的模型上。</div>
+    </div>
+    <div class="concept-card reveal">
+      <div class="c-icon" style="background:rgba(124,58,237,.1)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+      <div class="c-title">墊圖降級</div>
+      <div class="c-desc">有些模型不支援墊圖（image-to-image）。降級時如果備選模型不支援墊圖，退化為純文生圖，品質降低但至少能出圖。</div>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>使用者不關心你用的哪個模型，他只關心圖能不能出來。</b>在 Alice 裡，降級鏈保證了即使主力模型全掛，使用者最差也只是多等幾秒或收到一句友好提示，永遠不會撞上冷冰冰的錯誤頁面。</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+function replayChain() {
+  var nodes = document.querySelectorAll('.chain-node');
+  for (var i = 0; i < nodes.length; i++) {
+    nodes[i].classList.remove('active');
+  }
+  var delays = [300, 900, 1500, 2100, 2700, 3400];
+  for (var i = 0; i < nodes.length; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        nodes[idx].classList.add('active');
+      }, delays[idx]);
+    })(i);
+  }
+}
+
+lessonOnView(document.getElementById('chainWrap'), function() {
+  replayChain();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

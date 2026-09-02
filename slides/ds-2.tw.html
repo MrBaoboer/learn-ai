@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>陣列：你聊的每句話都躺在裡面 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<!-- SEO Start -->
+<meta name="description" content="message list 就是一個陣列：帶索引編號的格子怎麼裝下你和 AI 的每句話、上下文視窗為什麼「掐頭不掐尾」、聊久了為什麼忘事。再親手往陣列中間插一條資料，數一數右邊要搬動多少個元素——你就懂了為什麼對話歷史只往後長。">
+<meta name="keywords" content="陣列是什麼,message list,上下文視窗,上下文截斷,陣列插入,append-only,資料結構陣列,零基礎資料結構">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/ds-2.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/ds-2.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/ds-2.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/ds-2.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/ds-2.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/ds-2.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/ds-2.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/ds-2.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="陣列：你聊的每句話都躺在裡面">
+<meta property="og:description" content="message list 就是一個陣列：上下文視窗為什麼「掐頭不掐尾」，聊久了為什麼忘事。再看看往陣列中間插一條資料有多貴。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/ds-2.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/ds-2.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="陣列：你聊的每句話都躺在裡面">
+<meta name="twitter:description" content="message list 就是一個陣列：上下文視窗為什麼「掐頭不掐尾」，聊久了為什麼忘事。再看看往陣列中間插一條資料有多貴。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── 对话数组 ── */
+.chatarr-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.chatarr-legend{display:flex;gap:16px;flex-wrap:wrap;padding:11px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015);font-size:12px;font-weight:700;color:var(--sub)}
+.lg-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.chatarr-strip{display:flex;gap:10px;padding:18px 16px 16px;overflow-x:auto;align-items:stretch;scroll-behavior:smooth}
+.arr-cell{flex:0 0 112px;display:flex;flex-direction:column;gap:5px;transition:opacity .5s,filter .5s}
+.arr-idx{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:11.5px;font-weight:800;color:var(--sub);text-align:center}
+.arr-bubble{flex:1;border-radius:10px;padding:8px 10px;font-size:11.5px;line-height:1.55;border:1.5px solid transparent;min-height:66px;font-weight:600}
+.arr-cell.system .arr-bubble{background:rgba(100,116,139,.12);color:#475569;border-color:rgba(100,116,139,.3)}
+.arr-cell.user .arr-bubble{background:rgba(2,132,199,.1);color:var(--ds-deep);border-color:rgba(2,132,199,.28)}
+.arr-cell.assistant .arr-bubble{background:rgba(22,163,74,.09);color:#166534;border-color:rgba(22,163,74,.26)}
+.arr-role{font-size:10px;font-weight:800;text-align:center;color:var(--sub);letter-spacing:.4px}
+.arr-winbar{height:4px;border-radius:2px;background:transparent;transition:background .4s}
+.arr-cell.inwin .arr-winbar{background:var(--ds)}
+.arr-cell.evicted{opacity:.32;filter:grayscale(.9)}
+@keyframes cellIn{from{opacity:0;transform:translateY(14px) scale(.85)}to{opacity:1;transform:none}}
+.arr-cell.fresh{animation:cellIn .45s cubic-bezier(.25,1,.5,1)}
+.chatarr-foot{padding:14px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px}
+.chatarr-controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-ghost{background:var(--card);color:var(--sub);border:1.5px solid var(--border);padding:9px 22px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s}
+.btn-ghost:hover{border-color:var(--ds-line);color:var(--ds-deep)}
+.win-slider{display:flex;align-items:center;gap:10px;flex:1;min-width:220px}
+.win-slider label{font-size:13px;font-weight:800;color:var(--text);flex-shrink:0}
+.win-slider input[type=range]{flex:1;min-width:100px;accent-color:var(--ds)}
+.win-k{font-size:15px;font-weight:900;color:var(--ds);font-variant-numeric:tabular-nums;min-width:56px}
+.chat-status{font-size:12.5px;color:var(--sub);font-weight:600;line-height:1.7}
+.chat-status b{color:var(--ds-deep);font-variant-numeric:tabular-nums}
+
+/* ── 中间插入实验 ── */
+.ins-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 20px}
+.ins-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.ins-hint{font-size:13px;color:var(--sub);font-weight:600}
+.ins-counter{font-size:12.5px;font-weight:700;color:var(--sub)}
+.ins-counter b{font-size:22px;font-weight:900;color:var(--amber);font-variant-numeric:tabular-nums;margin:0 3px}
+.ins-strip{display:flex;gap:8px;flex-wrap:wrap;min-height:84px}
+.ins-cell{width:54px;cursor:pointer}
+.ins-val{height:52px;border-radius:10px;background:rgba(0,0,0,.045);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:var(--text);border:1.5px solid transparent;transition:transform .16s,background .16s,border-color .16s}
+.ins-cell:hover .ins-val{border-color:var(--ds-line);background:var(--ds-soft)}
+.ins-cell.shifting .ins-val{transform:translateX(26px);background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.5)}
+.ins-cell.fresh .ins-val{animation:cellIn .4s cubic-bezier(.25,1,.5,1);background:var(--ds-soft);border-color:var(--ds-line);color:var(--ds-deep)}
+.ins-idx{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:10.5px;font-weight:800;color:var(--sub);text-align:center;margin-top:4px}
+.ins-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;border-top:1px dashed var(--border);padding-top:14px}
+.ins-log{font-size:13px;color:var(--sub);font-weight:600;line-height:1.7}
+.ins-log b{color:var(--amber)}
+.ins-log .ok{color:var(--success);font-weight:800}
+
+/* ── 知识卡 ── */
+.know-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.know-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.know-card .kc-icon{font-size:24px;margin-bottom:8px}
+.know-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.know-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.know-card p b{color:var(--text)}
+.know-card code{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .arr-cell{flex:0 0 96px}
+  .ins-cell{width:46px}
+  .ins-val{height:46px;font-size:15px}
+  .know-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"陣列：你聊的每句話都躺在裡面","name":"陣列：你聊的每句話都躺在裡面","url":"https://xueai.miyang.cn/slides/ds-2.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 線性結構：你天天在用","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":true,"description":"message list 就是一個陣列：帶索引編號的格子怎麼裝下你和 AI 的每句話、上下文視窗為什麼「掐頭不掐尾」、聊久了為什麼忘事。再親手往陣列中間插一條資料，數一數右邊要搬動多少個元素——你就懂了為什麼對話歷史只往後長。","datePublished":"2026-08-10","dateModified":"2026-08-27"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">程式設計基礎篇 · 線性結構：你天天在用</div>
+    <h1>陣列：你聊的每句話都躺在裡面</h1>
+    <p class="subtitle">上一課說好了：資料結構 = 收納方式。第一種收納方式你其實天天在餵它資料——你和 AI 的每一段對話，在程式眼裡就是一個 <b>message list</b>，而 message list 的真身，是最樸素的收納方式：<b>一排編了號的格子，叫陣列</b>。這一課先把你的對話攤開來看，再順手回答一個老疑問：為什麼聊久了它會忘事。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>message list 就是一個陣列：對話歷史怎麼排隊、上下文截斷為什麼掐頭不掐尾；順便看陣列中間插一條資料有多貴</p></aside><!--seo:end-->  <div class="sec-label">先玩 · 你的對話正躺在一排格子裡</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">下面就是一個 message list：每條訊息佔一個格子，格子上方是它的<b style="color:var(--text)">索引</b>（編號，從 0 開始數——程式設計師的老習慣）。點<b style="color:var(--text)">「發一條訊息」</b>，看新訊息落在哪；再拖<b style="color:var(--text)">「上下文視窗」滑塊</b>，留意哪些格子變灰了、哪個格子永遠不灰。</p>
+
+  <div class="chatarr-box">
+    <div class="chatarr-legend">
+      <span><span class="lg-dot" style="background:rgba(100,116,139,.5)"></span>system（📌 釘住）</span>
+      <span><span class="lg-dot" style="background:rgba(2,132,199,.5)"></span>user（你）</span>
+      <span><span class="lg-dot" style="background:rgba(22,163,74,.5)"></span>assistant（AI）</span>
+      <span><span class="lg-dot" style="background:var(--ds)"></span>底下有藍條 = 在上下文視窗裡</span>
+    </div>
+    <div class="chatarr-strip" id="chatStrip"></div>
+    <div class="chatarr-foot">
+      <div class="chatarr-controls">
+        <button class="btn-ds" id="btnSend">發一條訊息 →</button>
+        <div class="win-slider">
+          <label>上下文視窗</label>
+          <input type="range" id="winRange" min="2" max="8" value="4">
+          <span class="win-k" id="winK">4 條</span>
+        </div>
+      </div>
+      <div class="chat-status" id="chatStatus"></div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>這就是「聊久了忘事」的全部真相。</b>模型一次能讀的內容有上限（上下文視窗），裝不下時就得扔。扔哪頭？<b>掐頭不掐尾</b>——最早的閒聊先扔，最近幾句必須留著，不然它連你剛說什麼都不知道。唯獨 <code>[0]</code> 號格子的 system 提示詞被<b>釘住</b>了：它是人設和規矩（「你是一個貼心的助理」），扔了它，AI 就忘了自己是誰。所以「忘事」不是玄學，就是<b>陣列切片</b>：留下 system + 最近 K 條，其餘不再送進模型。
+  </div>
+
+  <div class="sec-label">第二局 · 往中間插一條，有多貴？</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">陣列的格子在記憶體裡是<b style="color:var(--text)">緊挨著</b>排的，中間不許有空位。這帶來一個麻煩：想往中間塞一個新元素，右邊的所有元素都得<b style="color:var(--text)">挨個往右搬一格</b>給它騰地方。<b style="color:var(--text)">點任意一個格子</b>，在它的位置插入一顆 ⭐，盯著「搬動次數」；再點「在末尾追加」對比一下。</p>
+
+  <div class="ins-box">
+    <div class="ins-head">
+      <span class="ins-hint">👇 點格子 = 在這個位置插入 ⭐（越靠左，右邊要搬家的越多）</span>
+      <span class="ins-counter">搬動次數<b id="moveN">0</b>次</span>
+    </div>
+    <div class="ins-strip" id="insStrip"></div>
+    <div class="ins-foot">
+      <button class="btn-ds" id="btnAppend">在末尾追加 ⭐</button>
+      <button class="btn-ghost" id="btnResetIns">重置 ↻</button>
+      <span class="ins-log" id="insLog">先點一個靠左的格子試試，比如 [1]</span>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>看出規律了嗎？</b>末尾追加永遠只要 1 步，中間插入要搬動一大片——格子越多、插得越靠前，搬得越狠。這就是為什麼對話歷史被設計成<b>只往後長</b>（append-only）：每條新訊息 push 到末尾，誰也不搬家，快且省。你從來沒見過哪個聊天軟體讓你「把一句話插到十分鐘前」，不是產品經理沒想到，是這麼幹真的貴。
+  </div>
+
+  <div class="sec-label">陣列的看家本領（和它的軟肋）</div>
+
+  <div class="know-grid">
+    <div class="know-card">
+      <div class="kc-icon">🎯</div>
+      <h4>看家本領：按編號直達</h4>
+      <p>想拿第 3 條訊息？<code>messages[3]</code>，<b>不用從頭數</b>，一步到位。因為格子緊挨著排，編號本身就是地址——這叫 O(1)，翻譯成人話是「<b>不管陣列多長，耗時都一樣</b>」。按位置取資料，陣列是所有收納方式裡最快的，沒有之一。</p>
+    </div>
+    <div class="know-card">
+      <div class="kc-icon">⚖️</div>
+      <h4>軟肋：中間插入貴</h4>
+      <p>你剛才親手搬過了。順帶認識一個親戚：<b>連結串列</b>——它中間插入很便宜（改兩根「下一個是誰」的指標就行），代價是失去了按編號直達，找第 100 個得從頭挨個走。<b>沒有全能的收納方式，只有取捨</b>。對話這種「只追加、常整段讀」的場景，陣列完勝，所以 message list 用它。</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 這一課想和你分享的</h3>
+    <ul>
+      <li><b>message list 就是陣列</b>：一排編了號的格子，每條訊息躺一格，索引從 0 開始</li>
+      <li><b>索引直達 O(1)</b>：按位置取資料，陣列是最快的收納方式</li>
+      <li><b>上下文截斷 = 陣列切片</b>：留 system + 最近 K 條，「掐頭不掐尾」，這就是聊久了忘事的真相</li>
+      <li><b>中間插入貴、末尾追加便宜</b>：所以對話歷史只往後長（append-only）</li>
+      <li><b>收納方式都是取捨</b>：連結串列中間插得快但沒了直達——場景決定選擇</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* ── 交互一：对话就是数组 ──
+   窗口规则：钉住 [0] 的 system，再留最近 K 条 user/assistant。
+   初始 3 条 + 默认 K=4 时怎么发都不溢出，所以 FEED 备了 12 条轮换，
+   发到第 5 条左右学员第一次看到「变灰」，正好在滑块玩腻之前。 */
+const msgs = [
+  { role:'system',    text:'你是一個貼心的生活助理' },
+  { role:'user',      text:'幫我想個週末去哪玩' },
+  { role:'assistant', text:'郊區爬山，或者看個新展？' },
+];
+const FEED = [
+  { role:'user',      text:'想去安靜點的地方' },
+  { role:'assistant', text:'那推薦植物園或美術館' },
+  { role:'user',      text:'植物園怎麼去？' },
+  { role:'assistant', text:'地鐵 3 號線坐到底就是' },
+  { role:'user',      text:'門票貴嗎？' },
+  { role:'assistant', text:'20 元，兒童半價' },
+  { role:'user',      text:'帶娃方便嗎？' },
+  { role:'assistant', text:'有親子區和小火車' },
+  { role:'user',      text:'中午吃什麼？' },
+  { role:'assistant', text:'東門那家麵館不錯' },
+  { role:'user',      text:'萬一下雨呢？' },
+  { role:'assistant', text:'就改逛室內的美術館' },
+];
+let feedIdx = 0;
+let K = 4;
+
+const strip      = document.getElementById('chatStrip');
+const winRange   = document.getElementById('winRange');
+const winK       = document.getElementById('winK');
+const chatStatus = document.getElementById('chatStatus');
+const btnSend    = document.getElementById('btnSend');
+
+function renderChat(freshIdx){
+  strip.innerHTML = msgs.map((m, i) => {
+    const win = i === 0 || i >= msgs.length - K;
+    return `
+    <div class="arr-cell ${m.role}${win ? ' inwin' : ' evicted'}${i === freshIdx ? ' fresh' : ''}">
+      <div class="arr-idx">[${i}]</div>
+      <div class="arr-bubble">${m.role === 'system' ? '📌 ' : ''}${m.text}</div>
+      <div class="arr-role">${m.role === 'system' ? 'system · 釘住' : m.role}</div>
+      <div class="arr-winbar"></div>
+    </div>`;
+  }).join('');
+  const evicted = Math.max(0, msgs.length - 1 - K);
+  if (evicted === 0) {
+    chatStatus.innerHTML = `陣列長度 <b>${msgs.length}</b>，視窗還裝得下全部對話。繼續發訊息，看它什麼時候裝不下`;
+  } else {
+    chatStatus.innerHTML = `陣列長度 <b>${msgs.length}</b>：最早的 <b>${evicted}</b> 條對話被擠出視窗（變灰，模型看不見了）——但 [0] 的 system 提示詞還釘在視窗裡`;
+  }
+}
+
+btnSend.addEventListener('click', () => {
+  msgs.push(FEED[feedIdx % FEED.length]);
+  feedIdx++;
+  renderChat(msgs.length - 1);
+  strip.scrollTo({ left: strip.scrollWidth, behavior: 'smooth' });
+});
+
+winRange.addEventListener('input', () => {
+  K = +winRange.value;
+  winK.textContent = K + ' 條';
+  renderChat(-1);
+});
+
+renderChat(-1);
+
+/* ── 交互二：中间插入有多贵 ──
+   动画只做「右移预告」：被搬的格子先橙色右滑（此时还没真插入），
+   停一拍再重排 DOM 落位。真同步移动需要 FLIP 动画，成本高且学员
+   要看的其实是「搬了几次」这个数，不是像素级的位移。 */
+const INS_INIT = ['A','B','C','D','E','F','G','H','I','J'];
+let arr = INS_INIT.slice();
+let insBusy = false;
+
+const insStrip    = document.getElementById('insStrip');
+const moveN       = document.getElementById('moveN');
+const insLog      = document.getElementById('insLog');
+const btnAppend   = document.getElementById('btnAppend');
+const btnResetIns = document.getElementById('btnResetIns');
+
+function renderIns(freshIdx){
+  insStrip.innerHTML = arr.map((v, i) => `
+    <div class="ins-cell${i === freshIdx ? ' fresh' : ''}" data-i="${i}">
+      <div class="ins-val">${v}</div>
+      <div class="ins-idx">[${i}]</div>
+    </div>`).join('');
+}
+
+async function insertAt(i){
+  if (insBusy) return;
+  if (arr.length >= 16) {
+    insLog.innerHTML = '格子夠多了，點「重置 ↻」再玩一輪';
+    return;
+  }
+  insBusy = true;
+  let moves = 0;
+  moveN.textContent = '0';
+  const cells = [...insStrip.children];
+  for (let j = arr.length - 1; j >= i; j--) {
+    cells[j].classList.add('shifting');
+    moves++;
+    moveN.textContent = moves;
+    await sleep(150);
+  }
+  await sleep(300);
+  arr.splice(i, 0, '⭐');
+  renderIns(i);
+  insLog.innerHTML = `在 [${i}] 插入：右邊 <b>${moves}</b> 個元素全體搬家，再加 1 次寫入。插得越靠左，搬得越多`;
+  insBusy = false;
+}
+
+insStrip.addEventListener('click', e => {
+  const cell = e.target.closest('.ins-cell');
+  if (cell) insertAt(+cell.dataset.i);
+});
+
+btnAppend.addEventListener('click', () => {
+  if (insBusy) return;
+  if (arr.length >= 16) {
+    insLog.innerHTML = '格子夠多了，點「重置 ↻」再玩一輪';
+    return;
+  }
+  arr.push('⭐');
+  moveN.textContent = '0';
+  renderIns(arr.length - 1);
+  insLog.innerHTML = '末尾追加：<b>0</b> 次搬動 + 1 次寫入，<span class="ok">1 步到位</span>——這就是對話歷史選擇 append-only 的原因';
+});
+
+btnResetIns.addEventListener('click', () => {
+  if (insBusy) return;
+  arr = INS_INIT.slice();
+  moveN.textContent = '0';
+  renderIns(-1);
+  insLog.textContent = '重置好了，再試試點一個靠左的格子';
+});
+
+renderIns(-1);
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

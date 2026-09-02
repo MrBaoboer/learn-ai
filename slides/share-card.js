@@ -59,8 +59,44 @@
       copyFail: '复制失败，请手动复制地址栏链接',
       downloading: '已开始下载，如未响应请长按图片保存',
       posterCta: '扫码继续学这一节',
-      posterBrand: 'xueai.app · 小山学堂',
+      posterBrand: 'xueai.miyang.cn · 小山学堂',
       fileTag: '小山学堂'
+    },
+    hk: {
+      page: 'learn.hk.html',
+      course: '學 AI 產品，從入門到精通',
+      quote: ['「', '」'],
+      panelTitle: '分享這一節',
+      hintDesktop: '右鍵圖片可另存，或點下方按鈕下載',
+      hintMobile: '長按圖片保存，發給朋友',
+      download: '下載圖片',
+      copyLink: '複製連結',
+      systemShare: '系統分享',
+      close: '關閉',
+      copied: '連結已複製，去粘貼給朋友吧',
+      copyFail: '複製失敗，請手動複製地址欄連結',
+      downloading: '已開始下載，如未響應請長按圖片保存',
+      posterCta: '掃碼繼續學這一節',
+      posterBrand: 'xueai.miyang.cn · 小山學堂',
+      fileTag: '小山學堂'
+    },
+    tw: {
+      page: 'learn.tw.html',
+      course: '學 AI 產品，從入門到精通',
+      quote: ['「', '」'],
+      panelTitle: '分享這一節',
+      hintDesktop: '右鍵圖片可另存，或點下方按鈕下載',
+      hintMobile: '長按圖片儲存，發給朋友',
+      download: '下載圖片',
+      copyLink: '複製連結',
+      systemShare: '系統分享',
+      close: '關閉',
+      copied: '連結已複製，去貼上給朋友吧',
+      copyFail: '複製失敗，請手動複製網址列連結',
+      downloading: '已開始下載，如未響應請長按圖片儲存',
+      posterCta: '掃碼繼續學這一節',
+      posterBrand: 'xueai.miyang.cn · 小山學堂',
+      fileTag: '小山學堂'
     },
     en: {
       page: 'learn.en.html',
@@ -77,7 +113,7 @@
       copyFail: 'Copy failed — please copy the URL manually.',
       downloading: 'Download started — long-press the image if nothing happens',
       posterCta: 'Scan to keep learning',
-      posterBrand: 'xueai.app · Xiaoshan Academy',
+      posterBrand: 'xueai.miyang.cn · Xiaoshan Academy',
       fileTag: 'xueai'
     },
     ko: {
@@ -95,7 +131,7 @@
       copyFail: '복사 실패. 주소창 링크를 직접 복사해 주세요.',
       downloading: '저장을 시작했습니다. 반응이 없으면 이미지를 길게 눌러 저장하세요',
       posterCta: '스캔해서 이어서 학습하기',
-      posterBrand: 'xueai.app · 샤오산 아카데미',
+      posterBrand: 'xueai.miyang.cn · 샤오산 아카데미',
       fileTag: 'xueai'
     }
   };
@@ -139,7 +175,7 @@
   function wrapLines(ctx, text, maxWidth, lang, maxLines) {
     var str = String(text || '').trim();
     if (!str) return [];
-    var units = lang === 'zh' ? str.split('') : str.split(/(\s+)/);
+    var units = (lang === 'zh' || lang === 'tw') ? str.split('') : str.split(/(\s+)/);
     var lines = [];
     var line = '';
     var truncated = false;        /* 只有真有字没排进去才加省略号 */
@@ -244,7 +280,7 @@
     }
 
     function lessonUrl(lesson) {
-      return 'https://xueai.app/slides/' + T.page + '#' + encodeURIComponent(lesson.file);
+      return 'https://xueai.miyang.cn/slides/' + T.page + '#' + encodeURIComponent(lesson.file);
     }
 
     function lessonText(lesson) {

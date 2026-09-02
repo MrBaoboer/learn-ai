@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>把狀態機和邊界寫進提示詞 | 互動工程</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="ixd.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="AI 只寫你提到的狀態，沒提的一律按正常路徑想像。狀態機補全器把一段只有晴天的提示詞補全五態，邊界輪盤抽六種 AI 最愛糊弄的邊界情況，最後用積木機拼一段互動規格，可直接複製使用。">
+<meta name="keywords" content="狀態機,邊界情況,AI提示詞,互動規格,空狀態,防錯,About Face">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/ixd-9.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/ixd-9.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/ixd-9.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/ixd-9.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/ixd-9.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/ixd-9.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/ixd-9.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/ixd-9.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="把狀態機和邊界寫進提示詞">
+<meta property="og:description" content="你不寫的狀態，AI 就當不存在。把狀態列全、把邊界說死、把防錯寫明。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/ixd-9.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/ixd-9.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="把狀態機和邊界寫進提示詞">
+<meta name="twitter:description" content="你不寫的狀態，AI 就當不存在。把狀態列全、把邊界說死、把防錯寫明。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 深色提示词面板（体例对齐 taste-8 的规格书面板） ── */
+.x9-code{margin-top:16px;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px;font-size:12.5px;line-height:1.9;overflow-x:auto;white-space:pre-wrap;font-family:"SF Mono","Fira Code",Menlo,monospace;}
+.x9-code .c{color:#64748b;}
+.x9-code .add{color:#86efac;}
+.x9-code .warn{color:#fca5a5;}
+.x9-line{display:block;}
+.x9-line.in{animation:ixd-slide-up .25s ease-out both;}
+/* ── 状态机补全器：五个状态芯片 + 状态板 ── */
+.x9-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;}
+.x9-chip{border:1.5px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-weight:700;padding:6px 16px;border-radius:999px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s,color .15s;}
+.x9-chip:hover{border-color:var(--ct-line);}
+.x9-chip.on{background:var(--ct);border-color:var(--ct);color:#fff;cursor:default;}
+.x9-board{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:16px;}
+.x9-cell{border:1.5px dashed var(--border);border-radius:10px;padding:10px 8px;text-align:center;transition:border-color .2s,background .2s;}
+.x9-cell .cn{font-size:11px;font-weight:800;color:var(--sub);}
+.x9-cell .cs{font-size:10px;color:#c2410c;margin-top:3px;}
+.x9-cell.def{border-style:solid;border-color:rgba(22,163,74,.4);background:var(--good-soft);animation:ixd-pop .3s cubic-bezier(.34,1.56,.64,1) both;}
+.x9-cell.def .cs{color:var(--good);font-weight:800;}
+/* ── 边界轮盘 ── */
+.x9-wheel{margin-top:16px;border:1.5px solid var(--border);border-radius:14px;background:var(--card);padding:20px;min-height:168px;}
+.x9-wheel.spin{animation:ixd-pop .3s cubic-bezier(.34,1.56,.64,1) both;}
+.x9-wheel .wt{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:800;color:var(--ct-deep);}
+.x9-wheel .wt .wn{font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);flex-shrink:0;}
+.x9-wheel .wrow{display:flex;gap:10px;margin-top:12px;font-size:13px;line-height:1.75;}
+.x9-wheel .wrow .wl{flex-shrink:0;font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:999px;height:fit-content;margin-top:2px;}
+.x9-wheel .wrow.bad .wl{background:var(--bad-soft);color:var(--bad);}
+.x9-wheel .wrow.good .wl{background:var(--good-soft);color:var(--good);}
+.x9-wheel .wrow span:last-child{color:var(--text);min-width:0;}
+.x9-spinbtn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;font-family:inherit;background:var(--ct);color:#fff;font-size:14px;font-weight:800;padding:8px 24px;border-radius:10px;transition:background .15s;margin-top:16px;}
+.x9-spinbtn:hover{background:var(--ct-deep);}
+/* ── 积木机 seg 行 ── */
+.x9-ctl{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:8px;}
+.x9-ctl>span{font-size:13px;font-weight:700;color:var(--text);min-width:96px;}
+.x9-copy{margin-left:auto;border:1px solid var(--ct-line);background:#fff;color:var(--ct);font-size:12px;font-weight:800;padding:5px 16px;border-radius:8px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s;}
+.x9-copy:hover{background:var(--ct);color:#fff;}
+.x9-copy.done{background:var(--good);border-color:var(--good);color:#fff;}
+/* ── 姿态对照表 ── */
+.x9-posture{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
+.x9-pcard{border:1.5px solid var(--border);border-radius:14px;padding:16px 20px;background:var(--card);}
+.x9-pcard .ph{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:var(--ct-deep);margin-bottom:8px;}
+.x9-pcard .ph svg{width:16px;height:16px;color:var(--ct);}
+.x9-pcard .pd{font-size:13px;color:var(--sub);line-height:1.8;}
+.x9-pcard .pd b{color:var(--text);}
+/* 判词条 */
+.x9-note{margin-top:16px;padding:16px;border-radius:10px;background:rgba(0,0,0,.03);font-size:13.5px;line-height:1.8;color:var(--text);}
+.x9-note b{color:var(--ct-deep);}
+.x9-note.warn{background:var(--bad-soft);}
+.x9-note.warn b{color:var(--bad);}
+.x9-note.ok{background:var(--good-soft);}
+.x9-note.ok b{color:var(--good);}
+@media (max-width:768px){
+  .x9-board{grid-template-columns:repeat(2,1fr);}
+  .x9-posture{grid-template-columns:1fr;}
+  .x9-ctl>span{min-width:100%;}
+}
+@media (prefers-reduced-motion:reduce){
+  .x9-line.in,.x9-cell.def,.x9-wheel.spin{animation:none;}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"把狀態機和邊界寫進提示詞","name":"把狀態機和邊界寫進提示詞","url":"https://xueai.miyang.cn/slides/ixd-9.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 把互動翻譯給 AI 聽","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"AI 只寫你提到的狀態，沒提的一律按正常路徑想像。狀態機補全器把一段只有晴天的提示詞補全五態，邊界輪盤抽六種 AI 最愛糊弄的邊界情況，最後用積木機拼一段互動規格，可直接複製使用。","datePublished":"2026-08-11","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">互動工程 · 9 / 10</div>
+    <h1>把狀態機和邊界寫進提示詞</h1>
+    <p class="subtitle">上一節把「要什麼」翻譯成了目標和場景，這一節補上「別糊弄」的部分。規律很簡單：<b>AI 只認真寫你提到的狀態，沒提到的一律按晴天想像</b>。所以狀態要列全，邊界要說死，防錯要寫明，這三樣合起來就是互動規格。</p>
+    <div class="chips"><span class="chip">狀態五件套</span><span class="chip">邊界輪盤</span><span class="chip">介面姿態</span><span class="chip">規格積木機</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>每個介面把狀態列全，把邊界情況說死，把防錯要求寫明。狀態機補全器 + 邊界輪盤，配可複製的驗收話術模板</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">為什麼 AI 的產出總是「晴天版」</div>
+    <p class="desc">你說「做一個訂單列表頁」，AI 腦補的畫面永遠是：網路通暢、資料正好一屏、使用者不會點錯。它不是偷懶，是你給的描述裡只有晴天。本章第 2 節講過介面的狀態三件套（載入、空、錯誤），第 3 節講過防錯與可逆，那兩節教你識別，這一節教你把識別出的要求<b>變成提示詞裡白紙黑字的條款</b>。</p>
+    <a class="xref" href="ixd-2.html">
+      <span class="xref-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg></span>
+      <span><span class="xref-t">跨章引用 · 狀態三件套與錯誤資訊三要素</span><span class="xref-d">載入、空、錯誤各自長什麼樣才合格，錯誤資訊怎麼說人話，第 2 節已經玩過一遍，這裡直接引用它的結論。</span></span>
+    </a>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">動手 · 狀態機補全器</div>
+    <p class="desc">下面這段提示詞是典型的晴天版，右邊的狀態板上五個格子還全是問號。點下方的狀態晶片，逐個把狀態寫進提示詞，看規格一條條長出來。</p>
+    <div class="toy" id="x9sm">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg></span>
+        <span class="toy-t">狀態機補全器</span>
+        <span class="toy-badge" id="x9smBadge">已定義 0 / 5</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">點一個狀態晶片，就往提示詞裡寫進一條對應的規格。</div>
+        <div class="x9-code" id="x9smCode"><span class="x9-line">做一個訂單列表頁，顯示訂單、金額和狀態，頂部可以按狀態篩選。</span><span class="x9-line c" id="x9smHint">// 到這就停筆的話，下面五個狀態全部由 AI 自由發揮</span></div>
+        <div class="x9-board">
+          <div class="x9-cell" id="x9c-load"><div class="cn">載入中</div><div class="cs" id="x9s-load">AI 自由發揮</div></div>
+          <div class="x9-cell" id="x9c-empty"><div class="cn">空列表</div><div class="cs" id="x9s-empty">AI 自由發揮</div></div>
+          <div class="x9-cell" id="x9c-error"><div class="cn">載入失敗</div><div class="cs" id="x9s-error">AI 自由發揮</div></div>
+          <div class="x9-cell" id="x9c-slow"><div class="cn">弱網超時</div><div class="cs" id="x9s-slow">AI 自由發揮</div></div>
+          <div class="x9-cell" id="x9c-done"><div class="cn">操作成功</div><div class="cs" id="x9s-done">AI 自由發揮</div></div>
+        </div>
+        <div class="x9-chips">
+          <button class="x9-chip" type="button" data-k="load">載入中</button>
+          <button class="x9-chip" type="button" data-k="empty">空列表</button>
+          <button class="x9-chip" type="button" data-k="error">載入失敗</button>
+          <button class="x9-chip" type="button" data-k="slow">弱網超時</button>
+          <button class="x9-chip" type="button" data-k="done">操作成功</button>
+        </div>
+        <div class="x9-note" id="x9smNote">「自由發揮」四個字在互動上的意思通常是：白屏、alert、沒反應。</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">對決 · 同一個空列表，兩種命運</div>
+    <p class="desc">規格裡那句「空態給引導」到底值多少？下面是同一個訂單頁在新使用者眼裡的兩個版本：左邊的提示詞沒提空態，右邊多寫了一句。點你覺得留得住新使用者的那邊。</p>
+    <div class="toy" id="x9duel">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></span>
+        <span class="toy-t">晴天版 vs 全天候版</span>
+        <span class="toy-badge">點選一邊</span>
+      </div>
+      <div class="toy-body">
+        <div class="duel">
+          <div class="duel-side">
+            <span class="duel-tag">A · 提示詞沒提空態</span>
+            <div class="mockwin">
+              <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">shop.example.com/orders</span></div>
+              <div class="mock" style="padding:16px;background:#fff">
+                <div class="mock-h" style="font-size:13px">我的訂單</div>
+                <div style="display:flex;gap:6px;margin-top:8px">
+                  <span class="mock-chip" style="background:#f3f4f6;color:#374151;font-size:9.5px">全部</span>
+                  <span class="mock-chip" style="background:#fff;color:#9ca3af;font-size:9.5px;border:1px solid #e5e7eb">待付款</span>
+                  <span class="mock-chip" style="background:#fff;color:#9ca3af;font-size:9.5px;border:1px solid #e5e7eb">已完成</span>
+                </div>
+                <div style="min-height:152px;display:flex;align-items:center;justify-content:center">
+                  <span class="mock-p" style="color:#c4c7cc;font-size:11px">暫無資料</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="duel-side">
+            <span class="duel-tag">B · 多寫了一句空態規格</span>
+            <div class="mockwin">
+              <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">shop.example.com/orders</span></div>
+              <div class="mock" style="padding:16px;background:#fff">
+                <div class="mock-h" style="font-size:13px">我的訂單</div>
+                <div style="min-height:176px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center">
+                  <span style="width:40px;height:40px;border-radius:12px;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
+                  <span class="mock-h" style="font-size:12px">你的訂單會出現在這裡</span>
+                  <span class="mock-p" style="font-size:10.5px;color:#9ca3af;line-height:1.6">下第一單後，物流和發票都在這頁管</span>
+                  <span class="mock-btn" style="background:#2563eb;margin-top:4px;font-size:10.5px">去逛逛</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="duel-verdict"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">邊界輪盤：AI 最愛糊弄的六種情況</div>
+    <p class="desc">狀態列全之後，還有一批藏得更深的邊界情況。它們共同的特點是演示時永遠碰不到，上線第一週全都來報到。抽一個看看 AI 預設會怎麼糊弄，以及提示詞裡該補哪句。</p>
+    <div class="toy" id="x9wheel">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+        <span class="toy-t">邊界輪盤</span>
+        <span class="toy-badge" id="x9wBadge">已抽 0 / 6</span>
+      </div>
+      <div class="toy-body">
+        <div class="x9-wheel" id="x9wCard">
+          <div class="wt"><span class="wn" id="x9wNum">? / 6</span><span id="x9wTitle">點下面的按鈕，抽第一個邊界情況</span></div>
+          <div class="wrow bad" id="x9wBadRow" style="display:none"><span class="wl">AI 預設</span><span id="x9wBad"></span></div>
+          <div class="wrow good" id="x9wGoodRow" style="display:none"><span class="wl">該寫的一句</span><span id="x9wGood"></span></div>
+        </div>
+        <button class="x9-spinbtn" id="x9wBtn" type="button">抽一個邊界</button>
+        <div class="x9-note" id="x9wNote">六種全抽完，你就有了一張邊界自查單。</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">先報姿態，再談狀態密度</div>
+    <p class="desc">狀態和邊界要寫到多細，取決於介面的姿態。《About Face 4》第 9 章把產品分成幾種姿態，最常用的兩種抄給你。寫提示詞時先報姿態，AI 對狀態密度的拿捏會準很多。</p>
+    <div class="x9-posture">
+      <div class="x9-pcard">
+        <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>主權姿態（sovereign）</div>
+        <div class="pd">使用者整天開著的主力工具：IDE、後臺、表格。螢幕歸它獨佔，使用者是熟手。<b>狀態可以密：</b>骨架屏、行內校驗、批次操作的進度、快捷鍵提示，都值得寫進規格。</div>
+      </div>
+      <div class="x9-pcard">
+        <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg>臨時姿態（transient）</div>
+        <div class="pd">用完就走的小工具：掃碼、計算器、請假申請。使用者每次來都像第一次來。<b>狀態要少而醒目：</b>一屏一件事，回饋大而直白，別擺密密麻麻的儀表盤。</div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:16px">姿態報錯的典型翻車：給用完就走的請假頁配上主權級的篩選器和統計圖，或者給整天盯著的監控後臺配上大字報式的單屏流程。<b>密度跟著姿態走，姿態跟著使用頻率走</b>。</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">拼裝 · 互動規格積木機</div>
+    <p class="desc">審美篇的積木機拼的是視覺規格，這一臺拼互動規格。五組條款自由開關，右側預覽即時更新；哪組選了「不提」，預覽裡會標出 AI 將在哪裡自由發揮。拼好複製，貼在你生 UI 提示詞的末尾。</p>
+    <div class="toy" id="x9b">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M4 8h4"/><path d="M4 12h4"/><path d="M4 16h4"/><path d="M16 8h4"/><path d="M16 12h4"/><path d="M16 16h4"/></svg></span>
+        <span class="toy-t">互動規格積木機</span>
+        <button class="x9-copy" id="x9copy" type="button">複製</button>
+      </div>
+      <div class="toy-body">
+        <div class="x9-ctl"><span>狀態全集</span><div class="seg" id="x9gState"><button type="button" class="on" data-v="0">五態列全</button><button type="button" data-v="1">不提</button></div></div>
+        <div class="x9-ctl"><span>空態</span><div class="seg" id="x9gEmpty"><button type="button" class="on" data-v="0">給引導</button><button type="button" data-v="1">不提</button></div></div>
+        <div class="x9-ctl"><span>網路與錯誤</span><div class="seg" id="x9gNet"><button type="button" class="on" data-v="0">可重試守資料</button><button type="button" data-v="1">不提</button></div></div>
+        <div class="x9-ctl"><span>危險操作</span><div class="seg" id="x9gDanger"><button type="button" class="on" data-v="0">可撤銷優先</button><button type="button" data-v="1">不提</button></div></div>
+        <div class="x9-ctl"><span>控制項與文案</span><div class="seg" id="x9gCtrl"><button type="button" class="on" data-v="0">按速查表約束</button><button type="button" data-v="1">不提</button></div></div>
+        <div class="x9-code" id="x9bCode"></div>
+        <div class="x9-note" id="x9bNote">五組全開就是一份完整的互動驗收附件，關掉任何一組，風險都標在預覽裡。</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">考一下：防錯條款怎麼寫才對</div>
+    <div class="toy" id="x9quiz">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+        <span class="toy-t">給「刪除專案」寫防錯要求，哪句最好</span>
+        <span class="toy-badge">單選</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>刪除前彈兩次確認框，第二次加倒計時</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>刪除立即執行並給撤銷入口，回收站保留 30 天</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>把刪除按鈕做小做淺，放進三級選單</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>不用寫，AI 知道刪除要小心</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>AI 只寫你提到的狀態：</b>載入、空、錯誤、弱網、成功，五態點名列全，沒點名的就是白屏和 alert 的溫床。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>邊界要說死：</b>列表為空時、網路失敗時、重複提交時、權限不足時，每個「時」後面接一句明確要求。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>先報姿態再談密度：</b>主權姿態的介面狀態可以密，臨時姿態的介面要少而醒目，別拿錯劇本。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>規格拼好當附件：</b>目標場景（上一節）打頭，互動規格（這一節）殿後，兩段合起來就是喂 AI 的完整需求。</p></div>
+    </div>
+    <p class="src-note"><b>內容來源：</b>小山學堂「互動工程」專題原創；錯誤與狀態的原則整理自《About Face 4：互動設計精髓》第 15 章，介面姿態整理自第 9 章（Alan Cooper 等）。</p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="taste.js?v=20260810a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* 状态机补全器。
+   背景：「状态要列全」是句正确的废话，亲手把一段晴天提示词补成五态规格，
+   读者才知道「列全」具体是往提示词里写什么。
+   设计意图：芯片点亮（不可撤销，规格写了就是写了）、代码行滑入
+   （ixd-slide-up）、状态板格子翻绿（ixd-pop），三处动画同步发生，
+   把「一句话规格点亮一个状态」的因果演出来；judgment 文案在 5/5 时收口。 */
+var X9_SM = {
+  load: { spec: '載入中顯示骨架屏，禁止白屏和轉圈超過 1 秒不給回饋。', cell: '骨架屏' },
+  empty: { spec: '首次無訂單時給引導：一句話說明 + 「去下單」按鈕，禁止只寫「暫無資料」。', cell: '引導頁' },
+  error: { spec: '載入失敗給重試按鈕，保留使用者已選的篩選條件，錯誤資訊按「說了什麼錯、為什麼、怎麼辦」三段寫。', cell: '可重試' },
+  slow: { spec: '響應超過 1 秒顯示進度，超過 10 秒允許取消，取消後回到上一個穩定狀態。', cell: '可取消' },
+  done: { spec: '操作成功用頁內 toast 回饋並可撤銷，禁止彈對話框打斷。', cell: '輕回饋' }
+};
+var x9SmN = 0;
+document.querySelectorAll('#x9sm .x9-chip').forEach(function (chip) {
+  chip.addEventListener('click', function () {
+    if (chip.classList.contains('on')) return;
+    chip.classList.add('on');
+    var k = chip.dataset.k;
+    var code = document.getElementById('x9smCode');
+    var hint = document.getElementById('x9smHint');
+    var line = document.createElement('span');
+    line.className = 'x9-line add in';
+    line.textContent = X9_SM[k].spec;
+    code.insertBefore(line, hint);
+    document.getElementById('x9c-' + k).classList.add('def');
+    document.getElementById('x9s-' + k).textContent = X9_SM[k].cell;
+    x9SmN++;
+    document.getElementById('x9smBadge').textContent = '已定義 ' + x9SmN + ' / 5';
+    var note = document.getElementById('x9smNote');
+    if (x9SmN === 5) {
+      hint.textContent = '// 五態全部有主，AI 沒有自由發揮的空間了';
+      hint.className = 'x9-line add';
+      note.className = 'x9-note ok';
+      note.innerHTML = '<b>補全完成。</b>回頭看這五條：每條都短，每條都具體，每條都帶著禁止項。狀態機寫進提示詞就是這個樣子，不需要文采，需要點名。';
+    } else {
+      note.className = 'x9-note';
+      note.innerHTML = '<b>' + X9_SM[k].cell + '</b>有主了。還剩 ' + (5 - x9SmN) + ' 個狀態在等 AI 自由發揮。';
+    }
+  });
+});
+
+/* 对决：空态的两种命运。A 面连筛选器都保留着（AI 按晴天做的），
+   空到让新用户以为坏了；B 面一句规格换来说明 + 引导按钮。 */
+tasteDuel('x9duel', {
+  winner: 1,
+  verdict: 'A 是標準的晴天產物：篩選器做了、列表做了，唯獨沒人想過第一次進來的人看什麼，「暫無資料」四個字等於告訴新使用者這頁與你無關。B 只多花了一句提示詞：說明這裡將來放什麼，給一個直達第一步的按鈕，新使用者順著「去逛逛」就走進了主流程。空態是新使用者的第一印象，也是提示詞裡性價比最高的一句。'
+});
+
+/* 边界轮盘。
+   背景：边界情况的清单列在表格里没人记得住，做成抽卡，
+   每抽一张读者都会先自己猜「AI 会怎么糊弄」，猜完对答案，记忆深一截。
+   设计意图：卡片换内容时重放 ixd-pop 制造「抽出新卡」的手感；
+   顺序打乱但不重复，6/6 后按钮变「再抽一轮」。 */
+var X9_EDGE = [
+  { t: '列表為空（新使用者第一次進來）', bad: '一片空白，或者居中一行灰字「暫無資料」，新使用者以為頁面壞了。', good: '空態給引導：說明這裡將來放什麼 + 一個直達第一步的按鈕。' },
+  { t: '網路請求失敗', bad: '彈 alert 顯示 Request failed with status code 500，或者乾脆沒反應。', good: '失敗要可重試，保留使用者已填的內容，錯誤資訊說人話。' },
+  { t: '使用者手快雙擊了提交', bad: '老老實實發兩單，使用者月底對帳時發現重複扣款。', good: '提交後按鈕立即進入進行中態並禁用，直到結果返回。' },
+  { t: '輸入超長 / 貼進來特殊字元', bad: '文字溢位撐破卡片，或者頁面直接報錯。', good: '說明截斷規則和校驗規則：超長省略號收尾，非法字元即時提示。' },
+  { t: '使用者沒有這個操作的權限', bad: '按鈕照常顯示，點了才報「無權限」，等於設陷阱。', good: '無權限的操作置灰並說明缺什麼權限、找誰開通。' },
+  { t: '弱網，響應要 8 秒', bad: '介面假死 8 秒，使用者連點五次，五個請求一起發出去。', good: '超過 1 秒給進度回饋，超過 10 秒允許取消，進行中禁止重複觸發。' }
+];
+var x9Order = [], x9Drawn = 0;
+function x9Shuffle() {
+  x9Order = X9_EDGE.map(function (_, i) { return i; });
+  for (var i = x9Order.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = x9Order[i]; x9Order[i] = x9Order[j]; x9Order[j] = t;
+  }
+}
+x9Shuffle();
+document.getElementById('x9wBtn').addEventListener('click', function () {
+  var btn = this;
+  if (x9Drawn === 6) {
+    x9Drawn = 0;
+    x9Shuffle();
+    btn.textContent = '抽一個邊界';
+    document.getElementById('x9wNote').className = 'x9-note';
+    document.getElementById('x9wNote').textContent = '新一輪，順序已打亂。';
+  }
+  var item = X9_EDGE[x9Order[x9Drawn]];
+  x9Drawn++;
+  var card = document.getElementById('x9wCard');
+  card.classList.remove('spin');
+  void card.offsetWidth;
+  card.classList.add('spin');
+  document.getElementById('x9wNum').textContent = x9Drawn + ' / 6';
+  document.getElementById('x9wTitle').textContent = item.t;
+  document.getElementById('x9wBadRow').style.display = 'flex';
+  document.getElementById('x9wGoodRow').style.display = 'flex';
+  document.getElementById('x9wBad').textContent = item.bad;
+  document.getElementById('x9wGood').textContent = item.good;
+  document.getElementById('x9wBadge').textContent = '已抽 ' + x9Drawn + ' / 6';
+  if (x9Drawn === 6) {
+    btn.textContent = '再抽一輪';
+    var note = document.getElementById('x9wNote');
+    note.className = 'x9-note ok';
+    note.innerHTML = '<b>六種邊界全見過了。</b>共同規律：每一種的正解都是一句話就能寫清的要求。寫需求時把「＿＿時怎麼辦」造六次句，AI 就沒有糊弄的空當。';
+  }
+});
+
+/* 交互规格积木机。
+   背景：前面学的条款要落成一段能贴走的文本才算兑现，
+   玩法沿用审美篇 taste-8 的积木机，读者已经熟悉。
+   设计意图：五组 seg 开关条款，关掉的组在预览里保留一行红色注释
+   点名风险（比直接消失更扎眼），预览全量重渲染保证任意组合都是确定态。 */
+var X9_BLOCKS = [
+  { seg: 'x9gState', on: '每個介面把狀態列全：預設、載入、空、錯誤、成功，一個不許省。', off: '// 狀態沒點名：白屏和轉圈將自由出沒' },
+  { seg: 'x9gEmpty', on: '空狀態給引導：說明這裡將來放什麼，給一個直達第一步的按鈕。', off: '// 空態沒規定：新使用者將看到「暫無資料」' },
+  { seg: 'x9gNet', on: '網路失敗可重試且保留使用者已填內容；響應超 1 秒給進度，超 10 秒可取消；提交中禁止重複觸發。', off: '// 網路與錯誤沒規定：alert 和重複提交將自由出沒' },
+  { seg: 'x9gDanger', on: '危險操作可撤銷優先於確認彈窗：立即執行 + 撤銷入口 + 回收站兜底。', off: '// 防錯沒規定：AI 將預設彈「確定要刪除嗎」' },
+  { seg: 'x9gCtrl', on: '控制項按規則選：互斥單選鈕、多選核取方塊、立即生效開關、超一屏才下拉；按鈕文案寫明後果，禁用「確定 / 取消」配對。', off: '// 控制項與文案沒約束：三個選項也可能藏進下拉框' }
+];
+var x9On = [true, true, true, true, true];
+function x9Render() {
+  var html = '<span class="x9-line c">// 互動規格（貼在生 UI 提示詞末尾）</span>';
+  X9_BLOCKS.forEach(function (b, i) {
+    html += x9On[i]
+      ? '<span class="x9-line">' + (i + 1) + '. ' + b.on + '</span>'
+      : '<span class="x9-line warn">' + b.off + '</span>';
+  });
+  document.getElementById('x9bCode').innerHTML = html;
+  var offN = x9On.filter(function (v) { return !v; }).length;
+  var note = document.getElementById('x9bNote');
+  if (offN === 0) {
+    note.className = 'x9-note ok';
+    note.innerHTML = '<b>五組全開：</b>這就是一份完整的互動驗收附件，紅字風險一條沒有。';
+  } else {
+    note.className = 'x9-note warn';
+    note.innerHTML = '<b>關掉了 ' + offN + ' 組：</b>預覽裡的紅色註釋就是 AI 將要自由發揮的地方，每一條都是上線後的工單。';
+  }
+}
+X9_BLOCKS.forEach(function (b, i) {
+  var seg = document.getElementById(b.seg);
+  seg.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn || btn.classList.contains('on')) return;
+    seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+    btn.classList.add('on');
+    x9On[i] = btn.dataset.v === '0';
+    x9Render();
+  });
+});
+x9Render();
+
+/* 规格复制：只复制开着的条款，全关时按钮给出提示。 */
+document.getElementById('x9copy').addEventListener('click', function () {
+  var btn = this;
+  var lines = X9_BLOCKS.filter(function (_, i) { return x9On[i]; }).map(function (b, i) { return (i + 1) + '. ' + b.on; });
+  if (!lines.length) {
+    btn.textContent = '空的';
+    setTimeout(function () { btn.textContent = '複製'; }, 1500);
+    return;
+  }
+  var text = '互動規格：\n' + lines.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () {
+      btn.textContent = '已複製';
+      btn.classList.add('done');
+      setTimeout(function () { btn.textContent = '複製'; btn.classList.remove('done'); }, 2000);
+    });
+  }
+});
+
+/* 点选题：防错条款的写法。
+   答案 B：可逆优先。A 是狼来了，C 是把问题藏起来，D 高估了默认产出。 */
+tasteQuiz('x9quiz', {
+  answer: 1,
+  why: [
+    '兩次確認框只會訓練使用者連點兩次「確定」。第 3 節的狼來了實驗演過：攔截靠彈窗，攔到第三次就失效了。',
+    '可逆優先是本章反覆出現的排序：立即執行不打斷，撤銷入口敞著，回收站兜底。使用者敢點，誤刪也救得回來，這句寫進提示詞，AI 的產出立刻上一個檔。',
+    '把按鈕藏進三級選單防住了誤點，也防住了正常使用。該刪的時候找不到刪除，使用者會用更危險的野路子（比如清空內容假裝刪除）。',
+    'AI 不知道。它的預設方案就是彈「確定要刪除嗎？」，這正是本節要你親手寫條款覆蓋掉的行為。'
+  ]
+});
+</script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

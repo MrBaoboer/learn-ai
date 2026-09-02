@@ -38,6 +38,38 @@ var EX_STR_ALL = {
     reportOk: '✓ 已收到，感谢反馈！我们会尽快核实这道题。',
     reportFail: '提交失败，请确认已登录后重试。'
   },
+  hk: {
+    typeSingle: '單選題', typeMulti: '多選題（錯選漏選不得分）', typeJudge: '判斷題',
+    examLabel: '模擬考試 · 交卷後統一判分', drillLabel: '順序刷題 · 即時判定',
+    drillContinue: function(n, total){ return '繼續 · 第 ' + n + ' / ' + total + ' 題'; },
+    drillFromStart: '從頭開始',
+    btnSubmit: '交卷 →', btnFinish: '完成 →', btnNext: '下一題 →',
+    optTrue: '正確', optFalse: '錯誤',
+    fbRight: '✓ 回答正確', fbWrong: '✗ 回答錯誤 · 正確答案：',
+    expLabel: '解析',
+    resultExam: '考試結果', resultDrill: '刷題總結',
+    yourAns: '你的答案：', rightAns: '｜ 正確答案：',
+    reportBtn: '⚑ 這道題有問題？點此報錯',
+    reportEmpty: '請先描述一下問題，哪怕一句話也行。',
+    reportOk: '✓ 已收到，感謝反饋！我們會盡快核實這道題。',
+    reportFail: '提交失敗，請確認已登入後重試。'
+  },
+  tw: {
+    typeSingle: '單選題', typeMulti: '多選題（錯選漏選不得分）', typeJudge: '判斷題',
+    examLabel: '模擬考試 · 交卷後統一判分', drillLabel: '順序刷題 · 即時判定',
+    drillContinue: function(n, total){ return '繼續 · 第 ' + n + ' / ' + total + ' 題'; },
+    drillFromStart: '從頭開始',
+    btnSubmit: '交卷 →', btnFinish: '完成 →', btnNext: '下一題 →',
+    optTrue: '正確', optFalse: '錯誤',
+    fbRight: '✓ 回答正確', fbWrong: '✗ 回答錯誤 · 正確答案：',
+    expLabel: '解析',
+    resultExam: '考試結果', resultDrill: '刷題總結',
+    yourAns: '你的答案：', rightAns: '｜ 正確答案：',
+    reportBtn: '⚑ 這道題有問題？點此報錯',
+    reportEmpty: '請先描述一下問題，哪怕一句話也行。',
+    reportOk: '✓ 已收到，感謝回饋！我們會盡快核實這道題。',
+    reportFail: '提交失敗，請確認已登入後重試。'
+  },
   en: {
     typeSingle: 'Single choice', typeMulti: 'Multiple choice (no partial credit)', typeJudge: 'True / False',
     examLabel: 'Mock Exam · graded after submission', drillLabel: 'Drill Mode · instant feedback',

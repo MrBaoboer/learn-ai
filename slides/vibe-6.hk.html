@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding 方法論第 6 節：禁止簡化實現，不接受分期交付。AI 愛做「先上簡版」的真實原因與打破方式。">
+<meta name="author" content="洛小山">
+<title>第6節：不接受分期交付 | AI 系統課</title>
+<link rel="canonical" href="https://xueai.miyang.cn/slides/vibe-6.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vibe-6.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vibe-6.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vibe-6.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vibe-6.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vibe-6.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vibe-6.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vibe-6.html">
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e;--vibe-soft:rgba(13,148,136,.08)}
+.lesson-header .kicker{color:var(--vibe)}
+
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+
+/* ── 交互一：技术债时间线 ── */
+.tl-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.tl-stat{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 16px;text-align:center}
+.tl-stat .tv{font-size:28px;font-weight:800;font-family:"SF Mono",Menlo,monospace;color:var(--text);line-height:1.3;transition:color .3s}
+.tl-stat .tv.hot{color:var(--danger)}
+.tl-stat .tl{font-size:12px;color:var(--sub);font-weight:700;letter-spacing:.4px}
+
+.tl-track{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px}
+.tl-node{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;opacity:.4;transition:all .4s ease;box-shadow:var(--shadow-card)}
+.tl-node.lit{opacity:1}
+.tl-node.lit.warn{border-color:rgba(217,119,6,.4);background:rgba(217,119,6,.04)}
+.tl-node.lit.bad{border-color:rgba(220,38,38,.4);background:rgba(220,38,38,.04)}
+.tl-node.lit.ok{border-color:rgba(13,148,136,.4);background:var(--vibe-soft)}
+.tl-day{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.5px;padding:3px 10px;border-radius:999px;background:rgba(0,0,0,.06);color:var(--sub);margin-bottom:8px;font-family:"SF Mono",Menlo,monospace}
+.tl-node.lit.ok .tl-day{background:rgba(13,148,136,.14);color:var(--vibe-deep)}
+.tl-node.lit.warn .tl-day{background:rgba(217,119,6,.14);color:var(--amber)}
+.tl-node.lit.bad .tl-day{background:rgba(220,38,38,.12);color:var(--danger)}
+.tl-node h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:5px}
+.tl-node p{font-size:13px;color:var(--sub);line-height:1.7}
+.tl-note{display:none;margin-top:10px;font-size:12.5px;font-weight:700;line-height:1.6}
+.tl-node.lit .tl-note{display:block}
+.tl-node.warn .tl-note{color:var(--amber)}
+.tl-node.bad .tl-note{color:var(--danger)}
+.tl-node.ok .tl-note{color:var(--vibe-deep)}
+
+/* ── 交互二：对话分支 ── */
+.chat-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-top:14px}
+.chat-bar{padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);font-size:14px;font-weight:700;color:var(--sub)}
+.chat-body{min-height:220px;max-height:420px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
+.bub{max-width:88%;padding:10px 14px;border-radius:12px;font-size:14.5px;line-height:1.65;opacity:0;transform:translateY(8px);transition:all .35s ease;flex-shrink:0}
+.bub.show{opacity:1;transform:translateY(0)}
+.bub.ai{align-self:flex-start;background:rgba(0,0,0,.045);color:var(--text)}
+.bub.me{align-self:flex-end;background:var(--vibe);color:#fff}
+.bub.time{align-self:center;background:none;color:var(--sub);font-size:12.5px;font-weight:700;padding:2px 8px}
+.bub.warning{align-self:flex-start;background:rgba(220,38,38,.07);color:var(--danger);font-weight:600}
+.bub.ok{align-self:flex-start;background:rgba(22,163,74,.08);color:var(--success);font-weight:600}
+
+.reply-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.reply-btn{padding:13px 16px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;transition:all .2s;font-family:inherit;text-align:left;width:100%;min-height:44px;box-shadow:var(--shadow-card)}
+.reply-btn:hover:not(:disabled){border-color:rgba(0,0,0,.18)}
+.reply-btn:disabled{opacity:.45;cursor:not-allowed}
+.reply-btn .rk{display:inline-block;font-size:12px;font-weight:800;padding:2px 8px;border-radius:5px;margin-bottom:6px}
+.reply-btn.ra .rk{background:rgba(220,38,38,.1);color:var(--danger)}
+.reply-btn.rb .rk{background:var(--vibe-soft);color:var(--vibe-deep)}
+.reply-btn p{font-size:14px;color:var(--text);line-height:1.6;font-weight:600}
+
+.branch-verdict{display:none;margin-top:12px;padding:13px 16px;border-radius:10px;font-size:13.5px;line-height:1.75;border:1.5px solid transparent}
+.branch-verdict.show{display:block}
+.branch-verdict.bad{background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.22);color:#991b1b}
+.branch-verdict.good{background:rgba(22,163,74,.06);border-color:rgba(22,163,74,.25);color:#166534}
+
+.ctrl-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn{padding:11px 22px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-p{background:var(--vibe);color:#fff}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.05);color:var(--sub);border:1px solid var(--border)}
+.hint{font-size:13px;color:var(--sub)}
+
+.src-note{margin-top:24px;font-size:12.5px;color:var(--sub)}
+.src-note a{color:var(--vibe-deep)}
+
+@media (max-width:768px){
+  .tl-track{grid-template-columns:1fr}
+  .tl-stats{grid-template-columns:1fr 1fr}
+  .reply-row{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"不接受分期交付","name":"不接受分期交付","url":"https://xueai.miyang.cn/slides/vibe-6.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 質素底綫","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Vibe Coding 方法論第 6 節：禁止簡化實現，不接受分期交付。AI 愛做「先上簡版」的真實原因與打破方式。","datePublished":"2026-08-04","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="不接受分期交付"><meta property="og:description" content="Vibe Coding 方法論第 6 節：禁止簡化實現，不接受分期交付。AI 愛做「先上簡版」的真實原因與打破方式。"><meta property="og:url" content="https://xueai.miyang.cn/slides/vibe-6.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/vibe-6.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+  <header class="lesson-header">
+    <div class="kicker">Vibe Coding 方法論 · 第 6 節</div>
+    <h1>不接受分期交付</h1>
+    <p class="subtitle">你要一個完整的認證系統，AI 説「先做一個簡版的用戶名密碼登入，後續再加 OAuth」。後續永遠不會來。這一節用兩個演示，看清「先做簡版」的完整生命週期，並練習正確的回應方式。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>AI 愛做「先上簡版」的真實原因，以及為什麼要打破這個模式</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">動機分析</div>
+    <div class="l-callout" style="background:var(--vibe-soft);border-color:rgba(13,148,136,.3)">
+      <p>實踐中 AI 説「先做簡版」往往與複雜度無關，<b style="color:var(--vibe-deep)">它想快速給你一個能跑的東西來換取正反饋</b>。「先用臨時方案」「暫時 Mock」「簡單處理一下」背後是同一個模式。打破這個模式後，AI 反而會更認真地分析完整方案。</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">交互演示一 · 技術債時間綫播放器</div>
+    <p class="desc">點擊播放，看「先做簡版」的登入模組在 90 天裏怎麼變成永久技術債。上方兩個數字會隨時間綫一起變化。</p>
+
+    <div class="tl-stats">
+      <div class="tl-stat"><div class="tv" id="tvDep">0</div><div class="tl">依賴簡版接口的模組數</div></div>
+      <div class="tl-stat"><div class="tv" id="tvCost">0.5×</div><div class="tl">補全成本（相對當初直接做完整版）</div></div>
+    </div>
+
+    <div class="tl-track">
+      <div class="tl-node ok" id="tn0">
+        <span class="tl-day">第 1 天</span>
+        <h4>簡版上綫</h4>
+        <p>用戶名密碼登入能跑了，AI 承諾「OAuth 後續再加」，你也覺得挺合理。</p>
+        <div class="tl-note">此刻補全只要 0.5 倍成本，可惜沒人回頭</div>
+      </div>
+      <div class="tl-node warn" id="tn1">
+        <span class="tl-day">第 30 天</span>
+        <h4>後續沒有來</h4>
+        <p>新需求源源不斷，沒人回頭補 OAuth。會話、權限、支付、通知 4 個模組開始直接依賴簡版接口。</p>
+        <div class="tl-note">依賴 +4 · 補全成本升到 3 倍</div>
+      </div>
+      <div class="tl-node bad" id="tn2">
+        <span class="tl-day">第 90 天</span>
+        <h4>成為永久技術債</h4>
+        <p>想補全時發現依賴已經長死，9 個模組與簡版耦合，重構成本高過重寫。簡版成了永久版。</p>
+        <div class="tl-note">依賴 +9 · 補全成本 8 倍，超過重寫</div>
+      </div>
+    </div>
+
+    <div class="ctrl-row">
+      <button class="btn btn-p" id="btnTl" onclick="playTimeline()">▶ 播放 90 天生命週期</button>
+      <button class="btn btn-r" onclick="resetTimeline()">重置</button>
+      <span class="hint" id="tlHint"></span>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">交互演示二 · 對話分支模擬</div>
+    <p class="desc">AI 提出了分期方案，你的回應決定了 90 天後的結局。兩個分支都可以試。</p>
+
+    <div class="chat-wrap">
+      <div class="chat-bar">與 AI 的對話 · 需求：完整的認證系統</div>
+      <div class="chat-body" id="chatBody"></div>
+    </div>
+
+    <div class="reply-row" id="replyRow">
+      <button class="reply-btn ra" id="ra" onclick="pickReply(0)">
+        <span class="rk">回應 A</span>
+        <p>「好呀，先上簡版，快啲見到嘢。」</p>
+      </button>
+      <button class="reply-btn rb" id="rb" onclick="pickReply(1)">
+        <span class="rk">回應 B</span>
+        <p>「跟規則嚟：畀我完整方案同工作量評估。真係太複雜就列低要我先定嘅前置決策。」</p>
+      </button>
+    </div>
+
+    <div class="branch-verdict bad" id="vd0"><b>分支 A 的結局：</b>簡版換來了當天的正反饋，代價是 90 天後一筆高過重寫的技術債。「後續再優化」的後續沒有來。</div>
+    <div class="branch-verdict good" id="vd1"><b>分支 B 的結局：</b>AI 給出了完整方案、真實工作量和前置決策清單。選擇權回到人手裏：要不要拆、怎麼拆由你決定。</div>
+
+    <div class="ctrl-row">
+      <button class="btn btn-r" onclick="resetChat()">↺ 重來，試另一個回應</button>
+      <span class="hint" id="chatHint"></span>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">規則與替代方案</div>
+    <div class="l-cols">
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:6px;color:var(--danger)">禁止的做法</h3>
+        <p class="desc" style="font-size:13.5px">禁止以任何理由簡化實現：「先用臨時方案」「後續再優化」「暫時 Mock」「簡單處理一下」全部不接受。也禁止 AI 主動規劃分期、MVP、階段一二三。每次實現都必須是完整、正確、沒有程式碼債的方案。</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:6px;color:var(--vibe-deep)">替代的做法</h3>
+        <p class="desc" style="font-size:13.5px">評估一個功能只需回答：完整做下來需要什麼、有多複雜。確實太複雜時，明確列出「需要你先做哪些前置決策」，把選擇權交還給人。已知有缺陷的方案，直接給正確版本，別先做一個將就的。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">適用邊界</div>
+    <div class="l-callout">
+      <p>大型項目裏這條規則可能顯得激進：一個功能真需要 2000 行程式碼時，一次寫完不現實。此時正確動作依然成立，讓 AI 給出完整方案和真實工作量，由人決定是否拆分、怎麼拆分。<b>拆分是人的決策，降級是 AI 的自作主張</b>，兩者的區別就是這條規則的核心。</p>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="l-callout" style="background:var(--vibe-soft);border-color:rgba(13,148,136,.3)">
+      <p><b style="color:var(--vibe-deep)">「後續再優化」的後續永遠不會來。</b>把選擇權收回來：AI 負責給出完整方案和真實代價，拆不拆、怎麼拆由人決定。</p>
+    </div>
+    <div class="l-card src-note">素材來源：本節內容整理自開源倉庫 <a href="https://github.com/itshen/xs_vibe_rules" target="_blank" rel="noopener">itshen/xs_vibe_rules</a> 的 rule-opensource.mdc 第十一章「實現質素要求」。</div>
+  </section>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ── 交互一：技术债时间线播放器 ── */
+const TL_STEPS = [
+  { node:0, dep:0, cost:'0.5×', costHot:false },
+  { node:1, dep:4, cost:'3×',   costHot:true  },
+  { node:2, dep:9, cost:'8×',   costHot:true  }
+];
+let tlTimer = null, tlPlaying = false;
+
+function countTo(el, target, hot) {
+  let cur = parseInt(el.textContent, 10) || 0;
+  el.className = 'tv' + (hot ? ' hot' : '');
+  const iv = setInterval(function () {
+    if (cur >= target) { clearInterval(iv); return; }
+    cur++;
+    el.textContent = cur;
+  }, 90);
+}
+
+function playTimeline() {
+  if (tlPlaying) return;
+  resetTimeline();
+  tlPlaying = true;
+  document.getElementById('btnTl').disabled = true;
+  document.getElementById('tlHint').textContent = '時間流逝中';
+  let i = 0;
+
+  function step() {
+    const s = TL_STEPS[i];
+    document.getElementById('tn' + s.node).classList.add('lit');
+    countTo(document.getElementById('tvDep'), s.dep, s.costHot);
+    const costEl = document.getElementById('tvCost');
+    costEl.textContent = s.cost;
+    costEl.className = 'tv' + (s.costHot ? ' hot' : '');
+    i++;
+    if (i >= TL_STEPS.length) {
+      clearTimeout(tlTimer);
+      tlPlaying = false;
+      document.getElementById('btnTl').disabled = false;
+      document.getElementById('tlHint').textContent = '第 90 天：重構成本已高過重寫';
+      return;
+    }
+    tlTimer = setTimeout(step, 1400);
+  }
+  step();
+}
+
+function resetTimeline() {
+  clearTimeout(tlTimer);
+  tlPlaying = false;
+  document.getElementById('btnTl').disabled = false;
+  ['tn0','tn1','tn2'].forEach(function (id) { document.getElementById(id).classList.remove('lit'); });
+  const dep = document.getElementById('tvDep');
+  dep.textContent = '0'; dep.className = 'tv';
+  const cost = document.getElementById('tvCost');
+  cost.textContent = '0.5×'; cost.className = 'tv';
+  document.getElementById('tlHint').textContent = '';
+}
+
+/* ── 交互二：对话分支模拟 ── */
+const OPENING = { cls:'ai', text:'AI：登入呢舊有啲複雜，我哋不如先做一個簡版用戶名密碼登入，之後再加 OAuth，點樣？' };
+
+const BRANCHES = [
+  [
+    { cls:'me',      text:'好呀，先上簡版，快啲見到嘢。' },
+    { cls:'ai',      text:'AI：冇問題！20 分鐘後簡版登入已經跑得通，OAuth 我記喺待辦裏，之後再補。' },
+    { cls:'time',    text:'30 天後' },
+    { cls:'ai',      text:'AI：OAuth 都未排到。呢段時間會話、權限、支付、通知模組都已經直接叫緊簡版接口。' },
+    { cls:'time',    text:'90 天後' },
+    { cls:'warning', text:'重構評估：補全 OAuth 需要動 9 個模組，成本高過重寫。降級方案成了永久技術債。' }
+  ],
+  [
+    { cls:'me',      text:'跟規則嚟：畀我完整方案同工作量評估。真係太複雜就列低要我先定嘅前置決策。' },
+    { cls:'ai',      text:'AI：明白。完整方案：用戶名密碼 + OAuth（Google / GitHub）+ 會話管理與 Token 刷新。工作量評估：約 3 天，主要複雜度在 OAuth 回調與多端會話。' },
+    { cls:'ai',      text:'AI：需要你先定 3 個前置決策：1. 要不要支持手機號碼登入；2. OAuth 供應商選哪幾家；3. 會話有效期定多長。' },
+    { cls:'me',      text:'唔使手機號碼，供應商就呢兩家，會話 7 日。跟住咁做完整版。' },
+    { cls:'ok',      text:'完整版一次到位，沒有留下程式碼債。要不要拆成兩個 PR，是你基於工作量做的決策，與降級無關。' }
+  ]
+];
+
+let chatBusy = false, chatTimer = null;
+
+function pushBub(step) {
+  const body = document.getElementById('chatBody');
+  const el = document.createElement('div');
+  el.className = 'bub ' + step.cls;
+  el.textContent = step.text;
+  body.appendChild(el);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add('show'); }); });
+  body.scrollTop = body.scrollHeight;
+}
+
+function pickReply(idx) {
+  if (chatBusy) return;
+  chatBusy = true;
+  document.getElementById('ra').disabled = true;
+  document.getElementById('rb').disabled = true;
+  document.getElementById('chatHint').textContent = '';
+
+  const steps = BRANCHES[idx];
+  let i = 0;
+  chatTimer = setInterval(function () {
+    if (i >= steps.length) {
+      clearInterval(chatTimer);
+      chatTimer = null;
+      chatBusy = false;
+      document.getElementById('vd' + idx).classList.add('show');
+      document.getElementById('chatHint').textContent = '點「重來」可以試另一個回應';
+      return;
+    }
+    pushBub(steps[i]);
+    i++;
+  }, 1100);
+}
+
+function resetChat() {
+  clearInterval(chatTimer);
+  chatTimer = null;
+  chatBusy = false;
+  document.getElementById('chatBody').innerHTML = '';
+  document.getElementById('vd0').classList.remove('show');
+  document.getElementById('vd1').classList.remove('show');
+  document.getElementById('ra').disabled = false;
+  document.getElementById('rb').disabled = false;
+  document.getElementById('chatHint').textContent = '';
+  pushBub(OPENING);
+}
+
+/* 初始化：AI 先开口 */
+pushBub(OPENING);
+
+/* 进入视野时自动播放时间线 */
+lessonOnView(document.getElementById('tn0'), function () {
+  playTimeline();
+});
+</script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

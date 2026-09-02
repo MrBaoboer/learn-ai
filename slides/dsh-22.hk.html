@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM 適配層：單次嘗試、顯式重試、雙流持久 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.doc-quote{background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:20px 22px;margin:12px 0 20px;font-size:14px;line-height:1.9;color:var(--text)}
+.doc-quote .q-src{display:block;margin-top:8px;font-size:12px;color:var(--sub)}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}
+.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:var(--shadow-card);margin-top:12px}
+.cmp-card h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;color:var(--text)}
+.cmp-card h3 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eef1ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);color:var(--text);display:flex;gap:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+
+/* ── 交互演示：请求生命周期播放器 ── */
+#demo-llm{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card);margin-top:12px}
+.d-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.d-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(77,107,254,.4);background:var(--accent-soft);color:var(--accent-deep);border-radius:11px;padding:12px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;min-height:48px}
+.d-btn svg{flex:0 0 auto}
+.d-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.d-btn.scn{padding:10px 14px;font-size:13px;min-height:44px}
+.d-btn.scn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.llm-ui{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:12px;margin-bottom:14px}
+.llm-ui .ui-label{font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--sub);margin-bottom:7px}
+.bubble{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 13px;min-height:44px;font-size:13px;line-height:1.7;color:var(--text);transition:opacity .4s,border-color .3s}
+.bubble .rsn{display:block;font-size:12px;color:var(--purple);background:rgba(124,58,237,.06);border-radius:7px;padding:5px 9px;margin-bottom:6px}
+.bubble.withdrawn{opacity:.35;border-color:rgba(220,38,38,.4)}
+.bubble.withdrawn .txt{text-decoration:line-through}
+.llm-stage{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.llm-pane{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;min-width:0}
+.llm-pane-title{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--accent-deep);margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.llm-pane-title svg{color:var(--accent)}
+.wire{position:relative;min-height:180px}
+.wire.broken:after{content:"連接中斷";position:absolute;inset:auto 0 0 0;text-align:center;font:700 11px/1 ui-monospace,Menlo,monospace;color:var(--danger);background:rgba(220,38,38,.07);border:1px dashed rgba(220,38,38,.5);border-radius:8px;padding:8px 0}
+.chunk{display:flex;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:5px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);opacity:0;transform:translateX(-8px);transition:opacity .3s,transform .3s}
+.chunk.in{opacity:1;transform:translateX(0)}
+.chunk .t{font-weight:800;color:var(--accent)}
+.chunk.rsn .t{color:var(--purple)}
+.chunk.err .t{color:var(--danger)}
+.chunk.err{border-color:rgba(220,38,38,.45);background:rgba(220,38,38,.05)}
+.logrow{display:flex;gap:8px;align-items:baseline;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 9px;margin-bottom:5px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub);opacity:0;transform:translateY(5px);transition:opacity .3s,transform .3s}
+.logrow.in{opacity:1;transform:translateY(0)}
+.logrow .et{font-weight:800;color:var(--sub);flex:0 0 auto}
+.logrow.msg{border-color:rgba(77,107,254,.45);background:var(--accent-soft);color:var(--text)}
+.logrow.msg .et{color:var(--accent-deep)}
+.logrow.retry{border-color:rgba(217,119,6,.5);background:rgba(217,119,6,.06);color:var(--text)}
+.logrow.retry .et{color:var(--amber)}
+.llm-empty{font-size:12px;color:var(--sub);padding:4px 2px}
+.d-caption{display:flex;gap:9px;align-items:flex-start;margin-top:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);border-radius:10px;padding:16px 18px;font-size:14px;line-height:1.8;color:var(--text)}
+.d-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+@media(max-width:760px){
+  .facts{grid-template-columns:1fr}
+  .llm-stage{grid-template-columns:1fr}
+  .source-head{flex-direction:column}
+  .objective{grid-template-columns:1fr}.lesson-header:after{display:none}
+  .d-btn{flex:1 1 auto;justify-content:center}
+}
+</style>
+<meta name="description" content="DSH 的 LLM 適配層：一次適配器調用就是一次提供方嘗試，重試是持久日誌裏的顯式事件，原始分片流與派生消息流分開落盤。基於 assembler.ts 與 agent.ts 真實源碼講解。">
+<meta name="author" content="洛小山">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/dsh-22.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/dsh-22.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/dsh-22.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/dsh-22.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/dsh-22.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/dsh-22.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/dsh-22.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/dsh-22.html">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"LLM 適配層：單次嘗試、顯式重試、雙流持久","name":"LLM 適配層：單次嘗試、顯式重試、雙流持久","url":"https://xueai.miyang.cn/slides/dsh-22.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 模型與外部接入","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"DSH 的 LLM 適配層：一次適配器調用就是一次提供方嘗試，重試是持久日誌裏的顯式事件，原始分片流與派生消息流分開落盤。基於 assembler.ts 與 agent.ts 真實源碼講解。","datePublished":"2026-08-13","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="LLM 適配層：單次嘗試、顯式重試、雙流持久"><meta property="og:description" content="DSH 的 LLM 適配層：一次適配器調用就是一次提供方嘗試，重試是持久日誌裏的顯式事件，原始分片流與派生消息流分開落盤。基於 assembler.ts 與 agent.ts 真實源碼講解。"><meta property="og:url" content="https://xueai.miyang.cn/slides/dsh-22.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 模型與外部接入</div>
+    <h1>LLM 適配層：單次嘗試、顯式重試、雙流持久</h1>
+    <p class="subtitle">推理流與正文流分開存，重試是顯式事件。核心源碼：<code>packages/llm/llm/src/assembler.ts</code> 與 <code>packages/core/agent-loop/src/agent.ts</code>。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>推理流與正文流分開存，重試是顯式事件</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>課程目標</b>讀完你能説清三件事：DSH 為什麼規定一次適配器調用就是一次提供方嘗試、連 SDK 自帶的重試都要禁用；一次流式響應怎麼以兩種形態落盤，原始分片流管回放保真、派生消息流管對話歷史，失敗的半截輸出為什麼進得了前者進不了後者；以及重試為什麼被做成持久日誌裏的顯式事件，UI 靠它撤回半截輸出，事後靠它解釋每一秒都花在了哪。</span>
+  </div>
+
+  <div class="sec-label">互動演示 · 請求生命週期播放器</div>
+  <p class="reveal body">先玩再講。左邊是網綫上的 SSE 分片（provider 逐幀吐出來的原始數據），右邊是會話日誌（每個分片立刻落一條 <code>assistant/chunk</code>，流結束再派生一條 <code>assistant/message</code>），上方是用戶看到的 UI。三個情景：A 是一次順利的雙流落盤；B 中途斷綫，看重試怎麼以顯式事件出現在時間綫上；C 是反面教材，SDK 靜默重試模式，同一個故障，日誌裏無跡可查。</p>
+  <div id="demo-llm" class="reveal">
+    <div class="d-toolbar">
+      <button class="d-btn scn active" data-scn="A">情景 A · 雙流落盤</button>
+      <button class="d-btn scn" data-scn="B">情景 B · 斷綫與顯式重試</button>
+      <button class="d-btn scn" data-scn="C">情景 C · SDK 靜默重試</button>
+    </div>
+    <div class="d-toolbar">
+      <button class="d-btn primary" id="lPlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l14 8-14 8z"/></svg>播放</button>
+      <button class="d-btn" id="lStep"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4l10 8-10 8z" fill="currentColor" stroke="none"/><path d="M19 5v14"/></svg>單步</button>
+      <button class="d-btn" id="lReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>重置</button>
+    </div>
+    <div class="llm-ui">
+      <div class="ui-label">用戶看到的 UI</div>
+      <div class="bubble" id="lBubble"><span class="txt" id="lBubbleText">（等待模型回覆…）</span></div>
+    </div>
+    <div class="llm-stage">
+      <div class="llm-pane">
+        <div class="llm-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h6l2-7 4 14 2-7h6"/></svg>網綫 · provider 吐出的 StreamChunk</div>
+        <div class="wire" id="lWire"><div class="llm-empty">（尚無分片）</div></div>
+      </div>
+      <div class="llm-pane">
+        <div class="llm-pane-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>會話日誌 · 持久事件（append-only）</div>
+        <div id="lLog"><div class="llm-empty">（空日誌）</div></div>
+      </div>
+    </div>
+    <div class="d-caption">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      <span id="lCaption">選擇情景後點「播放」，或滾動到此處自動播放情景 A。</span>
+    </div>
+  </div>
+
+  <div class="sec-label">邏輯拆解 · 一次調用就是一次嘗試</div>
+  <p class="reveal body">先立規矩。DSH 的適配器約定裏有一條寫得很硬：一次適配器調用就是一次提供方嘗試，適配器必須禁用庫自帶的重試（<code>docs/subsystems/llm-streaming.zh.md</code> 適配器約定一節）。HTTP 庫們都愛替你悄悄重試，看起來是貼心，實際是把信息藏起來了：請求為什麼慢、重試了幾次、每次因為什麼失敗，全部消失在庫的內部循環裏。DSH 把這層全部剝掉，適配器只幹一件事：發一次請求，把響應轉成統一的 <code>StreamChunk</code> 分片吐出來，失敗就規範化成一個可序列化的 <code>LlmFailure</code>（帶穩定的錯誤 code），別的不管。</p>
+  <p class="reveal body">防掛起也在這層解決：兩個交付的遠程適配器都帶 <code>streamIdleTimeoutMs</code> 看門狗，預設五分鐘，provider 停頓超時就映射成 <code>TIMEOUT</code> 錯誤。還有一條容易漏的：空回覆算錯誤。模型返回一個不帶任何內容塊的 stop，適配器把它映射成 <code>EMPTY_RESPONSE</code> 錯誤而非靜默的成功，這樣重試層才有機會救它。</p>
+
+  <div class="sec-label">邏輯拆解 · 雙流持久：分片流和消息流分開存</div>
+  <p class="reveal body">然後看落盤。agent loop 消費分片流的時候幹兩件事：每個分片原樣追加一條 <code>assistant/chunk</code> 事件進會話日誌，同時把分片餵給 <code>BlockAssembler</code>（組裝器）。流成功結束，組裝結果作為一條 <code>assistant/message</code> 事件再落一次盤。這就是雙流：chunk 流是原始錄像，回放測試靠它逐幀重建當年的響應；message 流是派生歷史，下一次請求的對話上下文從它派生。推理塊（reasoning，模型的思考過程）和正文塊（text）在分片協議裏就是不同類型，各自獨立組裝、各自落盤。</p>
+  <div class="source reveal">
+    <div class="source-head"><span>packages/core/agent-loop/src/agent.ts</span><span>第 343 至 351 行</span></div>
+    <pre><code>      <span class="kw">const</span> assembler = <span class="kw">new</span> <span class="ty">BlockAssembler</span>()
+      <span class="kw">const</span> chunkSeqs: <span class="ty">number</span>[] = []
+      <span class="kw">const</span> stream = preparedCall?.<span class="fn">stream</span>(request) ?? <span class="kw">this</span>.loopCtx.llm.<span class="fn">stream</span>(request)
+      signal.<span class="fn">throwIfAborted</span>()
+      <span class="kw">for await</span> (<span class="kw">const</span> chunk <span class="kw">of</span> stream) {
+        signal.<span class="fn">throwIfAborted</span>()
+        chunkSeqs.<span class="fn">push</span>(<span class="kw">this</span>.session.<span class="fn">append</span>(<span class="str">'assistant/chunk'</span>, { turn, step, chunk }).seq)
+        assembler.<span class="fn">push</span>(chunk)
+      }</code></pre>
+  </div>
+  <div class="snapshot"><b>源碼快照説明：</b>依據本地倉庫 deepseek-harness-master，核對文件 <code>packages/core/agent-loop/src/agent.ts</code>，核對日期 2026-08-13。程式碼塊保留源碼原文。</div>
+  <p class="reveal body paywall-locked xa-peek">這九行是雙流的心臟：先落盤，再組裝，一個分片都不例外。流結束後走分岔：finish 是錯誤或中止，就把失敗交給 <code>agent/request-error</code> 事件去決定重不重試（第 354 到 371 行）；成功才在第 381 行追加 <code>assistant/message</code>，並把這批 chunk 的序號寫進 <code>sourceEventSeqs</code>，標明這條消息是從哪些分片派生的。所以失敗的半截輸出有明確的歸宿：留在 chunk 流裏作證，絕不進派生歷史。下一次請求重建上下文時，那半截就像沒發生過。</p>
+  <p class="reveal body paywall-locked">組裝器本身也值得停一下。<code>BlockAssembler</code> 是全倉庫唯一的分片摺疊實現，適配器只要按 index 吐格式正確的分片，塊重組不用每家自己寫。它對畸形流有明確態度：處理 <code>block-end</code> 分片時，先看這個塊是不是已經關閉過，關過就直接返回，後面再來的重複關閉一律忽略。註釋裏管這叫「First close wins」，理由是只有第一次關閉説了算，流式輸出和最終組裝出的塊才能保持一致。這一行防禦恰好是性質測試抓過真 bug 的地方（複盤見 <a href="dsh-26.html">測試一個非確定性系統</a>）。</p>
+  <p class="src-note reveal paywall-locked">出處：<code>packages/llm/llm/src/assembler.ts</code> 第 75 至 82 行的 block-end 分支，核對日期 2026-08-13。</p>
+
+  <div class="sec-label paywall-locked">邏輯拆解 · 重試是持久日誌裏的顯式事件</div>
+  <p class="reveal body paywall-locked">重試住在更高一層。<code>dsh-llm-retry</code> 插件監聽 <code>agent/request-error</code>，按每條 provider 路由註冊時捕獲的策略決定救不救。預設的 normal 策略：只對 <code>EMPTY_RESPONSE</code>、<code>RATE_LIMIT</code>、<code>SERVER</code>、<code>TIMEOUT</code>、<code>TRANSPORT</code> 五種 code 重試，最多兩次，退避從 500 毫秒到 10 秒，帶 10% 抖動；provider 用 Retry-After 指定的合法延遲會替換本地退避（<code>packages/llm/llm-retry/README.zh.md</code>）。</p>
+  <p class="reveal body paywall-locked">關鍵在於它怎麼記帳。等待退避之前，插件先往會話日誌追加一條 <code>llm/retry</code> 事件，裏面裝着重試 id、提供方、策略 mode、完整的失敗信息和計劃延遲；退避結束真要動手了，再追加一條 <code>llm/retry-started</code>。這兩條事件不進模型可見的表層，模型對重試一無所知，但 UI 和事後分析全靠它們：UI 據此撤回失敗的半截輸出、顯示「第 1/2 次重試，3 秒後」；排查問題時，日誌裏每一次嘗試、每一段等待都有時間戳。重試本身則開一個新的編號輪次，從持久歷史重建同樣的請求重發，舊輪次的記錄一個字不改。</p>
+  <p class="reveal body paywall-locked">還有一個跨適配器的細節：replayState。成功的 finish 分片可以攜帶適配器私有的回放狀態（比如 DeepSeek 推理內容的原生表示），跟着 <code>assistant/message</code> 一起存。下次請求把歷史發給適配器前，<code>LlmRuntime.forAdapter()</code> 檢查每條歷史消息：歷史 provider 和目標 provider 歸同一個適配器實例，狀態才透傳；換了適配器，狀態被剝離，對方只拿到提供方無關的內容（<code>packages/llm/llm/src/index.ts</code> 第 822 至 836 行）。一家的私貨絕不餵給另一家。</p>
+  <div class="facts paywall-locked">
+    <div class="fact reveal"><code>重試開新輪次</code><p>失敗輪次正常關閉，重試輪次帶新編號從頭開始。沒有任何記錄被改寫，兩次嘗試在日誌裏各自完整，時間綫永遠向前。</p></div>
+    <div class="fact reveal"><code>半截輸出進 chunk 不進 message</code><p>失敗前收到的分片都留在 <code>assistant/chunk</code> 流裏，回放能精確復現事故現場；但派生歷史裏沒有這半截，模型下一步看到的上下文是乾淨的。</p></div>
+    <div class="fact reveal"><code>空回覆是可重試錯誤</code><p>不帶內容塊的 stop 被映射成 <code>EMPTY_RESPONSE</code> 錯誤，預設策略會重試它。靜默接受一個空成功，等於把退化響應寫進對話歷史。</p></div>
+  </div>
+
+  <div class="sec-label paywall-locked">橫向對比 · 重試藏在哪一層</div>
+  <div class="cmp-card reveal paywall-locked">
+    <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build：重試內建在採樣器裏</h3>
+    <p>Grok Build 把流式與重試一起放進 <code>xai-grok-sampler</code>：<code>retry.rs</code> 是純邏輯的分類與退避模組，actor 層包重試循環。預算給得很足：預設最多重試 15 次（<code>DEFAULT_MAX_RETRIES = 15</code>，30 秒退避上限下約 6 分鐘），429 限流單獨降到 2 次就上報（<code>RATE_LIMIT_RETRY_THRESHOLD = 2</code>），413 圖片超限走特殊通道，剝掉圖片再試一次且不佔預算，服務端還能用 <code>x-should-retry</code> 頭一票否決（<code>crates/codegen/xai-grok-sampler/src/retry.rs</code> 第 1 至 34 行的行為總結註釋）。分類做得細，但重試循環發生在採樣器內部，對上層就是一次格外慢的調用。</p>
+  </div>
+  <div class="cmp-card reveal paywall-locked">
+    <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code：API 客戶端層的重試包裝器</h3>
+    <p>還原源碼裏，重試住在 <code>restored-src/src/services/api/withRetry.ts</code>：一個包在 Anthropic SDK 外面的應用層包裝器，預設最多 10 次（第 52 行 <code>DEFAULT_MAX_RETRIES = 10</code>），帶 Retry-After 感知和 fast mode 的冷卻處理。重試發生在 API 客戶端內部的 for 循環裏，會打調試日誌，但基於已公開證據，沒有看到把每次重試作為持久會話事件落盤的機制。</p>
+    <p>三家對齊來看，差別就一句話：Grok 和 Claude Code 的重試是函式內部的循環，DSH 的重試是日誌裏的一等公民。前兩家省事，後者可審計：策略、延遲、失敗原因、第幾次嘗試，全部持久化，UI 和回放測試都能拿它當事實依據。代價是 DSH 的重試邊界只有 agent 輪次這一層，繞過 loop 直接調 <code>ctx.llm.stream()</code> 的調用方就是一次裸嘗試。</p>
+  </div>
+
+  <div class="sec-label paywall-locked">課堂練習</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>推演一次斷在 block 中間的流</h3><p>模型正在輸出第 2 個 text 塊，吐了 3 個 <code>text-delta</code> 之後連接被重置，適配器以 <code>finish {kind:'error', TRANSPORT}</code> 收尾。請回答：日誌裏此刻有幾類事件、各多少條？<code>assistant/message</code> 會不會出現？UI 上那半句話怎麼被撤回，依據是哪條事件？重試成功後，模型重建上下文時能看到那 3 個 delta 嗎？再想一層：如果把這段歷史發給另一家 provider 的適配器，上一條成功消息裏的 <code>replayState</code> 去哪了？</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway：</b>適配器只負責一次誠實的嘗試，重試住在 agent 層並作為 <code>llm/retry</code> 事件落進持久日誌，每一次等待都可審計。一次響應存兩份：chunk 流保回放保真，message 流保歷史乾淨，失敗的半截進前者不進後者。把重試藏進 SDK 省的是程式碼，丟的是證據。</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  var demo = document.getElementById('demo-llm');
+  var wire = document.getElementById('lWire');
+  var log = document.getElementById('lLog');
+  var bubble = document.getElementById('lBubble');
+  var bubbleText = document.getElementById('lBubbleText');
+  var caption = document.getElementById('lCaption');
+  var idx = 0, timer = null, playing = false, cur = 'A', runId = 0;
+  var steps = [];
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function clearEmpty(box) {
+    var e = box.querySelector('.llm-empty');
+    if (e) box.removeChild(e);
+  }
+  function addChunk(label, detail, cls) {
+    clearEmpty(wire);
+    var d = document.createElement('div');
+    d.className = 'chunk' + (cls ? ' ' + cls : '');
+    d.innerHTML = '<span class="t">' + esc(label) + '</span><span>' + esc(detail || '') + '</span>';
+    wire.appendChild(d);
+    void d.offsetWidth;
+    d.classList.add('in');
+  }
+  function addLog(type, body, cls) {
+    clearEmpty(log);
+    var d = document.createElement('div');
+    d.className = 'logrow' + (cls ? ' ' + cls : '');
+    d.innerHTML = '<span class="et">' + esc(type) + '</span><span>' + esc(body || '') + '</span>';
+    log.appendChild(d);
+    void d.offsetWidth;
+    d.classList.add('in');
+  }
+  /* 一个分片：既上网线，也落日志（assistant/chunk） */
+  function chunkStep(label, detail, cls, capText, uiFn) {
+    return {
+      cap: capText || '',
+      dur: capText ? 1900 : 620,
+      run: function () {
+        addChunk(label, detail, cls);
+        addLog('assistant/chunk', label + (detail ? ' ' + detail : ''));
+        if (uiFn) uiFn();
+      }
+    };
+  }
+
+  var uiRsn = '', uiTxt = '';
+  function renderUi() {
+    var h = '';
+    if (uiRsn) h += '<span class="rsn">推理中：' + esc(uiRsn) + '</span>';
+    h += '<span class="txt">' + esc(uiTxt || '…') + '</span>';
+    bubble.innerHTML = h;
+  }
+
+  function buildA() {
+    return [
+      { cap: '用戶提問後，agent loop 組裝好請求，調用 ctx.llm.stream()。適配器發出一次、也只發出這一次 HTTP 請求。', dur: 2300 },
+      chunkStep('block-start', '#0 reasoning', 'rsn', '第一個塊是推理塊（reasoning）。注意右邊：分片剛到就落了一條 assistant/chunk，先記帳再消化。'),
+      chunkStep('reasoning-delta', '「先查 CI 日誌」', 'rsn', '', function () { uiRsn = '先查 CI 日誌'; renderUi(); }),
+      chunkStep('reasoning-delta', '「定位失敗用例」', 'rsn', '推理流逐幀落盤。UI 把它渲染成摺疊的思考區，正文區還是空的。', function () { uiRsn = '先查 CI 日誌，定位失敗用例'; renderUi(); }),
+      chunkStep('block-end', '#0（完整推理塊）', 'rsn'),
+      chunkStep('block-start', '#1 text', '', '推理塊關閉，正文塊開始。兩條流靠 index 區分，各自獨立組裝。'),
+      chunkStep('text-delta', '「構建失敗是因為」', '', '', function () { uiTxt = '構建失敗是因為'; renderUi(); }),
+      chunkStep('text-delta', '「快照過期了」', '', '', function () { uiTxt = '構建失敗是因為快照過期了。'; renderUi(); }),
+      chunkStep('block-end', '#1（完整正文塊）', ''),
+      chunkStep('usage', 'in 1204 / out 87', '', 'usage 在 finish 之前到，這是適配器約定，順序錯了組裝器不認。'),
+      chunkStep('finish', 'stop', ''),
+      { cap: '流正常結束。BlockAssembler 把分片摺疊成完整消息，追加一條 assistant/message，並記下它派生自哪些 chunk 的序號。一次響應，兩種形態，各管各的用途。', dur: 3000,
+        run: function () { addLog('assistant/message', 'reasoning + text · usage · sourceEventSeqs=[…]', 'msg'); } }
+    ];
+  }
+
+  function buildB() {
+    return [
+      { cap: '同樣的請求發出。這次網絡不太平。', dur: 1700 },
+      chunkStep('block-start', '#0 text', ''),
+      chunkStep('text-delta', '「正在分析構建」', '', '', function () { uiTxt = '正在分析構建'; renderUi(); }),
+      chunkStep('text-delta', '「日誌，初步」', '', '半句話已經上了螢幕，也已經落了盤。', function () { uiTxt = '正在分析構建日誌，初步'; renderUi(); }),
+      { cap: '連接被重置。適配器不自己重試，把失敗規範化成 finish 錯誤分片：code 是 TRANSPORT，可序列化，帶得走。', dur: 2600,
+        run: function () {
+          wire.classList.add('broken');
+          addChunk('finish', 'error · TRANSPORT', 'err');
+          addLog('assistant/chunk', 'finish error TRANSPORT');
+        } },
+      { cap: '注意日誌：半截分片都在，但沒有 assistant/message。失敗的流絕不派生消息，這是恢復語義的地基。', dur: 2700 },
+      { cap: 'agent/request-error 觸發，dsh-llm-retry 查策略：TRANSPORT 可重試，第 1/2 次。等待之前，先落一條 llm/retry 事件：策略、延遲、完整失敗信息，全在裏面。', dur: 3100,
+        run: function () { addLog('llm/retry', 'retryId r1 · normal · TRANSPORT · delay 512ms', 'retry'); } },
+      { cap: 'UI 拿到 llm/retry 事件，撤回那半句話。用戶看到的是「正在重試」，而非一句説到一半的鬼話。', dur: 2500,
+        run: function () { bubble.classList.add('withdrawn'); } },
+      { cap: '退避結束，llm/retry-started 落盤，重試輪次開一個新編號，從持久歷史重建同樣的請求重發。', dur: 2500,
+        run: function () {
+          addLog('llm/retry-started', 'retryId r1 · 新輪次 turn 2', 'retry');
+          wire.classList.remove('broken');
+          bubble.classList.remove('withdrawn');
+          uiTxt = ''; renderUi();
+        } },
+      chunkStep('block-start', '#0 text', '', '新嘗試開始，這次網絡正常。'),
+      chunkStep('text-delta', '「快照過期，需要重錄」', '', '', function () { uiTxt = '快照過期，需要重錄。'; renderUi(); }),
+      chunkStep('block-end', '#0', ''),
+      chunkStep('finish', 'stop', ''),
+      { cap: '成功。日誌讀下來是一部完整的事故報告：半截分片、顯式重試、第二次嘗試，每一步都有據可查。派生歷史裏只有這條幹淨的最終消息。', dur: 3200,
+        run: function () { addLog('assistant/message', 'text · turn 2 派生', 'msg'); } }
+    ];
+  }
+
+  function buildC() {
+    return [
+      { cap: '反面教材：假設我們不禁用 SDK 重試，讓 HTTP 庫自己兜底。同樣的請求、同樣的故障。', dur: 2400 },
+      chunkStep('block-start', '#0 text', ''),
+      chunkStep('text-delta', '「正在分析構建」', '', '', function () { uiTxt = '正在分析構建'; renderUi(); }),
+      { cap: '連接斷了。但這次 harness 什麼都不知道：SDK 在自己的循環裏吞掉了錯誤，靜默重發。', dur: 2600,
+        run: function () { wire.classList.add('broken'); } },
+      { cap: '等待中… 右邊的日誌一片安靜。沒有 llm/retry，沒有失敗記錄，UI 上半句話僵在螢幕上。', dur: 2800 },
+      { cap: 'SDK 第二次嘗試成功了，新分片和舊的半截拼在同一次調用裏繼續流。', dur: 2400,
+        run: function () {
+          wire.classList.remove('broken');
+          addChunk('text-delta', '「日誌…快照過期」', '');
+          addLog('assistant/chunk', 'text-delta 「日誌…快照過期」');
+          uiTxt = '正在分析構建日誌…快照過期。'; renderUi();
+        } },
+      chunkStep('finish', 'stop', ''),
+      { cap: '事後看日誌：一次格外慢的請求，分片銜接詭異，中間發生過什麼無從知曉。要是 agent 層也配了重試，兩層預算相乘，最壞情況的請求數是乘法。這就是 DSH 禁用 SDK 重試的原因：省下的不是程式碼，是證據。', dur: 3600,
+        run: function () { addLog('assistant/message', 'text ·（看起來一切正常）', 'msg'); } }
+    ];
+  }
+
+  function build(k) { return k === 'A' ? buildA() : k === 'B' ? buildB() : buildC(); }
+
+  function reset() {
+    runId++; playing = false; clearTimeout(timer); idx = 0;
+    wire.innerHTML = '<div class="llm-empty">（尚無分片）</div>';
+    wire.classList.remove('broken');
+    log.innerHTML = '<div class="llm-empty">（空日誌）</div>';
+    bubble.classList.remove('withdrawn');
+    uiRsn = ''; uiTxt = '';
+    bubble.innerHTML = '<span class="txt" id="lBubbleText">（等待模型回覆…）</span>';
+    bubbleText = bubble.querySelector('.txt');
+    caption.textContent = '已重置。點「播放」運行情景 ' + cur + '，或點「單步」逐幀推進。';
+    steps = build(cur);
+  }
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.cap) caption.textContent = s.cap;
+    if (s.run) s.run();
+    if (playing) timer = setTimeout(doStep, s.dur || 900);
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true; doStep();
+  }
+  function stepOnce() {
+    playing = false; clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-llm .scn'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-llm .scn'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  document.getElementById('lPlay').addEventListener('click', play);
+  document.getElementById('lStep').addEventListener('click', stepOnce);
+  document.getElementById('lReset').addEventListener('click', reset);
+  reset();
+  if (typeof window.lessonOnView === 'function') {
+    window.lessonOnView(demo, function () { if (idx === 0 && !playing) play(); });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>一條消息背後的真實成本 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+.input-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card);margin-top:8px}
+.input-box .label{font-size:13px;font-weight:700;color:var(--sub);margin-bottom:10px}
+.example-btns{display:flex;flex-wrap:wrap;gap:8px}
+.example-btn{padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;color:var(--text)}
+.example-btn:hover{border-color:var(--accent);background:rgba(0,102,255,.04)}
+.example-btn.active{border-color:var(--accent);background:rgba(0,102,255,.08);color:var(--accent)}
+.msg-chain{margin-top:16px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-card);max-height:420px;overflow-y:auto}
+.msg-item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);margin-bottom:6px;font-size:13px;line-height:1.6;transition:all .3s;opacity:0;transform:translateX(-8px)}
+.msg-item.show{opacity:1;transform:translateX(0)}
+.msg-item .role{font-weight:800;font-size:11px;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.msg-item .content{flex:1;color:var(--text)}
+.msg-item .tokens{font-size:11px;font-weight:700;color:var(--sub);white-space:nowrap;flex-shrink:0}
+.msg-item.system{background:rgba(124,58,237,.04)}
+.msg-item.system .role{background:rgba(124,58,237,.12);color:var(--purple)}
+.msg-item.user-msg{background:rgba(0,102,255,.04)}
+.msg-item.user-msg .role{background:rgba(0,102,255,.12);color:var(--accent)}
+.msg-item.assistant{background:rgba(22,163,74,.04)}
+.msg-item.assistant .role{background:rgba(22,163,74,.12);color:var(--success)}
+.msg-item.tool-call{background:rgba(217,119,6,.04)}
+.msg-item.tool-call .role{background:rgba(217,119,6,.12);color:var(--amber)}
+.msg-item.tool-result{background:rgba(8,145,178,.04)}
+.msg-item.tool-result .role{background:rgba(8,145,178,.12);color:var(--cyan)}
+.summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+@media(max-width:768px){.summary-bar{grid-template-columns:repeat(2,1fr)}}
+.summary-item{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center;box-shadow:var(--shadow-card)}
+.summary-item .s-val{font-size:24px;font-weight:900;color:var(--text);letter-spacing:-1px}
+.summary-item .s-label{font-size:12px;color:var(--sub);font-weight:600;margin-top:4px}
+.summary-item.cost .s-val{color:var(--danger)}
+.slider-wrap{margin-top:20px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-card)}
+.slider-wrap h3{font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px}
+.slider-row{display:flex;align-items:center;gap:16px}
+.slider-row label{font-size:13px;font-weight:600;color:var(--sub);white-space:nowrap}
+.slider-row input[type=range]{flex:1;accent-color:var(--accent)}
+.slider-row .val{font-size:15px;font-weight:800;color:var(--accent);min-width:60px;text-align:right}
+.cost-chart{display:flex;align-items:flex-end;gap:6px;height:120px;margin-top:16px;padding:16px 0}
+.cost-bar{flex:1;border-radius:6px 6px 0 0;background:linear-gradient(to top,rgba(0,102,255,.6),rgba(0,102,255,.2));transition:height .4s ease;position:relative;min-width:20px}
+.cost-bar .bar-label{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--sub);white-space:nowrap;font-weight:600}
+.cost-bar .bar-val{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--accent);white-space:nowrap;font-weight:700}
+.takeaway{background:rgba(217,119,6,.04);border:1.5px solid rgba(217,119,6,.18);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);display:flex;gap:10px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--amber)}
+</style>
+<meta name="description" content="用戶發一句話，底層可能跑 10+ 輪循環、產生幾十條 API 消息。可視化展示真實的 token 消耗和成本。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/9-10.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/9-10.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/9-10.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/9-10.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/9-10.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/9-10.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/9-10.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/9-10.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="一條消息背後的真實成本">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/9-10.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/9-10.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"一條消息背後的真實成本","name":"一條消息背後的真實成本","url":"https://xueai.miyang.cn/slides/9-10.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent Loop","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"用戶發一句話，底層可能跑 10+ 輪循環、產生幾十條 API 消息。可視化展示真實的 token 消耗和成本。","datePublished":"2026-07-03","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:description" content="用戶發一句話，底層可能跑 10+ 輪循環、產生幾十條 API 消息。可視化展示真實的 token 消耗和成本。"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Agent 實戰</div>
+    <h1>一條消息背後的真實成本</h1>
+    <p class="subtitle">用戶只發了一句話，但底層可能跑了 10+ 輪循環、產生幾十條 API 消息。當你打開帳單，可能會嚇一跳。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>用戶發一句話，底層可能跑 10+ 輪循環、幾十條 API 消息，由此建立成本意識</p></aside><!--seo:end-->  <div class="sec-label">選一個用戶消息，看背後發生了什麼</div>
+
+  <div class="input-box reveal">
+    <div class="label">模擬用戶發送的消息：</div>
+    <div class="example-btns" id="exampleBtns">
+      <button class="example-btn" onclick="selectExample(0)">幫我查一下天氣</button>
+      <button class="example-btn" onclick="selectExample(1)">分析這份 PDF 報告</button>
+      <button class="example-btn" onclick="selectExample(2)">幫我重構這個模組的程式碼</button>
+    </div>
+  </div>
+
+  <div class="msg-chain" id="msgChain" style="display:none"></div>
+
+  <div class="summary-bar" id="summaryBar" style="display:none">
+    <div class="summary-item"><div class="s-val" id="sRounds">-</div><div class="s-label">循環輪次</div></div>
+    <div class="summary-item"><div class="s-val" id="sMsgs">-</div><div class="s-label">API 消息數</div></div>
+    <div class="summary-item"><div class="s-val" id="sTokens">-</div><div class="s-label">總 Tokens</div></div>
+    <div class="summary-item cost"><div class="s-val" id="sCost">-</div><div class="s-label">預估成本</div></div>
+  </div>
+
+  <div class="sec-label">成本隨複雜度指數增長</div>
+
+  <div class="slider-wrap reveal paywall-locked xa-peek">
+    <h3>拖動滑塊：任務複雜度 vs 成本</h3>
+    <div class="slider-row">
+      <label>複雜度</label>
+      <input type="range" min="1" max="5" value="1" id="complexSlider" oninput="updateChart()">
+      <div class="val" id="complexVal">簡單</div>
+    </div>
+    <div class="cost-chart" id="costChart"></div>
+    <div style="text-align:center;margin-top:28px;font-size:13px;color:var(--sub)">
+      橫軸：成本組成 ｜ 縱軸：token 消耗量
+    </div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:20px;font-size:14px;line-height:1.8">
+    <b>成本的大頭在哪裏？</b><br>
+    • <b>System Prompt</b> — 每輪都要重複發送，輪次越多重複消耗越大<br>
+    • <b>Tool Results</b> — 工具返回的文本通常很長（整個文件內容、搜索結果...）<br>
+    • <b>上下文累積</b> — 後面的輪次要帶上前面所有消息，滾雪球式增長
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>你的用戶每説一句話，你的帳單上可能多了 10 美分。知道成本在哪裏，才能控制成本。</b>Agent 的成本隨輪次指數增長，遠超綫性：每一輪都要把之前所有內容重新發送給模型。</span>
+  </div>
+
+</article>
+
+<script>
+(function(){
+  var EXAMPLES = [
+    {
+      name: '幫我查一下天氣',
+      rounds: 2,
+      msgs: [
+        {role:'system', label:'System', content:'你是一個有工具調用能力的助手...（系統提示詞 + 工具定義）', tokens:850},
+        {role:'user-msg', label:'User', content:'幫我查一下天氣', tokens:12},
+        {role:'assistant', label:'Assistant', content:'我來幫你查詢天氣資訊。', tokens:18},
+        {role:'tool-call', label:'Tool Call', content:'get_weather(location="用戶當前城市")', tokens:24},
+        {role:'tool-result', label:'Tool Result', content:'{"city":"上海","temp":"28°C","weather":"多雲"...}', tokens:86},
+        {role:'assistant', label:'Assistant', content:'上海今天 28°C，多雲，建議帶把傘...', tokens:45}
+      ],
+      totalTokens: 1035,
+      cost: '$0.003'
+    },
+    {
+      name: '分析這份 PDF 報告',
+      rounds: 6,
+      msgs: [
+        {role:'system', label:'System', content:'你是一個有工具調用能力的助手...（系統提示詞 + 工具定義）', tokens:850},
+        {role:'user-msg', label:'User', content:'分析這份 PDF 報告，給我關鍵結論', tokens:18},
+        {role:'assistant', label:'Assistant', content:'我來讀取並分析這份報告。', tokens:15},
+        {role:'tool-call', label:'Tool Call', content:'read_pdf(file="report.pdf", pages="1-5")', tokens:28},
+        {role:'tool-result', label:'Tool Result', content:'[PDF 第 1-5 頁內容...共 3200 字]', tokens:1600},
+        {role:'assistant', label:'Assistant', content:'已讀取前 5 頁，繼續讀取剩餘部分...', tokens:22},
+        {role:'tool-call', label:'Tool Call', content:'read_pdf(file="report.pdf", pages="6-12")', tokens:30},
+        {role:'tool-result', label:'Tool Result', content:'[PDF 第 6-12 頁內容...共 4100 字]', tokens:2050},
+        {role:'assistant', label:'Assistant', content:'全文已讀完，開始提取關鍵資訊...', tokens:20},
+        {role:'tool-call', label:'Tool Call', content:'search_in_text(query="結論,建議,關鍵發現")', tokens:32},
+        {role:'tool-result', label:'Tool Result', content:'[匹配到 8 處關鍵段落...]', tokens:680},
+        {role:'assistant', label:'Assistant', content:'報告的三個核心結論：\n1. 市場增速放緩...\n2. 用戶留存率...\n3. 建議策略調整...', tokens:320}
+      ],
+      totalTokens: 5665,
+      cost: '$0.02'
+    },
+    {
+      name: '幫我重構這個模組的程式碼',
+      rounds: 12,
+      msgs: [
+        {role:'system', label:'System', content:'你是一個專業的編程助手...（系統提示詞 + 工具定義 + 項目規範）', tokens:1200},
+        {role:'user-msg', label:'User', content:'幫我重構 src/utils/parser.ts 這個模組', tokens:22},
+        {role:'assistant', label:'Assistant', content:'我先看看這個文件的當前程式碼。', tokens:14},
+        {role:'tool-call', label:'Tool Call', content:'read_file("src/utils/parser.ts")', tokens:26},
+        {role:'tool-result', label:'Tool Result', content:'[文件內容 280 行...]', tokens:1800},
+        {role:'assistant', label:'Assistant', content:'程式碼有幾個問題，讓我看看相關文件...', tokens:35},
+        {role:'tool-call', label:'Tool Call', content:'read_file("src/types/index.ts")', tokens:28},
+        {role:'tool-result', label:'Tool Result', content:'[類型定義文件...]', tokens:640},
+        {role:'tool-call', label:'Tool Call', content:'search_code("import.*parser")', tokens:24},
+        {role:'tool-result', label:'Tool Result', content:'[找到 6 個引用位置...]', tokens:420},
+        {role:'assistant', label:'Assistant', content:'分析完畢，開始重構。主要改動：...', tokens:180},
+        {role:'tool-call', label:'Tool Call', content:'write_file("src/utils/parser.ts", [新程式碼])', tokens:2200},
+        {role:'tool-result', label:'Tool Result', content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> 文件已寫入', tokens:8},
+        {role:'assistant', label:'Assistant', content:'主文件重構完成，更新相關引用...', tokens:24},
+        {role:'tool-call', label:'Tool Call', content:'write_file("src/services/data.ts", [修改引用])', tokens:480},
+        {role:'tool-result', label:'Tool Result', content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> 文件已寫入', tokens:8},
+        {role:'tool-call', label:'Tool Call', content:'run_tests("src/utils/parser.test.ts")', tokens:32},
+        {role:'tool-result', label:'Tool Result', content:'3 passed, 1 failed: expect(...).toBe(...)', tokens:120},
+        {role:'assistant', label:'Assistant', content:'有一個測試失敗了，修復中...', tokens:16},
+        {role:'tool-call', label:'Tool Call', content:'write_file("src/utils/parser.ts", [修復])', tokens:340},
+        {role:'tool-result', label:'Tool Result', content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg> 文件已寫入', tokens:8},
+        {role:'tool-call', label:'Tool Call', content:'run_tests("src/utils/parser.test.ts")', tokens:32},
+        {role:'tool-result', label:'Tool Result', content:'4 passed, 0 failed <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg>', tokens:14},
+        {role:'assistant', label:'Assistant', content:'重構完成！主要改動：\n1. 拆分了過長的 parse 函式...\n2. 提取了公共類型...\n3. 所有測試通過 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M20 6L9 17l-5-5"/></svg>', tokens:280}
+      ],
+      totalTokens: 7971,
+      cost: '$0.08'
+    }
+  ];
+
+  window.selectExample = function(idx){
+    var btns = document.querySelectorAll('.example-btn');
+    btns.forEach(function(b,i){ b.classList.toggle('active', i===idx); });
+
+    var ex = EXAMPLES[idx];
+    var chain = document.getElementById('msgChain');
+    var summary = document.getElementById('summaryBar');
+    chain.style.display = 'block';
+    summary.style.display = 'grid';
+    chain.innerHTML = '';
+
+    ex.msgs.forEach(function(m, i){
+      var div = document.createElement('div');
+      div.className = 'msg-item ' + m.role;
+      div.innerHTML = '<span class="role">' + m.label + '</span>'
+                    + '<span class="content">' + m.content + '</span>'
+                    + '<span class="tokens">' + m.tokens + ' tk</span>';
+      chain.appendChild(div);
+      setTimeout(function(){ div.classList.add('show'); }, i * 120);
+    });
+
+    document.getElementById('sRounds').textContent = ex.rounds;
+    document.getElementById('sMsgs').textContent = ex.msgs.length;
+    document.getElementById('sTokens').textContent = ex.totalTokens.toLocaleString();
+    document.getElementById('sCost').textContent = ex.cost;
+  };
+
+  var COMPLEXITY_LABELS = ['簡單','中等','複雜','很複雜','極複雜'];
+  var COST_DATA = [
+    {system:[850,850,1200,1200,1500], tool_result:[86,1800,3700,6400,12000], assistant:[63,400,900,1800,3500], context_repeat:[0,1200,4800,14000,38000]},
+  ];
+
+  window.updateChart = function(){
+    var slider = document.getElementById('complexSlider');
+    var val = parseInt(slider.value) - 1;
+    document.getElementById('complexVal').textContent = COMPLEXITY_LABELS[val];
+
+    var chart = document.getElementById('costChart');
+    var categories = ['System\nPrompt','工具返回','Assistant\n輸出','上下文\n累積'];
+    var data = [
+      COST_DATA[0].system[val],
+      COST_DATA[0].tool_result[val],
+      COST_DATA[0].assistant[val],
+      COST_DATA[0].context_repeat[val]
+    ];
+    var max = Math.max.apply(null, data) || 1;
+
+    var html = '';
+    data.forEach(function(d, i){
+      var h = Math.max((d / max) * 100, 4);
+      html += '<div class="cost-bar" style="height:'+h+'%">'
+            + '<div class="bar-val">'+d.toLocaleString()+' tk</div>'
+            + '<div class="bar-label">'+categories[i].replace('\n','<br>')+'</div>'
+            + '</div>';
+    });
+    chart.innerHTML = html;
+  };
+
+  updateChart();
+})();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

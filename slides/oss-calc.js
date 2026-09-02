@@ -153,6 +153,112 @@
       },
       recLM: function (n) { return 'LM Studio 用户：在模型库里搜 <b>' + n + '</b>，界面会直接标出哪些量化版本你带得动。'; },
     },
+    hk: {
+      tier: { edge: '端側', light: '輕量', main: '主流', high: '高配', moe: 'MoE', flagship: '旗艦' },
+      state: { ok: '可以跑', tight: '勉強，留意上下文', no: '跑不動' },
+      avail: '可用於載入模型：',
+      formula: function (f, label) {
+        return '顯存 ≈ 參數量(B) × ' + f + '（' + label + '，已含 KV Cache 開銷）';
+      },
+      vramNote: function (gb) { return '獨立顯存 ' + gb + ' GB'; },
+      memNote: function (gb, pct) {
+        return '統一記憶體 ' + gb + ' GB，按可分配給 GPU 的約 ' + pct + '% 計';
+      },
+      optVram: function (gb) { return gb + ' GB 顯存'; },
+      optMem: function (gb) { return gb + ' GB 統一記憶體'; },
+      wrap: function (s) { return '（' + s + '）'; },
+      moeTag: function (total, active) {
+        return '總參 ' + total + 'B / 激活 ' + active + 'B';
+      },
+      need: function (gb) { return '需 ' + gb + ' GB'; },
+      deviceMissing: '設備數據缺失，請重新選擇',
+      copy: '複製',
+      copied: '已複製',
+      copyManual: '請手動選中複製',
+      recWhy: function (need, avail) {
+        return '這台機器可用 ' + avail + ' GB，它需要 ' + need + ' GB，留得出餘量。';
+      },
+      recNone: '這台機器帶不動官方庫裏已上架的型號',
+      recNoneWhy: '先換更低的精度檔試試，或者按上一節的結論挑一個更小的尺寸。',
+      recCmdTip: '複製這條，裝好 Ollama 後直接敲',
+      recUse: { chat: '日常問答', code: '寫程式碼 / 數學' },
+      recQuant: function (q) { return '想更穩可以試 ' + q + ' 檔，拉之前先到 library 的 tags 頁確認這個尺寸有沒有這一檔。'; },
+      recTop: '這已經是官方庫裏<b>能下到本機的最大 Qwen 尺寸</b>了。再往上的 397B 只提供雲端版本（<code>qwen3.5:397b-cloud</code>），跑在別人的機器上，不落到你這裏。',
+      recVer: '注意它是 <b>3.5</b> 那一代，不是最新的 3.6。3.6 目前只出到 35B，<b>版本號更新不等於全尺寸跟進</b>，挑本地模型要看尺寸，不能只看版本號。',
+      qLevels: function (n) { return n.toLocaleString('zh-CN') + ' 檔'; },
+      qLevelsNote: { fp16: '浮點，越靠近 0 檔位越密', int8: '整個範圍均分', int4: '整個範圍均分' },
+      qOrig: '原始值', qAfter: '存進去變成', qErr: '差了',
+      qZero: '被抹成 0',
+      qRelMax: function (pct) { return '最大誤差 ' + pct + '%'; },
+      qVsInt8: function (x) { return '是 INT8 的 ' + x + ' 倍'; },
+      qHintFp16: '這是模型發佈時的原始格式，後面兩檔都拿它當基準。誤差小到看不出來。',
+      qHintInt8: '誤差還在千分之四以內。日常任務上基本察覺不到差別，顯存夠就選它。',
+      qHintInt4: '誤差跳到 6.7%，而且<b>絕對值小的權重會被直接抹成 0</b>——那個參數在這份檔案裏就不存在了。',
+      qFlipTitle: '一次預測裏會發生什麼',
+      qFlipHint: '模型每寫一個詞，都是在若干候選裏挑概率最高的那個。下面這組候選前兩名咬得很緊。',
+      qFlipKeep: '排序沒變，這一步不受影響',
+      qFlipTurn: '<b>排序翻了</b>，這一步會寫出另一個詞',
+      qChainHint: '單看一步，出問題的機會不大。但推理是一步接一步往下走的：',
+      qChainSteps: function (n) { return n + ' 步'; },
+      qChainLive: function (pct) { return '全程不出錯的概率 ' + pct + '%'; },
+      qChainNote: function (n) {
+        return n + ' 步裏只要有一步選錯，後面就順着錯的往下走。這也是為什麼長鏈條推理對精度更敏感，而問個天氣怎麼樣感覺不出區別。';
+      },
+      recLM: function (n) { return 'LM Studio 用戶：在模型庫裏搜 <b>' + n + '</b>，界面會直接標出哪些量化版本你帶得動。'; },
+    },
+    tw: {
+      tier: { edge: '端側', light: '輕量', main: '主流', high: '高配', moe: 'MoE', flagship: '旗艦' },
+      state: { ok: '可以跑', tight: '勉強，留意上下文', no: '跑不動' },
+      avail: '可用於載入模型：',
+      formula: function (f, label) {
+        return '顯存 ≈ 參數量(B) × ' + f + '（' + label + '，已含 KV Cache 開銷）';
+      },
+      vramNote: function (gb) { return '獨立顯存 ' + gb + ' GB'; },
+      memNote: function (gb, pct) {
+        return '統一記憶體 ' + gb + ' GB，按可分配給 GPU 的約 ' + pct + '% 計';
+      },
+      optVram: function (gb) { return gb + ' GB 顯存'; },
+      optMem: function (gb) { return gb + ' GB 統一記憶體'; },
+      wrap: function (s) { return '（' + s + '）'; },
+      moeTag: function (total, active) {
+        return '總參 ' + total + 'B / 啟用 ' + active + 'B';
+      },
+      need: function (gb) { return '需 ' + gb + ' GB'; },
+      deviceMissing: '裝置資料缺失，請重新選擇',
+      copy: '複製',
+      copied: '已複製',
+      copyManual: '請手動選中複製',
+      recWhy: function (need, avail) {
+        return '這臺機器可用 ' + avail + ' GB，它需要 ' + need + ' GB，留得出餘量。';
+      },
+      recNone: '這臺機器帶不動官方庫裡已上架的型號',
+      recNoneWhy: '先換更低的精度檔試試，或者按上一節的結論挑一個更小的尺寸。',
+      recCmdTip: '複製這條，裝好 Ollama 後直接敲',
+      recUse: { chat: '日常問答', code: '寫程式碼 / 數學' },
+      recQuant: function (q) { return '想更穩可以試 ' + q + ' 檔，拉之前先到 library 的 tags 頁確認這個尺寸有沒有這一檔。'; },
+      recTop: '這已經是官方庫裡<b>能下到本機的最大 Qwen 尺寸</b>了。再往上的 397B 只提供雲端版本（<code>qwen3.5:397b-cloud</code>），跑在別人的機器上，不落到你這裡。',
+      recVer: '注意它是 <b>3.5</b> 那一代，不是最新的 3.6。3.6 目前只出到 35B，<b>版本號更新不等於全尺寸跟進</b>，挑本地模型要看尺寸，不能只看版本號。',
+      qLevels: function (n) { return n.toLocaleString('zh-CN') + ' 檔'; },
+      qLevelsNote: { fp16: '浮點，越靠近 0 檔位越密', int8: '整個範圍均分', int4: '整個範圍均分' },
+      qOrig: '原始值', qAfter: '存進去變成', qErr: '差了',
+      qZero: '被抹成 0',
+      qRelMax: function (pct) { return '最大誤差 ' + pct + '%'; },
+      qVsInt8: function (x) { return '是 INT8 的 ' + x + ' 倍'; },
+      qHintFp16: '這是模型釋出時的原始格式，後面兩檔都拿它當基準。誤差小到看不出來。',
+      qHintInt8: '誤差還在千分之四以內。日常任務上基本察覺不到差別，顯存夠就選它。',
+      qHintInt4: '誤差跳到 6.7%，而且<b>絕對值小的權重會被直接抹成 0</b>——那個參數在這份檔案裡就不存在了。',
+      qFlipTitle: '一次預測裡會發生什麼',
+      qFlipHint: '模型每寫一個詞，都是在若干候選裡挑機率最高的那個。下面這組候選前兩名咬得很緊。',
+      qFlipKeep: '排序沒變，這一步不受影響',
+      qFlipTurn: '<b>排序翻了</b>，這一步會寫出另一個詞',
+      qChainHint: '單看一步，出問題的機會不大。但推理是一步接一步往下走的：',
+      qChainSteps: function (n) { return n + ' 步'; },
+      qChainLive: function (pct) { return '全程不出錯的機率 ' + pct + '%'; },
+      qChainNote: function (n) {
+        return n + ' 步裡只要有一步選錯，後面就順著錯的往下走。這也是為什麼長鏈條推理對精度更敏感，而問個天氣怎麼樣感覺不出區別。';
+      },
+      recLM: function (n) { return 'LM Studio 使用者：在模型庫裡搜 <b>' + n + '</b>，介面會直接標出哪些量化版本你帶得動。'; },
+    },
     en: {
       tier: { edge: 'On-device', light: 'Light', main: 'Mainstream', high: 'High-end', moe: 'MoE', flagship: 'Flagship' },
       state: { ok: 'Runs fine', tight: 'Tight, watch context length', no: 'Too large' },

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>『我訓了個模型』到底訓了什麼？ | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+.qa-answer {
+  background: linear-gradient(135deg, rgba(8,145,178,0.06), rgba(0,102,255,0.05));
+  border: 1.5px solid rgba(8,145,178,0.3);
+  border-radius: var(--radius); padding: 22px 26px; margin: 4px 0 8px;
+}
+.qa-answer .qa-tag { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #0891b2; margin-bottom: 8px; }
+.qa-answer p { font-size: 16.5px; font-weight: 700; color: var(--text); line-height: 1.85; }
+.qa-answer p b { color: #0891b2; }
+
+/* 四层梯子 */
+.ladder { display: flex; flex-direction: column-reverse; gap: 10px; }
+.ladder-rung {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  overflow: hidden; cursor: pointer; transition: border-color 0.2s;
+}
+.ladder-rung:hover { border-color: rgba(0,102,255,0.35); }
+.rung-head { display: flex; align-items: center; gap: 12px; padding: 15px 18px; }
+.rung-lv {
+  flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: #fff;
+}
+.rung-l1 .rung-lv { background: #16a34a; }
+.rung-l2 .rung-lv { background: #0891b2; }
+.rung-l3 .rung-lv { background: #d97706; }
+.rung-l4 .rung-lv { background: #7c3aed; }
+.rung-title { flex: 1; }
+.rung-title h4 { font-size: 15px; font-weight: 800; color: var(--text); }
+.rung-title .rung-hint { font-size: 12px; color: var(--sub); margin-top: 2px; }
+.rung-arrow { font-size: 13px; color: var(--sub); transition: transform 0.25s; flex-shrink: 0; }
+.ladder-rung.open .rung-arrow { transform: rotate(90deg); }
+.rung-body {
+  max-height: 0; overflow: hidden; transition: max-height 0.35s ease;
+  border-top: 0 solid var(--border);
+}
+.ladder-rung.open .rung-body { max-height: 400px; border-top: 1px solid var(--border); }
+.rung-facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 14px 18px; }
+.rung-fact { background: rgba(0,0,0,0.025); border-radius: var(--radius-sm); padding: 10px 13px; }
+.rung-fact .rf-k { font-size: 11px; font-weight: 800; letter-spacing: 0.5px; color: var(--sub); margin-bottom: 3px; }
+.rung-fact .rf-v { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.6; }
+.rung-desc { padding: 0 18px 15px; font-size: 13px; color: var(--sub); line-height: 1.8; }
+.rung-desc b { color: var(--accent); }
+
+/* 对号入座小测 */
+.quiz-item {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 18px 20px; margin-bottom: 14px;
+}
+.quiz-item .qz-say {
+  font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.8;
+  margin-bottom: 12px;
+}
+.qz-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.qz-opt {
+  border: 1.5px solid var(--border); background: var(--card);
+  border-radius: 999px; padding: 7px 15px;
+  font-size: 12.5px; font-weight: 800; color: var(--sub);
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.qz-opt:hover { border-color: rgba(0,102,255,0.4); color: var(--accent); }
+.qz-opt:disabled { cursor: default; }
+.qz-opt.hit { border-color: var(--success); background: rgba(22,163,74,0.08); color: var(--success); }
+.qz-opt.miss { border-color: var(--danger); background: rgba(220,38,38,0.06); color: var(--danger); }
+.qz-opt.dim { opacity: 0.45; }
+.qz-reveal {
+  display: none; margin-top: 12px; padding: 12px 15px;
+  border-radius: var(--radius-sm); background: rgba(8,145,178,0.05);
+  border: 1px solid rgba(8,145,178,0.2);
+  font-size: 13px; color: var(--text); line-height: 1.8;
+}
+.qz-reveal.show { display: block; }
+.qz-reveal b { color: #0891b2; }
+.quiz-score {
+  display: none; margin-top: 4px; padding: 14px 18px;
+  border-radius: var(--radius); text-align: center;
+  background: rgba(22,163,74,0.06); border: 1.5px solid rgba(22,163,74,0.25);
+  font-size: 14px; font-weight: 800; color: var(--success);
+}
+.quiz-score.show { display: block; }
+
+/* 三连问卡 */
+.pt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pt-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-card);
+}
+.pt-card .pt-icon { font-size: 26px; margin-bottom: 8px; }
+.pt-card h4 { font-size: 14.5px; font-weight: 800; color: var(--text); margin-bottom: 5px; }
+.pt-card p { font-size: 12.5px; color: var(--sub); line-height: 1.8; }
+.pt-card p b { color: var(--text); }
+
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .pt-grid { grid-template-columns: 1fr; }
+  .qa-answer p { font-size: 15px; }
+  .rung-facts { grid-template-columns: 1fr; }
+  .qz-opts { gap: 6px; }
+  .qz-opt { padding: 8px 13px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="飯局上總有人説「我訓了個模型」，他到底幹了什麼？訓練指改變模型參數，成本從幾十萬到上億；多數人做的其實是寫提示詞或掛知識庫。這頁用一把四層梯子幫你分清，再教你三個追問，當場聽出對方在哪一層。">
+<meta name="keywords" content="訓練模型是什麼意思,微調和提示詞的區別,RAG是什麼,預訓練成本,大模型訓練,AI入門問答,提示詞工程">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/zero-q-train-or-prompt.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/zero-q-train-or-prompt.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/zero-q-train-or-prompt.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/zero-q-train-or-prompt.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/zero-q-train-or-prompt.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/zero-q-train-or-prompt.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/zero-q-train-or-prompt.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/zero-q-train-or-prompt.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="『我訓了個模型』到底訓了什麼？">
+<meta property="og:description" content="訓練指改變模型參數，成本從幾十萬到上億。多數人説的「訓了個模型」，其實是寫了段提示詞，那是五分鐘和五千萬的區別。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/zero-q-train-or-prompt.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/zero-q-train-or-prompt.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="『我訓了個模型』到底訓了什麼？">
+<meta name="twitter:description" content="四層梯子幫你分清：改提示詞、掛知識庫、微調、從頭預訓練，五分鐘和五千萬的區別。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"「我訓了個模型」到底訓了什麼？","name":"「我訓了個模型」到底訓了什麼？","url":"https://xueai.miyang.cn/slides/zero-q-train-or-prompt.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 小白三千問 · 祛魅打假","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":true,"description":"飯局上總有人説「我訓了個模型」，他到底幹了什麼？訓練指改變模型參數，成本從幾十萬到上億；多數人做的其實是寫提示詞或掛知識庫。這頁用一把四層梯子幫你分清，再教你三個追問，當場聽出對方在哪一層。","datePublished":"2026-08-09","dateModified":"2026-08-27"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"「我訓了個模型」到底訓了什麼？","acceptedAnswer":{"@type":"Answer","text":"在 AI 圈，訓練指的是改變模型本身的參數，成本從幾十萬到上億。而絕大多數人説的「訓了個模型」，實際是寫了段提示詞，或者掛了個知識庫，那是五分鐘和五千萬的區別。"}}]}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">零基礎入門 · 小白三千問</div>
+    <h1>『我訓了個模型』到底訓了什麼？</h1>
+    <p class="subtitle">飯局上總有人舉着酒杯説「我最近訓了個模型」。這句話的水分可以從零到百分之九十九，這一頁幫你<b>聽出他到底幹了什麼</b>，順便學會三句能讓全桌安靜的追問。</p>
+  </header>
+
+  <div class="qa-answer">
+    <div class="qa-tag">一句話回答</div>
+    <p>在 AI 圈，訓練指的是<b>改變模型本身的參數</b>，成本從幾十萬到上億。而絕大多數人説的「訓了個模型」，實際是<b>寫了段提示詞，或者掛了個知識庫</b>，那是五分鐘和五千萬的區別。</p>
+  </div>
+
+  <div class="sec-label">先説清楚 · 「訓練」這個詞在圈內的真實含義</div>
+
+  <p class="l-p">大模型裏面裝着<b>幾百億到上萬億個參數</b>。參數説白了就是一大堆數字，你可以把它們想像成調音台上密密麻麻的旋鈕——模型的每一分本事，全都存在這些旋鈕擰到了哪個位置上。</p>
+
+  <!-- 原文只有一句「拿海量数据反复冲刷这些数字，把它们一点点调对」，抽象到没法接住。
+       换成可以在脑子里走一遍的循环：猜下一个词 → 猜错 → 把旋钮各拧回一丁点。 -->
+  <p class="l-p">訓練就是把這幾百億個旋鈕一個個擰對，而辦法笨得出奇：<b>遮住後半句，讓模型猜下一個詞</b>。比如給它「今天天氣真」，它蒙了個「香」，原文卻是「好」——猜錯了，就把參與這次判斷的旋鈕各自擰回來一丁點。一次只挪極小一格，然後換下一句，再來一遍。這個動作要重複上萬億次。沖刷完，旋鈕的位置裏就沉澱下了「天氣後面更可能跟『好』，不太可能跟『香』」這件事。所謂「學會」，全部內容就是這個。</p>
+
+  <p class="l-p">這件事費電、費卡、費錢，跟供一個孩子讀完二十年書差不多，屬於重資產工程。</p>
+
+  <p class="l-p">而你平時對 AI 説「你是一位資深編輯，幫我潤色」，或者給它上傳一份公司資料，這些操作<b>一個參數都沒動</b>。打個比方：前者是重新培養一個大學生，後者是給現成的大學生遞一張便籤、發一本手冊。便籤很有用，但你不能説自己「培養了一個大學生」。</p>
+
+  <p class="l-p">所以下次聽到「訓了個模型」，第一反應可以是：他動沒動參數？動了多少？下面這把梯子幫你把所有情況分成四層。</p>
+
+  <div class="sec-label">四層梯子 · 從五分鐘到五千萬</div>
+
+  <p class="l-p">從下往上，每爬一層，<b>成本和門檻都指數級上升</b>。點擊每一層，展開看它的耗時、成本和門檻。飯局上九成的「訓了個模型」，都發生在最下面兩層。</p>
+
+  <div class="ladder" id="ladder">
+    <div class="ladder-rung rung-l1" data-rung="1">
+      <div class="rung-head">
+        <div class="rung-lv">L1</div>
+        <div class="rung-title">
+          <h4>改提示詞</h4>
+          <div class="rung-hint">換個説法，讓 AI 更懂你</div>
+        </div>
+        <span class="rung-arrow">▶</span>
+      </div>
+      <div class="rung-body">
+        <div class="rung-facts">
+          <div class="rung-fact"><div class="rf-k">耗時</div><div class="rf-v">幾分鐘</div></div>
+          <div class="rung-fact"><div class="rf-k">成本量級</div><div class="rf-v">免費</div></div>
+          <div class="rung-fact"><div class="rf-k">門檻</div><div class="rf-v">人人可做</div></div>
+          <div class="rung-fact"><div class="rf-k">幹的事</div><div class="rf-v">給 AI 寫一段説明書</div></div>
+        </div>
+        <div class="rung-desc">給模型一段角色設定、工作流程、輸出要求，比如「你是一位嚴謹的法務，回答前先列風險點」。模型參數<b>一個沒動</b>，但輸出質素可以天差地別。九成的日常需求，這一層就夠了。</div>
+      </div>
+    </div>
+    <div class="ladder-rung rung-l2" data-rung="2">
+      <div class="rung-head">
+        <div class="rung-lv">L2</div>
+        <div class="rung-title">
+          <h4>掛知識庫（RAG）</h4>
+          <div class="rung-hint">給 AI 一個可以翻的書架</div>
+        </div>
+        <span class="rung-arrow">▶</span>
+      </div>
+      <div class="rung-body">
+        <div class="rung-facts">
+          <div class="rung-fact"><div class="rf-k">耗時</div><div class="rf-v">幾小時到幾天</div></div>
+          <div class="rung-fact"><div class="rf-k">成本量級</div><div class="rf-v">幾百到幾萬</div></div>
+          <div class="rung-fact"><div class="rf-k">門檻</div><div class="rf-v">會配置就行</div></div>
+          <div class="rung-fact"><div class="rf-k">幹的事</div><div class="rf-v">把資料放到 AI 手邊</div></div>
+        </div>
+        <div class="rung-desc">把公司文檔、產品手冊整理好放進一個「書架」，AI 回答前先去翻一翻，再照着資料作答。聽起來像「教會了它」，但<b>模型本身沒變</b>，只是手邊多了參考書。書拿走，它立刻恢復原樣。</div>
+      </div>
+    </div>
+    <div class="ladder-rung rung-l3" data-rung="3">
+      <div class="rung-head">
+        <div class="rung-lv">L3</div>
+        <div class="rung-title">
+          <h4>微調</h4>
+          <div class="rung-hint">真的動了參數，但底座是別人的</div>
+        </div>
+        <span class="rung-arrow">▶</span>
+      </div>
+      <div class="rung-body">
+        <div class="rung-facts">
+          <div class="rung-fact"><div class="rf-k">耗時</div><div class="rf-v">幾天到幾周</div></div>
+          <div class="rung-fact"><div class="rf-k">成本量級</div><div class="rf-v">幾千到幾十萬</div></div>
+          <div class="rung-fact"><div class="rf-k">門檻</div><div class="rf-v">需要數據和工程師</div></div>
+          <div class="rung-fact"><div class="rf-k">幹的事</div><div class="rf-v">在成品大腦上做專科培訓</div></div>
+        </div>
+        <div class="rung-desc">拿一個練好的開源模型，用自己的幾千到幾十萬條數據接着練，<b>參數真的被改了</b>。相當於給一位大學畢業生做崗前專科培訓。到這一層，説「訓了個模型」勉強成立，但要記住：底座那個大腦，還是別人造的。</div>
+      </div>
+    </div>
+    <div class="ladder-rung rung-l4" data-rung="4">
+      <div class="rung-head">
+        <div class="rung-lv">L4</div>
+        <div class="rung-title">
+          <h4>從頭預訓練</h4>
+          <div class="rung-hint">從零造一個大腦</div>
+        </div>
+        <span class="rung-arrow">▶</span>
+      </div>
+      <div class="rung-body">
+        <div class="rung-facts">
+          <div class="rung-fact"><div class="rf-k">耗時</div><div class="rf-v">數月</div></div>
+          <div class="rung-fact"><div class="rf-k">成本量級</div><div class="rf-v">數千萬到上億</div></div>
+          <div class="rung-fact"><div class="rf-k">門檻</div><div class="rf-v">全球做得起的公司屈指可數</div></div>
+          <div class="rung-fact"><div class="rf-k">幹的事</div><div class="rf-v">用半個互聯網的數據從零練起</div></div>
+        </div>
+        <div class="rung-desc">從一堆隨機數字開始，用海量數據和成千上萬張顯卡，練幾個月，造出一個全新的大腦。全球有能力做這件事的公司<b>一隻手數得過來還有富餘</b>。如果飯局上有人輕描淡寫地説自己幹了這個，你很大機會正在見證一個傳説，或者一個段子。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">對號入座 · 這些話到底在説哪一層</div>
+
+  <p class="l-p">來玩個小測：下面五句都是社交場合的高頻發言。你來猜猜，每句話説的事<b>很大機會發生在哪一層</b>。點選項揭曉答案。</p>
+
+  <div id="quizWrap">
+    <div class="quiz-item" data-q="0">
+      <div class="qz-say">「我用 ChatGPT 訓了個懂我們公司的模型」</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>多半是 L1 或 L2。</b>在對話產品裏能做的，基本就是寫提示詞、傳資料這兩件事。他很大機會是配了一個自定義助手，加了公司文檔。有用，值得肯定，但離「訓模型」還差着兩層樓。</div>
+    </div>
+    <div class="quiz-item" data-q="1">
+      <div class="qz-say">「我們微調了開源模型做客服」</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>L3，這句反而實誠。</b>他準確説出了自己在哪一層：動了參數，底座用的開源模型。能這麼説話的人，通常真的幹過活。</div>
+    </div>
+    <div class="quiz-item" data-q="2">
+      <div class="qz-say">「我天天用，它被我訓得越來越懂我了」</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>L0，連 L1 都算不上。</b>日常聊天改變不了模型的任何參數，你感覺它「越來越懂你」，多半來自記憶功能或者你自己提問變熟練了。為什麼對話練不出模型，可以看這一頁：<a href="learn.html#zero-q-ai-learning.html" target="_top">AI 會從聊天中學習嗎</a>。</div>
+    </div>
+    <div class="quiz-item" data-q="3">
+      <div class="qz-say">「我們自研了行業大模型」</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>可能是 L3，也可能是 L4，要追問。</b>「自研」這個詞的彈性極大：從頭預訓練叫自研，微調開源模型也有人叫自研。這時候就該祭出下一節的三連問了。</div>
+    </div>
+    <div class="quiz-item" data-q="4">
+      <div class="qz-say">「我給 AI 寫了一套人設和工作流程」</div>
+      <div class="qz-opts"></div>
+      <div class="qz-reveal"><b>L1，而且説得很清楚，值得表揚。</b>他沒有借用「訓練」這個大詞，老老實實描述了自己幹的事。這種表達方式，比很多發佈會都體面。</div>
+    </div>
+  </div>
+  <div class="quiz-score" id="quizScore"></div>
+
+  <div class="sec-label">怎麼聽怎麼問 · 隨身帶着這三連問</div>
+
+  <p class="l-p">分不清對方在哪一層？不用猜，直接問。這三個問題分別卡住<b>成本、數據、底座</b>三個要害，答不上來的人自己會往下滑層。</p>
+
+  <div class="pt-grid">
+    <div class="pt-card">
+      <div class="pt-icon">💰</div>
+      <h4>「花了多少算力？」</h4>
+      <p>訓練是真金白銀燒出來的。L3 起步就要租顯卡，L4 要燒掉數千萬到上億。<b>説不出成本量級的「訓練」，多半沒發生過。</b></p>
+    </div>
+    <div class="pt-card">
+      <div class="pt-icon">📚</div>
+      <!-- 原来问的是「数据从哪来的」，可 L2 和 L3 都会答「公司文档、业务数据」，
+           这一问区分不开两层。真正有判别力的是量级和轮数。 -->
+      <h4>「多少條數據？跑了幾輪？」</h4>
+      <p>別問「數據從哪來」——掛知識庫和微調都會答「公司文檔、業務數據」，這一問聽不出差別。要問的是量級：<b>幾百份文檔丟進檢索庫是 L2，幾千上萬條標好的問答對、還得跑上幾輪才是 L3</b>。説得出條數和輪數的，才是真動了參數。</p>
+    </div>
+    <div class="pt-card">
+      <div class="pt-icon">🏗️</div>
+      <h4>「底座是什麼模型？」</h4>
+      <p>L1 到 L3 都站在別人的底座上，這毫不丟人，但值得説清楚。<b>含糊其辭説「核心技術不便透露」的，可以預設是 L1。</b></p>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    這三連問還有一套完整的進階版，專治發佈會和朋友圈裏的各種話術。想練手可以去<a href="learn.html#zero-q-jargon-translator.html" target="_top">AI 圈黑話翻譯器</a>玩一輪。最後説句公道話：<b>改提示詞毫不丟人</b>，它是四層裏性價比最高的一層，九成需求它就夠了。丟人的從來只有一件事：明明在 L1，非説自己在 L4。
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 這一頁想和你分享的</h3>
+    <ul>
+      <li><b>訓練 = 改模型參數</b>：寫提示詞、掛知識庫都沒動參數，嚴格説都算「用模型」</li>
+      <li><b>四層梯子</b>：改提示詞、掛知識庫、微調、從頭預訓練，每上一層，門檻指數級上升</li>
+      <li><b>聽到「訓了個模型」先問成本和數據</b>：答不上來的，自己會往下滑層</li>
+      <li><b>改提示詞毫不丟人</b>：九成需求它就夠了，丟人的是站在 L1 説自己在 L4</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 四层梯子：点击展开 ── */
+(function () {
+  var rungs = document.querySelectorAll('.ladder-rung');
+  rungs.forEach(function (rung) {
+    rung.querySelector('.rung-head').addEventListener('click', function () {
+      rung.classList.toggle('open');
+    });
+  });
+})();
+
+/* ── 对号入座小测 ── */
+(function () {
+  var LEVELS = [
+    { id: 0, label: 'L0 只是聊天' },
+    { id: 1, label: 'L1 改提示詞' },
+    { id: 2, label: 'L2 掛知識庫' },
+    { id: 3, label: 'L3 微調' },
+    { id: 4, label: 'L4 從頭預訓練' },
+  ];
+  /* 每题的正确层级（数组表示多个都算对） */
+  var ANSWERS = [[1, 2], [3], [0], [3, 4], [1]];
+  var answered = 0;
+  var hits = 0;
+  var items = document.querySelectorAll('.quiz-item');
+  var scoreBox = document.getElementById('quizScore');
+
+  items.forEach(function (item) {
+    var qi = parseInt(item.getAttribute('data-q'), 10);
+    var correct = ANSWERS[qi];
+    var optsBox = item.querySelector('.qz-opts');
+    var reveal = item.querySelector('.qz-reveal');
+    var done = false;
+
+    LEVELS.forEach(function (lv) {
+      var btn = document.createElement('button');
+      btn.className = 'qz-opt';
+      btn.type = 'button';
+      btn.textContent = lv.label;
+      btn.addEventListener('click', function () {
+        if (done) return;
+        done = true;
+        answered += 1;
+        var isHit = correct.indexOf(lv.id) !== -1;
+        if (isHit) hits += 1;
+
+        optsBox.querySelectorAll('.qz-opt').forEach(function (b, bi) {
+          b.disabled = true;
+          if (correct.indexOf(LEVELS[bi].id) !== -1) {
+            b.classList.add('hit');
+          } else if (b === btn) {
+            b.classList.add('miss');
+          } else {
+            b.classList.add('dim');
+          }
+        });
+        reveal.classList.add('show');
+
+        if (answered === items.length) {
+          var line;
+          if (hits === items.length) {
+            line = '全對！' + hits + ' / ' + items.length + '，下次飯局你就是那個讓全桌安靜的人。';
+          } else if (hits >= 3) {
+            line = '答對 ' + hits + ' / ' + items.length + '，已經能聽出大部分水分了，把三連問背熟就齊活。';
+          } else {
+            line = '答對 ' + hits + ' / ' + items.length + '，沒關係，把上面那把梯子再爬一遍，很快就練出耳朵了。';
+          }
+          scoreBox.textContent = line;
+          scoreBox.classList.add('show');
+        }
+      });
+      optsBox.appendChild(btn);
+    });
+  });
+})();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice-zero-more.js?v=20260827a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

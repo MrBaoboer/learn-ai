@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>輸出層：管住模型的嘴 | Token 降本增效</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<!-- SEO Start -->
+<meta name="description" content="輸出 Token 比輸入貴好幾倍。三招管住模型的嘴：明確的負向約束（No yapping）砍 30% 廢話、潤色場景用 Diff 別重寫整段、停止序列做物理截斷。省 Token 省時間還不用擔心模型亂講。">
+<meta name="keywords" content="輸出優化,負向約束,No yapping,Diff 輸出,停止序列,stop sequence,Token 節省">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/cost-12.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/cost-12.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/cost-12.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/cost-12.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/cost-12.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/cost-12.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/cost-12.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/cost-12.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="輸出層：管住模型的嘴">
+<meta property="og:description" content="負向約束、Diff 潤色、停止序列：輸出端的三招。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/cost-12.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/cost-12.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="輸出層：管住模型的嘴">
+<meta name="twitter:description" content="負向約束、Diff 潤色、停止序列：輸出端的三招。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.codebox{margin-top:12px;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px 18px;font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.codebox .g{color:#4ade80}
+.codebox .r{color:#f87171}
+.code-tag{display:inline-block;margin-top:14px;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:800}
+.code-tag.bad{background:var(--warn-soft);color:var(--warn)}
+.code-tag.good{background:var(--ct-soft);color:var(--ct-deep)}
+.l-cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+
+/* 停止序列演示 */
+.stp{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.stp-tabs{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:14px}
+.stp-btn{padding:9px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;color:var(--text);transition:all .18s;min-height:40px}
+.stp-btn.on{border-color:var(--ct);background:var(--ct-soft);color:var(--ct-deep)}
+.stp-out{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px 18px;font-size:13px;line-height:1.8;font-family:"SF Mono","Fira Code",Menlo,monospace;white-space:pre-wrap;min-height:140px}
+.stp-out .cut{color:#f87171;text-decoration:line-through;opacity:.55}
+.stp-out .stopmark{display:inline-block;background:var(--warn);color:#fff;border-radius:5px;padding:0 7px;font-size:11px;font-weight:800;margin:0 3px}
+.stp-note{margin-top:12px;font-size:14px;line-height:1.75;color:var(--text);background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px}
+.stp-note b{color:var(--ct-deep)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+@media (max-width:768px){.l-cols2{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"輸出層：管住模型的嘴","name":"輸出層：管住模型的嘴","url":"https://xueai.miyang.cn/slides/cost-12.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 四層實戰優化","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"輸出 Token 比輸入貴好幾倍。三招管住模型的嘴：明確的負向約束（No yapping）砍 30% 廢話、潤色場景用 Diff 別重寫整段、停止序列做物理截斷。省 Token 省時間還不用擔心模型亂講。","datePublished":"2026-08-10","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 降本增效 · 12 / 13</div>
+    <h1>輸出層：管住模型的嘴</h1>
+    <p class="subtitle">實戰四層的最後一層。輸出 Token 比輸入貴好幾倍（回看第 3 節報價表），而且直接決定接口返回速度。管住模型的嘴，有三類合適的操作：指令層、程式碼層、工程層。</p>
+    <div class="chips"><span class="chip">負向約束</span><span class="chip">Diff 輸出</span><span class="chip">停止序列</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>明確的負向約束砍掉 30% 廢話；潤色用 Diff 別重寫整段；停止序列做物理截斷</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">指令層 · 寫明確的負向約束</div>
+    <p class="desc">很多人知道要求「請簡潔回答」，但這是有問題的——<b>「簡潔」對模型來説太抽象了，它不知道你要多簡潔</b>。有效的寫法是把「別幹什麼」列清楚：</p>
+    <div class="l-cols2">
+      <div>
+        <span class="code-tag bad">✗ 模糊約束</span>
+        <div class="codebox">請簡潔回答。
+
+<span class="r">→「當然，這是您要的程式碼。它實現了
+一個簡單的功能……希望對您有幫助。」</span></div>
+      </div>
+      <div>
+        <span class="code-tag good">✓ 明確的負向約束</span>
+        <div class="codebox">不要寒暄、不要總結、不要客套，
+直接輸出結果。
+（英文：No yapping. No preamble,
+no postscript.）
+
+<span class="g">→ def function():
+      return True</span></div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:12px">實測下來，<b>Agentic 場景能砍掉 30% 的廢話</b>。説白了就是告訴它：別整那些有的沒的，直接上結果。</p>
+    <div class="fig-wrap">
+      <img src="images/cost/no-yapping.webp" alt="Be concise 與 No yapping 的輸出對比" loading="lazy">
+      <div class="fig-cap">「Be concise」是玄學，「No preamble, no postscript」是指令：程式碼生成任務平均減少 30% 廢話消耗。（圖：作者分享原稿）</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">程式碼層 · 潤色用 Diff，別重寫整段</div>
+    <p class="desc">這是文字潤色場景最大的成本坑：用戶説「將呢句改通順啲」，模型把 2,000 字的文章從頭輸出一遍。就算約束到只輸出那個段落，Token 也在嘩嘩地燒。</p>
+    <p class="desc" style="margin-top:10px">換個思路：<b>讓模型只輸出修改的部分</b>——用 Diff 格式標出「原文→改後」，或者直接返回正則表達式，程式拿到後再做替換。只動那兩三個詞，1 秒搞定：<b>成本差幾十倍，體驗還更好</b>——速度快，用戶還能直接看到改了哪裏，不用自己對比。</p>
+    <div class="codebox"><span class="r">- 我們的產品在市場上是很有競爭力的存在</span>
+<span class="g">+ 我們的產品很有市場競爭力</span>
+
+<span class="g">或返回替換指令：{"find": "在市場上是很有競爭力的存在", "replace": "很有市場競爭力"}</span></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">工程層 · 停止序列做物理截斷</div>
+    <p class="desc">在 Prompt 裏寫「請只輸出 3 項」，模型聽不聽是玄學——可能輸出 3 項，也可能 5 項再加一段總結。但<b>停止序列（stop sequence）是物理截斷，和模型「聽不聽話」無關</b>：API 檢測到指定字串就直接掐斷生成流，被掐掉的部分不計費、不進歷史上下文。</p>
+    <div class="stp" id="stp">
+      <div class="stp-tabs" id="stpTabs"></div>
+      <div class="stp-out" id="stpOut"></div>
+      <div class="stp-note" id="stpNote"></div>
+    </div>
+    <p class="desc" style="margin-top:12px">簡單，粗暴，但好用。<b>有效控制輸出，就是控制成本和用戶體驗。</b></p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>負向約束要具體：</b>「不要寒暄、不要總結、不要客套」比「請簡潔」有效得多，Agentic 場景砍 30% 廢話。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>潤色輸出 Diff 或替換指令，</b>別讓模型重寫整段：成本差幾十倍，用戶體驗反而更好。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>停止序列是物理開關：</b>列表掐「4.」、單行答案掐換行、JSON 掐「}」、防自問自答掐「用戶：」。</p></div>
+    </div>
+    <p class="src-note">
+      <b>內容來源：</b>整理自作者團隊內部分享《AI Token 降本增效策略分享》實戰篇「04｜輸出」。停止序列參數見各家 API 文檔（OpenAI 相容接口為 <code>stop</code> 字段，最多可設 4 個序列）。
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ── 停止序列演示 ── */
+var STP = [
+  {tab:'列表只要前 3 項', stop:'"4."',
+   keep:'原因分析：\n1. 供應鏈成本上升\n2. 競品降價擠壓\n3. 渠道庫存積壓\n',
+   cut:'4. 匯率波動影響\n5. 營銷投放不足\n綜上所述，建議從以下幾個方面入手……',
+   note:'把 <b>「4.」設成停止序列</b>：模型剛想寫第 4 項，API 直接把生成流掐了。後面的長篇總結一個字都不會生成，也不計費。'},
+  {tab:'只要第一個答案', stop:'"\\n"（換行符）',
+   keep:'巴黎',
+   cut:'\n\n補充説明：法國的首都是巴黎，它同時也是法國最大的城市，位於……',
+   note:'單行答案場景把<b>換行符設成停止序列</b>：拿到答案立刻停，適合分類、判斷、填空類後台任務。'},
+  {tab:'JSON 到結尾就停', stop:'"}"',
+   keep:'{"sentiment":"positive","score":0.92}',
+   cut:'\n\n以上就是分析結果，如有其他需要請告訴我！',
+   note:'生成 JSON 後模型經常愛補一句客套話。把 <b>「}」設成停止序列</b>（配合 Minified JSON 約束），到閉合括號物理封口。'},
+  {tab:'防止自問自答', stop:'"用戶：" / "Human:"',
+   keep:'客服回覆：你嘅訂單已經安排加急處理，預計聽日送到。',
+   cut:'\n用戶：咁如果聽日未到點算？\n客服回覆：如果聽日未送到，你可以……',
+   note:'補全式模型有時會替用戶「編」下一輪對話。把 <b>「用戶：」「Human:」設成停止序列</b>，模型一開始演戲就掐斷。'}
+];
+var stpCur = -1;
+function stpRender(){
+  var t=document.getElementById('stpTabs'); t.innerHTML='';
+  STP.forEach(function(s,i){
+    var b=document.createElement('button'); b.className='stp-btn'+(i===stpCur?' on':''); b.type='button';
+    b.textContent=s.tab; b.onclick=function(){stpPick(i);}; t.appendChild(b);
+  });
+}
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function stpPick(i){
+  stpCur=i; var s=STP[i];
+  document.getElementById('stpOut').innerHTML = esc(s.keep) + '<span class="stopmark">STOP ' + esc(s.stop) + '</span><span class="cut">' + esc(s.cut) + '</span>';
+  document.getElementById('stpNote').innerHTML = s.note + ' 劃綫部分不生成、不計費、不進上下文。';
+  stpRender();
+}
+stpRender();
+lessonOnView(document.getElementById('stp'), function(){ if(stpCur<0) stpPick(0); });
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Base 模型：Token 推 Token 的預測機器 | xueai.miyang.cn</title>
+<script src="../global-attn.js"></script>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* ── 核心论断 ── */
+.big-claim {
+  font-size: 26px; font-weight: 800; color: var(--text);
+  line-height: 1.5;
+}
+.big-claim .em { color: var(--accent); }
+.desc-text {
+  font-size: 16px; color: var(--sub); line-height: 1.8; margin-top: 14px;
+}
+.desc-text strong { color: var(--text); }
+
+.pill-row {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  margin-top: 18px;
+}
+.pill {
+  padding: 8px 16px; border-radius: 100px;
+  font-size: 14px; font-weight: 700;
+}
+.pill-blue { background: rgba(0,102,255,0.1); color: var(--accent); border: 1px solid rgba(0,102,255,0.2); }
+.pill-amber { background: rgba(217,119,6,0.1); color: var(--amber); border: 1px solid rgba(217,119,6,0.2); }
+.pill-green { background: rgba(22,163,74,0.1); color: var(--success); border: 1px solid rgba(22,163,74,0.2); }
+.arrow-sep { font-size: 20px; color: #ccc; }
+
+.info-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 16px 18px;
+  border: 1px solid var(--border);
+  margin-top: 14px;
+}
+.info-card .label { font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 6px; }
+.info-card .val { font-size: 14px; color: var(--text); line-height: 1.7; }
+
+/* ── Token 推演动画区 ── */
+.token-chain-area {
+  background: var(--card); border-radius: var(--radius); padding: 24px 26px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 20px;
+  box-shadow: var(--shadow-card);
+}
+.chain-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.tk {
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 16px; font-weight: 700; font-family: 'SF Mono', Menlo, monospace;
+  transition: all 0.4s ease;
+}
+.tk-generated {
+  background: rgba(22,163,74,0.08); color: var(--success);
+  border: 1px solid rgba(22,163,74,0.2);
+  opacity: 0; transform: translateY(6px);
+}
+.tk-generated.show {
+  opacity: 1; transform: translateY(0);
+}
+.tk-arrow {
+  font-size: 18px; color: #ccc;
+}
+.prob-bar-wrap {
+  background: rgba(0,0,0,0.03); border-radius: 10px; padding: 14px 16px;
+  display: none;
+}
+.prob-bar-wrap.show { display: block; }
+.prob-title { font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 10px; letter-spacing: 0.4px; }
+.prob-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 7px;
+  transition: opacity 0.3s ease;
+}
+.prob-word {
+  width: 60px; font-size: 13px; font-weight: 700; font-family: 'SF Mono', Menlo, monospace;
+  color: var(--text); flex-shrink: 0;
+}
+.prob-bar-track {
+  flex: 1; height: 10px; background: rgba(0,0,0,0.07); border-radius: 5px; overflow: hidden;
+}
+.prob-bar-fill {
+  height: 100%; border-radius: 5px; width: 0;
+  transition: width 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+  background: var(--accent);
+}
+.prob-bar-fill.top { background: var(--success); }
+.prob-pct {
+  width: 38px; font-size: 12px; color: var(--sub); text-align: right; flex-shrink: 0;
+}
+
+/* 上下文 token 逐个出现 */
+.tk-context {
+  background: rgba(0,102,255,0.08); color: var(--accent);
+  border: 1px solid rgba(0,102,255,0.2);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.tk-context.show { opacity: 1; transform: translateY(0); }
+.tk-arrow-ctx {
+  font-size: 18px; color: #ccc;
+  opacity: 0; transition: opacity 0.2s;
+}
+.tk-arrow-ctx.show { opacity: 1; }
+
+.conclusion-card {
+  background: rgba(0,102,255,0.04); border-radius: var(--radius-sm); padding: 16px 20px;
+  border: 1px solid rgba(0,102,255,0.12);
+  display: none;
+}
+.conclusion-card.show { display: block; }
+.conclusion-card p {
+  font-size: 15px; color: var(--text); line-height: 1.8;
+}
+.conclusion-card b { color: var(--accent); }
+
+.btn-replay {
+  background: var(--card); color: var(--text); border: 1px solid rgba(0,0,0,0.12);
+  padding: 12px 24px; border-radius: 12px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  display: none;
+  margin-top: 16px;
+}
+.btn-replay:hover { background: rgba(0,0,0,0.05); }
+
+@media (max-width: 768px) {
+  .big-claim { font-size: 21px; }
+  .tk { font-size: 14px; padding: 8px 11px; }
+  .token-chain-area { padding: 16px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="大模型的核心是什麼？Base 模型透過海量語料學習 Token 序列的統計規律，每次生成只做一件事：預測下一個最可能的 Token。理解這個機制是一切的起點。">
+<meta name="keywords" content="Base模型,大模型原理,Token預測,自迴歸語言模型,GPT預訓練">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/1-2-base.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/1-2-base.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/1-2-base.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/1-2-base.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/1-2-base.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/1-2-base.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/1-2-base.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/1-2-base.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="Base 模型：Token 推 Token 的預測機器">
+<meta property="og:description" content="大模型的核心是什麼？Base 模型透過海量語料學習 Token 序列的統計規律，每次生成只做一件事：預測下一個最可能的 Token。理解這個機制是一切的起點。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/1-2-base.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/1-2-base.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Base 模型：Token 推 Token 的預測機器">
+<meta name="twitter:description" content="大模型的核心是什麼？Base 模型透過海量語料學習 Token 序列的統計規律，每次生成只做一件事：預測下一個最可能的 Token。理解這個機制是一切的起點。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Base 模型：Token 推 Token 機器","name":"Base 模型：Token 推 Token 機器","url":"https://xueai.miyang.cn/slides/1-2-base.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 基礎原理","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"大模型的核心是什麼？Base 模型透過海量語料學習 Token 序列的統計規律，每次生成只做一件事：預測下一個最可能的 Token。理解這個機制是一切的起點。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">基礎原理</div>
+    <h1>Base 模型：Token 推 Token 機器</h1>
+    <p class="subtitle">訓練結束後得到的原始模型，它只做一件事。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>訓練結束後得到什麼？逐步生成 + 機率分佈即時更新</p></aside><!--seo:end-->  <div class="sec-label">訓練結束後</div>
+
+  <div class="big-claim">
+    得到的就是一個
+    <span class="em">無情的</span> Token 推 Token 機器
+  </div>
+
+  <div class="desc-text" id="leftDesc">
+    它只知道一件事：<br>
+    <strong>給定前面所有的 Token，預測下一個最可能的 Token。</strong>
+  </div>
+
+  <div class="pill-row reveal" id="pillRow">
+    <span class="pill pill-blue">前文 Token</span>
+    <span class="arrow-sep">→</span>
+    <span class="pill pill-amber">機率分佈</span>
+    <span class="arrow-sep">→</span>
+    <span class="pill pill-green">取樣</span>
+    <span class="arrow-sep">→</span>
+    <span class="pill pill-blue">新 Token</span>
+    <span class="arrow-sep">→</span>
+    <span class="pill pill-blue">迴圈</span>
+  </div>
+
+  <div class="info-card reveal" id="card1">
+    <div class="label">它不會</div>
+    <div class="val">
+      理解問題 · 思考答案 · 查閱知識<br>
+      <span style="color:var(--danger);font-weight:600;">它只看機率，只吐 Token。</span>
+    </div>
+  </div>
+
+  <div class="info-card reveal paywall-locked xa-peek" id="card2">
+    <div class="label">這就意味著</div>
+    <div class="val">
+      給它<strong>「紫霞捧著月光寶盒，輕聲問：哥哥」</strong>，<br>
+      它會接著推出機率最高的下一個詞，<br>
+      但它並不<em>知道</em>自己在寫什麼。
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked" id="rightTitle">Token 推演演示</div>
+
+  <div class="token-chain-area paywall-locked">
+    <!-- Token 序列（上下文 + 原位接续生成） -->
+    <div>
+      <div style="font-size:12px;font-weight:700;color:var(--sub);margin-bottom:10px;letter-spacing:0.3px;" id="chainLabel">上下文（前文 Token）</div>
+      <div class="chain-row" id="contextRow">
+        <span class="tk tk-context" id="ctx0">紫霞</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA0">→</span>
+        <span class="tk tk-context" id="ctx1">捧著</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA1">→</span>
+        <span class="tk tk-context" id="ctx2">月光</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA2">→</span>
+        <span class="tk tk-context" id="ctx3">寶盒</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA3">→</span>
+        <span class="tk tk-context" id="ctx4">，</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA4">→</span>
+        <span class="tk tk-context" id="ctx5">輕聲</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA5">→</span>
+        <span class="tk tk-context" id="ctx6">問</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA6">→</span>
+        <span class="tk tk-context" id="ctx7">：</span>
+        <span class="tk-arrow tk-arrow-ctx" id="ctxA7">→</span>
+        <span class="tk tk-context" id="ctx8">哥哥</span>
+        <!-- 生成的 Token 动态追加到这里 -->
+      </div>
+    </div>
+
+    <!-- 概率分布（实时更新） -->
+    <div class="prob-bar-wrap" id="probWrap">
+      <div class="prob-title" id="probTitle">模型正在預測下一個 Token…</div>
+      <div class="prob-row" id="pb0">
+        <div class="prob-word" id="pw0"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf0"></div></div>
+        <div class="prob-pct" id="pp0"></div>
+      </div>
+      <div class="prob-row" id="pb1">
+        <div class="prob-word" id="pw1"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf1"></div></div>
+        <div class="prob-pct" id="pp1"></div>
+      </div>
+      <div class="prob-row" id="pb2">
+        <div class="prob-word" id="pw2"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf2"></div></div>
+        <div class="prob-pct" id="pp2"></div>
+      </div>
+      <div class="prob-row" id="pb3">
+        <div class="prob-word" id="pw3"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf3"></div></div>
+        <div class="prob-pct" id="pp3"></div>
+      </div>
+      <div class="prob-row" id="pb4">
+        <div class="prob-word" id="pw4"></div>
+        <div class="prob-bar-track"><div class="prob-bar-fill" id="pf4"></div></div>
+        <div class="prob-pct" id="pp4"></div>
+      </div>
+    </div>
+
+    <!-- 结论 -->
+    <div class="conclusion-card" id="conclusionCard">
+      <p>
+        這就是 Base 模型的全部：<b>不斷把最高機率詞追加到序列末尾</b>，直到生成終止符。<br>
+        它沒有意圖、沒有記憶、沒有常識判斷，只有機率，只有 Token。<br>
+        <strong>但這個簡單的迴圈，是一切大模型能力的底層引擎。</strong>
+      </p>
+    </div>
+  </div>
+
+  <button class="btn-replay paywall-locked" id="replayBtn" onclick="replayAll()">↺ 重播</button>
+
+</article>
+
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+let genInterval = null;
+const CTX_COUNT = 9;
+
+// 每步生成前的機率表：每個 Token 對應一組候選詞 + 機率
+// index 0 = 即將生成第 0 個 Token（"，"）之前的分佈，以此類推
+const PROB_FRAMES = [
+  // 前文：…哥哥 → 下一個？
+  { title: '前文結尾「哥哥」→ 下一個 Token 機率', chosen: '，',
+    rows: [['，', 62, true], ['你', 18, false], ['啊', 9, false], ['呀', 5, false], ['…', 6, false]] },
+  // 前文：…哥哥， → 下一個？
+  { title: '前文結尾「，」→ 下一個 Token 機率', chosen: '你',
+    rows: [['你', 55, true], ['我', 20, false], ['說', 12, false], ['的', 7, false], ['可', 6, false]] },
+  // 前文：…你 → 下一個？
+  { title: '前文結尾「你」→ 下一個 Token 機率', chosen: '說',
+    rows: [['說', 48, true], ['知', 22, false], ['愛', 15, false], ['懂', 9, false], ['走', 6, false]] },
+  // 前文：…說 → 下一個？
+  { title: '前文結尾「說」→ 下一個 Token 機率', chosen: '你',
+    rows: [['你', 61, true], ['她', 18, false], ['過', 11, false], ['不', 7, false], ['的', 3, false]] },
+  // 前文：…你 → 下一個？
+  { title: '前文結尾「你」→ 下一個 Token 機率', chosen: '喜',
+    rows: [['喜', 52, true], ['愛', 25, false], ['不', 13, false], ['已', 6, false], ['的', 4, false]] },
+  // 前文：…喜 → 下一個？
+  { title: '前文結尾「喜」→ 下一個 Token 機率', chosen: '歡',
+    rows: [['歡', 88, true], ['愛', 8, false], ['好', 3, false], ['悅', 1, false]] },
+  // 前文：…歡 → 下一個？
+  { title: '前文結尾「歡」→ 下一個 Token 機率', chosen: '我',
+    rows: [['我', 71, true], ['你', 14, false], ['他', 9, false], ['她', 4, false], ['它', 2, false]] },
+];
+
+const GENERATED = PROB_FRAMES.map(f => f.chosen);
+
+function updateProbPanel(frameIdx) {
+  const frame = PROB_FRAMES[frameIdx];
+  document.getElementById('probTitle').textContent = frame.title;
+
+  // 先把所有條寬度清零（觸發動畫）
+  for (let i = 0; i < 5; i++) {
+    const fill = document.getElementById('pf' + i);
+    fill.style.transition = 'none';
+    fill.style.width = '0';
+  }
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    frame.rows.forEach((row, i) => {
+      const [word, pct, isTop] = row;
+      document.getElementById('pw' + i).textContent = word;
+      document.getElementById('pp' + i).textContent = pct + '%';
+      const fill = document.getElementById('pf' + i);
+      fill.className = 'prob-bar-fill' + (isTop ? ' top' : '');
+      fill.style.transition = 'width 0.55s cubic-bezier(0.25,1,0.5,1)';
+      fill.style.width = pct + '%';
+
+      const pbRow = document.getElementById('pb' + i);
+      pbRow.style.opacity = i < frame.rows.length ? '1' : '0';
+    });
+    // 隱藏多餘行
+    for (let i = frame.rows.length; i < 5; i++) {
+      document.getElementById('pb' + i).style.opacity = '0';
+    }
+  }));
+}
+
+function showCtxTokens(cb) {
+  let i = 0;
+  const timer = setInterval(() => {
+    document.getElementById('ctx' + i).classList.add('show');
+    if (i > 0) document.getElementById('ctxA' + (i - 1)).classList.add('show');
+    i++;
+    if (i >= CTX_COUNT) { clearInterval(timer); setTimeout(cb, 150); }
+  }, 110);
+}
+
+function showProbBars() {
+  const wrap = document.getElementById('probWrap');
+  wrap.classList.add('show');
+  // 初始顯示第 0 幀（即將生成第一個 Token 前）
+  [0,1,2,3,4].forEach(i => {
+    document.getElementById('pb' + i).classList.add('show');
+  });
+  updateProbPanel(0);
+}
+
+function runGeneration() {
+  document.getElementById('chainLabel').textContent = '上下文 + 即時生成';
+
+  const row = document.getElementById('contextRow');
+  let count = 0;
+
+  genInterval = setInterval(() => {
+    if (count >= GENERATED.length) {
+      clearInterval(genInterval);
+      setTimeout(() => {
+        document.getElementById('conclusionCard').classList.add('show');
+        document.getElementById('replayBtn').style.display = 'inline-block';
+      }, 700);
+      return;
+    }
+
+    // 追加箭頭 + 新 Token 到 contextRow 末尾（原位接續）
+    const arrow = document.createElement('span');
+    arrow.className = 'tk-arrow';
+    arrow.textContent = '→';
+    row.appendChild(arrow);
+
+    const tk = document.createElement('span');
+    tk.className = 'tk tk-generated';
+    tk.textContent = GENERATED[count];
+    row.appendChild(tk);
+    requestAnimationFrame(() => requestAnimationFrame(() => tk.classList.add('show')));
+
+    count++;
+
+    // 更新機率分佈到下一幀（如果還有）
+    if (count < PROB_FRAMES.length) {
+      setTimeout(() => updateProbPanel(count), 200);
+    } else {
+      // 生成完畢，機率面板收起
+      setTimeout(() => {
+        document.getElementById('probTitle').textContent = '生成完畢';
+        for (let i = 0; i < 5; i++) {
+          const fill = document.getElementById('pf' + i);
+          fill.style.transition = 'width 0.4s ease';
+          fill.style.width = '0';
+          document.getElementById('pb' + i).style.opacity = '0';
+        }
+      }, 200);
+    }
+  }, 800);
+}
+
+// 演示進入視野時自動播放：上下文 token 逐個出現 → 機率面板 → 逐 token 生成
+function playDemo() {
+  showCtxTokens(() => {
+    showProbBars();
+    setTimeout(runGeneration, 900);
+  });
+}
+
+lessonOnView(document.getElementById('contextRow'), playDemo);
+
+function replayAll() {
+  if (genInterval) clearInterval(genInterval);
+
+  document.getElementById('replayBtn').style.display = 'none';
+  document.getElementById('chainLabel').textContent = '上下文（前文 Token）';
+
+  // 重置上下文 token
+  for (let i = 0; i < CTX_COUNT; i++) {
+    document.getElementById('ctx' + i).classList.remove('show');
+    if (i < CTX_COUNT - 1) document.getElementById('ctxA' + i).classList.remove('show');
+  }
+  // 移除生成追加的 token（ctx8 之後的節點）
+  const row = document.getElementById('contextRow');
+  const ctx8 = document.getElementById('ctx8');
+  while (row.lastChild && row.lastChild !== ctx8) row.removeChild(row.lastChild);
+
+  // 重置機率面板
+  const wrap = document.getElementById('probWrap');
+  wrap.classList.remove('show');
+  for (let i = 0; i < 5; i++) {
+    document.getElementById('pb' + i).classList.remove('show');
+    document.getElementById('pb' + i).style.opacity = '';
+    const fill = document.getElementById('pf' + i);
+    fill.style.transition = 'none';
+    fill.style.width = '0';
+    document.getElementById('pw' + i).textContent = '';
+    document.getElementById('pp' + i).textContent = '';
+  }
+  document.getElementById('probTitle').textContent = '模型正在預測下一個 Token…';
+
+  document.getElementById('conclusionCard').classList.remove('show');
+
+  setTimeout(playDemo, 300);
+}
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice-principles.js?v=20260827a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI 到底是什麼？它其實在玩「接話茬」 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* ── 接话茬卡片 ── */
+.phrase-grid { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.phrase-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px;
+  cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow: var(--shadow-card);
+}
+.phrase-card:hover { border-color: rgba(0,102,255,0.35); transform: translateY(-1px); }
+.phrase-card.open { border-color: rgba(0,102,255,0.45); box-shadow: var(--shadow-pop); cursor: default; }
+.phrase-q {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 17px; font-weight: 800; color: var(--text);
+}
+.phrase-q .tap-hint {
+  margin-left: auto; font-size: 12px; font-weight: 700; color: var(--accent);
+  background: rgba(0,102,255,0.07); padding: 3px 12px; border-radius: 999px;
+  flex-shrink: 0; transition: opacity 0.3s;
+}
+.phrase-card.open .tap-hint { opacity: 0; }
+.phrase-answers { max-height: 0; overflow: hidden; transition: max-height 0.5s ease; }
+.phrase-card.open .phrase-answers { max-height: 300px; }
+.answer-list { display: flex; flex-direction: column; gap: 7px; padding-top: 16px; }
+.answer-row { display: flex; align-items: center; gap: 10px; }
+.answer-word {
+  width: 96px; font-size: 14px; font-weight: 700; color: var(--text);
+  text-align: right; flex-shrink: 0;
+}
+.answer-track { flex: 1; height: 22px; background: rgba(0,0,0,0.05); border-radius: 6px; overflow: hidden; }
+.answer-fill {
+  height: 100%; border-radius: 6px; width: 0;
+  transition: width 0.8s cubic-bezier(0.25,1,0.5,1);
+}
+.answer-pct { width: 44px; font-size: 13px; font-weight: 800; flex-shrink: 0; }
+.phrase-note { font-size: 13px; color: var(--sub); padding-top: 12px; line-height: 1.7; }
+.phrase-note b { color: var(--accent); }
+
+/* ── AI 续写演示 ── */
+.demo-box {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.demo-head {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.015);
+}
+.demo-head-label { font-size: 12px; font-weight: 800; color: var(--sub); margin-right: 4px; }
+.starter-chip {
+  border: 1.5px solid var(--border); background: var(--card);
+  border-radius: 999px; padding: 6px 16px;
+  font-size: 13px; font-weight: 700; color: var(--text);
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+}
+.starter-chip:hover { border-color: rgba(0,102,255,0.4); }
+.starter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.demo-body { padding: 22px 24px; min-height: 150px; }
+.demo-text { font-size: 17px; line-height: 2; color: var(--text); word-break: break-all; }
+.demo-text .starter-part { color: var(--sub); }
+.demo-text .ai-part { color: var(--text); font-weight: 600; }
+.demo-text .caret {
+  display: inline-block; width: 2px; height: 1.1em; background: var(--accent);
+  vertical-align: text-bottom; margin-left: 1px;
+  animation: blink 0.85s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* 决策点气泡 */
+.decision-pop {
+  margin: 14px 0 4px; padding: 14px 16px;
+  background: rgba(0,102,255,0.045); border: 1.5px dashed rgba(0,102,255,0.35);
+  border-radius: var(--radius-sm);
+  opacity: 0; transform: translateY(6px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.decision-pop.show { opacity: 1; transform: translateY(0); }
+.decision-title { font-size: 12px; font-weight: 800; color: var(--accent); margin-bottom: 9px; letter-spacing: 0.3px; }
+.cand-list { display: flex; flex-direction: column; gap: 6px; }
+.cand-row { display: flex; align-items: center; gap: 9px; }
+.cand-word {
+  min-width: 68px; text-align: center; padding: 2px 10px;   /* 容得下「五花肉」这样的多字词元 */
+  font-size: 14px; font-weight: 800; border-radius: 7px;
+  background: rgba(0,0,0,0.05); color: var(--sub);
+  transition: background 0.13s, color 0.13s, transform 0.13s;
+}
+.cand-row.picked .cand-word { background: var(--accent); color: #fff; transform: scale(1.06); }
+.cand-track { flex: 1; height: 14px; background: rgba(0,0,0,0.05); border-radius: 5px; overflow: hidden; }
+/* 0.14s 配合 pace() 最短一档（220ms × 0.65 ≈ 143ms）：再慢条形就永远停在半途 */
+.cand-fill { height: 100%; border-radius: 5px; background: rgba(0,0,0,0.16); width: 0; transition: width 0.14s cubic-bezier(0.25,1,0.5,1); }
+.cand-row.picked .cand-fill { background: var(--accent); }
+.cand-pct { width: 44px; font-size: 12px; font-weight: 800; color: var(--sub); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.cand-row.picked .cand-pct { color: var(--accent); }
+
+.demo-foot {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px 18px; border-top: 1px solid var(--border);
+}
+.btn-run {
+  background: var(--accent); color: #fff; border: none;
+  padding: 10px 26px; border-radius: 999px;
+  font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
+  transition: filter 0.15s, transform 0.15s;
+}
+.btn-run:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-run:disabled { background: #c4c8cf; cursor: not-allowed; }
+.demo-status { font-size: 12.5px; color: var(--sub); font-weight: 600; }
+
+/* ── 对话真相图 ── */
+.chat-truth { display: flex; flex-direction: column; gap: 10px; }
+.chat-row { display: flex; gap: 10px; align-items: flex-start; }
+.chat-row.user { flex-direction: row-reverse; }
+.chat-avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff;
+}
+.chat-row.user .chat-avatar { background: #64748b; }
+.chat-row.ai .chat-avatar { background: var(--accent); }
+.chat-bubble {
+  max-width: 78%; padding: 10px 16px; border-radius: 14px;
+  font-size: 14px; line-height: 1.7;
+}
+.chat-row.user .chat-bubble { background: rgba(100,116,139,0.1); border-top-right-radius: 4px; }
+.chat-row.ai .chat-bubble { background: rgba(0,102,255,0.07); border-top-left-radius: 4px; }
+.chat-annotation {
+  text-align: center; font-size: 12.5px; font-weight: 700; color: var(--amber);
+  padding: 6px 0;
+}
+
+/* ── 三连卡 ── */
+.why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.why-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+}
+.why-card .why-icon { font-size: 26px; margin-bottom: 8px; }
+.why-card h4 { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+.why-card p { font-size: 13px; color: var(--sub); line-height: 1.75; }
+.why-card p b { color: var(--text); }
+
+/* ── 数学翻车实验 ── */
+.math-box {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-card);
+  padding: 20px 24px;
+}
+.math-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.math-chip {
+  border: 1.5px solid var(--border); background: var(--card);
+  border-radius: 999px; padding: 8px 20px;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.math-chip:hover { border-color: rgba(0,102,255,0.4); }
+.math-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.math-stage { min-height: 170px; }
+.math-q { font-size: 17px; font-weight: 800; color: var(--text); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+.math-q .mq-hint { font-size: 12px; font-weight: 700; color: var(--sub); margin-left: 10px; }
+.math-cands { margin-bottom: 14px; }
+.math-cands .cand-word { min-width: 96px; font-variant-numeric: tabular-nums; }
+.math-verdict {
+  font-size: 13px; line-height: 1.85; color: var(--sub);
+  border-top: 1px dashed var(--border); padding-top: 12px;
+  opacity: 0; transition: opacity 0.4s;
+}
+.math-verdict.show { opacity: 1; }
+.math-verdict b { color: var(--text); }
+.math-verdict .mv-ok { color: var(--success); font-weight: 800; }
+.math-verdict .mv-bad { color: var(--danger); font-weight: 800; }
+
+/* ── takeaway ── */
+.takeaway-box {
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  border: 1.5px solid #bfdbfe; border-radius: var(--radius);
+  padding: 24px 28px; margin-top: 36px;
+}
+.takeaway-box h3 { font-size: 17px; font-weight: 800; color: #1e40af; margin-bottom: 10px; }
+.takeaway-box ul { list-style: none; padding: 0; margin: 0; }
+.takeaway-box li {
+  font-size: 14.5px; color: #1e3a5f; line-height: 1.8;
+  padding: 4px 0 4px 22px; position: relative;
+}
+.takeaway-box li::before {
+  content: ''; position: absolute; left: 0; top: 13px;
+  width: 8px; height: 8px; border-radius: 50%; background: #3b82f6;
+}
+
+@media (max-width: 768px) {
+  .why-grid { grid-template-columns: 1fr; }
+  .answer-word { width: 72px; font-size: 13px; }
+  .demo-text { font-size: 15px; }
+  .chat-bubble { max-width: 85%; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="AI 到底是什麼？ChatGPT、DeepSeek、豆包為什麼能聊天？零基礎白話解釋：AI 不是真的在思考，而是一臺讀過海量文字的「超級接話機器」。3 分鐘互動演示，建立你對 AI 的第一個正確直覺。">
+<meta name="keywords" content="AI是什麼,ChatGPT原理,人工智慧入門,大模型是什麼,AI零基礎,AI怎麼工作">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/zero-1.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/zero-1.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/zero-1.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/zero-1.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/zero-1.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/zero-1.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/zero-1.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/zero-1.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="AI 到底是什麼？它其實在玩「接話茬」">
+<meta property="og:description" content="AI 不是真的在思考，而是一臺讀過海量文字的「超級接話機器」。3 分鐘互動演示，建立你對 AI 的第一個正確直覺。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/zero-1.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/zero-1.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI 到底是什麼？它其實在玩「接話茬」">
+<meta name="twitter:description" content="AI 不是真的在思考，而是一臺讀過海量文字的「超級接話機器」。3 分鐘互動演示，建立你對 AI 的第一個正確直覺。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"它其實在玩「接話茬」","name":"它其實在玩「接話茬」","url":"https://xueai.miyang.cn/slides/zero-1.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · AI 是個什麼東西","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":true,"description":"AI 到底是什麼？ChatGPT、DeepSeek、豆包為什麼能聊天？零基礎白話解釋：AI 不是真的在思考，而是一臺讀過海量文字的「超級接話機器」。3 分鐘互動演示，建立你對 AI 的第一個正確直覺。","datePublished":"2026-08-07","dateModified":"2026-08-27"}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">零基礎入門 · AI 是個什麼東西</div>
+    <h1>AI 到底是什麼？它其實在玩「接話茬」</h1>
+    <p class="subtitle">別被「人工智慧」四個字嚇到。ChatGPT、DeepSeek、豆包……不管叫什麼名字，它們做的事情本質上只有一件：<b>猜你這句話的下一個詞是什麼</b>。這一課不需要任何基礎，玩兩個小遊戲你就明白了。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>不需要任何基礎：AI 每次只做一件事——猜下一個字。兩個小遊戲，建立你對 AI 的第一個正確直覺</p></aside><!--seo:end-->  <div class="sec-label">第一步 · 你天生就會玩這個遊戲</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">先別管 AI。下面三句話都沒說完，<b style="color:var(--text)">點開每一句</b>，看看你心裡冒出來的下半句，和大多數人是不是一樣的。</p>
+
+  <div class="phrase-grid" id="phraseGrid"></div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>發現了嗎？</b>有的話茬只有一種接法（「祝你生日……」），有的話茬有好幾種可能（「今天天氣真……」）。你的大腦在一瞬間完成了一次「選擇題」——<b>AI 每往下寫一步，做的就是這道題</b>。區別只是：它讀過的東西比你多幾百萬倍，所以猜得特別準。
+  </div>
+
+  <div class="sec-label">第二步 · 親眼看 AI 接一次話</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">選一個開頭，點「讓 AI 接下去」。下面這個框，是它<b style="color:var(--text)">每往下寫一步</b>時腦子裡的那道選擇題——放慢了給你看。留意兩件事：一是它<b style="color:var(--text)">不是一個字一個字</b>往外蹦的，「餛飩」「五花肉」「分鐘」都是一整塊寫出來的，這一塊叫<b style="color:var(--text)">詞元</b>（token）——有的詞元是一個字，有的是一個詞，後面的課會講它是怎麼切出來的；二是每個候選後面那根<b style="color:var(--text)">橫條</b>的長短——橫條越長，說明它越傾向於選這一塊；有的一步幾乎是被前文摁著寫出來的，有的一步它明顯在幾個選項之間搖擺。<b style="color:var(--text)">同一個開頭多跑幾遍</b>——在幾根橫條差不多長的地方，它並不總是挑最長的那根。</p>
+
+  <div class="demo-box">
+    <div class="demo-head">
+      <span class="demo-head-label">選個開頭：</span>
+      <button class="starter-chip active" data-i="0">今天加班到十點，</button>
+      <button class="starter-chip" data-i="1">尊敬的王老師：您好！</button>
+      <button class="starter-chip" data-i="2">紅燒肉的做法是：</button>
+    </div>
+    <div class="demo-body">
+      <div class="demo-text" id="demoText"><span class="starter-part">今天加班到十點，</span><span class="caret"></span></div>
+      <div class="decision-pop" id="decisionPop">
+        <div class="decision-title" id="decisionTitle">它正在選下一個詞元（token）……</div>
+        <div class="cand-list" id="candList"></div>
+      </div>
+    </div>
+    <div class="demo-foot">
+      <button class="btn-run" id="btnRun">讓 AI 接下去 →</button>
+      <span class="demo-status" id="demoStatus">它不查資料、不聯網，只憑「讀過的文字」一個詞元一個詞元往下接</span>
+    </div>
+  </div>
+
+  <div class="sec-label">第三步 · 那「聊天」是怎麼回事？</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">你可能會問：接話茬我懂了，可我和 AI 是在<b style="color:var(--text)">一問一答地聊天</b>啊？其實，聊天只是接話茬換了個包裝——</p>
+
+  <div class="l-card">
+    <div class="chat-truth">
+      <div class="chat-row user">
+        <div class="chat-avatar">你</div>
+        <div class="chat-bubble">幫我想個週末去哪玩</div>
+      </div>
+      <div class="chat-annotation">↓ 在 AI 眼裡，你的話是「上半句」，它負責接「下半句」 ↓</div>
+      <div class="chat-row ai">
+        <div class="chat-avatar">AI</div>
+        <div class="chat-bubble">可以考慮去郊區爬山，或者找個新開的展覽逛逛。你更喜歡安靜點的還是熱鬧點的？</div>
+      </div>
+      <div class="chat-row user">
+        <div class="chat-avatar">你</div>
+        <div class="chat-bubble">安靜點的</div>
+      </div>
+      <div class="chat-annotation">↓ 它把前面「所有的對話」拼成一個更長的上半句，繼續接 ↓</div>
+      <div class="chat-row ai">
+        <div class="chat-bubble" style="margin-left:44px;">那推薦植物園或者美術館，人少，走累了還有地方坐……</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    它接得足夠好、足夠自然，看起來就像「懂你」。這一課最想和你分享的一句話是：<b>它沒有想法，它有的是從人類幾億本書、幾十億網頁裡統計出來的「什麼話後面通常跟什麼話」</b>。
+  </div>
+
+  <div class="sec-label">這一個直覺，能解釋後面所有事</div>
+
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="why-icon">✍️</div>
+      <h4>為什麼它能寫文章？</h4>
+      <p>接話茬接得又長又順而已。你給個開頭（題目和要求），它一個詞一個詞往下接，接出一整篇。</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🤥</div>
+      <h4>為什麼它會胡說八道？</h4>
+      <p>它只管接得<b>像不像</b>，不管接得<b>對不對</b>。順口的錯話，比笨拙的真話更容易被它選中。這事很重要，<b>後面單獨用一課講</b>。</p>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🎲</div>
+      <h4>為什麼同一個問題，每次答得不一樣？</h4>
+      <p>上面的演示裡，它並不總是挑最長的那根橫條——在幾個候選可能性相近的地方，它按可能性大小擲一次骰子，於是走上不同的句子岔路。橫條長到 99% 的地方則怎麼擲都是同一個結果，所以差異只出現在它本來就搖擺的那幾處。</p>
+    </div>
+  </div>
+
+  <div class="sec-label">順便解開一個老謎團 · 它為什麼算不好數學？</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">你可能聽說過「AI 連小學數學都會算錯」。學完接話茬，這個謎你已經能自己解開了——<b style="color:var(--text)">它從來不是在「算」，它是在接話茬</b>。下面兩道題都發給它試試，看看它腦子裡的候選有什麼不同。</p>
+
+  <div class="math-box">
+    <div class="math-chips">
+      <button class="math-chip active" data-i="0">問它：1 + 1 =</button>
+      <button class="math-chip" data-i="1">問它：3847 × 2963 =</button>
+    </div>
+    <div class="math-stage">
+      <div class="math-q" id="mathQ"></div>
+      <div class="cand-list math-cands" id="mathCands"></div>
+      <div class="math-verdict" id="mathVerdict"></div>
+    </div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    看出區別了嗎？<b>「1+1=2」它在訓練資料裡見過幾百萬遍，等於背下來了；「3847×2963」這道原題它幾乎沒見過</b>，只能挑一個「長得像答案」的數——位數對了、開頭結尾也像樣，中間的數字卻是猜的。好訊息是：現在很多 AI 產品遇到數學題，會讓 AI 去呼叫真正的計算器或寫程式碼來算，「猜」就變成了「算」——這個聰明的分工，後面的課裡還會見到。
+  </div>
+
+  <div class="takeaway-box">
+    <h3>✅ 這一課想和你分享的</h3>
+    <ul>
+      <li><b>AI = 超級接話機器</b>：它做的事就是不停地猜「下一個詞是什麼」</li>
+      <li><b>聊天只是接話茬的包裝</b>：你的話是上半句，它負責接下半句</li>
+      <li><b>它沒有想法</b>：它有的是從海量文字裡統計出來的語言規律</li>
+      <li><b>它算數學靠「背」不靠「算」</b>：常見的題背得滾瓜爛熟，沒見過的題只能猜個像樣的數</li>
+      <li><b>接得像 ≠ 接得對</b>：這是用好 AI 最重要的一根弦，下一課展開</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 第一步：接话茬卡片 ── */
+const PHRASES = [
+  {
+    q: '「床前明月光，……」',
+    answers: [
+      { w: '疑是地上霜', pct: 99, color: '#0066ff' },
+      { w: '低頭思故鄉', pct: 1,  color: '#94a3b8' },
+    ],
+    note: '幾乎所有人都會接「疑是地上霜」——因為這句詩你<b>見過太多遍</b>了。AI 也一樣：見得越多，接得越準。',
+  },
+  {
+    q: '「祝你生日……」',
+    answers: [
+      { w: '快樂', pct: 98, color: '#0066ff' },
+      { w: '開心', pct: 2,  color: '#94a3b8' },
+    ],
+    note: '這句誰也沒專門背過，但你照樣<b>脫口而出</b>。可見不是只有名句才有唯一接法——日常話裡到處是這種<b>幾乎沒有懸念的搭配</b>。',
+  },
+  {
+    q: '「今天天氣真……」',
+    answers: [
+      { w: '好',   pct: 42, color: '#0066ff' },
+      { w: '熱',   pct: 26, color: '#7c3aed' },
+      { w: '冷',   pct: 18, color: '#16a34a' },
+      { w: '不錯', pct: 14, color: '#d97706' },
+    ],
+    note: '這種話茬<b>有好幾種合理的接法</b>。AI 會在這些候選裡挑一個——這就是為什麼同一個問題，它每次的回答可能不完全一樣。',
+  },
+];
+
+const grid = document.getElementById('phraseGrid');
+PHRASES.forEach((p, i) => {
+  const card = document.createElement('div');
+  card.className = 'phrase-card';
+  card.innerHTML = `
+    <div class="phrase-q">${p.q}<span class="tap-hint">點開看大家怎麼接</span></div>
+    <div class="phrase-answers">
+      <div class="answer-list">
+        ${p.answers.map(a => `
+          <div class="answer-row">
+            <div class="answer-word">${a.w}</div>
+            <div class="answer-track"><div class="answer-fill" style="background:${a.color}" data-w="${a.pct}"></div></div>
+            <div class="answer-pct" style="color:${a.color}">${a.pct}%</div>
+          </div>`).join('')}
+      </div>
+      <div class="phrase-note">${p.note}</div>
+    </div>`;
+  card.addEventListener('click', () => {
+    if (card.classList.contains('open')) return;
+    card.classList.add('open');
+    setTimeout(() => {
+      card.querySelectorAll('.answer-fill').forEach(el => el.style.width = el.dataset.w + '%');
+    }, 250);
+  });
+  grid.appendChild(card);
+});
+
+/* ── 第二步：AI 续写演示 ──
+   每一步一道选择题：['首选词元', 可能性, '备选', 可能性, '备选', 可能性]，
+   第七项可选，写 'alt' 表示「这一步允许掷骰子选到第二候选」（见 pickIndex）。
+   d.text（下方派生）是全程都取首选时的那句话，不另存一份，免得改了文案忘了改
+   steps、屏幕上出现「先写出这一块、再问它选什么」的错位。
+
+   为什么切到「词元」而不是逐个汉字：中文的 token 同样不等于一个字——
+   「馄饨」「五花肉」「分钟」在词表里都是整块的，后面《Token 与词表》一课里
+   中文词表也是这么建的。如果这里一格一个汉字，学员会先入为主地把
+   token 认成汉字，到那一课再纠正就晚了。切成词元还有个副作用是步数变少，
+   每一步就能停得更久、看得更清。
+
+   为什么每一步都展示、而不是只挑几个决策点：这一课要传达的正是「确定性
+   时高时低」——「馄饨」后面接标点几乎没有悬念，而「回家路上」后面接什么
+   相当发散。只挑几处看不出这种起伏，反而像是 AI 偶尔才需要选一次。
+   配合下面 pace()，有把握的一掠而过、犹豫的多停一会儿，节奏本身就在讲这件事。
+
+   概率是凭语感标的，不是真实模型输出，够传达「有的地方几乎没得选、有的地方
+   全靠掂量」即可。 */
+const DEMOS = [
+  {
+    starter: '今天加班到十點，',
+    steps: [
+      ['回家',38,'走在',19,'累得',15,'alt'],
+      ['路上',34,'的',22,'順路',13],
+      ['買了',41,'看到',16,'想吃',12],
+      ['一碗',47,'一份',18,'個',11,'alt'],
+      ['熱',43,'牛肉',19,'小',12,'alt'],
+      ['餛飩',31,'面',22,'湯',14],
+      ['，',64,'。',17,'湯',6],
+      ['吃完',44,'熱',15,'一口',11],
+      ['感覺',57,'整個',14,'渾身',9],
+      ['整個',46,'身上',16,'人',13],
+      ['人',94,'世界',2,'都',1],
+      ['都',73,'才',8,'像',5],
+      ['活',54,'暖',27,'舒服',9,'alt'],
+      ['過來',96,'了',2,'回來',1],
+      ['了',88,'。',5,'，',3],
+      ['。',92,'！',4,'，',2],
+    ],
+  },
+  {
+    starter: '尊敬的王老師：您好！',
+    steps: [
+      ['我是',58,'打擾',14,'非常',9],
+      ['三年',24,'您',13,'李明',11],
+      ['二班',52,'一班',17,'三班',12],
+      ['李明',36,'王強',16,'小明',11],
+      ['的',87,'同學',4,'家長',3],
+      ['家長',79,'媽媽',6,'爸爸',5],
+      ['，',77,'。',10,'：',5],
+      ['想',37,'有',22,'今天',13],
+      ['跟您',43,'向您',21,'請',14,'alt'],
+      ['請',56,'說',12,'反映',9],
+      ['個',68,'一天',15,'假',9],
+      ['假',96,'事',1,'空',1],
+      ['：',36,'。',26,'，',20],
+      ['李明',49,'孩子',25,'他',12],
+      ['明天',51,'因為',17,'身體',11],
+      ['需要',38,'要',21,'因',13,'alt'],
+      ['去',64,'到',13,'前往',8],
+      ['醫院',59,'學校',12,'複查',9],
+      ['複查',44,'檢查',23,'看病',10,'alt'],
+      ['，',76,'。',12,'；',4],
+      ['無法',43,'不能',31,'沒法',11,'alt'],
+      ['到校',48,'來',18,'按時',13],
+      ['上課',72,'參加',10,'到',7],
+      ['。',89,'，',5,'！',3],
+    ],
+  },
+  {
+    starter: '紅燒肉的做法是：',
+    steps: [
+      ['五花肉',51,'先',24,'準備',11,'alt'],
+      ['切塊',63,'洗淨',15,'切成',11],
+      ['焯水',49,'冷水',20,'後',11],
+      ['，',86,'後',7,'。',3],
+      ['冰糖',37,'鍋',26,'熱油',15],
+      ['小火',58,'下',12,'中火',11],
+      ['炒出',61,'熬',18,'慢慢',9],
+      ['糖色',93,'焦糖',3,'紅',2],
+      ['，',90,'。',5,'後',3],
+      ['下',39,'加',23,'放',19],
+      ['肉',74,'入',11,'五花肉',6],
+      ['翻炒',52,'煸炒',21,'炒',16,'alt'],
+      ['上色',56,'均勻',16,'至',11],
+      ['，',89,'。',6,'後',2],
+      ['加',54,'倒',17,'放',13],
+      ['生抽',46,'料酒',18,'醬油',14],
+      ['料酒',57,'老抽',21,'、',10],
+      ['燉',45,'燒',28,'煮',15,'alt'],
+      ['四十',33,'三十',25,'半',15,'alt'],
+      ['分鐘',97,'小時',2,'鍾',0.5],
+      ['。',87,'，',7,'即',3],
+    ],
+  },
+];
+DEMOS.forEach(d => { d.text = d.steps.map(s => s[0]).join(''); });
+
+let curDemo = 0;
+let running = false;
+let runSeq = 0;   // 逐字播放一輪要十幾秒，切換開頭得能中途打斷
+const demoText  = document.getElementById('demoText');
+const btnRun    = document.getElementById('btnRun');
+const statusEl  = document.getElementById('demoStatus');
+const pop       = document.getElementById('decisionPop');
+const candList  = document.getElementById('candList');
+
+function resetDemo() {
+  const d = DEMOS[curDemo];
+  demoText.innerHTML = `<span class="starter-part">${d.starter}</span><span class="ai-part" id="aiPart"></span><span class="caret"></span>`;
+  pop.classList.remove('show');
+  btnRun.disabled = false;
+  btnRun.textContent = '讓 AI 接下去 →';
+  statusEl.textContent = '它不查資料、不聯網，只憑「讀過的文字」一個詞元一個詞元往下接';
+}
+
+/* 三行候选只建一次、之后原地改内容：重建 innerHTML 会让 cand-fill 从 0 重新
+   长起来，逐步刷新时看到的就是一片乱闪；复用节点才能让条形从上一步的
+   高度平滑滑到这一步，像一排跳动的仪表。 */
+candList.innerHTML = [0, 1, 2].map(() => `
+  <div class="cand-row">
+    <div class="cand-word"></div>
+    <div class="cand-track"><div class="cand-fill"></div></div>
+    <div class="cand-pct"></div>
+  </div>`).join('');
+const candRows = [...candList.children].map(row => ({
+  row,
+  word: row.querySelector('.cand-word'),
+  fill: row.querySelector('.cand-fill'),
+  pct:  row.querySelector('.cand-pct'),
+}));
+
+function renderStep(step) {
+  candRows.forEach((r, k) => {
+    const w = step[k * 2], p = step[k * 2 + 1];
+    r.row.classList.remove('picked');
+    /* 英文词元自带前导空格（' soup'），拼进正文时要留着，摆进候选框时得去掉，
+       否则整块字都被空格顶偏。中文词元不受影响。 */
+    r.word.textContent = w.trim() || w;
+    r.pct.textContent = p + '%';
+    r.fill.style.width = p + '%';
+  });
+}
+
+document.querySelectorAll('.starter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    runSeq++;
+    running = false;
+    document.querySelectorAll('.starter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    curDemo = +chip.dataset.i;
+    resetDemo();
+  });
+});
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* 停顿时长跟着把握度走：几乎没得选的字一掠而过，拿不准的字多停一会儿。
+   全程匀速的话，「饨」和「回」看起来就一样难，而这一课要讲的恰恰是它们不一样。 */
+function pace(pct) {
+  if (pct >= 90) return 300;
+  if (pct >= 60) return 620;
+  return 950;
+}
+
+/* 掷骰子：真实模型默认不是永远取可能性最大的那个，而是在头部候选里按可能性
+   加权抽样（temperature / top-p），这正是「同一个问题每次答得不一样」的来源。
+   两个约束：
+   1. 只在标了 'alt' 的步骤上抽。别处换掉首选会让后文接不上——英文的 'gr' 换成
+      'I' 就成了「Iabbed」，韩语换掉体词还会连带把后面的助词变错。标 'alt' 的
+      位置都逐句念过，两条路都通顺。
+   2. 按两者可能性的比值抽（38 : 19 约等于 2 : 1），不是五五开。加权才是真实
+      行为，也才解释得通为什么 99% 的位置事实上从来不变、只有横条差不多长的地方才分叉。
+   window.DEMO_GREEDY 是给自动化测试用的确定性开关，相当于 temperature = 0。 */
+function pickIndex(step) {
+  if (step[6] !== 'alt' || window.DEMO_GREEDY) return 0;
+  return Math.random() * (step[1] + step[3]) < step[1] ? 0 : 1;
+}
+
+async function runDemo() {
+  if (running) return;
+  running = true;
+  const seq = ++runSeq;
+  btnRun.disabled = true;
+  btnRun.textContent = '正在接話……';
+  statusEl.textContent = '藍色虛線框裡就是它每寫一個詞元時面前的候選';
+
+  const d = DEMOS[curDemo];
+  const aiPart = document.getElementById('aiPart');
+  pop.classList.add('show');
+
+  let forks = 0;                         // 本輪有幾處沒選可能性最大的
+  for (const step of d.steps) {
+    const k = pickIndex(step);
+    const ms = pace(step[1]);
+    renderStep(step);
+    /* 65% 留给「摆出候选」这一段：犹豫的那步（950ms）有充分时间读完三个候选，
+       没悬念的（300ms）一掠而过，看个长条压满的印象就够。 */
+    await sleep(ms * 0.65);
+    if (seq !== runSeq) return;          // 期間切了開頭，這一輪作廢
+    candRows[k].row.classList.add('picked');
+    if (k > 0) {
+      forks++;
+      statusEl.textContent = '看到了嗎？這次它沒挑最長的那根——句子從這裡拐上了另一條路';
+    }
+    // 分叉時多停一會兒：否則那一瞬間閃過去，學員只會以為自己看錯了
+    await sleep(ms * (k > 0 ? 0.9 : 0.35));
+    if (seq !== runSeq) return;
+    aiPart.textContent += step[k * 2];
+  }
+
+  statusEl.textContent = forks
+    ? `寫完了。這一遍它有 ${forks} 處沒挑最大的，所以再跑一次多半又是另一句話`
+    : '寫完了。這一遍它每步都挑了最大的；再跑幾次，幾根橫條差不多長的地方就會分叉';
+  btnRun.disabled = false;
+  btnRun.textContent = '再看一遍 ↻';
+  running = false;
+}
+
+btnRun.addEventListener('click', () => {
+  if (btnRun.textContent.indexOf('再看') === 0) resetDemo();
+  setTimeout(runDemo, 50);
+});
+resetDemo();
+
+/* ── 数学翻车实验 ── */
+const MATH_CASES = [
+  {
+    q: '1 + 1 = ？',
+    hint: '這道題它在訓練資料裡見過幾百萬遍',
+    cands: [
+      { w: '2',  pct: 99 },
+      { w: '3',  pct: 0.6 },
+      { w: '11', pct: 0.4 },
+    ],
+    picked: '2',
+    verdict: '<span class="mv-ok">✓ 答對了。</span>但別誤會——不是它會算術，是<b>「1+1=」後面接「2」的次數壓倒性地多</b>，它等於把答案背下來了。就像你接「祝你生日……」一樣，想都不用想。',
+  },
+  {
+    q: '3847 × 2963 = ？',
+    hint: '這道原題它幾乎沒在任何地方見過',
+    cands: [
+      { w: '11,397,461', pct: 23 },
+      { w: '11,398,661', pct: 21 },
+      { w: '11,402,381', pct: 18 },
+    ],
+    picked: '11,397,461',
+    verdict: '<span class="mv-bad">✗ 答錯了。</span>正確答案是 <b>11,398,661</b>——就藏在它的候選裡，但它挑了個機率更高的錯誤答案。注意看：幾個候選<b>位數都對、開頭結尾都像樣</b>，因為它在憑「什麼數字長得像答案」來接話茬，而不是真的動筆算。沒有哪個候選的可能性是壓倒性的——<b>這種「心裡沒底」的題，它就容易翻車</b>。',
+  },
+];
+
+const mathQ = document.getElementById('mathQ');
+const mathCands = document.getElementById('mathCands');
+const mathVerdict = document.getElementById('mathVerdict');
+let mathTimers = [];
+
+function runMath(i) {
+  mathTimers.forEach(t => clearTimeout(t));
+  mathTimers = [];
+  const c = MATH_CASES[i];
+  mathQ.innerHTML = c.q + '<span class="mq-hint">' + c.hint + '</span>';
+  mathVerdict.classList.remove('show');
+  mathCands.innerHTML = c.cands.map(x => `
+    <div class="cand-row" data-w="${x.w}">
+      <div class="cand-word">${x.w}</div>
+      <div class="cand-track"><div class="cand-fill" data-p="${x.pct}"></div></div>
+      <div class="cand-pct">${x.pct}%</div>
+    </div>`).join('');
+  mathTimers.push(setTimeout(() => {
+    mathCands.querySelectorAll('.cand-fill').forEach(el => el.style.width = Math.max(el.dataset.p, 2) + '%');
+  }, 80));
+  mathTimers.push(setTimeout(() => {
+    const row = mathCands.querySelector(`.cand-row[data-w="${c.picked}"]`);
+    if (row) row.classList.add('picked');
+  }, 950));
+  mathTimers.push(setTimeout(() => {
+    mathVerdict.innerHTML = c.verdict;
+    mathVerdict.classList.add('show');
+  }, 1500));
+}
+
+document.querySelectorAll('.math-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.math-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    runMath(+chip.dataset.i);
+  });
+});
+runMath(0);
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><!--seo:end-->
+</body>
+</html>

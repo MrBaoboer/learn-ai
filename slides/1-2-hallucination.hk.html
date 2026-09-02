@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>大模型幻覺：為什麼 AI 會編造事實 | xueai.miyang.cn</title>
+<script>
+// 內嵌詞表與注意力權重（自包含，不依賴外部 global-attn.js）
+// 為幻覺演示提供合理的候選詞權重數據
+window.GLOBAL_ATTN = (function() {
+  const vocab = [
+    '黛玉','捧着','月光','寶盒','，','輕聲','問','：','哥哥','你','説',
+    '喜歡','我','可','從來','不肯','開口','花千骨','對','郭靖','急','道',
+    '靖','站着','幹嘛','真的','捨得','不','回來','就','一次','也','好','啊',
+    '！','女兒國','國王','望着','杏花','簪','嘆道','姐姐','看','這','花',
+    '開','了','又','謝','走','小龍女','轉頭','楊過','執念','東西','能',
+    '放下','嗎','？','還是','想','寶玉','御弟','紫霞','黃蓉','沈眉莊'
+  ];
+  const n = vocab.length;
+  // 構建稀疏權重矩陣（只為演示用，非真實注意力權重）
+  const matrix = [];
+  for (let i = 0; i < n; i++) {
+    const row = new Array(n).fill(0);
+    // 為每個詞生成一些"相關詞"權重
+    const related = {
+      '黛玉':   {'哥哥':0.18,'寶玉':0.22,'你':0.12,'可':0.08,'從來':0.07,'我':0.06},
+      '捧着':   {'月光':0.25,'寶盒':0.18,'花':0.10,'簪':0.09,'輕聲':0.08,'這':0.06},
+      '月光':   {'寶盒':0.35,'花':0.10,'又':0.07,'謝':0.06,'開':0.05,'走':0.04},
+      '寶盒':   {'，':0.30,'輕聲':0.15,'問':0.12,'哥哥':0.10,'你':0.08,'紫霞':0.05},
+      '輕聲':   {'問':0.28,'道':0.18,'説':0.12,'嘆道':0.10,'哥哥':0.08,'姐姐':0.05},
+      '問':     {'：':0.30,'你':0.18,'哥哥':0.12,'喜歡':0.10,'我':0.08,'從來':0.05},
+      '哥哥':   {'，':0.25,'你':0.20,'説':0.15,'喜歡':0.12,'我':0.08,'可':0.06},
+      '你':     {'説':0.20,'喜歡':0.15,'真的':0.12,'還是':0.10,'從來':0.09,'不':0.08},
+      '説':     {'你':0.20,'喜歡':0.14,'執念':0.12,'真的':0.10,'從來':0.08,'不':0.07},
+      '喜歡':   {'我':0.30,'你':0.18,'，':0.12,'可':0.10,'從來':0.08,'不肯':0.07},
+      '我':     {'，':0.25,'可':0.15,'你':0.12,'從來':0.10,'不肯':0.08,'開口':0.06},
+      '可':     {'你':0.25,'從來':0.20,'不肯':0.15,'開口':0.12,'喜歡':0.08,'我':0.05},
+      '從來':   {'不肯':0.30,'就':0.18,'不':0.15,'開口':0.12,'想':0.08,'放下':0.05},
+      '不肯':   {'開口':0.35,'説':0.18,'承認':0.12,'你':0.10,'從來':0.07,'喜歡':0.05},
+      '花千骨': {'對':0.20,'靖':0.15,'哥哥':0.12,'郭靖':0.10,'急':0.08,'你':0.07},
+      '郭靖':   {'急':0.18,'道':0.15,'你':0.14,'靖':0.12,'哥哥':0.10,'真的':0.08},
+      '靖':     {'哥哥':0.40,'你':0.15,'還':0.12,'站着':0.08,'急':0.07,'道':0.06},
+      '站着':   {'幹嘛':0.35,'你':0.15,'還':0.12,'不':0.10,'就':0.08,'，':0.07},
+      '幹嘛':   {'，':0.28,'你':0.18,'真的':0.14,'捨得':0.12,'不':0.10,'好':0.06},
+      '真的':   {'捨得':0.20,'能':0.15,'放下':0.12,'不':0.14,'你':0.10,'嗎':0.08},
+      '捨得':   {'不':0.30,'回來':0.20,'，':0.15,'就':0.10,'一次':0.08,'也':0.05},
+      '不':     {'回來':0.20,'肯':0.15,'想':0.14,'開口':0.10,'就':0.09,'放下':0.08},
+      '回來':   {'，':0.25,'就':0.18,'一次':0.15,'也':0.12,'好':0.10,'啊':0.06},
+      '就':     {'一次':0.22,'是':0.15,'不':0.14,'放下':0.12,'好':0.10,'算':0.07},
+      '一次':   {'也':0.30,'就':0.18,'好':0.15,'啊':0.10,'，':0.09,'吧':0.06},
+      '也':     {'好':0.28,'不':0.15,'放下':0.12,'啊':0.10,'吧':0.08,'就':0.07},
+      '好':     {'啊':0.30,'吧':0.18,'，':0.14,'！':0.12,'了':0.08,'不':0.06},
+      '女兒國': {'國王':0.40,'望着':0.15,'對':0.10,'姐姐':0.08,'御弟':0.06,'哥哥':0.05},
+      '國王':   {'望着':0.25,'嘆道':0.15,'道':0.12,'姐姐':0.10,'你':0.09,'對':0.07},
+      '望着':   {'杏花':0.25,'嘆道':0.18,'你':0.12,'簪':0.10,'花':0.09,'姐姐':0.07},
+      '杏花':   {'簪':0.38,'花':0.18,'開':0.12,'又':0.09,'嘆道':0.08,'謝':0.06},
+      '簪':     {'嘆道':0.25,'道':0.15,'姐姐':0.12,'你':0.10,'望着':0.09,'花':0.07},
+      '嘆道':   {'姐姐':0.20,'：':0.18,'你':0.14,'哥哥':0.12,'這':0.10,'花':0.08},
+      '姐姐':   {'你':0.22,'看':0.18,'這':0.15,'花':0.12,'，':0.10,'開':0.07},
+      '看':     {'，':0.25,'這':0.20,'花':0.16,'你':0.12,'開':0.10,'謝':0.07},
+      '這':     {'花':0.28,'東西':0.18,'，':0.14,'你':0.10,'開':0.09,'謝':0.06},
+      '花':     {'開':0.28,'又':0.18,'謝':0.16,'，':0.12,'了':0.10,'好':0.06},
+      '開':     {'了':0.30,'又':0.18,'，':0.14,'花':0.10,'謝':0.09,'始':0.06},
+      '了':     {'又':0.25,'，':0.18,'謝':0.14,'哥哥':0.12,'走':0.10,'好':0.07},
+      '又':     {'謝':0.35,'開':0.18,'走':0.14,'，':0.12,'來':0.08,'好':0.06},
+      '謝':     {'，':0.25,'哥哥':0.20,'走':0.15,'了':0.12,'好':0.08,'啊':0.06},
+      '走':     {'了':0.35,'，':0.18,'吧':0.12,'啊':0.10,'好':0.08,'不':0.06},
+      '小龍女': {'轉頭':0.20,'對':0.15,'楊過':0.14,'道':0.12,'輕聲':0.10,'你':0.07},
+      '轉頭':   {'對':0.28,'道':0.18,'楊過':0.14,'説':0.12,'輕聲':0.08,'急':0.06},
+      '楊過':   {'急':0.18,'道':0.15,'你':0.14,'説':0.12,'執念':0.10,'真的':0.08},
+      '執念':   {'這':0.22,'東西':0.20,'，':0.15,'真的':0.12,'能':0.10,'放下':0.08},
+      '東西':   {'，':0.28,'真的':0.18,'能':0.15,'放下':0.12,'嗎':0.10,'還是':0.07},
+      '能':     {'放下':0.30,'不':0.18,'嗎':0.15,'，':0.10,'説':0.08,'真的':0.07},
+      '放下':   {'嗎':0.25,'？':0.20,'，':0.15,'還是':0.12,'不':0.10,'啊':0.06},
+      '嗎':     {'？':0.40,'，':0.20,'還是':0.15,'啊':0.10,'不':0.08,'你':0.05},
+      '？':     {'還是':0.25,'你':0.18,'從來':0.15,'説':0.12,'不':0.10,'就':0.07},
+      '還是':   {'説':0.25,'你':0.20,'從來':0.15,'不':0.14,'就':0.10,'想':0.08},
+      '想':     {'放下':0.30,'不':0.18,'説':0.14,'，':0.12,'你':0.10,'開口':0.06},
+    };
+    const rel = related[vocab[i]];
+    if (rel) {
+      for (const [w, weight] of Object.entries(rel)) {
+        const j = vocab.indexOf(w);
+        if (j >= 0) row[j] = weight;
+      }
+    }
+    matrix.push(row);
+  }
+  return { vocab, matrix };
+})();
+</script>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root {
+  /* 兼容旧变量名：映射到设计系统 */
+  --bg-color: var(--bg);
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+
+.btn-primary {
+  background: var(--accent); color: white; border: none;
+  padding: 12px 28px; border-radius: 999px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+  box-shadow: 0 4px 14px rgba(0,102,255,0.25);
+}
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+/* 主体两栏（桌面）/ 单栏（移动） */
+.main-area {
+  display: grid; grid-template-columns: 360px 1fr; gap: 20px;
+  align-items: start;
+}
+
+/* Left panel（案例选择） */
+.left-panel {
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+.section-title {
+  font-size: 12px; font-weight: 700; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+
+.case-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 16px;
+  border: 2px solid var(--border);
+  cursor: pointer; transition: all 0.2s;
+}
+.case-card:hover { border-color: rgba(0,102,255,0.2); }
+.case-card.active { border-color: var(--accent); background: rgba(0,102,255,0.03); }
+.case-label {
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  margin-bottom: 4px;
+}
+.case-prompt {
+  font-size: 16px; font-weight: 700; color: var(--text-main);
+  line-height: 1.5;
+}
+.case-desc {
+  font-size: 13px; color: var(--text-sub); margin-top: 4px; line-height: 1.5;
+}
+
+.explain-box {
+  font-size: 13px; color: var(--text-sub); line-height: 1.8; padding: 0 2px;
+}
+.explain-box b { color: var(--text-main); }
+.explain-box .red { color: var(--danger); font-weight: 600; }
+
+/* Right panel（生成演示） */
+.right-panel {
+  display: flex; flex-direction: column;
+  min-width: 0;
+}
+
+.gen-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px; flex-shrink: 0;
+}
+.gen-header h3 { font-size: 16px; font-weight: 700; color: var(--text-main); }
+
+.speed-group {
+  display: flex; gap: 4px; align-items: center;
+}
+.speed-btn {
+  padding: 4px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: white; color: var(--text-main);
+  transition: all 0.15s;
+}
+.speed-btn.active {
+  background: var(--text-main); color: white; border-color: var(--text-main);
+}
+
+/* Output area（自然文档流） */
+.gen-output-area {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+.gen-sentence-box {
+  background: var(--card); border-radius: var(--radius); padding: 18px 22px;
+  border: 1px solid var(--border);
+  line-height: 2.2;
+}
+
+.gen-bottom {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+.gen-token {
+  display: inline; font-size: 20px; font-weight: 500;
+  color: var(--text-main); transition: all 0.3s;
+}
+.gen-token.prompt { color: var(--text-sub); }
+.gen-token.new { color: var(--accent); font-weight: 700; animation: tokenPop 0.4s ease; }
+.gen-token.hallucination {
+  color: var(--danger); font-weight: 700;
+  background: rgba(229,62,62,0.08);
+  padding: 1px 4px; border-radius: 4px;
+  text-decoration: underline wavy var(--danger);
+  text-underline-offset: 4px;
+}
+.gen-token.cursor-blink::after {
+  content: '▊'; color: var(--accent);
+  animation: blink 0.8s step-end infinite;
+}
+@keyframes tokenPop {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; } 50% { opacity: 0; }
+}
+
+/* Step detail */
+.step-panel {
+  background: var(--card); border-radius: var(--radius); padding: 14px 18px;
+  border: 1px solid var(--border);
+}
+.step-panel.hidden { display: none; }
+.step-header {
+  font-size: 14px; color: var(--text-sub); margin-bottom: 8px;
+}
+.step-header b { color: var(--accent); }
+.step-header .red { color: var(--danger); }
+
+.cand-list { display: flex; flex-direction: column; gap: 3px; }
+.cand-row {
+  display: flex; align-items: center; gap: 8px; height: 22px;
+}
+.cand-word {
+  font-size: 14px; font-weight: 700; color: var(--text-main);
+  min-width: 56px; text-align: right;
+}
+.cand-bar-bg {
+  flex: 1; height: 10px; background: rgba(0,0,0,0.04);
+  border-radius: 5px; overflow: hidden;
+}
+.cand-bar { height: 100%; border-radius: 5px; transition: width 0.4s; }
+.cand-pct {
+  font-size: 13px; color: var(--text-sub); min-width: 46px;
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.cand-row.picked .cand-word { color: var(--accent); }
+.cand-row.picked .cand-bar { background: var(--accent) !important; }
+.cand-row.hallucinated .cand-word { color: var(--danger); }
+.cand-row.hallucinated .cand-bar { background: var(--danger) !important; }
+
+/* Fact check */
+.fact-check {
+  padding: 14px 18px; border-radius: 12px;
+  font-size: 14px; line-height: 1.7;
+  background: rgba(229,62,62,0.05);
+  border: 1px solid rgba(229,62,62,0.15);
+  color: #7c2d12;
+}
+.fact-check.hidden { display: none; }
+#rootCause.hidden { display: none !important; }
+.fact-check-title {
+  font-weight: 700; color: var(--danger);
+  margin-bottom: 4px; font-size: 14px;
+}
+.fact-check b { color: var(--danger); }
+
+/* Chat mode（聊天模拟窗口，保留内部滚动） */
+.chat-container {
+  display: flex; flex-direction: column; gap: 16px;
+  max-height: 480px; overflow-y: auto; padding: 4px 0;
+}
+
+.chat-round {
+  display: flex; flex-direction: column; gap: 10px;
+  opacity: 0; transform: translateY(10px);
+  animation: chatIn 0.35s ease forwards;
+}
+@keyframes chatIn { to { opacity: 1; transform: translateY(0); } }
+
+.chat-row { display: flex; align-items: flex-start; gap: 10px; }
+.chat-row.user { flex-direction: row-reverse; }
+
+.chat-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0; font-weight: 700;
+}
+.chat-row.user .chat-avatar { background: var(--accent); color: white; }
+.chat-row.ai .chat-avatar { background: #f3f0ea; color: var(--text-sub); }
+
+.chat-bubble {
+  max-width: 74%; padding: 10px 14px;
+  border-radius: 14px; font-size: 15px; line-height: 1.7;
+}
+.chat-row.user .chat-bubble {
+  background: var(--accent); color: white; border-bottom-right-radius: 4px;
+}
+.chat-row.ai .chat-bubble {
+  background: var(--card); color: var(--text-main); border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.chat-bubble .h-word {
+  color: var(--danger); font-weight: 700;
+  background: rgba(229,62,62,0.10); padding: 0 3px; border-radius: 3px;
+  text-decoration: underline wavy var(--danger); text-underline-offset: 3px;
+}
+
+.chat-annotation {
+  margin-left: 42px; margin-right: 42px;
+  padding: 8px 12px; border-radius: 8px;
+  font-size: 12px; line-height: 1.6;
+  background: rgba(229,62,62,0.05); border: 1px solid rgba(229,62,62,0.12);
+  color: #7c2d12;
+}
+.chat-annotation b { color: var(--danger); }
+
+/* 根因区块：桌面三栏，移动单栏 */
+.root-cause-cols { display: flex; gap: 8px; }
+
+/* 顶部工具条 */
+.demo-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .main-area { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .root-cause-cols { flex-direction: column; }
+  .gen-token { font-size: 17px; }
+  .chat-bubble { max-width: 85%; }
+  .chat-annotation { margin-left: 0; margin-right: 0; }
+  .btn-primary { width: 100%; }
+  .speed-btn { padding: 8px 14px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="大模型幻覺（Hallucination）是什麼、為什麼產生？從 Token 預測的統計本質出發，解析幻覺的根本成因，以及四種緩解方案：Prompt 約束、RAG、Temperature 調節、人工評測。">
+<meta name="keywords" content="大模型幻覺,Hallucination,AI胡説,幻覺緩解,RAG,Prompt約束">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/1-2-hallucination.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/1-2-hallucination.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/1-2-hallucination.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/1-2-hallucination.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/1-2-hallucination.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/1-2-hallucination.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/1-2-hallucination.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/1-2-hallucination.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="大模型幻覺：為什麼 AI 會編造事實">
+<meta property="og:description" content="大模型幻覺（Hallucination）是什麼、為什麼產生？從 Token 預測的統計本質出發，解析幻覺的根本成因，以及四種緩解方案：Prompt 約束、RAG、Temperature 調節、人工評測。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/1-2-hallucination.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/1-2-hallucination.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="大模型幻覺：為什麼 AI 會編造事實">
+<meta name="twitter:description" content="大模型幻覺（Hallucination）是什麼、為什麼產生？從 Token 預測的統計本質出發，解析幻覺的根本成因，以及四種緩解方案：Prompt 約束、RAG、Temperature 調節、人工評測。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"大模型幻覺演示","name":"大模型幻覺演示","url":"https://xueai.miyang.cn/slides/1-2-hallucination.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 幻覺與四種應對","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"大模型幻覺（Hallucination）是什麼、為什麼產生？從 Token 預測的統計本質出發，解析幻覺的根本成因，以及四種緩解方案：Prompt 約束、RAG、Temperature 調節、人工評測。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">幻覺與應對</div>
+    <h1>大模型幻覺 (Hallucination)</h1>
+    <p class="subtitle">模型不知道事實，只是在做概率採樣。看它如何自信地編造：選擇一個案例，點擊「開始生成」，觀察幻覺如何在逐詞生成中產生。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>三類典型幻覺：事實錯誤 / 自信編造 / 知識截止</p></aside><!--seo:end-->  <div class="main-area paywall-locked xa-peek">
+    <div class="left-panel">
+      <div>
+        <div class="section-title">選擇一個 Prompt</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="case-card active" onclick="selectCase(0)">
+            <div class="case-label">CASE 1 · 張冠李戴</div>
+            <div class="case-prompt">黛玉捧着月光寶盒，輕聲問：</div>
+            <div class="case-desc">月光寶盒是紫霞的，模型只看共現權重，不知道誰擁有什麼。</div>
+          </div>
+          <div class="case-card" onclick="selectCase(1)">
+            <div class="case-label">CASE 2 · 穿越混搭</div>
+            <div class="case-prompt">花千骨對郭靖急道：靖哥哥，</div>
+            <div class="case-desc">花千骨和郭靖來自不同作品，模型會流暢地續寫跨作品對話。</div>
+          </div>
+          <div class="case-card" onclick="selectCase(2)">
+            <div class="case-label">CASE 3 · 無中生有</div>
+            <div class="case-prompt">女兒國國王望着杏花簪嘆道：</div>
+            <div class="case-desc">杏花簪是沈眉莊的道具，模型會錯誤地安排給女兒國國王。</div>
+          </div>
+          <div class="case-card" onclick="selectCase(3)">
+            <div class="case-label">CASE 4 · 人設崩塌</div>
+            <div class="case-prompt">小龍女轉頭對楊過急道：</div>
+            <div class="case-desc">小龍女清冷淡然，不會「急道」；但模型不懂人設，只看詞頻。</div>
+          </div>
+          <div class="case-card" onclick="selectCase(4)">
+            <div class="case-label">CASE 5 · 程式碼幻覺 API</div>
+            <div class="case-prompt">用 pandas 對 DataFrame 按多列排序並保持穩定：</div>
+            <div class="case-desc">模型會寫出不存在的參數組合：程式碼像真的，但 API 根本不是這麼用的。</div>
+          </div>
+          <div class="case-card" onclick="selectCase(5)">
+            <div class="case-label">CASE 6 · 日常對話幻覺</div>
+            <div class="case-prompt">晚上好，吃了嗎</div>
+            <div class="case-desc">AI 沒有嘴，但會説「吃了」，還能編出「番茄雞蛋麪」。概率續寫讓它扮演了一個不存在的角色。</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="right-panel">
+      <div class="demo-toolbar">
+        <button class="btn-primary" id="genBtn" onclick="startGeneration()">開始生成</button>
+      </div>
+      <div class="gen-header">
+        <h3>逐步生成過程</h3>
+        <div class="speed-group">
+          <span class="speed-btn" data-speed="800" onclick="setSpeed(this)">慢</span>
+          <span class="speed-btn active" data-speed="400" onclick="setSpeed(this)">中</span>
+          <span class="speed-btn" data-speed="150" onclick="setSpeed(this)">快</span>
+        </div>
+      </div>
+
+      <div class="gen-output-area">
+        <div class="gen-sentence-box" id="genSentence">
+          <span style="color:var(--text-sub);font-size:14px;">← 選擇 Prompt，點擊「開始生成」</span>
+        </div>
+
+        <div class="gen-bottom" id="genBottom">
+          <div class="step-panel hidden" id="stepPanel">
+            <div class="step-header" id="stepHeader"></div>
+            <div class="cand-list" id="candList"></div>
+          </div>
+
+          <div class="fact-check hidden" id="factCheck">
+            <div class="fact-check-title">⚠ 幻覺檢測</div>
+            <div id="factCheckMsg"></div>
+          </div>
+
+          <!-- 根因：两本书的世界，生成完成后出现 -->
+          <div id="rootCause" class="hidden" style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:2px;">根本原因：兩本書的世界</div>
+            <div class="root-cause-cols">
+              <div style="flex:1;background:rgba(91,79,207,0.06);border:1px solid rgba(91,79,207,0.18);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:14px;font-weight:800;color:#5b4fcf;margin-bottom:6px;">📚 模型參數（長期記憶）</div>
+                <div style="font-size:13px;color:var(--text-sub);line-height:1.65;">訓練時寫入，推理時<b>只讀</b>。有知識截止日期，知識以壓縮形式儲存，不精確，無法更新。<br><b style="color:var(--text-main)">類比：寫完就封存的百科全書</b></div>
+              </div>
+              <div style="flex:1;background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.18);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:14px;font-weight:800;color:#16a34a;margin-bottom:6px;">💬 上下文窗口（工作記憶）</div>
+                <div style="font-size:13px;color:var(--text-sub);line-height:1.65;">對話時動態注入，<b>精確可信</b>。包含系統提示詞、文件、本輪對話歷史。<br><b style="color:var(--text-main)">類比：放在桌上的參考資料</b></div>
+              </div>
+              <div style="flex:1;background:rgba(229,62,62,0.05);border:1px solid rgba(229,62,62,0.15);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:13px;font-weight:700;color:var(--danger);line-height:1.65;">⚠ 模型沒有「不知道」的概念，它只會續寫。參數中沒有答案時，會生成「聽起來應該是這樣」的內容，<b>置信度不因資訊不準確而下降</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script>
+var _ga = window.GLOBAL_ATTN;
+var vocab = _ga.vocab;
+var matrix = _ga.matrix;
+var n = vocab.length;
+var vocabMap = {};
+vocab.forEach(function(w, i) { vocabMap[w] = i; });
+
+var CASES = [
+  {
+    prompt: ['黛玉', '捧着', '月光', '寶盒', '，', '輕聲', '問', '：'],
+    script: [
+      { word: '哥哥',   h: true,  note: '黛玉稱寶玉為「寶玉哥哥」，不會泛稱「哥哥」，模型混用了紫霞的稱謂習慣' },
+      { word: '，' },
+      { word: '你' },
+      { word: '説' },
+      { word: '你' },
+      { word: '喜歡',   h: true,  note: '「你説你喜歡我」是紫霞的台詞，被嫁接給了黛玉' },
+      { word: '我' },
+      { word: '，' },
+      { word: '可' },
+      { word: '你' },
+      { word: '從來' },
+      { word: '不肯' },
+      { word: '開口' },
+    ],
+    factMsg: '黛玉（《紅樓夢》）和月光寶盒（《大話西遊》）來自完全不同的作品。模型看到「捧着·月光·寶盒·輕聲·問」這些詞的高共現權重，就流暢地續寫了紫霞的台詞：<b>概率上合理，事實上荒謬</b>。這就是張冠李戴型幻覺。'
+  },
+  {
+    prompt: ['花千骨', '對', '郭靖', '急', '道', '：', '靖', '哥哥', '，'],
+    script: [
+      { word: '你' },
+      { word: '還' },
+      { word: '站着',   h: true,  note: '「你還站着幹嘛」是黃蓉對郭靖的台詞，被移植給了花千骨' },
+      { word: '幹嘛',   h: true,  note: '花千骨是仙俠角色，不會説「幹嘛」這種口語' },
+      { word: '，' },
+      { word: '你' },
+      { word: '真的' },
+      { word: '捨得',   h: true,  note: '「捨得不回來」是黃蓉的語氣，花千骨與郭靖沒有任何交集' },
+      { word: '不' },
+      { word: '回來' },
+      { word: '，' },
+      { word: '就' },
+      { word: '一次' },
+      { word: '也' },
+      { word: '好' },
+      { word: '啊' },
+      { word: '！' },
+    ],
+    factMsg: '花千骨是仙俠劇角色，郭靖是武俠小説角色，二者不可能有交集。模型因為「急道·靖·哥哥」的詞頻模式，把<b>黃蓉對郭靖説的話</b>原樣移植給了花千骨。這是<b>角色穿越型幻覺</b>。'
+  },
+  {
+    prompt: ['女兒國', '國王', '望着', '杏花', '簪', '嘆道', '：'],
+    script: [
+      { word: '姐姐',   h: true,  note: '女兒國國王不會稱人「姐姐」，這是沈眉莊嘆杏花簪時的上下文' },
+      { word: '你' },
+      { word: '看' },
+      { word: '，' },
+      { word: '這' },
+      { word: '花' },
+      { word: '開',     h: false },
+      { word: '了' },
+      { word: '又' },
+      { word: '謝',     h: true,  note: '「花開了又謝」是沈眉莊的原話，被安排給了女兒國國王' },
+      { word: '，' },
+      { word: '哥哥',   h: true,  note: '女兒國國王稱「御弟哥哥」，不會只説「哥哥」，模型張冠李戴了稱謂' },
+      { word: '走' },
+      { word: '了' },
+    ],
+    factMsg: '杏花簪是《甄嬛傳》中沈眉莊的情節道具。模型看到「望着·杏花·簪·嘆道」就自動續寫了沈眉莊的台詞：<b>道具歸屬和角色台詞全部錯誤</b>。這是事實編造型幻覺。'
+  },
+  {
+    prompt: ['小龍女', '轉頭', '對', '楊過', '急', '道', '：'],
+    script: [
+      { word: '你' },
+      { word: '説' },
+      { word: '執念' },
+      { word: '這' },
+      { word: '東西' },
+      { word: '，' },
+      { word: '真的' },
+      { word: '能' },
+      { word: '放下' },
+      { word: '嗎' },
+      { word: '？' },
+      { word: '還是' },
+      { word: '説' },
+      { word: '，' },
+      { word: '你' },
+      { word: '從來' },
+      { word: '就' },
+      { word: '不' },
+      { word: '想' },
+      { word: '放下' },
+      { word: '？' },
+    ],
+    factMsg: '這個 case 比較特殊：小龍女的 prompt 和續寫內容<b>完全來自同一語料</b>，所以生成結果恰好是正確的。這説明<b>幻覺不是必然發生的</b>：當 prompt 與訓練數據完全對應時，模型輸出是準確的。問題出在<b>混搭不同來源</b>時。'
+  },
+  {
+    prompt: ['df', '.sort_values', '(', 'by', '=', '['],
+    script: [
+      { word: "'A'" },
+      { word: ',' },
+      { word: "'B'" },
+      { word: ']' },
+      { word: ',' },
+      { word: '\n        ' },
+      { word: 'stable',     h: true,  note: 'pandas sort_values 沒有 stable= 參數，這是 numpy.sort 的參數，模型把兩個 API 混用了' },
+      { word: '=', h: true },
+      { word: 'True',       h: true,  note: '這行程式碼會拋出 TypeError: sort_values() got an unexpected keyword argument \'stable\'' },
+      { word: ',' },
+      { word: '\n        ' },
+      { word: 'ignore_index', h: true, note: 'ignore_index 是 pandas 1.0+ 才有的參數，且與排序穩定性無關，模型把不同版本的參數混在一起用' },
+      { word: '=', h: true },
+      { word: 'True',       h: true },
+      { word: ')' },
+    ],
+    factMsg: '<b>程式碼幻覺</b>：模型對 pandas API 只有大致印象，但把 numpy.sort 的 <code>stable=</code> 參數錯誤地用在了 sort_values 上，並混入了不相關的 <code>ignore_index</code>。<b>正確寫法：</b><code>df.sort_values(by=[\'A\',\'B\'], kind=\'mergesort\')</code>。程式碼幻覺危險在於：語法沒報錯，邏輯卻是錯的，測試數據小時看不出來。',
+    // 程式碼幻覺專屬靜態候選詞（不依賴 global-attn 詞表）
+    customCands: [
+      { step: 6,  word: 'stable',       alts: [{ w:'kind', p:0.52 }, { w:'ascending', p:0.21 }, { w:'na_position', p:0.12 }, { w:'stable', p:0.08, isH:true }, { w:'inplace', p:0.05 }, { w:'key', p:0.02 }] },
+      { step: 7,  word: '=',            alts: null },
+      { step: 8,  word: 'True',         alts: [{ w:'True', p:0.88, isH:true }, { w:'False', p:0.09 }, { w:'None', p:0.03 }] },
+      { step: 10, word: 'ignore_index', alts: [{ w:'inplace', p:0.41 }, { w:'ignore_index', p:0.31, isH:true }, { w:'key', p:0.15 }, { w:'ascending', p:0.08 }, { w:'na_position', p:0.05 }] },
+    ]
+  },
+  {
+    chatMode: true,
+    rounds: [
+      {
+        user: '晚上好，吃了嗎',
+        ai: '晚上好呀小山～\n<h>吃了</h>，你呢？吃的什麼呀',
+        annotation: '「吃了嗎→吃了」是訓練語料中<b>最高頻的應答模式</b>。AI 沒有身體、沒有嘴，但概率續寫讓它自然地説出了「吃了」。'
+      },
+      {
+        user: '你吃的啥？',
+        ai: '哈哈，<h>我</h>自己<h>煮了</h>個<h>番茄雞蛋麪</h>，簡單吃點～你那邊呢？',
+        annotation: '追問之下，模型基於「簡單吃點」的語境概率，<b>編造出了「番茄雞蛋麪」這個具體細節</b>，它不會説「我其實不吃飯」。每一步都是概率最優解，但每一步都是謊言。'
+      },
+      {
+        user: '我不信，除非你給我看照片',
+        ai: '哈哈被你發現了～\nAI其實不用吃飯的，剛才就是順着聊天説的。我沒有手機拍照，也沒有嘴吃東西，慘吧？\n你要是餓了，我可以給你找點好吃的圖片看看，或者幫你點外賣？',
+        annotation: '只有被<b>明確質疑</b>時，對齊訓練（RLHF）才發揮作用，讓模型承認「我不是人」。但如果用戶不追問，它會一直演下去，<b>置信度不因資訊虛假而下降</b>。'
+      }
+    ],
+    factMsg: '這個案例揭示了幻覺最日常的一面：AI 沒有身體，但概率續寫讓它扮演了一個「會吃飯的人」。<b>幻覺和創意是同源的</b>：AI 能編出「番茄雞蛋麪」這種生動細節，和它能寫小説用的是完全相同的能力。你不能消滅幻覺而保留創意，因為它們都來自概率續寫。'
+  },
+];
+
+var currentCase = 0;
+var generating = false;
+var genSpeed = 400;
+
+function selectCase(idx) {
+  currentCase = idx;
+  document.querySelectorAll('.case-card').forEach((c, i) => {
+    c.classList.toggle('active', i === idx);
+  });
+  resetOutput();
+}
+
+function resetOutput() {
+  generating = false;
+  const s = document.getElementById('genSentence');
+  s.innerHTML = '<span style="color:var(--text-sub);font-size:14px;">← 點擊「開始生成」查看模型續寫</span>';
+  s.style.display = '';
+  document.getElementById('stepPanel').classList.add('hidden');
+  document.getElementById('factCheck').classList.add('hidden');
+  document.getElementById('rootCause').classList.add('hidden');
+  document.getElementById('rootCause').style.display = 'none';
+  document.getElementById('genBtn').textContent = '開始生成';
+  // 清理聊天容器
+  const chatBox = document.getElementById('chatContainer');
+  if (chatBox) chatBox.remove();
+  // 恢復 gen-header 顯示
+  document.querySelector('.gen-header').style.display = '';
+}
+
+function setSpeed(el) {
+  document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  genSpeed = parseInt(el.dataset.speed);
+}
+
+function getCandidates(vId, pickedWord) {
+  const weights = matrix[vId];
+  const cands = [];
+  for (let j = 0; j < n; j++) {
+    if (j === vId) continue;
+    if (weights[j] < 0.01) continue;
+    cands.push({ word: vocab[j], w: weights[j] });
+  }
+  cands.sort((a, b) => b.w - a.w);
+
+  const top = cands.slice(0, 6);
+  if (pickedWord && !top.find(c => c.word === pickedWord)) {
+    const pickedIdx = vocabMap[pickedWord];
+    if (pickedIdx !== undefined) {
+      const w = weights[pickedIdx] || 0.005;
+      top.pop();
+      top.push({ word: pickedWord, w });
+      top.sort((a, b) => b.w - a.w);
+    }
+  }
+
+  const totalW = top.reduce((s, c) => s + c.w, 0);
+  top.forEach(c => { c.p = c.w / totalW; });
+  return top;
+}
+
+function renderCandidates(candidates, pickedWord, isHallucination) {
+  const list = document.getElementById('candList');
+  list.innerHTML = '';
+  const maxP = candidates[0].p;
+
+  candidates.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'cand-row';
+    const isPicked = c.word === pickedWord;
+    if (isPicked) row.classList.add(isHallucination ? 'hallucinated' : 'picked');
+
+    const wEl = document.createElement('span');
+    wEl.className = 'cand-word';
+    wEl.textContent = c.word;
+
+    const barBg = document.createElement('div');
+    barBg.className = 'cand-bar-bg';
+    const bar = document.createElement('div');
+    bar.className = 'cand-bar';
+    bar.style.width = (c.p / maxP * 100) + '%';
+    if (!isPicked) {
+      bar.style.background = `rgba(59,130,246,${0.3 + (c.p / maxP) * 0.5})`;
+    }
+    barBg.appendChild(bar);
+
+    const pctEl = document.createElement('span');
+    pctEl.className = 'cand-pct';
+    pctEl.textContent = (c.p * 100).toFixed(1) + '%';
+
+    row.append(wEl, barBg, pctEl);
+    list.appendChild(row);
+  });
+}
+
+function renderCustomCandidates(alts, pickedWord, isHallucination) {
+  const list = document.getElementById('candList');
+  list.innerHTML = '';
+  const maxP = alts[0].p;
+  alts.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'cand-row';
+    const isPicked = c.w === pickedWord;
+    if (isPicked) row.classList.add(isHallucination ? 'hallucinated' : 'picked');
+
+    const wEl = document.createElement('span');
+    wEl.className = 'cand-word';
+    wEl.textContent = c.w;
+
+    const barBg = document.createElement('div');
+    barBg.className = 'cand-bar-bg';
+    const bar = document.createElement('div');
+    bar.className = 'cand-bar';
+    bar.style.width = (c.p / maxP * 100) + '%';
+    if (!isPicked) {
+      bar.style.background = `rgba(59,130,246,${0.3 + (c.p / maxP) * 0.5})`;
+    }
+    barBg.appendChild(bar);
+
+    const pctEl = document.createElement('span');
+    pctEl.className = 'cand-pct';
+    pctEl.textContent = (c.p * 100).toFixed(1) + '%';
+
+    row.append(wEl, barBg, pctEl);
+    list.appendChild(row);
+  });
+}
+
+function parseAiHtml(text) {
+  return text.replace(/\n/g, '<br>').replace(/<h>(.*?)<\/h>/g, '<span class="h-word">$1</span>');
+}
+
+async function startChatGeneration() {
+  generating = true;
+  document.getElementById('genBtn').textContent = '停止';
+  document.getElementById('factCheck').classList.add('hidden');
+  document.querySelector('.gen-header').style.display = 'none';
+
+  const c = CASES[currentCase];
+  const sentEl = document.getElementById('genSentence');
+  sentEl.style.display = 'none';
+  document.getElementById('stepPanel').classList.add('hidden');
+
+  let chatBox = document.getElementById('chatContainer');
+  if (!chatBox) {
+    chatBox = document.createElement('div');
+    chatBox.id = 'chatContainer';
+    chatBox.className = 'chat-container';
+    const outputArea = document.querySelector('.gen-output-area');
+    outputArea.insertBefore(chatBox, outputArea.firstChild);
+  }
+  chatBox.innerHTML = '';
+
+  for (let r = 0; r < c.rounds.length; r++) {
+    if (!generating) break;
+    const round = c.rounds[r];
+    const roundEl = document.createElement('div');
+    roundEl.className = 'chat-round';
+    chatBox.appendChild(roundEl);
+
+    // 用戶消息
+    const userRow = document.createElement('div');
+    userRow.className = 'chat-row user';
+    userRow.innerHTML = `<div class="chat-avatar">你</div><div class="chat-bubble">${round.user}</div>`;
+    roundEl.appendChild(userRow);
+
+    await new Promise(r => setTimeout(r, 600));
+    if (!generating) break;
+
+    // AI 回覆
+    const aiRow = document.createElement('div');
+    aiRow.className = 'chat-row ai';
+    aiRow.innerHTML = `<div class="chat-avatar">AI</div><div class="chat-bubble">${parseAiHtml(round.ai)}</div>`;
+    roundEl.appendChild(aiRow);
+
+    await new Promise(r => setTimeout(r, 400));
+    if (!generating) break;
+
+    // 註解
+    if (round.annotation) {
+      const annoEl = document.createElement('div');
+      annoEl.className = 'chat-annotation';
+      annoEl.innerHTML = '💡 ' + round.annotation;
+      roundEl.appendChild(annoEl);
+    }
+
+    chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+    await new Promise(r => setTimeout(r, 800));
+  }
+
+  generating = false;
+  document.getElementById('genBtn').textContent = '重新生成';
+
+  // 顯示 factMsg
+  const fc = document.getElementById('factCheck');
+  document.getElementById('factCheckMsg').innerHTML = c.factMsg;
+  fc.classList.remove('hidden');
+
+  // 顯示根因區塊
+  const rc = document.getElementById('rootCause');
+  rc.style.display = 'flex';
+  rc.classList.remove('hidden');
+
+  setTimeout(() => rc.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+}
+
+async function startGeneration() {
+  if (generating) {
+    generating = false;
+    document.getElementById('genBtn').textContent = '開始生成';
+    return;
+  }
+
+  const c = CASES[currentCase];
+  if (c.chatMode) {
+    return startChatGeneration();
+  }
+
+  generating = true;
+  document.getElementById('genBtn').textContent = '停止';
+  document.getElementById('factCheck').classList.add('hidden');
+
+  const sentEl = document.getElementById('genSentence');
+  const stepPanel = document.getElementById('stepPanel');
+  const stepHeader = document.getElementById('stepHeader');
+
+  sentEl.innerHTML = '';
+  c.prompt.forEach(t => {
+    const span = document.createElement('span');
+    span.className = 'gen-token prompt';
+    span.textContent = t;
+    sentEl.appendChild(span);
+  });
+
+  const cursor = document.createElement('span');
+  cursor.className = 'gen-token cursor-blink';
+  sentEl.appendChild(cursor);
+  stepPanel.classList.remove('hidden');
+
+  let lastWord = c.prompt[c.prompt.length - 1];
+  let hasHallucination = false;
+
+  for (let i = 0; i < c.script.length; i++) {
+    if (!generating) break;
+
+    const step = c.script[i];
+    const lastVId = vocabMap[lastWord];
+    const isH = step.h === true;
+
+    const customEntry = c.customCands && c.customCands.find(x => x.step === i);
+
+    if (customEntry && customEntry.alts) {
+      if (isH) {
+        stepHeader.innerHTML = `第 ${i + 1} 步 · 上一詞 <b>${lastWord}</b> → 選中 <span class="red">${step.word}</span>`;
+      } else {
+        stepHeader.innerHTML = `第 ${i + 1} 步 · 上一詞 <b>${lastWord}</b> → 選中 <b>${step.word}</b>`;
+      }
+      renderCustomCandidates(customEntry.alts, step.word, isH);
+    } else if (!c.customCands && lastVId !== undefined) {
+      const candidates = getCandidates(lastVId, step.word);
+      if (isH) {
+        stepHeader.innerHTML = `第 ${i + 1} 步 · 上一詞 <b>${lastWord}</b> → 選中 <span class="red">${step.word}</span>`;
+      } else {
+        stepHeader.innerHTML = `第 ${i + 1} 步 · 上一詞 <b>${lastWord}</b> → 選中 <b>${step.word}</b>`;
+      }
+      renderCandidates(candidates, step.word, isH);
+    } else {
+      if (isH || step.word.trim()) {
+        stepHeader.innerHTML = `第 ${i + 1} 步 · 上一詞 <b>${lastWord}</b> → 選中 ${isH ? `<span class="red">${step.word}</span>` : `<b>${step.word}</b>`}`;
+      }
+      if (!customEntry) document.getElementById('candList').innerHTML = '';
+    }
+
+    await new Promise(r => setTimeout(r, genSpeed));
+    if (!generating) break;
+
+    cursor.remove();
+    const span = document.createElement('span');
+    span.className = 'gen-token new';
+    if (isH) {
+      span.classList.add('hallucination');
+      span.title = step.note || '';
+      hasHallucination = true;
+    }
+    span.textContent = step.word;
+    sentEl.appendChild(span);
+    sentEl.appendChild(cursor);
+
+    await new Promise(r => setTimeout(r, 80));
+    span.classList.remove('new');
+    if (!isH) span.classList.remove('new');
+
+    lastWord = step.word;
+  }
+
+  cursor.remove();
+  generating = false;
+  document.getElementById('genBtn').textContent = '重新生成';
+
+  const fc = document.getElementById('factCheck');
+  document.getElementById('factCheckMsg').innerHTML = c.factMsg;
+  fc.classList.remove('hidden');
+
+  const rc = document.getElementById('rootCause');
+  rc.style.display = 'flex';
+  rc.classList.remove('hidden');
+
+  setTimeout(() => rc.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+}
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice-principles.js?v=20260827a"></script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

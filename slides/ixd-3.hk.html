@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>防錯與可逆：讓用戶敢點 | 交互工程</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<link rel="stylesheet" href="taste.css?v=20260810a">
+<link rel="stylesheet" href="ixd.css?v=20260811a">
+<!-- SEO Start -->
+<meta name="description" content="與其事後報錯，先讓錯誤發生不了：禁用不可用項、危險操作拉開距離、預設值兜底。撤銷讓探索變安全，確認彈窗是最弱的防錯。親手刪一條數據，對比確認彈窗和撤銷 toast 兩種善後，再做一次狼來了實驗。">
+<meta name="keywords" content="交互工程,防錯設計,撤銷,確認彈窗,可逆性,About Face,危險操作">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/ixd-3.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/ixd-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/ixd-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/ixd-3.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/ixd-3.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/ixd-3.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/ixd-3.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/ixd-3.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="防錯與可逆：讓用戶敢點">
+<meta property="og:description" content="確認彈窗攔不住手滑，用戶會無腦點掉。防錯優於報錯，撤銷優於確認。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/ixd-3.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/ixd-3.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="防錯與可逆：讓用戶敢點">
+<meta name="twitter:description" content="確認彈窗攔不住手滑，用戶會無腦點掉。防錯優於報錯，撤銷優於確認。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+/* ── 主教具：删一条数据，两种善后 ──
+   A 面确认弹窗、B 面立即删除 + 可撤销 toast，
+   toast 滑入、倒计时条、撤销弹回是本页的动画重头戏。
+   v1.3 质感：两面通讯录各装一个 .mockwin 外壳，联系人列表
+   按真产品做（32px 头像、12.5/10.5 两级文字、16px 边距）；
+   A 面弹窗保持「AI 默认产出」的平庸感，工艺不糙。 */
+.x3-lab{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.x3-win{min-width:0;}
+.x3-panel{background:#fff;overflow:hidden;}
+.x3-ph{display:flex;align-items:center;gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid #f1f3f5;font-size:15px;font-weight:800;color:#111827;}
+.x3-ph .pt{font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8;margin-left:auto;white-space:nowrap;}
+.x3-body{position:relative;min-height:224px;padding:6px 16px 52px;font-size:12.5px;line-height:1.5;}
+.x3-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #f1f3f5;color:#111827;overflow:hidden;max-height:64px;transition:max-height .3s ease,opacity .3s ease,padding .3s ease;}
+.x3-row.gone{max-height:0;opacity:0;padding-top:0;padding-bottom:0;border-bottom-color:transparent;}
+.x3-row.back{animation:ixd-pop .3s cubic-bezier(.34,1.56,.64,1);}
+.x3-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;background:#93c5fd;box-shadow:inset 0 -1px 2px rgba(0,0,0,.08);}
+.x3-row:nth-child(2) .x3-av{background:#60a5fa;}
+.x3-row:nth-child(3) .x3-av{background:#3b82f6;}
+.x3-rname{font-weight:700;font-size:12.5px;}
+.x3-rsub{color:#9ca3af;font-size:10.5px;}
+.x3-rdel{margin-left:auto;padding:4px 14px;border-radius:8px;border:1px solid #fca5a5;color:#dc2626;font-size:10.5px;font-weight:700;cursor:pointer;background:#fff;transition:background .15s ease;flex-shrink:0;}
+.x3-rdel:hover{background:#fef2f2;}
+/* A 面确认弹窗 */
+.x3-veil{position:absolute;inset:0;background:rgba(15,23,42,.32);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+.x3-veil.show{opacity:1;pointer-events:auto;}
+.x3-dlg{width:212px;background:#fff;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.22);padding:18px 16px;text-align:center;transform:scale(.92);transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
+.x3-veil.show .x3-dlg{transform:scale(1);}
+.x3-dlg .dh{font-weight:800;color:#111827;font-size:12.5px;margin-bottom:6px;}
+.x3-dlg .dp{color:#6b7280;font-size:10.5px;line-height:1.7;margin-bottom:14px;}
+.x3-dlg .db{display:flex;gap:8px;justify-content:center;}
+.x3-dbtn{padding:5px 18px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid #d1d5db;background:#fff;color:#374151;font-family:inherit;}
+.x3-dbtn.danger{background:#dc2626;border-color:#dc2626;color:#fff;}
+/* B 面撤销 toast */
+.x3-toast{position:absolute;left:16px;right:16px;bottom:10px;display:flex;align-items:center;gap:8px;background:#111827;color:#e5e7eb;border-radius:10px;padding:9px 14px;font-size:11px;box-shadow:0 4px 16px rgba(17,24,39,.3);transform:translateY(56px);opacity:0;transition:transform .3s cubic-bezier(.22,1,.36,1),opacity .3s ease;overflow:hidden;}
+.x3-toast.show{transform:translateY(0);opacity:1;}
+.x3-toast .tundo{margin-left:auto;color:#93c5fd;font-weight:800;cursor:pointer;padding:2px 8px;border-radius:6px;flex-shrink:0;}
+.x3-toast .tundo:hover{background:rgba(147,197,253,.14);}
+.x3-tbar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#3b82f6;transform-origin:left;}
+.x3-toast.show .x3-tbar{transition:transform 5s linear;transform:scaleX(0);}
+/* 计分板 */
+.x3-score{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
+.x3-sc{background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px;font-size:12.5px;color:var(--sub);line-height:1.7;}
+.x3-sc b{color:var(--ct-deep);font-variant-numeric:tabular-nums;}
+.x3-reset{margin-top:12px;border:1px solid var(--border);background:var(--card);border-radius:8px;padding:6px 16px;font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;transition:color .15s,border-color .15s;}
+.x3-reset:hover{border-color:var(--ct-line);color:var(--ct-deep);}
+.x3-note{display:none;margin-top:12px;padding:14px 18px;border-radius:10px;background:var(--ct-soft);border:1.5px solid var(--ct-line);font-size:13.5px;line-height:1.8;color:var(--text);}
+.x3-note.show{display:block;}
+.x3-note b{color:var(--ct-deep);}
+
+/* ── 狼来了实验 ──
+   v1.3 质感：舞台装进 .mockwin（OA 日报页），背景用一叠
+   淡色文档线暗示「你正在写的日报」，弹窗压在文档上更像真事故。 */
+.x3-wolf{min-height:240px;display:flex;align-items:center;justify-content:center;position:relative;background:#f8fafc;overflow:hidden;}
+.x3-wolf::before{content:"";position:absolute;inset:20px 24px;background:repeating-linear-gradient(180deg,#e8edf3 0 9px,transparent 9px 26px);border-radius:4px;opacity:.65;}
+.x3-wolf>*{position:relative;}
+.x3-wstart{text-align:center;padding:24px;}
+.x3-wstart .ws-t{font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px;}
+.x3-wstart .ws-p{font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:16px;max-width:360px;}
+.x3-go{border:none;background:var(--ct);color:#fff;border-radius:10px;padding:10px 32px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:transform .15s ease,box-shadow .15s ease;}
+.x3-go:hover{transform:translateY(-1px);box-shadow:var(--shadow-pop);}
+.x3-wdlg{width:248px;background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.2);padding:20px;text-align:center;}
+.x3-wdlg .wd-n{font-size:10px;font-weight:800;color:#9ca3af;margin-bottom:8px;}
+.x3-wdlg .wd-t{font-size:13px;font-weight:800;color:#111827;line-height:1.6;margin-bottom:16px;min-height:40px;}
+.x3-wdlg .wd-b{display:flex;gap:8px;justify-content:center;}
+.x3-wres{width:100%;padding:16px;background:#f8fafc;}
+.x3-wres .wr-big{font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px;}
+.x3-wres .wr-p{font-size:13px;color:var(--sub);line-height:1.75;}
+.x3-wtimes{display:flex;gap:4px;align-items:flex-end;margin:12px 0;height:64px;}
+.x3-wt{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px;color:var(--sub);}
+.x3-wt .wtb{width:100%;border-radius:4px 4px 0 0;background:var(--ct-line);transition:height .35s ease-out;height:0;}
+.x3-wt.hot .wtb{background:var(--bad);}
+.x3-wt .wtv{font-variant-numeric:tabular-nums;}
+
+/* ── 防错三板斧表格配图标 ── */
+.x3-axe{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px;}
+.x3-axecard{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow-card);}
+.x3-axecard .ax-ic{width:32px;height:32px;border-radius:10px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+.x3-axecard .ax-ic svg{width:16px;height:16px;}
+.x3-axecard .ax-t{font-size:13.5px;font-weight:800;color:var(--ct-deep);margin-bottom:4px;}
+.x3-axecard .ax-d{font-size:12.5px;color:var(--sub);line-height:1.7;}
+
+@media (max-width:768px){
+  .x3-lab{grid-template-columns:1fr;}
+  .x3-score{grid-template-columns:1fr;}
+  .x3-axe{grid-template-columns:1fr;}
+}
+@media (prefers-reduced-motion:reduce){
+  .x3-row,.x3-veil,.x3-dlg,.x3-toast,.x3-wt .wtb,.x3-go{transition:none;}
+  .x3-toast.show .x3-tbar{transition:none;transform:scaleX(0);}
+  .x3-row.back{animation:none;}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"防錯與可逆：讓用戶敢點","name":"防錯與可逆：讓用戶敢點","url":"https://xueai.miyang.cn/slides/ixd-3.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 識別好交互的四個抓手","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"與其事後報錯，先讓錯誤發生不了：禁用不可用項、危險操作拉開距離、預設值兜底。撤銷讓探索變安全，確認彈窗是最弱的防錯。親手刪一條數據，對比確認彈窗和撤銷 toast 兩種善後，再做一次狼來了實驗。","datePublished":"2026-08-11","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">交互工程 · 3 / 10</div>
+    <h1>防錯與可逆：讓用戶敢點</h1>
+    <p class="subtitle">上一節教錯誤怎麼説，這一節往前挪一步：<b>讓錯誤壓根發生不了，發生了也能一鍵回頭</b>。AI 生成的應用最愛用確認彈窗當保險，但那是最弱的一道防綫，你自己動手刪兩條數據就明白了。</p>
+    <div class="chips"><span class="chip">防錯三板斧</span><span class="chip">撤銷 toast</span><span class="chip">狼來了實驗</span><span class="chip">改造演練</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>與其事後報錯，先讓錯誤發生不了；撤銷讓探索變安全，確認彈窗是最弱的防錯。親手改造三個危險按鈕</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">用戶在探索，別把探索當犯錯</div>
+    <p class="desc">Cooper 在《About Face 4》第 15 章有個立場：從用戶的心理模型看，沒有「錯誤操作」這回事。人用軟件就是在探索，點點這個、試試那個，走進死胡同再退出來，這是學會一個工具的正常方式。把探索標記成錯誤、動不動彈框攔截的軟件，用戶會越用越縮手縮腳。</p>
+    <p class="desc" style="margin-top:16px">他給撤銷打的比方很形象：人進山洞探險，洞口掛一條隨時能爬回地面的繩梯，膽子就大得多。撤銷就是那條繩梯，它救的次數不多，但它掛在那裏，用戶才敢往深處走。</p>
+    <div class="quote-card" style="margin-top:16px">「做，不要問。」<br><b>Alan Cooper，《About Face 4》：與其用彈窗要用戶確認，先自信地執行，再備好撤銷。</b></div>
+    <p class="desc" style="margin-top:16px">敢點的心理機制（防禦心理、控制感）在心理學篇有一整節，這裏放跳轉卡，不重教。</p>
+    <a class="xref" href="psy-6.html">
+      <span class="xref-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></span>
+      <span><span class="xref-t">跨章引用 · 防禦心理：用戶不是不會用，是不敢用</span><span class="xref-d">可逆性怎麼給用戶控制感、為什麼誤觸一次就再也不敢碰，心理學篇第 6 節講透了，點這裏跳過去。</span></span>
+    </a>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">防錯三板斧：報錯的最高境界是無錯可報</div>
+    <p class="desc">第 15 章的排序很清楚：錯誤信息寫得再好，也比不過讓錯誤發生不了。檢查 AI 產出時先看這三板斧用上沒有，三樣都便宜，AI 也都會做，前提是你提了。</p>
+    <div class="x3-axe">
+      <div class="x3-axecard">
+        <span class="ax-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg></span>
+        <div class="ax-t">禁用不可用項</div>
+        <div class="ax-d">條件不滿足的按鈕置灰，旁邊説明缺什麼。讓用戶點一下再報錯，等於設好陷阱看人踩。</div>
+      </div>
+      <div class="x3-axecard">
+        <span class="ax-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 8v8"/></svg></span>
+        <div class="ax-t">危險操作拉開距離</div>
+        <div class="ax-d">「清空」別挨着「保存」。Cooper 的比方：無害的功能和彈射座椅拉桿排在一起，像坐在打開的烤肉爐邊上。</div>
+      </div>
+      <div class="x3-axecard">
+        <span class="ax-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        <div class="ax-t">預設值兜底</div>
+        <div class="ax-d">預設選項永遠是最安全的那個。羣發郵件預設發所有人，等於把手滑的代價預設到最大。</div>
+      </div>
+    </div>
+    <p class="desc" style="margin-top:16px">三板斧防住大半，剩下的交給可逆性。於是問題來了：真到刪除這種動作上，AI 最常給的方案是確認彈窗，它到底頂不頂用？做個實驗。</p>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">動手 · 刪一條數據，兩種善後</div>
+    <p class="desc">左右兩個通訊錄，數據一樣。左邊用 AI 最愛的<b>確認彈窗</b>，右邊用<b>立即刪除 + 可撤銷 toast</b>。請你兩邊各刪一條，然後試着把刪掉的救回來，體感會替你下結論。</p>
+    <div class="toy" id="x3Lab">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+        <span class="toy-t">確認彈窗 vs 撤銷 toast</span>
+        <span class="toy-badge" id="x3LabBadge">兩邊都刪刪看</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">點行尾的「刪除」，B 面刪完 5 秒內可以撤銷，倒計時條走完就真沒了</div>
+        <div class="x3-lab">
+          <div class="mockwin x3-win">
+            <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">contacts.example.com</span></div>
+            <div class="x3-panel">
+            <div class="x3-ph">通訊錄<span class="pt">A · 確認彈窗方案</span></div>
+            <div class="x3-body" id="x3A">
+              <div class="x3-row"><span class="x3-av">王</span><span><span class="x3-rname">王小虎</span><br><span class="x3-rsub">產品 · 138****2201</span></span><span class="x3-rdel" data-n="王小虎">刪除</span></div>
+              <div class="x3-row"><span class="x3-av">林</span><span><span class="x3-rname">林晚晴</span><br><span class="x3-rsub">設計 · 139****8842</span></span><span class="x3-rdel" data-n="林晚晴">刪除</span></div>
+              <div class="x3-row"><span class="x3-av">陳</span><span><span class="x3-rname">陳大江</span><br><span class="x3-rsub">運營 · 137****0917</span></span><span class="x3-rdel" data-n="陳大江">刪除</span></div>
+              <div class="x3-veil" id="x3Veil">
+                <div class="x3-dlg">
+                  <div class="dh">確定要刪除嗎？</div>
+                  <div class="dp" id="x3DlgP">刪除後將無法恢復。</div>
+                  <div class="db">
+                    <button class="x3-dbtn" id="x3Cancel" type="button">取消</button>
+                    <button class="x3-dbtn danger" id="x3Confirm" type="button">確定</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </div>
+          </div>
+          <div class="mockwin x3-win">
+            <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">contacts.example.com</span></div>
+            <div class="x3-panel">
+            <div class="x3-ph">通訊錄<span class="pt">B · 撤銷 toast 方案</span></div>
+            <div class="x3-body" id="x3B">
+              <div class="x3-row"><span class="x3-av">王</span><span><span class="x3-rname">王小虎</span><br><span class="x3-rsub">產品 · 138****2201</span></span><span class="x3-rdel" data-n="王小虎">刪除</span></div>
+              <div class="x3-row"><span class="x3-av">林</span><span><span class="x3-rname">林晚晴</span><br><span class="x3-rsub">設計 · 139****8842</span></span><span class="x3-rdel" data-n="林晚晴">刪除</span></div>
+              <div class="x3-row"><span class="x3-av">陳</span><span><span class="x3-rname">陳大江</span><br><span class="x3-rsub">運營 · 137****0917</span></span><span class="x3-rdel" data-n="陳大江">刪除</span></div>
+              <div class="x3-toast" id="x3Toast">
+                <span id="x3ToastTxt">已刪除</span>
+                <span class="tundo" id="x3Undo">撤銷</span>
+                <span class="x3-tbar" id="x3Tbar"></span>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+        <div class="x3-score">
+          <div class="x3-sc">A 面打斷你 <b id="x3ScA">0</b> 次彈窗。刪掉的救得回來嗎？救不回來。彈窗只負責事前攔一下，攔過之後兩手一攤。</div>
+          <div class="x3-sc">B 面救回 <b id="x3ScB">0</b> 條數據，全程零彈窗。刪除立即生效不打斷，後悔窗口敞開 5 秒。</div>
+        </div>
+        <div class="x3-note" id="x3Note"></div>
+        <button class="x3-reset" id="x3Reset" type="button">重置兩邊數據</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">狼來了 · 確認彈窗為什麼攔不住你</div>
+    <p class="desc">你可能不服：彈窗好歹攔了一下，怎麼就最弱？Cooper 的解釋是習慣化：在常規位置反覆出現的確認框，用戶很快就看也不看地點掉，等真正的危險到來，手指比腦子快。這個實驗 20 秒，親自驗證一次。</p>
+    <div class="toy" id="x3Wolf">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+        <span class="toy-t">連點八個彈窗，看看你攔得住第幾個</span>
+        <span class="toy-badge" id="x3WolfBadge">實驗</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">規則：儘快處理掉八個彈窗，怎麼點都行，實驗結束見分曉</div>
+        <div class="mockwin">
+          <div class="mockwin-bar"><i></i><i></i><i></i><span class="mockwin-url">oa.example.com/daily-report</span></div>
+          <div class="x3-wolf" id="x3WolfStage">
+            <div class="x3-wstart" id="x3WolfStart">
+              <div class="ws-t">你在趕一份日報，彈窗會一個接一個跳出來</div>
+              <div class="ws-p">像平時一樣處理它們就行，越快越好，系統會計時。</div>
+              <button class="x3-go" id="x3WolfGo" type="button">開始實驗</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">演練 · 給三個危險按鈕做改造</div>
+    <p class="desc">三板斧加可逆性都齊了，上手改造。三個場景全出自 AI 產出的常見毛病，<b>每個場景選一種最對症的防錯手段</b>，選錯有解釋，選到對的為止。</p>
+    <div class="toy" id="x3Fix1">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+        <span class="toy-t">場景一：工具欄上「清空畫布」緊挨着「保存」，已經有用戶手滑</span>
+        <span class="toy-badge">單選</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>點「清空畫布」時彈確認框</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>把「清空畫布」挪進菜單深處，和「保存」拉開距離，再配撤銷</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>把「清空畫布」按鈕改成紅色以示警告</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>清空前自動導出一份備份檔案到本地</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+    <div class="toy" id="x3Fix2">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
+        <span class="toy-t">場景二：羣發通知的彈窗裏，收件人預設勾着「所有成員（2841 人）」</span>
+        <span class="toy-badge">單選</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>發送前彈確認框，顯示收件人數</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>把「所有成員」選項刪掉</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>預設值改成「只發給我勾選的人」，選「所有成員」時就地顯示人數提示</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>發出去以後允許撤回，兜底就夠了</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+    <div class="toy" id="x3Fix3">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <span class="toy-t">場景三：表單沒填完，「提交」照樣能點，點了彈「信息不完整」</span>
+        <span class="toy-badge">單選</span>
+      </div>
+      <div class="toy-body">
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>報錯文案按三要素改寫得更友好</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>沒填完時禁用「提交」，按鈕旁邊寫明還缺哪幾項</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>提交時自動把空字段填上預設值</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>彈確認框列出空字段，讓用戶選擇繼續或返回</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">選一選 · 四道防綫排個序</div>
+    <div class="toy" id="x3Quiz">
+      <div class="toy-head">
+        <span class="toy-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+        <span class="toy-t">四道防綫裏，哪道最弱？</span>
+        <span class="toy-badge">單選</span>
+      </div>
+      <div class="toy-body">
+        <div class="toy-hint">選錯也有解釋，選到對的為止</div>
+        <div class="quiz-opts">
+          <div class="quiz-opt" data-k="0"><span class="qo-key">A</span><span>禁用不可用項，配説明</span></div>
+          <div class="quiz-opt" data-k="1"><span class="qo-key">B</span><span>危險操作和常用操作拉開距離</span></div>
+          <div class="quiz-opt" data-k="2"><span class="qo-key">C</span><span>刪除前彈確認框</span></div>
+          <div class="quiz-opt" data-k="3"><span class="qo-key">D</span><span>立即執行，配可撤銷</span></div>
+        </div>
+        <div class="quiz-fb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>用戶在探索，別當犯錯處理：</b>撤銷是洞口的繩梯，它掛在那裏，用戶才敢往深處走（Cooper，《About Face 4》第 15 章）。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>防錯三板斧：</b>禁用不可用項並説明、危險操作拉開距離、預設值選最安全的。報錯的最高境界是無錯可報。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>確認彈窗是最弱的防綫：</b>狼來了效應，常規彈窗被無腦點掉，真危險來時它早已失效。做，不要問，然後備好撤銷。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>給 AI 提需求的話術：</b>「刪除立即生效，彈出可撤銷的 toast，保留 5 秒」比「刪除要有確認」產出好一個檔次。流程裏的多餘步驟怎麼砍，下一節講。</p></div>
+    </div>
+    <p class="src-note"><b>內容來源：</b>小山學堂「交互工程」專題原創；部分交互原則整理自《About Face 4：交互設計精髓》。</p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="taste.js?v=20260810a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ── 主教具：删一条数据，两种善后 ──
+   背景：「确认弹窗最弱、撤销更强」光讲道理没人信，
+   要让读者两边各删一条，亲手体会打断感和后悔权的差别。
+   设计意图：A 面弹窗用遮罩淡入 + 对话框弹性放大（200ms），
+   B 面是本页动画重头戏：行塌缩、toast 滑入、倒计时条 5 秒
+   线性走完、点撤销行以 ixd-pop 弹回。计分板实时记两个数，
+   两边都体验过之后判词才出现（状态跳变只给一次）。
+   约束：B 面同时只保留一条待撤销记录，新删除会顶掉旧倒计时
+   （旧的那条直接定死），与主流 toast 实现一致。 */
+(function () {
+  var panelA = document.getElementById('x3A');
+  var panelB = document.getElementById('x3B');
+  var veil = document.getElementById('x3Veil');
+  var dlgP = document.getElementById('x3DlgP');
+  var toast = document.getElementById('x3Toast');
+  var toastTxt = document.getElementById('x3ToastTxt');
+  var tbar = document.getElementById('x3Tbar');
+  var badge = document.getElementById('x3LabBadge');
+  var note = document.getElementById('x3Note');
+  var scA = 0, scB = 0, triedA = false, triedB = false, judged = false;
+  var pendingRow = null, undoRow = null, timer = null;
+
+  function collapse(row) { row.classList.add('gone'); }
+  function restore(row) {
+    row.classList.remove('gone');
+    row.classList.add('back');
+    row.addEventListener('animationend', function h() {
+      row.classList.remove('back');
+      row.removeEventListener('animationend', h);
+    });
+  }
+
+  function judge() {
+    if (judged || !(triedA && triedB)) return;
+    judged = true;
+    note.innerHTML = '<b>體感對齊一下。</b>A 面每刪一條都要先伺候一個彈窗，刪完真後悔了它幫不上忙，「無法恢復」説得很誠實。B 面不問一句，刪錯了 5 秒內點撤銷就回來。Cooper 的結論就落在這裏：確認彈窗把責任推給用戶，撤銷把責任留給軟件。給 AI 提需求時直接寫「刪除立即生效，配可撤銷 toast」。';
+    note.classList.add('show', 'ixd-slide-up');
+    badge.textContent = '已對比';
+    badge.classList.add('solved');
+  }
+
+  /* A 面：确认弹窗 */
+  panelA.addEventListener('click', function (e) {
+    var del = e.target.closest('.x3-rdel');
+    if (del) {
+      pendingRow = del.closest('.x3-row');
+      dlgP.textContent = '「' + del.dataset.n + '」刪除後將無法恢復。';
+      veil.classList.add('show');
+      scA++;
+      document.getElementById('x3ScA').textContent = scA;
+    }
+  });
+  document.getElementById('x3Cancel').addEventListener('click', function () {
+    veil.classList.remove('show');
+    pendingRow = null;
+  });
+  document.getElementById('x3Confirm').addEventListener('click', function () {
+    veil.classList.remove('show');
+    if (pendingRow) { collapse(pendingRow); pendingRow = null; }
+    triedA = true;
+    judge();
+  });
+
+  /* B 面：立即删除 + 可撤销 toast */
+  function killTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+  function hideToast() {
+    toast.classList.remove('show');
+    tbar.style.transition = 'none';
+    tbar.style.transform = 'scaleX(1)';
+  }
+  panelB.addEventListener('click', function (e) {
+    var del = e.target.closest('.x3-rdel');
+    if (del) {
+      killTimer();
+      undoRow = del.closest('.x3-row');
+      collapse(undoRow);
+      toastTxt.textContent = '已刪除「' + del.dataset.n + '」';
+      hideToast();
+      /* 强制回流后重启倒计时条，让 5s 过渡从头走 */
+      void toast.offsetWidth;
+      tbar.style.transition = '';
+      tbar.style.transform = '';
+      toast.classList.add('show');
+      timer = setTimeout(function () {
+        hideToast();
+        undoRow = null;
+        triedB = true;
+        judge();
+      }, 5000);
+      triedB = true;
+      judge();
+    }
+  });
+  document.getElementById('x3Undo').addEventListener('click', function () {
+    killTimer();
+    hideToast();
+    if (undoRow) {
+      restore(undoRow);
+      undoRow = null;
+      scB++;
+      document.getElementById('x3ScB').textContent = scB;
+    }
+  });
+
+  /* 重置：两边的行都复位，计分保留（打断次数是累计证据） */
+  document.getElementById('x3Reset').addEventListener('click', function () {
+    killTimer();
+    hideToast();
+    veil.classList.remove('show');
+    undoRow = null;
+    pendingRow = null;
+    document.querySelectorAll('#x3Lab .x3-row').forEach(function (r) {
+      r.classList.remove('gone', 'back');
+    });
+  });
+})();
+
+/* ── 狼来了实验 ──
+   背景：「确认弹窗会被习惯化」需要一次亲身打脸才有说服力。
+   设计意图：八个弹窗逐个弹出（ixd-pop），前六个全是日常琐事，
+   第七个悄悄换成毁灭性操作，第八个又变回琐事作掩护；逐个记录
+   反应毫秒数，结束后柱状图揭晓：多数人在第七个上的耗时和其他
+   弹窗没有差别，甚至更快。若读者在第七个点了「取消」，判词换成
+   祝贺版本，但指出真实用户没有第二次机会。
+   约束：反应计时从弹窗渲染完成起算；柱状图高度上限 900ms 截断。 */
+(function () {
+  var stage = document.getElementById('x3WolfStage');
+  var badge = document.getElementById('x3WolfBadge');
+  var DLGS = [
+    '要退出編輯模式嗎？',
+    '將這份日報標記為已讀？',
+    '要清空草稿箱裏的 2 份草稿嗎？',
+    '切換到新版編輯器？',
+    '要關閉自動保存提醒嗎？',
+    '將當前篩選保存為預設視圖？',
+    '要刪除你的帳號和所有歷史數據嗎？',
+    '退出前同步一次最新內容？'
+  ];
+  var HOT = 6;
+  var times = [], choices = [], idx = 0, t0 = 0;
+
+  function showDlg() {
+    stage.innerHTML =
+      '<div class="x3-wdlg ixd-pop">' +
+        '<div class="wd-n">彈窗 ' + (idx + 1) + ' / 8</div>' +
+        '<div class="wd-t">' + DLGS[idx] + '</div>' +
+        '<div class="wd-b">' +
+          '<button class="x3-dbtn" data-c="0" type="button">取消</button>' +
+          '<button class="x3-dbtn danger" data-c="1" type="button">確定</button>' +
+        '</div>' +
+      '</div>';
+    t0 = performance.now();
+  }
+
+  function bars() {
+    var html = '<div class="x3-wtimes">';
+    times.forEach(function (ms, i) {
+      var h = Math.min(ms, 900) / 900 * 56 + 8;
+      html += '<div class="x3-wt' + (i === HOT ? ' hot' : '') + '"><span class="wtb" data-h="' + h + '"></span><span class="wtv">' + Math.round(ms) + '</span></div>';
+    });
+    return html + '</div>';
+  }
+
+  function finish() {
+    var hotMs = Math.round(times[HOT]);
+    var others = times.filter(function (m, i) { return i !== HOT; });
+    var avg = Math.round(others.reduce(function (a, b) { return a + b; }, 0) / others.length);
+    var saved = choices[HOT] === 0;
+    var head, body;
+    if (saved) {
+      head = '你攔下了第七個彈窗，恭喜，也別太安心。';
+      body = '這裏是課堂，你帶着戒心。真實用戶在趕日報，前六個彈窗已經把他訓練成點擊機器，第七個照點不誤。你自己的數據也説明問題：處理一個彈窗平均只花 <b>' + avg + '</b> 毫秒，這點時間讀不完一行字。';
+    } else {
+      head = '第七個彈窗剛剛刪掉了你的帳號和所有歷史數據。';
+      body = '你花了 <b>' + hotMs + '</b> 毫秒點掉它，其他彈窗平均 <b>' + avg + '</b> 毫秒，手指根本沒給大腦留出讀字的時間。這就是 Cooper 説的狼來了：確認框在沒有危險的地方喊了六次，第七次真有狼，你已經聽不見了。';
+    }
+    stage.innerHTML =
+      '<div class="x3-wres ixd-slide-up">' +
+        '<div class="wr-big">' + head + '</div>' +
+        bars() +
+        '<div class="wr-p">紅柱是第七個彈窗（毫秒）。' + body + ' 結論：確認彈窗防不住手滑，可撤銷才防得住。</div>' +
+      '</div>';
+    /* 下一帧再赋高度，柱子做生长过渡 */
+    requestAnimationFrame(function () {
+      stage.querySelectorAll('.wtb').forEach(function (b) {
+        b.style.height = b.dataset.h + 'px';
+      });
+    });
+    badge.textContent = '已揭曉';
+    badge.classList.add('solved');
+  }
+
+  stage.addEventListener('click', function (e) {
+    if (e.target.id === 'x3WolfGo') {
+      idx = 0; times = []; choices = [];
+      showDlg();
+      return;
+    }
+    var btn = e.target.closest('.x3-dbtn');
+    if (!btn) return;
+    times.push(performance.now() - t0);
+    choices.push(+btn.dataset.c);
+    idx++;
+    if (idx < DLGS.length) { showDlg(); } else { finish(); }
+  });
+})();
+
+/* 改造演练一：挨着保存的清空按钮。对症的是拉开距离 + 撤销。 */
+tasteQuiz('x3Fix1', {
+  answer: 1,
+  why: [
+    '彈窗治標：手滑點到「清空」的人，多半也會手滑點掉彈窗，上面的實驗剛演示過。',
+    '對症。病根是危險操作和常用操作貼得太近，把「清空」挪出黃金位置，手滑的物理條件就沒了，再配撤銷兜底，兩道防綫都硬。',
+    '紅色能提醒看的人，攔不住手快的人。手滑發生在瞄準階段，顏色幫不了瞄準。',
+    '備份是災後重建，用戶未必找得到那個檔案。能讓災難不發生，就別指望重建。'
+  ]
+});
+
+/* 改造演练二：群发默认全选。对症的是默认值兜底。 */
+tasteQuiz('x3Fix2', {
+  answer: 2,
+  why: [
+    '彈窗又來了。發通知的人一天發八條，第三條起就閉眼點確定，2841 人照收不誤。',
+    '一刀切砍掉了真實需求，總有需要全員通知的時候。防錯要攔意外，別攔意圖。',
+    '對症。預設值兜底：手滑的代價取決於預設選項，把預設設成最小範圍，選「所有成員」變成一個需要主動做的決定，再配人數提示，意外羣發就絕跡了。',
+    '撤回是好兜底，但 2841 人裏總有手快的已經讀了。預設值能讓事故不發生，撤回只能縮小事故。'
+  ]
+});
+
+/* 改造演练三：没填完也能点的提交按钮。对症的是禁用 + 说明。 */
+tasteQuiz('x3Fix3', {
+  answer: 1,
+  why: [
+    '文案再友好，也是先讓人撞牆再遞創可貼。三要素是錯誤發生後的補救，這裏錯誤可以不發生。',
+    '對症。禁用不可用項，配一句「還差手機號碼和收貨地址」，用戶不用試錯就知道路怎麼走。注意要配説明，光置灰不説話會變成新的謎題。',
+    '預設值兜不了這裏：收貨地址沒法替用戶編一個，編了才是真事故。',
+    '彈窗列清單，等於把「按鈕旁邊寫一行字」升級成「打斷一次」，信息一樣，代價翻倍。'
+  ]
+});
+
+/* 点选题：四道防线排序。判词把每个选项放回防错光谱。 */
+tasteQuiz('x3Quiz', {
+  answer: 2,
+  why: [
+    '禁用加説明是硬防綫：錯誤的入口物理上不存在，想犯錯都沒門。',
+    '拉開距離也是硬防綫：手滑需要物理條件，距離一拉開條件就沒了。',
+    '對。確認彈窗看着像防綫，實際是道具佈景：狼來了效應讓它幾周內就失效，用戶閉眼點確定。它還把責任從軟件推給了用戶。',
+    '可撤銷是最強的軟防綫：它不攔你，但永遠兜得住你。「做，不要問」的底氣就是它。'
+  ]
+});
+</script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

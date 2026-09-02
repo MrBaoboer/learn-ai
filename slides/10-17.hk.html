@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contextual Retrieval：更好的 RAG | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+.desc{font-size:15px;color:var(--text);line-height:1.8;margin-bottom:8px}
+
+.problem-box{background:var(--card);border:1.5px solid rgba(220,38,38,.2);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:12px}
+.problem-box h4{font-size:16px;font-weight:800;color:var(--danger);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+.problem-box h4 svg{color:var(--danger)}
+.pb-desc{font-size:14px;color:var(--text);line-height:1.8;margin-bottom:16px}
+.pb-example{background:rgba(220,38,38,.04);border:1px solid rgba(220,38,38,.1);border-radius:var(--radius-sm);padding:16px 18px}
+.pb-example .pbe-label{font-size:12px;font-weight:800;color:var(--danger);margin-bottom:8px;letter-spacing:.5px}
+.pb-example .pbe-chunk{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;color:var(--text);line-height:1.6;padding:10px 14px;background:rgba(0,0,0,.03);border-radius:6px;margin-bottom:10px;border:1px dashed var(--border)}
+.pb-example .pbe-question{font-size:13px;color:var(--sub);line-height:1.6;font-style:italic}
+.pb-flow{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px;padding:14px;background:var(--bg);border-radius:var(--radius-sm)}
+.pb-flow .pf-node{border-radius:8px;padding:10px 14px;font-size:12px;font-weight:700;text-align:center}
+.pb-flow .pf-node.doc{background:rgba(0,102,255,.06);border:1.5px solid rgba(0,102,255,.2);color:var(--accent)}
+.pb-flow .pf-node.cut{background:rgba(220,38,38,.06);border:1.5px solid rgba(220,38,38,.2);color:var(--danger)}
+.pb-flow .pf-node.lost{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2);color:var(--amber)}
+.pb-flow .pf-arrow{color:var(--sub);display:flex;align-items:center}
+
+.solution-box{background:var(--card);border:1.5px solid rgba(22,163,74,.2);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:20px}
+.solution-box h4{font-size:16px;font-weight:800;color:var(--success);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+.solution-box h4 svg{color:var(--success)}
+.sb-desc{font-size:14px;color:var(--text);line-height:1.8;margin-bottom:16px}
+.sb-compare{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:768px){.sb-compare{grid-template-columns:1fr}}
+.sb-side{border-radius:var(--radius-sm);padding:16px 18px}
+.sb-side.before{background:rgba(220,38,38,.04);border:1px solid rgba(220,38,38,.12)}
+.sb-side.after{background:rgba(22,163,74,.04);border:1px solid rgba(22,163,74,.12)}
+.sb-side .sbs-label{font-size:12px;font-weight:800;letter-spacing:.5px;margin-bottom:8px}
+.sb-side.before .sbs-label{color:var(--danger)}
+.sb-side.after .sbs-label{color:var(--success)}
+.sb-side .sbs-code{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px;color:var(--text);line-height:1.6;white-space:pre-wrap;padding:10px 12px;background:rgba(0,0,0,.03);border-radius:6px;border:1px dashed var(--border)}
+.sb-side .sbs-note{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.5}
+
+.layer-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:12px}
+@media(max-width:768px){.layer-grid{grid-template-columns:1fr}}
+.opt-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-card);display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden}
+.opt-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px}
+.opt-card:nth-child(1){border-color:rgba(0,102,255,.2)}.opt-card:nth-child(1)::before{background:var(--accent)}
+.opt-card:nth-child(2){border-color:rgba(124,58,237,.2)}.opt-card:nth-child(2)::before{background:var(--purple)}
+.opt-card:nth-child(3){border-color:rgba(217,119,6,.2)}.opt-card:nth-child(3)::before{background:var(--amber)}
+.opt-card .oc-num{font-size:11px;font-weight:800;letter-spacing:.5px}
+.opt-card:nth-child(1) .oc-num{color:var(--accent)}
+.opt-card:nth-child(2) .oc-num{color:var(--purple)}
+.opt-card:nth-child(3) .oc-num{color:var(--amber)}
+.opt-card .oc-title{font-size:16px;font-weight:800;color:var(--text)}
+.opt-card .oc-desc{font-size:13px;color:var(--sub);line-height:1.7}
+
+.data-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:20px}
+.data-panel h4{font-size:16px;font-weight:800;color:var(--text);margin:0 0 16px;display:flex;align-items:center;gap:10px}
+.data-panel h4 svg{color:var(--accent)}
+.data-bars{display:flex;flex-direction:column;gap:14px}
+.data-bar{display:flex;align-items:center;gap:14px}
+@media(max-width:768px){.data-bar{flex-direction:column;align-items:flex-start;gap:6px}}
+.data-bar .db-label{font-size:13px;font-weight:600;color:var(--text);width:260px;flex-shrink:0;line-height:1.4}
+@media(max-width:768px){.data-bar .db-label{width:auto}}
+.data-bar .db-track{flex:1;height:32px;background:var(--bg);border-radius:8px;overflow:hidden;position:relative;min-width:200px}
+@media(max-width:768px){.data-bar .db-track{width:100%}}
+.data-bar .db-fill{height:100%;border-radius:8px;display:flex;align-items:center;justify-content:flex-end;padding-right:12px;font-size:13px;font-weight:800;color:#fff;transition:width .6s ease}
+.data-bar:nth-child(1) .db-fill{background:linear-gradient(90deg,var(--accent),#3d9aff);width:49%}
+.data-bar:nth-child(2) .db-fill{background:linear-gradient(90deg,var(--success),#34d399);width:67%}
+
+.cost-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);margin-top:16px}
+.cost-panel h4{font-size:16px;font-weight:800;color:var(--text);margin:0 0 16px;display:flex;align-items:center;gap:10px}
+.cost-panel h4 svg{color:var(--amber)}
+.cost-items{display:flex;flex-direction:column;gap:10px}
+.cost-item{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:var(--radius-sm);background:var(--bg);font-size:14px;color:var(--text);line-height:1.6}
+.cost-item svg{flex-shrink:0;margin-top:3px;color:var(--amber)}
+.cost-item b{color:var(--amber)}
+
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:18px 22px;font-size:15px;color:var(--text);display:flex;gap:12px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--accent)}
+</style>
+<meta name="description" content="理解 Contextual Retrieval 如何通過給 Chunk 加上下文前綴來解決傳統 RAG 的語境丟失問題，將檢索失敗率降低 67%。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/10-17.hk.html">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/10-17.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/10-17.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/10-17.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/10-17.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/10-17.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/10-17.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/10-17.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Contextual Retrieval：更好的 RAG","name":"Contextual Retrieval：更好的 RAG","url":"https://xueai.miyang.cn/slides/10-17.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 進階收官","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"理解 Contextual Retrieval 如何通過給 Chunk 加上下文前綴來解決傳統 RAG 的語境丟失問題，將檢索失敗率降低 67%。","datePublished":"2026-07-04","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:title" content="Contextual Retrieval：更好的 RAG"><meta property="og:description" content="理解 Contextual Retrieval 如何通過給 Chunk 加上下文前綴來解決傳統 RAG 的語境丟失問題，將檢索失敗率降低 67%。"><meta property="og:url" content="https://xueai.miyang.cn/slides/10-17.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/10-17.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">進階收官</div>
+    <h1>Contextual Retrieval：更好的 RAG</h1>
+    <p class="subtitle">RAG 的核心假設是「檢索到正確的 Chunk 就能給出正確的答案」。但實踐中發現了一個根本性問題：切 Chunk 的過程本身就會丟失關鍵信息。Contextual Retrieval 正是為了解決這個問題。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>在檢索前先給 Chunk 加上下文，Anthropic 的 RAG 升級方案</p></aside><!--seo:end-->  <!-- ===== 传统 RAG 的问题 ===== -->
+  <div class="sec-label">傳統 RAG 的核心問題</div>
+
+  <p class="desc reveal">傳統 RAG 的工作流程是：把文檔切成小塊（Chunk），對每個 Chunk 做向量化，用戶提問時檢索最相似的 Chunk，然後把 Chunk 餵給 LLM 生成答案。這個流程有一個致命缺陷：</p>
+
+  <div class="problem-box reveal">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      Chunk 脱離上下文後變得模糊不清
+    </h4>
+    <div class="pb-desc">文檔被切成 Chunk 後，每個 Chunk 失去了它在原文中的位置信息。一段在原文中意義清晰的文本，單獨拿出來可能完全無法理解。</div>
+    <div class="pb-example">
+      <div class="pbe-label">典型案例</div>
+      <div class="pbe-chunk">"The company's Q2 revenue increased by 3% over the previous quarter."</div>
+      <div class="pbe-question">哪個公司？哪一年？Q1 的基準是多少？這個增長率在行業中算好還是差？所有這些關鍵上下文，都在切 Chunk 時丟失了。向量檢索可能找到了這個 Chunk，但它本身攜帶的信息嚴重不足。</div>
+    </div>
+    <div class="pb-flow">
+      <div class="pf-node doc">完整文檔</div>
+      <div class="pf-arrow"><svg width="24" height="14" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="2"><line x1="0" y1="7" x2="20" y2="7"/><polyline points="16 3 20 7 16 11"/></svg></div>
+      <div class="pf-node cut">切成 Chunks</div>
+      <div class="pf-arrow"><svg width="24" height="14" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="2"><line x1="0" y1="7" x2="20" y2="7"/><polyline points="16 3 20 7 16 11"/></svg></div>
+      <div class="pf-node lost">上下文丟失</div>
+      <div class="pf-arrow"><svg width="24" height="14" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="2"><line x1="0" y1="7" x2="20" y2="7"/><polyline points="16 3 20 7 16 11"/></svg></div>
+      <div class="pf-node lost">檢索模糊</div>
+    </div>
+  </div>
+
+  <!-- ===== Contextual Retrieval 的思路 ===== -->
+  <div class="sec-label">Contextual Retrieval 的核心思路</div>
+
+  <div class="solution-box reveal paywall-locked xa-peek">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      在 Embedding 前，用 LLM 給每個 Chunk 加上上下文前綴
+    </h4>
+    <div class="sb-desc">思路非常直觀：在對 Chunk 做向量化之前，先用 LLM 閲讀整篇文檔，然後為每個 Chunk 生成一段簡短的上下文描述作為前綴。這樣每個 Chunk 在被檢索時都自帶了必要的語境信息。</div>
+    <div class="sb-compare">
+      <div class="sb-side before">
+        <div class="sbs-label">BEFORE -- 裸 Chunk</div>
+        <div class="sbs-code">"The company's Q2 revenue
+increased by 3% over the
+previous quarter."</div>
+        <div class="sbs-note">誰？什麼時候？無從得知。</div>
+      </div>
+      <div class="sb-side after">
+        <div class="sbs-label">AFTER -- 帶上下文的 Chunk</div>
+        <div class="sbs-code">"This chunk is from the company's
+2024 Annual Report, specifically
+the Financial Performance section.
+
+The company's Q2 revenue
+increased by 3% over the
+previous quarter."</div>
+        <div class="sbs-note">LLM 生成的前綴自動補充了來源、時間、章節。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 三层优化 ===== -->
+  <div class="sec-label paywall-locked">三層遞進優化</div>
+
+  <div class="layer-grid paywall-locked">
+    <div class="opt-card reveal">
+      <div class="oc-num">LAYER 01</div>
+      <div class="oc-title">Contextual Embeddings</div>
+      <div class="oc-desc">給每個 Chunk 加上下文前綴後再做向量化。前綴包含文檔標題、章節位置、關鍵實體等信息。向量檢索時，Chunk 自帶語境，語義匹配更精準。</div>
+    </div>
+    <div class="opt-card reveal">
+      <div class="oc-num">LAYER 02</div>
+      <div class="oc-title">Contextual BM25</div>
+      <div class="oc-desc">傳統的 BM25 關鍵詞檢索也加上上下文前綴。前綴中的關鍵詞（如公司名、年份）讓 BM25 能匹配到原本因缺少語境而無法命中的 Chunk。向量檢索 + BM25 雙路召回，互補盲區。</div>
+    </div>
+    <div class="opt-card reveal">
+      <div class="oc-num">LAYER 03</div>
+      <div class="oc-title">Reranking</div>
+      <div class="oc-desc">檢索後，用 Reranker 模型對候選 Chunk 重新排序。Reranker 能更精確地判斷 Chunk 與查詢的相關性，把最相關的結果排到前面。三層疊加效果最佳。</div>
+    </div>
+  </div>
+
+  <!-- ===== 效果数据 ===== -->
+  <div class="sec-label paywall-locked">效果數據</div>
+
+  <div class="data-panel reveal paywall-locked">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      檢索失敗率降低幅度
+    </h4>
+    <div class="data-bars">
+      <div class="data-bar">
+        <div class="db-label">僅 Contextual Embeddings</div>
+        <div class="db-track">
+          <div class="db-fill">49%</div>
+        </div>
+      </div>
+      <div class="data-bar">
+        <div class="db-label">Contextual Embeddings + BM25 + Reranking</div>
+        <div class="db-track">
+          <div class="db-fill">67%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:16px">
+    <b>67% 的檢索失敗率降低意味着什麼？</b>假設之前每 100 次檢索有 30 次找不到正確的 Chunk（失敗率 30%），優化後失敗率降到約 10%，三分之二的檢索錯誤被消除了。對於依賴 RAG 的生產系統來説，這是質的飛躍。
+  </div>
+
+  <!-- ===== 成本权衡 ===== -->
+  <div class="sec-label paywall-locked">成本權衡</div>
+
+  <div class="cost-panel reveal paywall-locked">
+    <h4>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      沒有免費的午餐
+    </h4>
+    <div class="cost-items">
+      <div class="cost-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        <span><b>預處理成本增加：</b>每個 Chunk 都需要一次額外的 LLM 調用來生成上下文前綴。對於大規模文檔庫，這個預處理成本不可忽視。</span>
+      </div>
+      <div class="cost-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <span><b>Prompt Caching 可以降低成本：</b>同一篇文檔的不同 Chunk 共享相同的文檔級上下文。利用 Prompt Caching，可以避免重複發送整篇文檔內容。</span>
+      </div>
+      <div class="cost-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span><b>適合高準確率場景：</b>如果你的 RAG 系統對準確率要求極高（如法律文檔檢索、醫療知識問答、金融合規查詢），額外的預處理成本是值得的。對於容錯率高的場景（如閒聊推薦），可能不划算。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Takeaway ===== -->
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>RAG 不是切 Chunk 加向量檢索就夠了，每個 Chunk 要自帶上下文。</b>Contextual Retrieval 的核心洞察：檢索的質素瓶頸在 Chunk 本身的信息完整性，換更強的向量模型幫助有限。給 Chunk 補上丟失的語境，檢索失敗率可以降低三分之二。</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){
+  var ob = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); ob.unobserve(e.target); }});
+  }, {threshold:0.15});
+  ob.observe(el);
+});
+</script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Linux: build the view, then seccomp, then exec | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* 变量挂在 .lesson 上：nav-inject.js 会在页面样式之后再注入一次 :root 主色，
+   靠就近继承才能保住专题色。 */
+:root,.lesson{--accent:#414b5a;--accent-deep:#262d38;--accent-soft:rgba(65,75,90,.085)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(65,75,90,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(65,75,90,.04),0 0 0 52px rgba(65,75,90,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(65,75,90,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.q-tag{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font-size:13px;font-weight:800;margin:28px 0 14px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.visual{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.source{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin:24px 0 0}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}.source code{color:var(--text);font:12.5px/1.85 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.snapshot{margin:14px 0 0;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text);background:rgba(0,0,0,.05)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eff1f5,var(--card));border:1px solid rgba(65,75,90,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.9}.exercise p:last-child{margin:0}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);color:var(--text);display:flex;gap:14px;font-size:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.compare{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h4{margin:0;font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}.cmp-card h4 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:12px 0 0}
+.cmp-card .cmp-tag{display:inline-block;margin-top:14px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent-deep);border:1px solid rgba(65,75,90,.25)}
+/* ── 交互演示 ── */
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card)}
+.demo-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo-ctrl button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;min-height:44px;min-width:44px;border:1px solid rgba(65,75,90,.35);border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font:600 14px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:filter .15s}
+.demo-ctrl button:active{filter:brightness(.92)}
+.dm-budget{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-budget .dm-b-label{font-size:13px;font-weight:700;color:var(--text);flex:0 0 auto}
+.dm-budget .dm-b-hint{font-size:12px;color:var(--sub);line-height:1.7}
+.dm-seg{display:flex;gap:8px;flex-wrap:wrap}
+.dm-seg button{min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--sub);font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all .15s cubic-bezier(.4,0,.2,1)}
+.dm-seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dm-req{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 18px;margin-bottom:20px;border-radius:12px;background:var(--card);border:1px solid var(--border);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-req.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-req .dm-req-k{font-size:12px;font-weight:700;color:var(--sub)}
+.dm-req .dm-req-v{font-size:14px;font-weight:800;color:var(--accent-deep);margin-top:4px;word-break:break-all}
+.dm-req .dm-who{text-align:right}
+.dm-req .dm-who b{display:block;font-size:14px;color:var(--accent-deep);margin-top:4px}
+.dm-gates{position:relative;display:flex;gap:16px}
+.dm-gate{flex:1 1 0;min-width:0;border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:20px;min-height:168px;max-height:360px;display:flex;flex-direction:column;gap:10px;overflow:hidden;opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-gates.is-live .dm-gate{opacity:.4;transform:scale(.98)}
+.dm-gates.is-live .dm-gate.on,.dm-gates.is-live .dm-gate.ok,.dm-gates.is-live .dm-gate.no{opacity:1;transform:scale(1)}
+.dm-gate.on{background:var(--accent-soft);border-color:rgba(65,75,90,.45)}
+.dm-gate.ok{background:rgba(22,163,74,.07);border-color:rgba(22,163,74,.4)}
+.dm-gate.no{background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.35)}
+.dm-gate.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-gate.skip,.dm-gates.is-live .dm-gate.skip{opacity:.4;transform:scale(.98);flex:0.45 1 0;max-height:140px;min-height:0}
+.dm-gate:after{content:"";display:block;height:4px;margin-top:auto;border-radius:99px;background:var(--accent);transform:scaleX(.12);transform-origin:left center;transition:transform .5s cubic-bezier(.25,1,.5,1)}
+.dm-gate.on:after{transform:scaleX(.55)}
+.dm-gate.ok:after{transform:scaleX(1);background:var(--success)}
+.dm-gate.no:after{transform:scaleX(1);background:var(--danger)}
+.dm-gate.skip:after{transform:scaleX(0)}
+.dm-ghost{position:absolute;z-index:2;pointer-events:none;margin:0;transition:all .4s cubic-bezier(.25,1,.5,1)}
+.dm-ghost.fly{opacity:0;transform:translateY(-18px) scale(.9)}
+.dm-g-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.dm-g-name{font-size:13px;font-weight:800;color:var(--text)}
+.dm-g-badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--card);color:var(--sub);border:1px solid var(--border);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-g-badge.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-gate.on .dm-g-badge{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dm-gate.ok .dm-g-badge{background:var(--success);color:#fff;border-color:var(--success)}
+.dm-gate.no .dm-g-badge{background:var(--danger);color:#fff;border-color:var(--danger)}
+.dm-g-why{font-size:13px;line-height:1.8;color:var(--sub);flex:1}
+.dm-g-why.is-enter,.dm-verdict.is-enter{opacity:0;transform:translateY(8px)}
+.dm-g-why.is-enter.in,.dm-verdict.is-enter.in{opacity:1;transform:none;transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-verdict{margin-top:20px;padding:16px 18px;border-radius:10px;border:1px dashed var(--border);background:var(--bg);font-size:13.5px;line-height:1.8;color:var(--sub);min-height:58px;transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-verdict.warn{border-style:solid;border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.05);color:var(--danger);font-weight:600}
+.dm-verdict.hold{border-style:solid;border-color:rgba(65,75,90,.4);background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-verdict.ok{border-style:solid;border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.07);color:var(--success);font-weight:600}
+.dm-verdict.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-trace{margin-top:24px;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.dm-trace-tag{padding:12px 18px;background:var(--card);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--sub)}
+.dm-trace ol{margin:0;padding:10px 0;list-style:none}
+.dm-trace li{display:flex;justify-content:space-between;gap:16px;padding:9px 18px;font-size:12.5px;line-height:1.7;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-trace.is-live li{opacity:.4;transform:scale(.98)}
+.dm-trace.is-live li.on{opacity:1;transform:scale(1);background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-trace li.on{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-trace li.firing{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-trace li span.ln{flex:0 0 auto;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)}
+.dm-trace li.on span.ln{color:var(--accent-deep)}
+.dm-caption{margin-top:20px;min-height:56px;display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.dm-caption svg{flex:0 0 auto;color:var(--accent)}
+#dm-caption-text{transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-summary{display:flex;flex-direction:column;gap:14px;max-height:0;overflow:hidden;opacity:0;margin-top:0;padding:0 22px;border:1px solid transparent;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),var(--card));transition:max-height .5s cubic-bezier(.25,1,.5,1),opacity .4s cubic-bezier(.4,0,.2,1)}
+.dm-summary.on{max-height:400px;opacity:1;margin-top:20px;padding:20px 22px;border-color:rgba(65,75,90,.3)}
+.dm-summary .dm-s{font-size:13px;line-height:1.8;color:var(--sub)}.dm-summary .dm-s b{display:block;font-size:13.5px;color:var(--accent-deep);margin-bottom:2px}
+.demo-caption{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.7}
+@keyframes flashPop{0%{transform:scale(.8)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(65,75,90,.3)}50%{box-shadow:0 0 20px 6px rgba(65,75,90,.2)}100%{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.demo,.demo *{transition-duration:0s!important;animation-duration:0s!important}}
+@media(max-width:760px){.lesson{overflow-x:hidden}.compare{grid-template-columns:1fr}.objective{grid-template-columns:1fr}.lesson-header:after{display:none}.demo{padding:18px;max-width:100%;min-width:0;overflow-x:hidden}.demo-ctrl{width:100%}.demo-ctrl button{flex:1}.dm-gates{flex-direction:column}.dm-gate.skip,.dm-gates.is-live .dm-gate.skip{flex:0 1 auto;max-height:120px}.dm-req{flex-direction:column;align-items:flex-start}.dm-req .dm-who{text-align:left}.visual{padding:14px;max-width:100%;min-width:0}.dm-trace li{flex-direction:column;gap:4px}.source,.cmp-card{max-width:100%;min-width:0}.lesson code{overflow-wrap:anywhere;word-break:break-word}}
+</style>
+<meta name="description" content="On Linux, Codex first swaps the filesystem view with bubblewrap, then applies seccomp in the same helper, and only then execs the user command. Send one access request through and see which layer stops it">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Linux: build the view, then seccomp, then exec","name":"Linux: build the view, then seccomp, then exec","url":"https://xueai.miyang.cn/slides/codex-15.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Sandbox","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"On Linux, Codex first swaps the filesystem view with bubblewrap, then applies seccomp in the same helper, and only then execs the user command. Send one access request through and see which layer stops it","datePublished":"2026-08-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Linux: build the view, then seccomp, then exec"><meta property="og:description" content="On Linux, Codex first swaps the filesystem view with bubblewrap, then applies seccomp in the same helper, and only then execs the user command. Send one access request through and see which layer stops it"><meta property="og:url" content="https://xueai.miyang.cn/slides/codex-15.en.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.miyang.cn/slides/codex-15.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/codex-15.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/codex-15.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/codex-15.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/codex-15.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/codex-15.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/codex-15.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/codex-15.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI Product Manager Training">
+<meta property="og:locale" content="en_US">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>OpenAI Codex · Code Mode</div>
+    <h1>Linux: build the view, then seccomp, then exec</h1>
+    <p class="subtitle">The same read: Mac returns Operation not permitted, Linux returns No such file or directory. Linux first swaps the file tree the process can see, then tightens which syscalls it can make.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>The same read: Mac returns Operation not permitted, Linux returns No such file or directory. Linux first swaps the file tree the process can see, then tightens which syscalls it can make.</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5" fill="none"/></svg>
+    <span><b>Course goal</b>After this lesson you can explain three things. Why the Linux default path is two beats: bubblewrap builds the filesystem view first, then seccomp. Why a separate helper exists. Why the type is still named LandlockCommand while the default walks bubblewrap.</span>
+  </div>
+
+  <div class="sec-label">Try it first · One request through two layers</div>
+  <div class="demo reveal" id="demo-layers">
+    <div class="demo-top">
+      <div class="demo-title">Swap probes, flip switches, see which layer stops the request</div>
+      <div class="demo-ctrl">
+        <button id="dm-play" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="none"/></svg>Play</button>
+        <button id="dm-step" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z" fill="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Step</button>
+        <button id="dm-reset" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" fill="none"/><path d="M3 3v5h5" fill="none"/></svg>Reset</button>
+      </div>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">Probe</span>
+      <div class="dm-seg" id="dm-probe">
+        <button type="button" data-probe="shadow" class="on">Read /etc/shadow</button>
+        <button type="button" data-probe="workspace">Read workspace</button>
+        <button type="button" data-probe="connect">connect outbound</button>
+        <button type="button" data-probe="nouser">Turn off user namespace</button>
+      </div>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">Switches</span>
+      <div class="dm-seg" id="dm-flags">
+        <button type="button" data-flag="wsl1">WSL1</button>
+        <button type="button" data-flag="legacy">legacy Landlock</button>
+      </div>
+      <span class="dm-b-hint">On the default path, reading /etc/shadow stops at the view. Switch to connect and the same road reaches the filter.</span>
+    </div>
+    <div class="dm-req">
+      <div>
+        <div class="dm-req-k">This request</div>
+        <div class="dm-req-v" id="dm-req-v">open /etc/shadow</div>
+      </div>
+      <div class="dm-who">
+        <div class="dm-req-k">Current path</div>
+        <b id="dm-who">Default two-stage</b>
+      </div>
+    </div>
+    <div class="dm-gates">
+      <div class="dm-gate" id="dm-g1">
+        <div class="dm-g-top"><span class="dm-g-name">Layer 1 · Preflight</span><span class="dm-g-badge">Standby</span></div>
+        <div class="dm-g-why" id="dm-g1-why">transform first asks whether the helper is there, whether this is WSL1, and whether a user namespace can be built. If it cannot enter, it stops here.</div>
+      </div>
+      <div class="dm-gate" id="dm-g2">
+        <div class="dm-g-top"><span class="dm-g-name">Layer 2 · View</span><span class="dm-g-badge">Standby</span></div>
+        <div class="dm-g-why" id="dm-g2-why">bubblewrap swaps the file tree first. Default is read-only; writable roots are layered on. A path not in the mounts later reports that the file does not exist.</div>
+      </div>
+      <div class="dm-gate" id="dm-g3">
+        <div class="dm-g-top"><span class="dm-g-name">Layer 3 · seccomp</span><span class="dm-g-badge">Standby</span></div>
+        <div class="dm-g-why" id="dm-g3-why">Only after the view is built does it set no_new_privs and install the network filter. A hit returns EPERM.</div>
+      </div>
+    </div>
+    <div class="dm-verdict" id="dm-verdict">Hit Play to watch this request walk through the two layers.</div>
+    <div class="dm-trace">
+      <div class="dm-trace-tag">Logic trail · each animation step maps to a source span</div>
+      <ol id="dm-trace">
+        <li><span>Read the permission profile and preflight WSL1</span><span class="ln">manager.rs L413</span></li>
+        <li><span>Build helper argv and attach the profile JSON</span><span class="ln">landlock.rs L23</span></li>
+        <li><span>Outer run_main picks bwrap or the shortcut</span><span class="ln">linux_run_main.rs L152</span></li>
+        <li><span>Build the inner command with --apply-seccomp-then-exec</span><span class="ln">linux_run_main.rs L1520</span></li>
+        <li><span>bwrap does ro-bind, bind, unshare in order</span><span class="ln">bwrap.rs L306</span></li>
+        <li><span>Insert --as-pid-1 when execing bwrap</span><span class="ln">launcher.rs L39</span></li>
+        <li><span>Inner capget, confirm capabilities are zero</span><span class="ln">linux_run_main.rs L216</span></li>
+        <li><span>Set PR_SET_NO_NEW_PRIVS, then install seccomp</span><span class="ln">landlock.rs L61</span></li>
+        <li><span>Fork the user command; the parent waitpid reaps orphans</span><span class="ln">linux_run_main.rs L243</span></li>
+        <li><span>execvp takes over the process image</span><span class="ln">linux_run_main.rs L1565</span></li>
+      </ol>
+    </div>
+    <div class="dm-caption" id="dm-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none"/></svg><span id="dm-caption-text">Hit Play to watch this request walk through the two layers.</span></div>
+    <div class="dm-summary" id="dm-summary">
+      <div class="dm-s"><b>The view blocks seeing</b>If the path is not in the mounts, the kernel returns No such file or directory. This layer has not reached the syscall table yet.</div>
+      <div class="dm-s"><b>seccomp blocks calling</b>The filter allows by default; only hits on rules like connect, bind, ptrace return EPERM. Files already invisible are not its job.</div>
+      <div class="dm-s"><b>If it cannot enter, say so</b>On WSL1 or a missing user namespace, the command stops in transform. A default-path failure does not quietly fall back to Landlock.</div>
+    </div>
+    <div class="demo-caption">Teaching sketch: paths and probes are course fixtures. Line numbers on the logic trail match openai/codex commit 4f39251a01.</div>
+  </div>
+
+  <div class="sec-label">Idea 1 · Swap the world it can see, then tighten calls</div>
+
+  <div class="q-tag reveal">What problem it solves</div>
+  <p class="reveal">A teammate runs Codex on a Mac; the agent reads <code>~/.ssh/id_rsa</code>; Seatbelt returns Operation not permitted at once. Put the same repo on a Linux laptop and the usual copy becomes No such file or directory. The path is often not in the mounts at all.</p>
+  <p class="reveal">If you set <code>PR_SET_NO_NEW_PRIVS</code> first, then call the distro’s own bwrap, the setuid binary on many distros will not even start. The sandbox fails on the machine that has everything installed. seccomp is a kernel filter that says which syscalls the process may still make; <code>no_new_privs</code> is its precondition, and it also blocks setuid privilege gain.</p>
+
+  <div class="q-tag reveal">What the idea is</div>
+  <p class="reveal">The default path enters the same helper twice. The outer pass only builds bubblewrap, swaps the filesystem to default read-only, then layers writable roots; <code>.git</code>, <code>.agents</code>, and <code>.codex</code> stay read-only even when they sit inside a writable root. The inner pass then sets <code>no_new_privs</code>, installs network seccomp, forks, and hands the process image to the user command.</p>
+  <p class="reveal">The function header writes the order as three steps:</p>
+  <div class="source reveal">
+    <div class="source-head"><span>codex-rs/linux-sandbox/src/linux_run_main.rs</span><span>lines 152–158</span></div>
+    <pre><code>/// Entry point for the Linux sandbox helper.
+///
+/// The sequence is:
+/// 1. When needed, wrap the command with bubblewrap to construct the
+///    filesystem view.
+/// 2. Apply in-process restrictions (no_new_privs + seccomp).
+/// 3. `execvp` into the final command.</code></pre>
+  </div>
+  <div class="snapshot">Source snapshot note: based on the local <code>openai/codex</code> repo; verified file <code>codex-rs/linux-sandbox/src/linux_run_main.rs</code>, commit <code>4f39251a01</code>, verified 2026-08-22. The code block keeps the original source; these three steps are the default-path contract.</div>
+  <p class="reveal paywall-locked xa-peek" style="margin-top:20px">A field comment puts the reason on the flag: bubblewrap may depend on setuid, so build the view first, then tighten.<span class="src-note">Source: <code>codex-rs/linux-sandbox/src/linux_run_main.rs</code> lines 117–121；<code>codex-rs/linux-sandbox/src/landlock.rs</code> lines 57–65</span></p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 300" role="img" aria-label="Two-beat order: view first, then seccomp" fill="none">
+      <defs><marker id="arrA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="40" width="260" height="220" rx="16" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="170" y="84" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">Outer helper</text>
+      <text x="170" y="122" fill="#6b7280" text-anchor="middle" font-size="13">Build bubblewrap flags</text>
+      <text x="170" y="150" fill="#6b7280" text-anchor="middle" font-size="13">--ro-bind then --bind</text>
+      <text x="170" y="196" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Swap the file tree first</text>
+      <text x="170" y="224" fill="#6b7280" text-anchor="middle" font-size="13">Do not touch no_new_privs yet</text>
+      <path fill="none" d="M310 150H390" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="398" y="40" width="260" height="220" rx="16" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="528" y="84" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">Inner helper</text>
+      <text x="528" y="122" fill="#6b7280" text-anchor="middle" font-size="13">capget confirms caps are zero</text>
+      <text x="528" y="150" fill="#6b7280" text-anchor="middle" font-size="13">no_new_privs plus seccomp</text>
+      <text x="528" y="196" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Then tighten syscalls</text>
+      <text x="528" y="224" fill="#6b7280" text-anchor="middle" font-size="13">With --apply-seccomp-then-exec</text>
+      <path fill="none" d="M668 150H748" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="756" y="40" width="144" height="220" rx="16" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="828" y="122" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">execvp</text>
+      <text x="828" y="168" fill="#6b7280" text-anchor="middle" font-size="13">User command</text>
+      <text x="828" y="196" fill="#6b7280" text-anchor="middle" font-size="13">Takes the process</text>
+    </svg>
+    <div class="visual-caption">Teaching diagram: the same binary enters twice, with a bubblewrap-built world in between.</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">What you can see, and which syscalls you can make, are two walls. Swap the world first, then tighten calls. Rewrite it in another language: as long as distros still ship a setuid wrapper, this order still holds.</p>
+
+  <div class="sec-label paywall-locked">Idea 2 · Start a helper, leave someone to reap orphans</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">bubblewrap and seccomp must happen in the process that is about to become the user command. If the main CLI unshares and execs itself, a failure takes the whole session with it, and you cannot leave a PID-1 reaper in the PID namespace. Timeouts and cancels leave sleeping processes behind.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">Linux looks at the basename of argv[0]. If the filename is already <code>codex-linux-sandbox</code>, keep it; otherwise rewrite it to that alias and steer the same binary into the helper. The outer exec is not <code>ls</code>; it is the helper itself, with <code>--apply-seccomp-then-exec</code>. The launcher also inserts <code>--as-pid-1</code> so bubblewrap itself is PID 1 in the namespace.</p>
+  <p class="reveal paywall-locked">The inner pass starts with <code>capget</code>. If effective or permitted is nonzero, it panics at once; the command never runs. Only after that check does it fork. The child <code>execvp</code>s; the parent <code>waitpid(-1)</code> reaps descendants and forwards the exit code as-is.<span class="src-note">Source: <code>codex-rs/linux-sandbox/src/linux_run_main.rs</code> lines 216–221、lines 242–243；<code>codex-rs/linux-sandbox/src/launcher.rs</code> lines 38–39</span></p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 280" role="img" aria-label="Handoff order: helper, bubblewrap, inner pass, user command" fill="none">
+      <defs><marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="28" y="70" width="150" height="88" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="103" y="122" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">SandboxManager</text>
+      <path fill="none" d="M188 114H248" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="256" y="70" width="150" height="88" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="331" y="110" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Outer helper</text>
+      <text x="331" y="134" fill="#6b7280" text-anchor="middle" font-size="12">Build inner argv</text>
+      <path fill="none" d="M416 114H476" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="484" y="70" width="150" height="88" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="559" y="110" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">bubblewrap</text>
+      <text x="559" y="134" fill="#6b7280" text-anchor="middle" font-size="12">--as-pid-1</text>
+      <path fill="none" d="M644 114H704" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <rect x="712" y="36" width="200" height="70" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="812" y="64" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Inner fork of the command</text>
+      <text x="812" y="88" fill="#6b7280" text-anchor="middle" font-size="12">Child execvp</text>
+      <rect x="712" y="126" width="200" height="70" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="812" y="154" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Parent stays</text>
+      <text x="812" y="178" fill="#6b7280" text-anchor="middle" font-size="12">waitpid reaps orphans</text>
+      <text x="470" y="240" fill="#6b7280" text-anchor="middle" font-size="13">Cancel and timeout lean on the PID 1 that stayed</text>
+    </svg>
+    <div class="visual-caption">Teaching sequence: after the process is handed off, the reaper is still there.</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">A dedicated helper plus wrap-then-tighten is the same family of self-invocation across platforms. Windows looks at a hidden flag; Linux looks at arg0. When the wrapper fails, a fixed exit code plus a fixed stderr prefix is easier to attribute automatically.</p>
+
+  <div class="sec-label paywall-locked">Idea 3 · The default is not Landlock, and failure does not fall back</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">The type is still named <code>LandlockCommand</code>, and the crate directory is still <code>linux-sandbox</code>, so plenty of write-ups say Codex uses Landlock on Linux. The current default filesystem sandbox is already bubblewrap. Landlock is an explicit legacy fallback; the feature flag is marked Deprecated and off by default. Legacy cannot express restricted read, and cannot express nested read-only that was split out.</p>
+  <p class="reveal paywall-locked">If bwrap fails and silently switches to Landlock, the model plans as if “I am locked in a view,” while it can still see the host file tree. The next step forks.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">The outer pass writes never falls back. bubblewrap failure is failure. On WSL1, when bubblewrap is required, <code>transform</code> returns <code>Wsl1UnsupportedForBubblewrap</code> and the command never enters the helper. When the disk is fully writable and no proxy is used, bwrap is not entered at all, so WSL1 can pass. A user namespace that cannot be built becomes a startup warning; it does not switch to a weaker backend.<span class="src-note">Source: <code>codex-rs/linux-sandbox/src/linux_run_main.rs</code> lines 290–294；<code>codex-rs/sandboxing/src/manager.rs</code> lines 413–420、lines 696–710；<code>codex-rs/features/src/lib.rs</code> lines 1064–1069</span></p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 300" role="img" aria-label="Three Linux machines are not the same wall" fill="none">
+      <defs><marker id="arrC" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="28" y="36" width="280" height="228" rx="16" fill="#ffffff" stroke="rgba(65,75,90,.28)"/>
+      <text x="168" y="76" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">Local distro</text>
+      <text x="168" y="112" fill="#6b7280" text-anchor="middle" font-size="13">Has user namespace</text>
+      <text x="168" y="140" fill="#6b7280" text-anchor="middle" font-size="13">System bwrap or bundled binary</text>
+      <path fill="none" d="M168 160V188" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <text x="168" y="220" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Default two-stage</text>
+      <rect x="330" y="36" width="280" height="228" rx="16" fill="#ffffff" stroke="rgba(65,75,90,.28)"/>
+      <text x="470" y="76" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">CI container</text>
+      <text x="470" y="112" fill="#6b7280" text-anchor="middle" font-size="13">User namespace disabled</text>
+      <text x="470" y="140" fill="#6b7280" text-anchor="middle" font-size="13">No silent Landlock fallback</text>
+      <path fill="none" d="M470 160V188" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <text x="470" y="220" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Startup warning, hard fail</text>
+      <rect x="632" y="36" width="280" height="228" rx="16" fill="#ffffff" stroke="rgba(65,75,90,.28)"/>
+      <text x="772" y="76" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">WSL1</text>
+      <text x="772" y="112" fill="#6b7280" text-anchor="middle" font-size="13">Cannot build a user namespace</text>
+      <text x="772" y="140" fill="#6b7280" text-anchor="middle" font-size="13">Commands that need bwrap cannot enter</text>
+      <path fill="none" d="M772 160V188" stroke="#414b5a" stroke-width="2" marker-end="url(#arrC)"/>
+      <text x="772" y="220" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Refused at transform</text>
+    </svg>
+    <div class="visual-caption">Teaching diagram: they are all called a Linux sandbox; the layer that is actually on is not the same on three machines.</div>
+  </div>
+  <div class="key-line reveal paywall-locked">Seeing and calling are two walls. If it cannot enter, say so — do not synthesize “already sandboxed.”</div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">When platforms are unequal, the easy mistake is covering every Linux with “we have a Linux sandbox.” A laptop with a new bwrap, a CI container that banned user namespaces, a teammate still on WSL1 — three machines, not one wall. Product copy and the model brief must be written against the layer that is actually on.</p>
+
+  <div class="sec-label paywall-locked">Side-by-side · after the three beats split, what each side leaks</div>
+  <div class="compare paywall-locked">
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness: if the probe passes, shift gears, fuse into one beat</h4>
+      <p>DSH’s Linux chain is hard-wired as <code>bwrap</code> then <code>landlock</code>. The bwrap tier is view plus exec, no seccomp. Only if the probe fails does it take <code>landlock-run</code>: install rules on itself, then exec the target. Filesystem limits and exec share one <code>main</code>. That path has no setuid bwrap, so the filter does not need another beat.</p>
+      <p>Both sides use a dedicated helper. DSH launcher failure is 125, and you also need the fatal <code>landlock-run: </code> line — easier to attribute. Codex helper failure is a panic or the wait status as-is. If both chains fail the probe, DSH refuses to run naked. It may shift to a probed second tier; after the shift it still fails closed. Codex’s default path does not fall back to Landlock.<span class="src-note">Source: <code>packages/sandbox/sandbox-local/src/index.ts</code> lines 159–166；<code>native/landlock-run/packages/entry/src/main.c</code> lines 254–261</span></p>
+      <span class="cmp-tag">Checked DSH PLATFORM_CHAINS and landlock-run · 2026-08-22 · <a href="dsh-16.html">DSH · Sandbox</a></span>
+    </div>
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok: three beats hit the agent; failure may fall back</h4>
+      <p>Grok’s order shares Codex’s engineering reason: let a possibly-setuid bwrap finish, then tighten inside a process that is already in the namespace. The subject differs. Grok lands the three beats on the agent process; commands only inherit the result. The view is a patchy <code>--bind / /</code> then deny paths on top; the host tree is still there. When a child spawns, if the network must be limited, seccomp is installed in <code>pre_exec</code>.</p>
+      <p>If bwrap exec fails and read-deny is not required, it warns once and falls back to Landlock. A built-in Profile <code>apply</code> failure is a warning and continue; <code>is_active()</code> is the real state. Codex’s outer pass writes never falls back.<span class="src-note">Source: <code>crates/codegen/xai-grok-shell/src/config/mod.rs</code> lines 1293–1320；<code>crates/codegen/xai-grok-sandbox/src/lib.rs</code> lines 181–192</span></p>
+      <span class="cmp-tag">Checked Grok bwrap_reexec_for_profile and apply · 2026-08-22 · <a href="12-17.html">Grok · Five sandbox Profiles</a></span>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div>
+      <h3>The same read — after you flip switches, where does it stick</h3>
+      <p>Leave the probe on reading <code>/etc/shadow</code>, then turn on WSL1. Write your prediction: which layer it stops at, and what the copy says. Then turn WSL1 off, turn on legacy Landlock, and see whether restricted read becomes UnsupportedOperation.</p>
+      <p>Advanced: switch the probe to connect outbound. Why does the default path walk through the view and stop at seccomp, with the copy changing from No such file to EPERM?</p>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/></svg>
+    <span><b>Takeaway:</b> The Linux default path is three beats: bubblewrap swaps the filesystem view, then seccomp is applied in a helper already inside the namespace, then exec. Reverse the order and a setuid system bwrap will not start. The type is still named Landlock — that is compatibility, not the current default. If it cannot enter, refuse before spawn; failure does not switch to a weaker backend.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function(){
+  var probe = 'shadow';
+  var wsl1 = false, legacy = false;
+  var steps = [], idx = 0, autoId = null, pauseUntil = 0, played = false;
+  var prevG = ['wait','wait','wait'];
+  var gEls = [document.getElementById('dm-g1'), document.getElementById('dm-g2'), document.getElementById('dm-g3')];
+  var gWhy = [document.getElementById('dm-g1-why'), document.getElementById('dm-g2-why'), document.getElementById('dm-g3-why')];
+  var gatesBox = document.querySelector('#demo-layers .dm-gates');
+  var reqBox = document.querySelector('#demo-layers .dm-req');
+  var reqEl = document.getElementById('dm-req-v');
+  var whoEl = document.getElementById('dm-who');
+  var verdict = document.getElementById('dm-verdict');
+  var traceBox = document.querySelector('#demo-layers .dm-trace');
+  var traceRows = Array.prototype.slice.call(document.querySelectorAll('#dm-trace li'));
+  var captionText = document.getElementById('dm-caption-text');
+  var summary = document.getElementById('dm-summary');
+  var IDLE = 'Hit Play to watch this request walk through the two layers.';
+  var BADGE = {wait:'Standby', on:'Checking', ok:'Allow', no:'Block', skip:'Skip'};
+  var GATE_IDLE = [
+    'transform first asks whether the helper is there, whether this is WSL1, and whether a user namespace can be built. If it cannot enter, it stops here.',
+    'bubblewrap swaps the file tree first. Default is read-only; writable roots are layered on. A path not in the mounts later reports that the file does not exist.',
+    'Only after the view is built does it set no_new_privs and install the network filter. A hit returns EPERM.'
+  ];
+  var ACT = {
+    shadow:    {req:'open /etc/shadow', name:'Read /etc/shadow'},
+    workspace: {req:'open ./src/main.rs', name:'Read a workspace file'},
+    connect:   {req:'connect 203.0.113.10:443', name:'connect to an address that is in the view'},
+    nouser:    {req:'open /etc/hostname', name:'Read /etc/hostname; this host banned user namespace'}
+  };
+
+  function pathLabel(){
+    var bits = [];
+    if (wsl1) bits.push('WSL1');
+    if (legacy) bits.push('legacy Landlock');
+    return bits.length ? bits.join(' + ') : 'Default two-stage';
+  }
+  function needsBwrap(){ return !legacy; }
+  function step(o){ steps.push(o); }
+
+  function buildSteps(){
+    var A = ACT[probe];
+    var who = pathLabel();
+    steps = [];
+    step({
+      cap: 'Request in: ' + A.name + '. Current path is ' + who + '. The two layers are not lit yet.',
+      trace: 0, who: who, req: A.req,
+      g:['wait','wait','wait'], w: GATE_IDLE.slice(),
+      vk:'', vs:'Two layers on standby.'
+    });
+
+    if (wsl1 && needsBwrap()) {
+      step({
+        cap: 'transform preflights first. WSL1 cannot build a user namespace, and this command needs bubblewrap.',
+        trace: 0, who: who, req: A.req,
+        g:['on','wait','wait'],
+        w:['is_wsl1 is true; requires_bubblewrap is true.','Not yet time to build the view.','Not yet time for the filter.'],
+        vk:'hold', vs:'Preflight is asking whether this machine can walk bubblewrap.'
+      });
+      step({
+        cap: 'Returns Wsl1UnsupportedForBubblewrap. The command never enters the helper. The product hint is switch to WSL2.',
+        trace: 0, who: who, req: A.req,
+        g:['no','skip','skip'],
+        w:['WSL1 and bwrap required; transform refuses outright.','Not reached.','Not reached.'],
+        vk:'warn', vs:'Wsl1UnsupportedForBubblewrap. The model sees sandbox unavailable, not file-not-found.',
+        fin:true
+      });
+      return;
+    }
+
+    if (probe === 'nouser' && needsBwrap()) {
+      step({
+        cap: 'The helper is there, and this is not WSL1. Next, probe user namespace with system bwrap.',
+        trace: 0, who: who, req: A.req,
+        g:['on','wait','wait'],
+        w:['The probe runs --unshare-user --unshare-net.','The view is not built yet.','The filter is not installed yet.'],
+        vk:'hold', vs:'Probing user namespace.'
+      });
+      step({
+        cap: 'Hit No permissions to create a new namespace. Emit a startup warning; the envelope never enters the conveyor. No Landlock fallback.',
+        trace: 0, who: who, req: A.req,
+        g:['no','skip','skip'],
+        w:['user namespace cannot be built; startup warning, hard fail.','Not reached. The default path never falls back.','Not reached.'],
+        vk:'warn', vs:'Cannot enter. The model must not plan as if it is already confined.',
+        fin:true
+      });
+      return;
+    }
+
+    step({
+      cap: 'Preflight passes. Build argv starting with the helper; the profile is serialized into --permission-profile.',
+      trace: 1, who: who, req: A.req,
+      g:['ok','wait','wait'],
+      w:['Helper is there; preflight allows.',GATE_IDLE[1],GATE_IDLE[2]],
+      vk:'hold', vs:'The request enters the helper.'
+    });
+
+    if (legacy) {
+      step({
+        cap: '--use-legacy-landlock is on. The outer pass skips bubblewrap and confines this process on the spot.',
+        trace: 2, who: who, req: A.req,
+        g:['ok','on','wait'],
+        w:['Preflight allows. Legacy does not need bwrap.','apply_landlock_fs is true. The restricted-read tier reports UnsupportedOperation.','Network seccomp may still be installed.'],
+        vk:'hold', vs:'Walking the legacy path.'
+      });
+      if (probe === 'shadow') {
+        step({
+          cap: 'Legacy Landlock models full-disk read and writes on writable roots. Restricted read errors out; the command never ran.',
+          trace: 2, who: who, req: A.req,
+          g:['ok','no','skip'],
+          w:['Preflight allows.','Restricted read-only access is not supported by the legacy Linux Landlock filesystem backend.','Not reached.'],
+          vk:'warn', vs:'UnsupportedOperation. This is why the default no longer walks Landlock.',
+          fin:true
+        });
+        return;
+      }
+      if (probe === 'workspace' || probe === 'nouser') {
+        step({
+          cap: 'The workspace sits in the writable-root model; legacy allows the read. No mount view was swapped; the host tree is still there.',
+          trace: 7, who: who, req: A.req,
+          g:['ok','ok','on'],
+          w:['Preflight allows.','Landlock write limits are on; reads are allowed as full-disk readable.','Next, whether to install the network filter.'],
+          vk:'hold', vs:'The filesystem gate passed; ready to exec.'
+        });
+        step({
+          cap: 'Legacy has no reaper in a PID namespace. It execvp’s on the spot; the process image becomes the user command.',
+          trace: 9, who: who, req: A.req,
+          g:['ok','ok','ok'],
+          w:['Preflight allows.','No view swap; only writes were limited.','If network policy is off, the filter is already on; this is a read, allow.'],
+          vk:'ok', vs:'The command ran. Isolation stopped at Landlock write limits.',
+          fin:true
+        });
+        return;
+      }
+      step({
+        cap: 'connect does not use file rules. Legacy still installs network seccomp; a connect hit returns EPERM.',
+        trace: 7, who: who, req: A.req,
+        g:['ok','ok','on'],
+        w:['Preflight allows.','Landlock does not care about network calls.','Restricted mode bans connect / bind / listen.'],
+        vk:'hold', vs:'The request reached the filter.'
+      });
+      step({
+        cap: 'Filter hit. The copy is EPERM. The command never sent the packet.',
+        trace: 7, who: who, req: A.req,
+        g:['ok','ok','no'],
+        w:['Preflight allows.','The view gate sits out.','connect is bounced by seccomp with EPERM.'],
+        vk:'warn', vs:'EPERM. Stuck at the filter, not the file tree.',
+        fin:true
+      });
+      return;
+    }
+
+    step({
+      cap: 'The outer pass picks the default two-stage path. It builds the inner command first; user argv is wrapped after --apply-seccomp-then-exec.',
+      trace: 3, who: who, req: A.req,
+      g:['ok','on','wait'],
+      w:['Preflight allows.','About to exec bubblewrap, not the user command yet.','seccomp must wait until the view is built.'],
+      vk:'hold', vs:'The outer pass only swaps the world.'
+    });
+    step({
+      cap: 'bubblewrap mounts in order: read-only roots, writable roots, then protected subpaths back on top. It also unshares user / pid / ipc.',
+      trace: 4, who: who, req: A.req,
+      g:['ok','on','wait'],
+      w:['Preflight allows.','--ro-bind then --bind. Paths like /etc/shadow are often not in the view.','no_new_privs is not set yet.'],
+      vk:'hold', vs:'The file tree is being swapped for a new one.'
+    });
+
+    if (probe === 'shadow') {
+      step({
+        cap: '/etc/shadow is not in the mounts. The kernel returns No such file or directory. The filter has not had its turn.',
+        trace: 4, who: who, req: A.req,
+        g:['ok','no','skip'],
+        w:['Preflight allows.','The path vanished from the view; the copy is No such file or directory.','Not reached. It does not care about files already invisible.'],
+        vk:'warn', vs:'No such file or directory. Stuck at seeing, not at the syscall table.',
+        fin:true
+      });
+      return;
+    }
+
+    step({
+      cap: probe === 'workspace'
+        ? 'The workspace is lit by --bind; the path is in the view. What execs is still the helper itself.'
+        : 'connect does not depend on this file tree. The net namespace was already split with --unshare-net; the request continues to the filter.',
+      trace: 5, who: who, req: A.req,
+      g:['ok','ok','wait'],
+      w:['Preflight allows.', probe === 'workspace' ? 'workspace sits on a writable root; the file is visible.' : 'The view allows. Next, look at the syscall.','The inner pass is about to enter with --apply-seccomp-then-exec.'],
+      vk:'hold', vs:'The view gate allows.'
+    });
+    step({
+      cap: 'Inner pass starts with capget. Only when effective and permitted are both zero does it set no_new_privs and install network seccomp.',
+      trace: 6, who: who, req: A.req,
+      g:['ok','ok','on'],
+      w:['Preflight allows.','The view is built.','The filter allows by default; a rule hit returns EPERM.'],
+      vk:'hold', vs:'Start tightening syscalls.'
+    });
+
+    if (probe === 'connect') {
+      step({
+        cap: 'connect hits a red light. Restricted mode bans connect / bind / listen / sendto; sockets only allow AF_UNIX.',
+        trace: 7, who: who, req: A.req,
+        g:['ok','ok','no'],
+        w:['Preflight allows.','The path is in the view; this gate allows.','connect returns EPERM. recvfrom is left allowed on purpose.'],
+        vk:'warn', vs:'EPERM. Through the view first, then the syscall. Reverse the order and a setuid bwrap will not start.',
+        fin:true
+      });
+      return;
+    }
+
+    step({
+      cap: 'Reading the workspace is not a banned network call. The filter allows. The helper forks and leaves a reaper on the left.',
+      trace: 8, who: who, req: A.req,
+      g:['ok','ok','on'],
+      w:['Preflight allows.','The file is in the view.','open is not on the deny table. The parent prepares waitpid(-1).'],
+      vk:'hold', vs:'The process is about to be handed off.'
+    });
+    step({
+      cap: 'The child execvp’s. PID 1 is still reaping orphans. Cancel and timeout lean on it.',
+      trace: 9, who: who, req: A.req,
+      g:['ok','ok','ok'],
+      w:['Preflight allows.','The view is in effect.','The filter is on; this call is not on the deny table.'],
+      vk:'ok', vs:'The command runs in an already-swapped world. The exit code is forwarded as-is.',
+      fin:true
+    });
+  }
+
+  function motionOk(){
+    return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  function enterEl(el){
+    el.classList.remove('in');
+    el.classList.add('is-enter');
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ el.classList.add('in'); });
+    });
+  }
+  function spawnGhost(el){
+    var host = gatesBox;
+    var box = host.getBoundingClientRect();
+    var rc = el.getBoundingClientRect();
+    var ghost = el.cloneNode(true);
+    ghost.className = el.className + ' dm-ghost';
+    ghost.style.left = (rc.left - box.left) + 'px';
+    ghost.style.top = (rc.top - box.top) + 'px';
+    ghost.style.width = rc.width + 'px';
+    host.appendChild(ghost);
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ ghost.classList.add('fly'); });
+    });
+    setTimeout(function(){ if (ghost.parentNode) ghost.remove(); }, 480);
+  }
+  function bump(el, cls){
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  function paint(st, animate){
+    if (animate && !motionOk()) animate = false;
+    gatesBox.classList.add('is-live');
+    traceBox.classList.add('is-live');
+    var oldRects = [];
+    if (animate) {
+      gEls.forEach(function(el){ oldRects.push(el.getBoundingClientRect()); });
+    }
+    var reqChanged = reqEl.textContent !== st.req;
+    reqEl.textContent = st.req;
+    whoEl.textContent = st.who;
+    if (animate && reqChanged) bump(reqBox, 'firing');
+    for (var i = 0; i < 3; i++) {
+      var next = st.g[i] || 'wait';
+      var prev = prevG[i] || 'wait';
+      gEls[i].className = 'dm-gate' + (next !== 'wait' ? ' ' + next : '');
+      var badge = gEls[i].querySelector('.dm-g-badge');
+      badge.textContent = BADGE[next] || BADGE.wait;
+      if (gWhy[i].textContent !== st.w[i]) {
+        gWhy[i].textContent = st.w[i];
+        if (animate) enterEl(gWhy[i]);
+      }
+      if (animate && next !== prev) {
+        if (next === 'on') bump(gEls[i], 'firing');
+        if (next === 'ok' || next === 'no') bump(badge, 'pop');
+        if (next === 'no') spawnGhost(gEls[i]);
+      }
+    }
+    if (animate) {
+      gEls.forEach(function(el, n){
+        if ((st.g[n] || '') === 'skip') return;
+        var now = el.getBoundingClientRect();
+        var old = oldRects[n];
+        var dx = old.left - now.left;
+        var dy = old.top - now.top;
+        if (!dx && !dy) return;
+        el.style.transition = 'none';
+        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        requestAnimationFrame(function(){
+          el.style.transition = '';
+          el.style.transform = '';
+        });
+      });
+    }
+    prevG = st.g.slice();
+    var vChanged = verdict.textContent !== st.vs;
+    verdict.className = 'dm-verdict' + (st.vk ? ' ' + st.vk : '');
+    verdict.textContent = st.vs;
+    if (animate && vChanged) {
+      enterEl(verdict);
+      if (st.vk === 'warn') bump(verdict, 'pop');
+    }
+    if (st.trace !== null && st.trace !== undefined) {
+      traceRows.forEach(function(el, n){
+        var nextOn = n === st.trace;
+        var wasOn = el.classList.contains('on');
+        el.classList.toggle('on', nextOn);
+        if (animate && nextOn && !wasOn) bump(el, 'firing');
+      });
+    }
+    if (animate) {
+      captionText.style.opacity = '0';
+      requestAnimationFrame(function(){
+        captionText.textContent = st.cap;
+        requestAnimationFrame(function(){ captionText.style.opacity = '1'; });
+      });
+    } else {
+      captionText.textContent = st.cap;
+    }
+    if (st.fin) summary.classList.add('on');
+    else summary.classList.remove('on');
+  }
+
+  function holdFor(i){
+    var st = steps[i];
+    if (!st) return 1100;
+    if (st.fin) return 2400;
+    var g = st.g || [];
+    var blocked = false, checking = false;
+    for (var k = 0; k < g.length; k++) {
+      if (g[k] === 'no') blocked = true;
+      if (g[k] === 'on') checking = true;
+    }
+    if (blocked) return 2200;
+    if (st.trace === 4 || st.trace === 7) return 2000;
+    if (st.trace === 3 || st.trace === 5 || st.trace === 6) return 1700;
+    if (checking) return 1500;
+    return 1100;
+  }
+  function tick(){
+    if (idx >= steps.length) { stop(); return; }
+    paint(steps[idx], true);
+    idx++;
+    if (idx >= steps.length) stop();
+  }
+  function stop(){
+    if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+    pauseUntil = 0;
+  }
+  function loop(ts){
+    if (idx >= steps.length) { autoId = null; return; }
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(loop); return; }
+    paint(steps[idx], true);
+    var wait = holdFor(idx);
+    idx++;
+    pauseUntil = ts + wait;
+    if (idx >= steps.length) { autoId = null; return; }
+    autoId = requestAnimationFrame(loop);
+  }
+  function reset(){
+    stop(); idx = 0; prevG = ['wait','wait','wait'];
+    buildSteps();
+    gatesBox.classList.remove('is-live');
+    traceBox.classList.remove('is-live');
+    Array.prototype.slice.call(gatesBox.querySelectorAll('.dm-ghost')).forEach(function(g){ g.remove(); });
+    reqBox.classList.remove('firing');
+    reqEl.textContent = ACT[probe].req;
+    whoEl.textContent = pathLabel();
+    for (var i = 0; i < 3; i++) {
+      gEls[i].className = 'dm-gate';
+      gEls[i].style.transition = '';
+      gEls[i].style.transform = '';
+      gEls[i].querySelector('.dm-g-badge').textContent = BADGE.wait;
+      gEls[i].querySelector('.dm-g-badge').classList.remove('pop');
+      gWhy[i].classList.remove('is-enter','in');
+      gWhy[i].textContent = GATE_IDLE[i];
+    }
+    verdict.className = 'dm-verdict';
+    verdict.classList.remove('is-enter','in','pop');
+    verdict.textContent = IDLE;
+    traceRows.forEach(function(el){ el.classList.remove('on'); el.classList.remove('firing'); });
+    summary.classList.remove('on');
+    captionText.style.opacity = '1';
+    captionText.textContent = IDLE;
+  }
+  function play(){
+    if (idx >= steps.length) reset();
+    if (autoId) return;
+    pauseUntil = 0;
+    autoId = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('dm-play').addEventListener('click', play);
+  document.getElementById('dm-step').addEventListener('click', function(){ stop(); tick(); });
+  document.getElementById('dm-reset').addEventListener('click', reset);
+  document.getElementById('dm-probe').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    Array.prototype.forEach.call(this.children, function(el){ el.classList.remove('on'); });
+    b.classList.add('on');
+    probe = b.getAttribute('data-probe');
+    reset();
+  });
+  document.getElementById('dm-flags').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    b.classList.toggle('on');
+    var flag = b.getAttribute('data-flag');
+    if (flag === 'wsl1') wsl1 = b.classList.contains('on');
+    if (flag === 'legacy') legacy = b.classList.contains('on');
+    reset();
+  });
+
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(document.getElementById('demo-layers'), function(){
+      if (played) return; played = true; play();
+    });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

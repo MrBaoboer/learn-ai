@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>多 Agent 協作：一個人幹不完，就派團隊 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* ── 场景卡 ── */
+.scenario-card{background:var(--card);border:1.5px solid rgba(8,145,178,.25);border-radius:var(--radius);padding:14px 18px}
+.sc-label{font-size:12px;font-weight:800;color:var(--cyan);letter-spacing:.4px;margin-bottom:4px}
+.sc-text{font-size:15px;color:var(--text);line-height:1.6}
+
+/* ── 组织结构图 ── */
+.org{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0 6px}
+.org-node{padding:6px 14px;border-radius:8px;font-size:14px;font-weight:700;text-align:center}
+.org-coord{background:rgba(0,102,255,.08);color:var(--accent);border:1.5px solid rgba(0,102,255,.3)}
+.org-line{width:1px;height:12px;background:var(--border)}
+.org-branches{display:flex;gap:10px;position:relative;width:100%;max-width:480px;justify-content:center}
+.org-branches::before{content:'';position:absolute;top:0;left:16%;right:16%;height:1px;background:var(--border)}
+.org-branch{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.org-branch-line{width:1px;height:8px;background:var(--border)}
+.org-sub{padding:5px 10px;border-radius:6px;font-size:12px;font-weight:700;text-align:center;white-space:nowrap}
+.org-sub-r{background:rgba(8,145,178,.08);color:var(--cyan);border:1px solid rgba(8,145,178,.2)}
+.org-sub-d{background:rgba(124,58,237,.06);color:var(--purple);border:1px solid rgba(124,58,237,.2)}
+.org-sub-t{background:rgba(22,163,74,.06);color:var(--success);border:1px solid rgba(22,163,74,.2)}
+
+/* ── Agent 角色卡 ── */
+.agent-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+.agent-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;transition:all .35s;box-shadow:var(--shadow-card)}
+.agent-card.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,102,255,.12)}
+.agent-card.done{border-color:var(--success);background:rgba(22,163,74,.02)}
+.ac-hd{display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap}
+.ac-icon{font-size:16px}
+.ac-name{font-size:15px;font-weight:800;color:var(--text)}
+.ac-role{font-size:12px;color:var(--sub);font-weight:600}
+.ac-task{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:6px}
+.ac-tools{display:flex;flex-wrap:wrap;gap:4px}
+.ac-tool{padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;background:rgba(0,0,0,.05);color:var(--sub);font-family:"SF Mono","Fira Code",Menlo,monospace}
+.ac-status{margin-top:6px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:4px}
+.typing-dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 1.4s infinite both}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
+
+/* ── 执行流程 ── */
+.c-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.c-stats{display:flex;gap:16px;align-items:center}
+.c-stat{font-size:13px;color:var(--sub);font-weight:600}
+.c-stat span{font-weight:800;color:var(--text)}
+.btn-reset{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-reset:hover{color:var(--text);border-color:rgba(0,0,0,.15)}
+.ctrl-hint{font-size:13px;color:var(--sub)}
+.flow-area{display:flex;flex-direction:column;gap:8px;min-height:40px}
+
+.flow-item{border-radius:var(--radius-sm);padding:11px 14px;font-size:14px;line-height:1.6;opacity:0;transform:translateY(6px);transition:all .35s}
+.flow-item.show{opacity:1;transform:translateY(0)}
+.fi-coordinator{background:rgba(0,102,255,.05);border:1.5px solid rgba(0,102,255,.18)}
+.fi-researcher{background:rgba(8,145,178,.04);border:1.5px solid rgba(8,145,178,.18)}
+.fi-developer{background:rgba(124,58,237,.04);border:1.5px solid rgba(124,58,237,.15)}
+.fi-tester{background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.15)}
+.fi-event{background:var(--card);border:1.5px dashed var(--border)}
+.fi-label{font-size:11px;font-weight:800;letter-spacing:.4px;margin-bottom:3px}
+.fi-text{color:var(--text)}
+.fi-detail{color:var(--sub);font-size:13px;margin-top:2px}
+.parallel-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:rgba(8,145,178,.08);color:var(--cyan)}
+.sequential-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;background:rgba(0,102,255,.08);color:var(--accent)}
+
+/* ── 产品决策 / 核心概念 ── */
+.dec-area{display:flex;flex-direction:column;gap:10px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius-sm);padding:12px 15px;font-size:14px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(4px);transition:all .35s}
+.dec-card.show{opacity:1;transform:translateY(0)}
+.dec-card b{color:var(--accent)}
+.concept-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.concept-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 15px;font-size:13px;color:var(--text);line-height:1.6;box-shadow:var(--shadow-card)}
+.concept-card b{color:var(--purple)}
+
+@media (max-width:768px){
+  .agent-grid{grid-template-columns:1fr}
+  .concept-grid{grid-template-columns:1fr}
+  .org-branches{gap:6px}
+  .org-sub{font-size:11px;padding:4px 8px}
+}
+</style>
+<meta name="description" content="多 Agent 協作：當任務太複雜，一個 Agent 幹不完時，就派一個團隊。主 Agent 拆解任務、分派子 Agent、彙總結果。只讀並行、寫入串行。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/7-6b.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/7-6b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/7-6b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/7-6b.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/7-6b.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/7-6b.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/7-6b.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/7-6b.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="多 Agent 協作：一個人幹不完，就派團隊">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/7-6b.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/7-6b.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"多 Agent 協作","name":"多 Agent 協作","url":"https://xueai.miyang.cn/slides/7-6b.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"多 Agent 協作：當任務太複雜，一個 Agent 幹不完時，就派一個團隊。主 Agent 拆解任務、分派子 Agent、彙總結果。只讀並行、寫入串行。","datePublished":"2026-04-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:description" content="多 Agent 協作：當任務太複雜，一個 Agent 幹不完時，就派一個團隊。主 Agent 拆解任務、分派子 Agent、彙總結果。只讀並行、寫入串行。"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Agent 工程</div>
+    <h1>多 Agent 協作：一個人幹不完，就派團隊</h1>
+    <p class="subtitle">主 Agent 拆任務 → 子 Agent 各司其職 → 彙總交付。只讀任務並行加速，寫入任務串行保安全。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>子 Agent 調度、Worker Thread、並行 vs 串行執行策略</p></aside><!--seo:end-->  <div class="sec-label reveal">場景 · Agent 團隊</div>
+
+  <div class="scenario-card reveal">
+    <div class="sc-label">用戶指令</div>
+    <div class="sc-text">「幫我重構這個項目的用戶認證模組」</div>
+  </div>
+
+  <div class="org reveal">
+    <div class="org-node org-coord">主 Agent · 協調員</div>
+    <div class="org-line"></div>
+    <div class="org-branches">
+      <div class="org-branch"><div class="org-branch-line"></div><div class="org-sub org-sub-r">🔍 調研員</div></div>
+      <div class="org-branch"><div class="org-branch-line"></div><div class="org-sub org-sub-d">💻 開發者</div></div>
+      <div class="org-branch"><div class="org-branch-line"></div><div class="org-sub org-sub-t">🧪 測試員</div></div>
+    </div>
+  </div>
+
+  <div class="agent-grid reveal paywall-locked xa-peek">
+    <div class="agent-card" id="agentResearcher">
+      <div class="ac-hd"><span class="ac-icon">🔍</span><span class="ac-name">調研員</span><span class="ac-role">只讀</span></div>
+      <div class="ac-task">分析當前認證模組的程式碼結構和依賴</div>
+      <div class="ac-tools"><span class="ac-tool">read_file</span><span class="ac-tool">search_files</span><span class="ac-tool">grep</span></div>
+      <div class="ac-status" id="statusResearcher" style="color:var(--sub)">待分配</div>
+    </div>
+
+    <div class="agent-card" id="agentDeveloper">
+      <div class="ac-hd"><span class="ac-icon">💻</span><span class="ac-name">開發者</span><span class="ac-role">可讀寫</span></div>
+      <div class="ac-task">重寫認證中間件，改用 JWT</div>
+      <div class="ac-tools"><span class="ac-tool">read_file</span><span class="ac-tool">edit_file</span><span class="ac-tool">run_command</span></div>
+      <div class="ac-status" id="statusDeveloper" style="color:var(--sub)">待分配</div>
+    </div>
+
+    <div class="agent-card" id="agentTester">
+      <div class="ac-hd"><span class="ac-icon">🧪</span><span class="ac-name">測試員</span><span class="ac-role">可讀 + 運行</span></div>
+      <div class="ac-task">編寫並運行認證模組的單元測試</div>
+      <div class="ac-tools"><span class="ac-tool">read_file</span><span class="ac-tool">edit_file</span><span class="ac-tool">run_command</span></div>
+      <div class="ac-status" id="statusTester" style="color:var(--sub)">待分配</div>
+    </div>
+  </div>
+
+  <div class="sec-label reveal paywall-locked">核心概念</div>
+
+  <div class="concept-grid reveal paywall-locked">
+    <div class="concept-card">
+      <b>類比理解</b><br>
+      單 Agent = 一個人幹所有事<br>
+      多 Agent = 一個團隊，各有專長
+    </div>
+    <div class="concept-card">
+      <b>技術原理</b><br>
+      子 Agent 運行在獨立 Worker Thread<br>
+      隔離記憶體，互不干擾<br>
+      父級可隨時中止子級
+    </div>
+    <div class="concept-card">
+      <b>事件通信</b><br>
+      subagent_start → 子 Agent 啓動<br>
+      subagent_chunk → 流式返回中<br>
+      subagent_end → 子 Agent 完成
+    </div>
+  </div>
+
+  <div class="sec-label reveal paywall-locked">執行流程</div>
+
+  <div class="c-bar reveal paywall-locked" id="flowDemo">
+    <div class="c-stats">
+      <div class="c-stat">子 Agent <span id="agentCount">0</span>/3</div>
+      <div class="c-stat">事件 <span id="eventCount">0</span></div>
+      <span class="ctrl-hint" id="hint">共 8 步 · 看主 Agent 如何調度團隊</span>
+    </div>
+    <button class="btn-reset" onclick="reset()">↺ 重播</button>
+  </div>
+  <div class="flow-area paywall-locked" id="flowArea"></div>
+
+  <div class="sec-label reveal paywall-locked">產品決策</div>
+
+  <div class="dec-area paywall-locked" id="decArea"></div>
+
+  <div class="l-callout reveal paywall-locked" style="margin-top:28px">
+    <b>Takeaway</b> 複雜任務不靠一個 Agent 硬撐，而是拆成多個專職子 Agent：調研員負責讀程式碼、開發者負責改程式碼、測試員負責驗證。只讀任務並行加速，寫入任務串行保安全。這就是 Agent 世界的團隊協作。
+  </div>
+
+</article>
+
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+var STEPS = [
+  {
+    hint: '1/8 · 主 Agent 接到任務，開始拆解',
+    agents: 0, events: 1,
+    agentStates: {researcher:'待分配',developer:'待分配',tester:'待分配'},
+    agentActive: [],
+    flow: [
+      {type:'coordinator',label:'主 Agent · 協調員',color:'var(--accent)',
+       text:'收到任務：「重構用戶認證模組」。分析後拆解為 3 個子任務 →',
+       detail:'① 分析現有程式碼結構  ② 重寫認證中間件  ③ 編寫單元測試'}
+    ],
+    decision: '<b>📌 什麼時候需要多 Agent？</b><br>當任務可以拆解成獨立子任務，且子任務需要不同能力（只讀 / 讀寫 / 運行命令）時。如果一個 Agent 就能搞定，就別派團隊：每個子 Agent 都要帶自己的 system prompt + 上下文 = 額外 Token 成本。'
+  },
+  {
+    hint: '2/8 · 調研員啓動，只讀模式並行安全',
+    agents: 1, events: 2,
+    agentStates: {researcher:'running',developer:'待分配',tester:'待分配'},
+    agentActive: ['researcher'],
+    flow: [
+      {type:'event',label:'事件',color:'var(--sub)',
+       text:'subagent_start → 調研員（Worker Thread #1）',
+       detail:'只讀子 Agent，不會修改任何文件'},
+      {type:'researcher',label:'🔍 調研員',color:'var(--cyan)',
+       text:'正在分析認證模組…掃描 auth/ 目錄、追蹤依賴鏈、識別 session 存儲邏輯',
+       badge:{text:'只讀 · 可並行',class:'parallel-badge'}}
+    ],
+    decision: '<b>📌 只讀子 Agent 的優勢</b><br>調研員只能讀不能寫，所以可以和其他只讀任務並行運行（Promise.all）。這就像多人同時翻資料，互不影響。'
+  },
+  {
+    hint: '3/8 · 調研員完成，返回發現給協調員',
+    agents: 1, events: 3,
+    agentStates: {researcher:'done',developer:'待分配',tester:'待分配'},
+    agentActive: [],
+    flow: [
+      {type:'event',label:'事件',color:'var(--sub)',
+       text:'subagent_end → 調研員完成',detail:''},
+      {type:'researcher',label:'🔍 調研員 · 報告',color:'var(--cyan)',
+       text:'發現：當前使用 express-session + Redis 存儲，auth 中間件 3 處、路由守衞 5 處、密碼用 bcrypt 哈希。建議遷移到 JWT 後可移除 Redis 依賴。',
+       detail:'結果通過 postMessage 返回給主 Agent'}
+    ],
+    decision: '<b>📌 子 Agent 隔離的意義</b><br>調研員在獨立 Worker Thread 運行，有自己的記憶體空間。即使出錯崩潰，也不會影響主 Agent 和其他子 Agent。主 Agent 可以 postMessage → 等 2 秒 → 強制 terminate。'
+  },
+  {
+    hint: '4/8 · 開發者啓動，需要調研員的發現作為上下文',
+    agents: 2, events: 4,
+    agentStates: {researcher:'done',developer:'running',tester:'待分配'},
+    agentActive: ['developer'],
+    flow: [
+      {type:'coordinator',label:'主 Agent · 協調員',color:'var(--accent)',
+       text:'將調研報告注入開發者的上下文 → 啓動開發者子 Agent',
+       detail:'開發者需要知道現有程式碼結構，才能安全重構'},
+      {type:'event',label:'事件',color:'var(--sub)',
+       text:'subagent_start → 開發者（Worker Thread #2）',detail:''},
+      {type:'developer',label:'💻 開發者',color:'var(--purple)',
+       text:'正在重構認證中間件…移除 session 邏輯、實現 JWT 簽發 / 驗證、更新路由守衞…',
+       badge:{text:'可讀寫 · 必須串行',class:'sequential-badge'}}
+    ],
+    decision: '<b>📌 並行 vs 串行的核心原則</b><br>開發者要改文件，如果同時有兩個寫入 Agent，可能互相覆蓋程式碼。所以<b>只讀任務可以並行（快），寫入任務必須串行（安全）</b>。這是多 Agent 系統最關鍵的調度決策。'
+  },
+  {
+    hint: '5/8 · 開發者完成，程式碼已修改',
+    agents: 2, events: 5,
+    agentStates: {researcher:'done',developer:'done',tester:'待分配'},
+    agentActive: [],
+    flow: [
+      {type:'event',label:'事件',color:'var(--sub)',
+       text:'subagent_end → 開發者完成',detail:''},
+      {type:'developer',label:'💻 開發者 · 交付',color:'var(--purple)',
+       text:'完成：已移除 express-session，新增 jwt.middleware.ts，更新 5 處路由守衞，添加 token 刷新邏輯。修改了 8 個文件。',
+       detail:''}
+    ],
+    decision: '<b>📌 子 Agent 的 Token 成本</b><br>每個子 Agent 都有獨立的 system prompt + 完整上下文。3 個子 Agent ≈ 3 倍 Token 消耗。所以只有當任務確實需要不同能力、且拆解後效率更高時，才值得啓動多 Agent。'
+  },
+  {
+    hint: '6/8 · 測試員啓動，需要開發者的程式碼變更',
+    agents: 3, events: 6,
+    agentStates: {researcher:'done',developer:'done',tester:'running'},
+    agentActive: ['tester'],
+    flow: [
+      {type:'coordinator',label:'主 Agent · 協調員',color:'var(--accent)',
+       text:'將開發者的變更文件列表注入測試員上下文 → 啓動測試員',
+       detail:'測試員需要知道改了哪些文件，才能針對性編寫測試'},
+      {type:'event',label:'事件',color:'var(--sub)',
+       text:'subagent_start → 測試員（Worker Thread #3）',detail:''},
+      {type:'tester',label:'🧪 測試員',color:'var(--success)',
+       text:'正在編寫測試…JWT 簽發測試、過期 Token 測試、路由守衞鑑權測試、Token 刷新測試…',
+       badge:{text:'可讀寫 · 必須串行',class:'sequential-badge'}}
+    ],
+    decision: '<b>📌 串行依賴鏈</b><br>調研員 → 開發者 → 測試員，後一個依賴前一個的輸出。這就像真實團隊的工作流程：先調研、再開發、最後測試。主 Agent 負責在中間傳遞上下文。'
+  },
+  {
+    hint: '7/8 · 測試員完成，測試全部通過',
+    agents: 3, events: 7,
+    agentStates: {researcher:'done',developer:'done',tester:'done'},
+    agentActive: [],
+    flow: [
+      {type:'event',label:'事件',color:'var(--sub)',
+       text:'subagent_end → 測試員完成',detail:''},
+      {type:'tester',label:'🧪 測試員 · 報告',color:'var(--success)',
+       text:'測試結果：12 個測試用例全部通過。覆蓋場景：正常登入、Token 過期、非法 Token、刷新機制、路由保護。',
+       detail:''}
+    ],
+    decision: '<b>📌 終止與容錯</b><br>如果測試員發現嚴重 Bug，主 Agent 可以決定：① 把 Bug 信息交給開發者重新修復  ② 終止流程並向用戶報告。父級通過 postMessage 通知子 Agent 停止 → 等 2 秒寬限期 → 強制 terminate。'
+  },
+  {
+    hint: '8/8 · 主 Agent 彙總所有結果，交付給用戶',
+    agents: 3, events: 8,
+    agentStates: {researcher:'done',developer:'done',tester:'done'},
+    agentActive: [],
+    flow: [
+      {type:'coordinator',label:'主 Agent · 彙總交付',color:'var(--accent)',
+       text:'認證模組重構完成。調研員分析了程式碼結構，開發者將 session 改為 JWT（修改 8 個文件），測試員驗證了 12 個用例全部通過。Redis 依賴已移除，新增 Token 刷新機制。',
+       detail:'用戶只看到這一條最終回答，背後是 3 個子 Agent 的協作成果'}
+    ],
+    decision: '<b>📌 用戶感知 vs 實際過程</b><br>用戶發了一句話，收到一段完整彙報。但背後跑了 3 個子 Agent、3 個 Worker Thread、8 個事件。產品經理要決定：中間過程要不要透出給用戶？（Cursor 選擇了透出，讓用戶看到每個子 Agent 的即時狀態。）'
+  }
+];
+
+var cur = 0;
+
+function setAgentState(id, state) {
+  var card = document.getElementById('agent' + id);
+  var status = document.getElementById('status' + id);
+  card.classList.remove('active','done');
+  if (state === 'running') {
+    card.classList.add('active');
+    status.innerHTML = '<span style="color:var(--accent)">執行中 </span><span class="typing-dots"><span></span><span></span><span></span></span>';
+  } else if (state === 'done') {
+    card.classList.add('done');
+    status.innerHTML = '<span style="color:var(--success)">✓ 已完成</span>';
+  } else {
+    status.innerHTML = '<span style="color:var(--sub)">' + state + '</span>';
+  }
+}
+
+function addFlow(item) {
+  var area = document.getElementById('flowArea');
+  var el = document.createElement('div');
+  var cls = 'flow-item';
+  if (item.type === 'coordinator') cls += ' fi-coordinator';
+  else if (item.type === 'researcher') cls += ' fi-researcher';
+  else if (item.type === 'developer') cls += ' fi-developer';
+  else if (item.type === 'tester') cls += ' fi-tester';
+  else cls += ' fi-event';
+
+  el.className = cls;
+  var html = '<div class="fi-label" style="color:' + item.color + '">' + item.label + '</div>';
+  html += '<div class="fi-text">' + item.text + '</div>';
+  if (item.detail) html += '<div class="fi-detail">' + item.detail + '</div>';
+  if (item.badge) html += '<div class="' + item.badge.class + '" style="margin-top:4px">' + item.badge.text + '</div>';
+  el.innerHTML = html;
+  area.appendChild(el);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    el.classList.add('show');
+  })});
+}
+
+var playTimer = null;
+
+function playStep() {
+  if (cur >= STEPS.length) return;
+  var s = STEPS[cur];
+
+  document.getElementById('agentCount').textContent = s.agents;
+  document.getElementById('eventCount').textContent = s.events;
+  document.getElementById('hint').textContent = s.hint;
+
+  var states = s.agentStates;
+  setAgentState('Researcher', states.researcher);
+  setAgentState('Developer', states.developer);
+  setAgentState('Tester', states.tester);
+
+  for (var i = 0; i < s.flow.length; i++) {
+    (function(item, delay){
+      setTimeout(function(){ addFlow(item); }, delay);
+    })(s.flow[i], i * 200);
+  }
+
+  var da = document.getElementById('decArea');
+  var dec = document.createElement('div');
+  dec.className = 'dec-card';
+  dec.innerHTML = s.decision;
+  da.innerHTML = '';
+  da.appendChild(dec);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    dec.classList.add('show');
+  })});
+
+  cur++;
+  if (cur >= STEPS.length) {
+    playTimer = null;
+  } else {
+    playTimer = setTimeout(playStep, 900);
+  }
+}
+
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
+function reset() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
+  cur = 0;
+  document.getElementById('flowArea').innerHTML = '';
+  document.getElementById('decArea').innerHTML = '';
+  document.getElementById('agentCount').textContent = '0';
+  document.getElementById('eventCount').textContent = '0';
+  document.getElementById('hint').textContent = '自動播放中…';
+
+  setAgentState('Researcher','待分配');
+  setAgentState('Developer','待分配');
+  setAgentState('Tester','待分配');
+  startPlay();
+}
+
+lessonOnView(document.getElementById('flowDemo'), function() {
+  document.getElementById('hint').textContent = '自動播放中…';
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

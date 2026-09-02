@@ -28,13 +28,15 @@
 
   /* ── 语言检测：优先读 i18n.js 注入的 window.XUEAI_I18N.lang，
      其次从文件名后缀判断，默认中文 ── */
+  var _m = location.pathname.match(/\.(en|ko|tw|hk)\.html?$/);
   var _lang = (window.XUEAI_I18N && window.XUEAI_I18N.lang)
-    || (location.pathname.match(/\.(en)\.html?$/) ? 'en'
-       : location.pathname.match(/\.(ko)\.html?$/) ? 'ko' : 'zh');
+    || (_m ? _m[1] : 'zh');
 
   /* ── 三语字典（仅 aria-label 等用户可见字符串） ── */
   var _SP_T = {
     zh: { overlayLabel: '推荐', closeLabel: '关闭' },
+    hk: { overlayLabel: '推薦', closeLabel: '關閉' },
+    tw: { overlayLabel: '推薦', closeLabel: '關閉' },
     en: { overlayLabel: 'Recommended', closeLabel: 'Close' },
     ko: { overlayLabel: '추천',        closeLabel: '닫기'  }
   };

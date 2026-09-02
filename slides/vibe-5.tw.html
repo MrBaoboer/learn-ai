@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding 方法論第 5 節：先加 Log 定位根因再改程式碼，禁止猜測性修復，修復前回答三個問題，改完宣告影響範圍。">
+<meta name="author" content="洛小山">
+<title>第5節：除錯鐵律：先 Log 再改碼 | AI 系統課</title>
+<link rel="canonical" href="https://xueai.miyang.cn/slides/vibe-5.tw.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_TW">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vibe-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vibe-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vibe-5.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vibe-5.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vibe-5.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vibe-5.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vibe-5.html">
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e;--vibe-soft:rgba(13,148,136,.08)}
+.lesson-header .kicker{color:var(--vibe)}
+
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+
+/* Bug 案例框 */
+.bug-box{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.22);border-radius:10px;padding:13px 16px;font-size:14.5px;line-height:1.75;color:var(--text);margin-top:12px}
+.bug-box b{color:var(--danger)}
+
+/* 路径选择按钮组（延续 5-2 的按钮组写法） */
+.path-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.path-btn{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;transition:all .2s;font-family:inherit;text-align:left;width:100%;min-height:44px;box-shadow:var(--shadow-card)}
+.path-btn:hover{border-color:rgba(0,0,0,.15)}
+.path-btn h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px}
+.path-btn p{font-size:13px;color:var(--sub)}
+.path-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.path-btn.p0 .path-icon{background:rgba(220,38,38,.1)}
+.path-btn.p1 .path-icon{background:var(--vibe-soft)}
+.path-btn.p0.active{border-color:var(--danger);background:rgba(220,38,38,.04)}
+.path-btn.p0.active h4{color:var(--danger)}
+.path-btn.p1.active{border-color:var(--vibe);background:rgba(13,148,136,.05)}
+.path-btn.p1.active h4{color:var(--vibe-deep)}
+
+/* 计数器 */
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px}
+.stat{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;text-align:center}
+.stat .sv{font-size:26px;font-weight:800;color:var(--text);font-family:"SF Mono",Menlo,monospace;line-height:1.3}
+.stat .sv.hot{color:var(--danger)}
+.stat .sv.cool{color:var(--vibe-deep)}
+.stat .sl{font-size:12px;color:var(--sub);font-weight:700;letter-spacing:.4px}
+
+/* 演示区（延续 5-2 的气泡写法） */
+.vis-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;margin-top:14px}
+.vis-bar{padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.vis-bar-title{font-size:14px;font-weight:700;color:var(--sub)}
+.vis-body{min-height:240px;max-height:400px;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.msg{padding:10px 14px;border-radius:10px;font-size:14.5px;line-height:1.65;opacity:0;transform:translateY(8px);transition:all .35s ease;flex-shrink:0}
+.msg.show{opacity:1;transform:translateY(0)}
+.msg.ai{background:rgba(0,0,0,.045);color:var(--text)}
+.msg.log{background:#0e1c1a;color:#5eead4;font-family:"SF Mono",Menlo,monospace;font-size:13px}
+.msg.warning{background:rgba(220,38,38,.07);color:var(--danger);font-weight:600}
+.msg.ok{background:rgba(22,163,74,.08);color:var(--success);font-weight:600}
+.msg.fix{background:var(--vibe-soft);color:var(--vibe-deep);font-family:"SF Mono",Menlo,monospace;font-size:13px}
+
+.ctrl-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn{padding:11px 22px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-p{background:var(--vibe);color:#fff}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.05);color:var(--sub);border:1px solid var(--border)}
+.hint{font-size:13px;color:var(--sub)}
+
+/* 战绩对比 */
+.score-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.score-box{border-radius:12px;padding:14px 16px;border:1.5px solid var(--border);background:var(--card)}
+.score-box h4{font-size:14px;font-weight:800;margin-bottom:6px}
+.score-box.s0 h4{color:var(--danger)}
+.score-box.s1 h4{color:var(--vibe-deep)}
+.score-box .sd{font-size:13.5px;color:var(--sub);line-height:1.7;font-family:"SF Mono",Menlo,monospace}
+.score-box.done.s0{border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.03)}
+.score-box.done.s1{border-color:rgba(13,148,136,.35);background:rgba(13,148,136,.04)}
+
+/* 三问自查器 */
+.qcheck{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.qc-item{border:1.5px solid var(--border);border-radius:12px;background:var(--card);overflow:hidden;box-shadow:var(--shadow-card)}
+.qc-head{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;background:none;border:none;cursor:pointer;font-family:inherit;text-align:left;min-height:44px}
+.qc-badge{width:30px;height:30px;border-radius:8px;background:rgba(0,0,0,.05);color:var(--sub);font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.qc-item.open .qc-badge{background:var(--vibe);color:#fff}
+.qc-head h4{font-size:15px;font-weight:700;color:var(--text);flex:1}
+.qc-arrow{font-size:13px;color:var(--sub);transition:transform .2s}
+.qc-item.open .qc-arrow{transform:rotate(90deg)}
+.qc-body{display:none;padding:0 16px 14px 58px;font-size:13.5px;color:var(--sub);line-height:1.75}
+.qc-item.open .qc-body{display:block}
+.qc-body b{color:var(--vibe-deep)}
+.unlock-area{margin-top:14px}
+.fix-result{display:none;margin-top:12px}
+.fix-result.show{display:block}
+
+.imp-line{font-family:"SF Mono",Menlo,monospace;font-size:13.5px;background:rgba(0,0,0,.04);border-radius:8px;padding:10px 14px;margin-top:10px;color:var(--text)}
+
+.src-note{margin-top:24px;font-size:12.5px;color:var(--sub)}
+.src-note a{color:var(--vibe-deep)}
+
+@media (max-width:768px){
+  .path-row{grid-template-columns:1fr}
+  .stat-row{grid-template-columns:1fr 1fr 1fr}
+  .score-grid{grid-template-columns:1fr}
+  .qc-body{padding-left:16px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"除錯鐵律：先 Log 再改碼","name":"除錯鐵律：先 Log 再改碼","url":"https://xueai.miyang.cn/slides/vibe-5.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 品質底線","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Vibe Coding 方法論第 5 節：先加 Log 定位根因再改程式碼，禁止猜測性修復，修復前回答三個問題，改完宣告影響範圍。","datePublished":"2026-08-04","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="除錯鐵律：先 Log 再改碼"><meta property="og:description" content="Vibe Coding 方法論第 5 節：先加 Log 定位根因再改程式碼，禁止猜測性修復，修復前回答三個問題，改完宣告影響範圍。"><meta property="og:url" content="https://xueai.miyang.cn/slides/vibe-5.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/vibe-5.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+  <header class="lesson-header">
+    <div class="kicker">Vibe Coding 方法論 · 第 5 節</div>
+    <h1>除錯鐵律：先 Log 再改碼</h1>
+    <p class="subtitle">AI 遇到報錯的第一反應是猜一個原因改改看，不行再猜一個。這一節立最核心的一條規矩：禁止猜測性修復。下面兩個演示，親手對比兩條修 Bug 路徑。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>禁止猜測性修復，修復前回答三個問題，改完宣告影響範圍</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">核心條款</div>
+    <div class="l-callout" style="background:var(--vibe-soft);border-color:rgba(13,148,136,.3)">
+      <p><b style="color:var(--vibe-deep)">禁止猜測性修復。</b>無法確認根因時，必須先透過 Log、斷點或測試腳本驗證假設，禁止「試著改一下看看」。後端在終端打詳細日誌，前端在瀏覽器 Console 打日誌，無論什麼問題，第一步都是加 Log。</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">互動演示一 · 同一個 Bug，兩條修法</div>
+    <div class="bug-box"><b>Bug 現場：</b>聊天輸入框在中文輸入法下，使用者按回車確認候選詞時，半截拼音被當成訊息直接發了出去。</div>
+    <p class="desc" style="margin-top:10px">點選一條路徑，觀察修復過程。右側計數器記錄輪數和累計改動行數。</p>
+
+    <div class="path-row">
+      <button class="path-btn p0" id="pb0" onclick="pickPath(0)">
+        <div class="path-icon">🎲</div>
+        <div><h4>猜測性修復</h4><p>猜一個原因，改改看</p></div>
+      </button>
+      <button class="path-btn p1" id="pb1" onclick="pickPath(1)">
+        <div class="path-icon">🔍</div>
+        <div><h4>先 Log 再改</h4><p>加日誌、看證據、定位根因</p></div>
+      </button>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="sv" id="stRound">0</div><div class="sl">修復輪數</div></div>
+      <div class="stat"><div class="sv" id="stLines">0</div><div class="sl">累計改動行數</div></div>
+      <div class="stat"><div class="sv" id="stState">待演示</div><div class="sl">Bug 狀態</div></div>
+    </div>
+
+    <div class="vis-wrap">
+      <div class="vis-bar">
+        <span class="vis-bar-title" id="visTitle">選擇上方任意一條路徑開始</span>
+        <span style="font-size:13px;color:var(--sub)" id="stepHint"></span>
+      </div>
+      <div class="vis-body" id="visBody"></div>
+    </div>
+    <div class="ctrl-row">
+      <button class="btn btn-r" onclick="replayPath()">↺ 重播當前路徑</button>
+      <span class="hint" id="ctrlHint"></span>
+    </div>
+
+    <div class="score-grid">
+      <div class="score-box s0" id="score0">
+        <h4>猜測性修復 · 戰績</h4>
+        <div class="sd" id="score0d">尚未演示</div>
+      </div>
+      <div class="score-box s1" id="score1">
+        <h4>先 Log 再改 · 戰績</h4>
+        <div class="sd" id="score1d">尚未演示</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">互動演示二 · 修復前三問自查器</div>
+    <div class="bug-box" style="background:rgba(217,119,6,.06);border-color:rgba(217,119,6,.25)"><b style="color:var(--amber)">新 Bug 到達：</b>使用者刪除一條聊天記錄後，會話列表上的未讀數沒有更新。</div>
+    <p class="desc" style="margin-top:10px">規則要求修 Bug 前必須回答三個問題。依次點開三問，全部看完才解鎖「開始修復」按鈕。</p>
+
+    <div class="qcheck" id="qcheck">
+      <div class="qc-item" id="qc0">
+        <button class="qc-head" onclick="openQ(0)">
+          <span class="qc-badge">Q1</span>
+          <h4>這個 Bug 所在的功能，完整業務流程是什麼？</h4>
+          <span class="qc-arrow">▶</span>
+        </button>
+        <div class="qc-body">鏈路是 <b>刪除訊息 → 更新會話摘要 → 重算未讀數 → 推送列表重新整理</b>。排查發現「重算未讀數」只在收到新訊息時觸發，刪除路徑根本沒有走到它。只盯著報錯點看不到這條鏈路。</div>
+      </div>
+      <div class="qc-item" id="qc1">
+        <button class="qc-head" onclick="openQ(1)">
+          <span class="qc-badge">Q2</span>
+          <h4>修改這裡會影響哪些其他模組？</h4>
+          <span class="qc-arrow">▶</span>
+        </button>
+        <div class="qc-body">重算時機改動會波及 <b>會話列表、App 角標、多端訊息同步</b> 三處。理解上下游依賴再動手，避免按下葫蘆起了瓢。規則同時建議：優先啟動 SubAgent 並行調研影響範圍，確認安全後再修改。</div>
+      </div>
+      <div class="qc-item" id="qc2">
+        <button class="qc-head" onclick="openQ(2)">
+          <span class="qc-badge">Q3</span>
+          <h4>是否有其他地方存在同類問題？</h4>
+          <span class="qc-arrow">▶</span>
+        </button>
+        <div class="qc-body">有。<b>「標記已讀」和「撤回訊息」</b> 走的是同一條更新鏈路，同樣漏了觸發重算。同一個坑往往不止一處，這次一起修乾淨。</div>
+      </div>
+    </div>
+
+    <div class="unlock-area">
+      <button class="btn btn-p" id="btnFix" onclick="doFix()" disabled>🔒 開始修復（先答完三問）</button>
+      <div class="fix-result" id="fixResult">
+        <div class="l-callout" style="background:rgba(22,163,74,.05);border-color:rgba(22,163,74,.28)">
+          <p><b style="color:var(--success)">前置調研完成，允許動手。</b>修復完成後還有最後一步：宣告影響範圍，讓人知道該回歸測試哪些地方。</p>
+          <div class="imp-line">⚡ 影響範圍：會話列表未讀數、App 角標、標記已讀、撤回訊息</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">交付線 · 兩道硬性檢查</div>
+    <div class="l-cols">
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:6px;color:var(--vibe-deep)">禁止 Mock 繞過真實 AI 介面</h3>
+        <p class="desc" style="font-size:13.5px">凡涉及 AI 模型呼叫的功能，交付前必須確認介面真的能訪問。使用者沒給 API Key 時必須停下來要，禁止硬編碼假響應或本地模擬繞過真實呼叫。Key 到位後先發一次測試請求驗證可用性，再繼續開發。</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:6px;color:var(--vibe-deep)">單元測試不過，不得交付</h3>
+        <p class="desc" style="font-size:13.5px">核心業務邏輯、API 介面、資料處理函式、邊界條件都要覆蓋。測試檔案統一放 <code>tests/</code>，命名 <code>test_{模組名}.py</code>，Python 專案用 pytest。除錯用的臨時腳本，用完自行刪除。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="l-callout" style="background:var(--vibe-soft);border-color:rgba(13,148,136,.3)">
+      <p><b style="color:var(--vibe-deep)">證據先行。</b>加 Log 的 2 分鐘，買斷的是猜錯三輪的返工和被掩蓋的根因。修復後用 <code>⚡ 影響範圍：XXX、YYY、ZZZ</code> 的格式宣告影響面，交付前過真實介面和單元測試兩道線。</p>
+    </div>
+    <div class="l-card src-note">素材來源：本節內容整理自開源倉庫 <a href="https://github.com/itshen/xs_vibe_rules" target="_blank" rel="noopener">itshen/xs_vibe_rules</a> 的 rule-opensource.mdc 第八章「除錯與日誌規範」。</div>
+  </section>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ── 交互一：两条修 Bug 路径对比 ── */
+const PATHS = [
+  {
+    name: '猜測性修復',
+    final: '3 輪 · 改動 47 行 · Bug 仍在',
+    steps: [
+      { cls:'ai',      text:'AI：可能是傳送按鈕重複綁定了事件，我去掉一個監聽試試。', round:1, lines:12, title:'第 1 輪：開始猜' },
+      { cls:'warning', text:'測試：問題依舊，輸入法回車還是會誤傳送。', round:1, lines:12, title:'第 1 輪猜錯了' },
+      { cls:'ai',      text:'AI：那可能是沒做防抖，我給傳送加個 300ms 防抖。', round:2, lines:26, title:'第 2 輪：接著猜' },
+      { cls:'warning', text:'測試：沒修好，還多了一個傳送延遲的新問題。', round:2, lines:26, title:'第 2 輪又錯了' },
+      { cls:'ai',      text:'AI：再試試把 keydown 換成 keyup，順便重寫一下事件處理。', round:3, lines:47, title:'第 3 輪：繼續猜' },
+      { cls:'warning', text:'測試：仍然誤傳送。三輪下來事件處理邏輯被改得認不出來，原始現場也沒了。', round:3, lines:47, title:'程式碼被改花，根因被掩蓋' }
+    ],
+    endState: '未修好', endHot: true
+  },
+  {
+    name: '先 Log 再改',
+    final: '1 輪 · 改動 4 行 · 修好且宣告了影響範圍',
+    steps: [
+      { cls:'ai',  text:'AI：先不改程式碼。我在 keydown 回撥裡加一行 Log，列印 e.key 和 isComposing。', round:1, lines:1, title:'第 1 步：加 Log' },
+      { cls:'log', text:'Console › key=Enter  isComposing=true  ← 輸入法確認候選詞的回車也進來了', round:1, lines:1, title:'第 2 步：看證據' },
+      { cls:'ai',  text:'AI：根因定位。程式碼只判斷了 e.key === "Enter"，沒有檢查 isComposing，輸入法確認候選詞的回車被當成了傳送。', round:1, lines:1, title:'第 3 步：定位根因' },
+      { cls:'fix', text:'if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { send() }', round:1, lines:4, title:'第 4 步：一次修復' },
+      { cls:'ok',  text:'測試通過。⚡ 影響範圍：所有帶回車傳送的輸入框元件，建議迴歸聊天框、評論框。', round:1, lines:4, title:'第 5 步：宣告影響範圍' }
+    ],
+    endState: '已修好', endHot: false
+  }
+];
+
+let curPath = -1, curStep = 0, stepTimer = null;
+const pathDone = [false, false];
+
+function pickPath(idx) {
+  curPath = idx;
+  document.getElementById('pb0').classList.toggle('active', idx === 0);
+  document.getElementById('pb1').classList.toggle('active', idx === 1);
+  playPath();
+}
+
+function replayPath() {
+  if (curPath < 0) return;
+  playPath();
+}
+
+function setStats(round, lines, state, hot) {
+  const r = document.getElementById('stRound');
+  const l = document.getElementById('stLines');
+  const s = document.getElementById('stState');
+  r.textContent = round;
+  l.textContent = lines;
+  s.textContent = state;
+  r.className = 'sv' + (hot ? ' hot' : ' cool');
+  l.className = 'sv' + (hot ? ' hot' : ' cool');
+  s.className = 'sv' + (hot ? ' hot' : ' cool');
+  s.style.fontSize = '17px';
+}
+
+function playPath() {
+  clearInterval(stepTimer);
+  curStep = 0;
+  document.getElementById('visBody').innerHTML = '';
+  document.getElementById('ctrlHint').textContent = '';
+  const p = PATHS[curPath];
+  const hot = curPath === 0;
+  setStats(0, 0, '排查中', hot);
+  document.getElementById('visTitle').textContent = p.name + '：演示中';
+
+  stepTimer = setInterval(function () {
+    if (curStep >= p.steps.length) {
+      clearInterval(stepTimer);
+      stepTimer = null;
+      setStats(p.steps[p.steps.length - 1].round, p.steps[p.steps.length - 1].lines, p.endState, p.endHot);
+      document.getElementById('visTitle').textContent = p.name + '：演示完成';
+      document.getElementById('ctrlHint').textContent = '試試另一條路徑，對比數字';
+      pathDone[curPath] = true;
+      const box = document.getElementById('score' + curPath);
+      box.classList.add('done');
+      document.getElementById('score' + curPath + 'd').textContent = p.final;
+      return;
+    }
+    const step = p.steps[curStep];
+    const body = document.getElementById('visBody');
+    const el = document.createElement('div');
+    el.className = 'msg ' + step.cls;
+    el.textContent = step.text;
+    body.appendChild(el);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add('show'); }); });
+    body.scrollTop = body.scrollHeight;
+
+    setStats(step.round, step.lines, '排查中', hot);
+    document.getElementById('visTitle').textContent = step.title;
+    curStep++;
+    document.getElementById('stepHint').textContent = curStep + ' / ' + p.steps.length;
+  }, 1000);
+}
+
+/* 进入视野时自动播放第一条路径 */
+let demoStarted = false;
+lessonOnView(document.getElementById('visBody'), function () {
+  if (demoStarted || curPath >= 0) return;
+  demoStarted = true;
+  pickPath(0);
+});
+
+/* ── 交互二：修复前三问自查器 ── */
+const qOpened = [false, false, false];
+
+function openQ(idx) {
+  const item = document.getElementById('qc' + idx);
+  item.classList.toggle('open');
+  if (item.classList.contains('open')) qOpened[idx] = true;
+
+  if (qOpened[0] && qOpened[1] && qOpened[2]) {
+    const btn = document.getElementById('btnFix');
+    btn.disabled = false;
+    btn.textContent = '✓ 三問已答，開始修復';
+  }
+}
+
+function doFix() {
+  document.getElementById('fixResult').classList.add('show');
+  document.getElementById('btnFix').disabled = true;
+  document.getElementById('btnFix').textContent = '修復完成';
+}
+</script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

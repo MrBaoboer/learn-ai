@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skill：讓 Agent 少走彎路的技能封裝 | xueai.miyang.cn</title>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--green:var(--success);--orange:var(--amber);--red:var(--danger);--muted:var(--sub);--surface:var(--card);--surface2:rgba(0,0,0,.04)}
+
+.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.left-col,.right-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+
+/* 公式 */
+.formula{background:rgba(217,119,6,.06);border:1.5px solid rgba(217,119,6,.2);border-radius:12px;padding:14px 16px;text-align:center}
+.formula .eq{font-size:19px;font-weight:800;color:var(--orange);font-family:'Cascadia Code','Fira Code',monospace;margin-bottom:4px}
+.formula p{font-size:14px;color:var(--sub)}
+
+/* 控制区 */
+.ctrl{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.ctrl-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.ctrl-label{font-size:14px;color:var(--muted);font-weight:600}
+.btn-reset{padding:8px 14px;border-radius:8px;background:var(--surface2);color:var(--sub);font-size:14px;font-weight:600;border:1px solid var(--border);cursor:pointer;font-family:inherit;min-height:38px}
+.prog{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;border-radius:2px;transition:width .4s ease}
+
+/* 场景选择 */
+.scene-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.scene-btn{padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;font-weight:700;color:var(--sub);font-family:inherit;transition:all .15s;min-height:40px}
+.scene-btn.active{border-color:var(--orange);background:rgba(217,119,6,.06);color:var(--orange)}
+
+/* 动画演绎区 */
+.stage{background:var(--card);border:1.5px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+.stage-head{padding:9px 14px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.stage-title{font-size:14px;font-weight:700;color:var(--text)}
+.mode-toggle{display:flex;gap:4px}
+.mode-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;transition:all .15s;min-height:32px}
+.mode-btn.on-bad{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.25);color:var(--red)}
+.mode-btn.on-good{background:rgba(22,163,74,.08);border-color:rgba(22,163,74,.25);color:var(--green)}
+.stage-body{padding:12px;display:flex;flex-direction:column;gap:6px;min-height:120px}
+
+/* 消息条 */
+.act{border-radius:8px;padding:8px 12px;display:flex;align-items:flex-start;gap:8px;opacity:0;transform:translateY(6px);transition:all .35s ease}
+.act.show{opacity:1;transform:translateY(0)}
+.act-icon{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:800}
+.act-body{flex:1;display:flex;flex-direction:column;gap:2px}
+.act-who{font-size:11px;font-weight:800;letter-spacing:.3px}
+.act-text{font-size:14px;line-height:1.6;color:var(--text)}
+.act.agent{background:rgba(217,119,6,.04)}.act.agent .act-icon{background:rgba(217,119,6,.12);color:var(--orange)}.act.agent .act-who{color:var(--orange)}
+.act.human{background:rgba(8,145,178,.04)}.act.human .act-icon{background:rgba(8,145,178,.12);color:var(--cyan)}.act.human .act-who{color:var(--cyan)}
+.act.waste{background:rgba(220,38,38,.04);border:1px dashed rgba(220,38,38,.15)}.act.waste .act-icon{background:rgba(220,38,38,.1);color:var(--red)}.act.waste .act-who{color:var(--red)}
+.act.done{background:rgba(22,163,74,.04)}.act.done .act-icon{background:rgba(22,163,74,.12);color:var(--green)}.act.done .act-who{color:var(--green)}
+
+/* 统计条 */
+.stat-bar{display:flex;gap:6px}
+.stat{flex:1;border-radius:8px;padding:8px 10px;text-align:center}
+.stat-n{font-size:22px;font-weight:800}
+.stat-l{font-size:11px;font-weight:700;margin-top:1px}
+.stat.bad{background:rgba(220,38,38,.06);color:var(--red)}.stat.bad .stat-l{color:var(--red)}
+.stat.good{background:rgba(22,163,74,.06);color:var(--green)}.stat.good .stat-l{color:var(--green)}
+.stat.neutral{background:var(--surface2);color:var(--text)}.stat.neutral .stat-l{color:var(--muted)}
+
+/* 右栏 SKILL.md */
+.skill-file{background:var(--card);border:1.5px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+.sf-head{padding:9px 14px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);font-size:14px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sf-body{padding:14px}
+.sk-section{margin-bottom:12px}.sk-section:last-child{margin-bottom:0}
+.sk-h{font-size:14px;font-weight:800;color:var(--orange);margin-bottom:3px}
+.sk-text{font-size:14px;color:var(--text);line-height:1.65}
+.sk-code{background:#1e1b2e;color:#cdd6f4;padding:10px 12px;border-radius:7px;font-family:'Cascadia Code','Fira Code',monospace;font-size:12px;line-height:1.6;margin-top:4px;white-space:pre-wrap;word-break:break-word}
+.sk-code .c{color:#6c7086}.sk-code .k{color:#cba6f7}.sk-code .s{color:#a6e3a1}.sk-code .fn{color:#89b4fa}
+.sk-list{padding-left:16px;font-size:13px;color:var(--sub);line-height:1.65;margin-top:3px}
+.sk-list li{margin-bottom:2px}
+
+.insight-box{background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.18);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(6px);transition:all .5s}
+.insight-box.show{opacity:1;transform:translateY(0)}
+.insight-box b{color:var(--orange)}
+
+.ref-box{background:rgba(124,58,237,.04);border:1px solid rgba(124,58,237,.15);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text);line-height:1.6}
+.ref-box b{color:var(--purple)}
+
+@keyframes bounce-in{0%{transform:scale(0.8);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+
+@media (max-width:768px){
+  .demo-grid{grid-template-columns:1fr}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="Skill（技能）是對 Agent 常用工具鏈的高層封裝，減少 Agent 的決策負擔。介紹 Skill 的設計原則、與 Tool 的區別，以及如何構建可複用的 Agent 技能庫。">
+<meta name="keywords" content="Agent Skill,技能封裝,AI Agent工程,工具鏈,Agent設計模式">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/7-5.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/7-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/7-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/7-5.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/7-5.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/7-5.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/7-5.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/7-5.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="Skill：讓 Agent 少走彎路的技能封裝">
+<meta property="og:description" content="Skill（技能）是對 Agent 常用工具鏈的高層封裝，減少 Agent 的決策負擔。介紹 Skill 的設計原則、與 Tool 的區別，以及如何構建可複用的 Agent 技能庫。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/7-5.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/7-5.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Skill：讓 Agent 少走彎路的技能封裝">
+<meta name="twitter:description" content="Skill（技能）是對 Agent 常用工具鏈的高層封裝，減少 Agent 的決策負擔。介紹 Skill 的設計原則、與 Tool 的區別，以及如何構建可複用的 Agent 技能庫。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Skill：讓 Agent 少走彎路","name":"Skill：讓 Agent 少走彎路","url":"https://xueai.miyang.cn/slides/7-5.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Skill（技能）是對 Agent 常用工具鏈的高層封裝，減少 Agent 的決策負擔。介紹 Skill 的設計原則、與 Tool 的區別，以及如何構建可複用的 Agent 技能庫。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 工程</div>
+    <h1>Skill：讓 Agent 少走彎路</h1>
+    <p class="subtitle">選擇一個場景，演示自動播放，對比「差迴圈」和「好迴圈」的兩種執行方式。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>Skill = 流程說明 + 工具呼叫指引，用「陽臺收衣服」類比好迴圈 vs 差迴圈</p></aside><!--seo:end-->  <div class="demo-grid reveal paywall-locked xa-peek" id="skillDemo">
+    <!-- 左栏：动画演绎 -->
+    <div class="left-col">
+      <div class="formula">
+        <div class="eq">Skill = 流程說明 + 工具呼叫指引</div>
+        <p>讓 ReAct 迴圈儘可能短、儘可能高效</p>
+      </div>
+
+      <div class="scene-tabs" id="sceneTabs"></div>
+
+      <div class="ctrl">
+        <div class="ctrl-top">
+          <span class="ctrl-label" id="ctrlLabel">準備開始</span>
+          <button class="btn-reset" onclick="replayScene()">↺ 重播</button>
+        </div>
+        <div class="prog"><div class="prog-fill" id="progFill" style="width:0%;background:var(--red)"></div></div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-head">
+          <span class="stage-title" id="stageTitle">沒有 Skill 的 ReAct</span>
+          <div class="mode-toggle">
+            <button class="mode-btn on-bad" id="modeBad" onclick="setMode('bad')">差迴圈</button>
+            <button class="mode-btn" id="modeGood" onclick="setMode('good')">好迴圈</button>
+          </div>
+        </div>
+        <div class="stage-body" id="stageBody"></div>
+      </div>
+
+      <div class="stat-bar" id="statBar"></div>
+
+      <div class="insight-box" id="insightBox">
+        <b>本質：</b>Skill 就是<b>把經驗寫成文件</b>，算不上新技術。用自然語言告訴 AI：遇到這類任務，先做什麼、再做什麼、調哪個工具。AI 出門之前就想清楚，一趟全搞完。
+      </div>
+    </div>
+
+    <!-- 右栏：Skill 文件结构 -->
+    <div class="right-col">
+      <div style="font-size:14px;font-weight:700;color:var(--muted)">對應的 SKILL.md 檔案 ↓（好迴圈的秘密）</div>
+      <div class="skill-file">
+        <div class="sf-head">
+          <span style="font-size:16px">📄</span>
+          <span id="sfTitle">SKILL.md</span>
+        </div>
+        <div class="sf-body" id="sfBody"></div>
+      </div>
+      <div class="ref-box">
+        <b>Cursor / Claude Code / Copilot</b> 都已支援 Skill 標準。核心就是一個 <code>SKILL.md</code> 檔案，AI 在識別到匹配任務時自動載入。<b>寫好 Skill = 把你的經驗變成 AI 的能力。</b>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+const SCENES = [
+  {
+    name: '陽臺收衣服',
+    skillTitle: 'SKILL.md — 陽臺收衣服技能',
+    bad: {
+      title: '沒有 Skill 的 ReAct',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'收了陽臺的衣服，回到房間。'},
+        {who:'waste',icon:'🔁',label:'來回確認',text:'主人，褲子也要收嗎？'},
+        {who:'human',icon:'👤',label:'你',text:'當然要。'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'出去收了褲子，又回來了。'},
+        {who:'waste',icon:'🔁',label:'來回確認',text:'檸檬樹要澆水嗎？'},
+        {who:'human',icon:'👤',label:'你',text:'要啊！'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'又出去澆水…'},
+        {who:'waste',icon:'🔁',label:'來回確認',text:'孩子的玩具也要收嗎？'},
+        {who:'human',icon:'👤',label:'你',text:'你說呢…'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'又出去收玩具…終於全搞完了。'},
+      ],
+      stats:{trips:'4 趟',loops:'10 步',verdict:'浪費時間 + 浪費精力'}
+    },
+    good: {
+      title: '有 Skill 的執行',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'載入 Skill：「陽臺收衣服」技能。'},
+        {who:'done',icon:'📋',label:'Plan',text:'出門前規劃好全部任務清單。'},
+        {who:'done',icon:'✅',label:'執行',text:'衣服收了 ✓'},
+        {who:'done',icon:'✅',label:'執行',text:'褲子也收了 ✓'},
+        {who:'done',icon:'✅',label:'執行',text:'檸檬樹澆了 ✓'},
+        {who:'done',icon:'✅',label:'執行',text:'孩子玩具也順手收了 ✓'},
+        {who:'done',icon:'🎉',label:'完成',text:'一趟全搞完，回來說「都好了」。'},
+      ],
+      stats:{trips:'1 趟',loops:'7 步',verdict:'一次到位 → 省錢省力'}
+    },
+    skillBody: `
+      <div class="sk-section">
+        <div class="sk-h">觸發條件</div>
+        <div class="sk-text">當使用者提到「收衣服」「陽臺」「晾曬」時自動觸發此技能。</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">執行流程</div>
+        <div class="sk-code"><span class="c"># 陽臺收衣服 Skill</span>
+
+<span class="k">Step 1:</span> 檢查陽臺所有物品（衣服、褲子、襪子、玩具…）
+<span class="k">Step 2:</span> 一次性全部收回
+<span class="k">Step 3:</span> 檢查植物是否需要澆水 → 如果需要就澆
+<span class="k">Step 4:</span> 檢查地面雜物 → 順手收拾
+<span class="k">Step 5:</span> 彙報完成</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">核心原則</div>
+        <div class="sk-text"><b>一趟搞完，不反覆回確認。</b><br>出門前就想清楚要做的所有事，Plan 好順序，一次執行到位。<br>差的迴圈 = 每做一步就停下來確認 → 多輪對話 → Token 費用高<br>好的迴圈 = 出發前規劃好 → 一次執行 → Token 費用低<br><b>好的迴圈和差的迴圈，差距非常大。</b></div>
+      </div>
+    `
+  },
+  {
+    name: '搜尋筆記',
+    skillTitle: 'SKILL.md — 搜尋筆記技能',
+    bad: {
+      title: '沒有 Skill 的 ReAct',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'思考：使用者想搜筆記，我試試…'},
+        {who:'agent',icon:'🔧',label:'工具呼叫',text:'search_notes("筆記")'},
+        {who:'waste',icon:'❌',label:'結果',text:'返回了 200 條…太多了。'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'換個關鍵詞試試？'},
+        {who:'agent',icon:'🔧',label:'工具呼叫',text:'search_notes("AI 學習筆記")'},
+        {who:'waste',icon:'❌',label:'結果',text:'還是不對，只有 1 條。'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'要不讀一下內容看看？'},
+        {who:'agent',icon:'🔧',label:'工具呼叫',text:'read_note(id=xxx)'},
+        {who:'agent',icon:'🔧',label:'工具呼叫',text:'read_note(id=yyy)'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'終於找到了…來回折騰了 10 步。'},
+      ],
+      stats:{trips:'5 次工具呼叫',loops:'10 步',verdict:'反覆試錯 → Token 浪費'}
+    },
+    good: {
+      title: '有 Skill 的執行',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'識別任務 → 載入「搜尋筆記」Skill'},
+        {who:'done',icon:'📋',label:'Plan',text:'按 Skill 指引：先精確搜尋標題'},
+        {who:'done',icon:'🔧',label:'Step 1',text:'search_notes("關鍵詞") → 拿到初步結果'},
+        {who:'done',icon:'🔧',label:'Step 2',text:'semantic_search(query) → 語義補充'},
+        {who:'done',icon:'🔧',label:'Step 3',text:'read_note(Top 3) → 讀取摘要'},
+        {who:'done',icon:'🎉',label:'完成',text:'輸出結構化列表：標題 + 摘要 + 日期'},
+      ],
+      stats:{trips:'3 次工具呼叫',loops:'6 步',verdict:'精準路徑 → 迴圈減半'}
+    },
+    skillBody: `
+      <div class="sk-section">
+        <div class="sk-h">觸發條件</div>
+        <div class="sk-text">當使用者說「搜尋筆記」「找筆記」「之前寫過什麼」時觸發。</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">執行流程</div>
+        <div class="sk-code"><span class="c"># 搜尋筆記 Skill 標準流程</span>
+
+<span class="k">Step 1:</span> 提取關鍵詞，呼叫 <span class="fn">search_notes</span>(keyword)
+<span class="k">Step 2:</span> 如果結果 < 3，用 <span class="fn">semantic_search</span>(query) 補充
+<span class="k">Step 3:</span> 取 Top 5 結果，呼叫 <span class="fn">read_note</span>(id) 讀摘要
+<span class="k">Step 4:</span> 整合輸出結構化列表，包含標題+摘要+日期</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">可用工具</div>
+        <ul class="sk-list">
+          <li><b>search_notes(keyword)</b> — 關鍵詞搜尋</li>
+          <li><b>semantic_search(query)</b> — 語義搜尋</li>
+          <li><b>read_note(id)</b> — 讀取內容</li>
+        </ul>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">注意事項</div>
+        <div class="sk-text">先查後編，不猜測 ID。大文件用 search_note_content 定位。</div>
+      </div>
+    `
+  },
+  {
+    name: '部署上線',
+    skillTitle: 'SKILL.md — 部署上線技能',
+    bad: {
+      title: '沒有 Skill 的 ReAct',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'思考：先試試 build…'},
+        {who:'agent',icon:'🔧',label:'工具呼叫',text:'run("npm run build")'},
+        {who:'waste',icon:'❌',label:'失敗',text:'Build 失敗：缺環境變數 DATABASE_URL。'},
+        {who:'waste',icon:'🔁',label:'來回確認',text:'主人，DATABASE_URL 是什麼？'},
+        {who:'human',icon:'👤',label:'你',text:'mysql://user:pass@host/db'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'好的，重新 build…成功了。'},
+        {who:'agent',icon:'🔧',label:'工具呼叫',text:'run("deploy production") — 直接部署了！'},
+        {who:'waste',icon:'💥',label:'線上炸了',text:'忘了跑測試，線上報 500 錯誤！'},
+        {who:'agent',icon:'🤖',label:'Agent',text:'緊急回滾…'},
+      ],
+      stats:{trips:'缺步驟',loops:'9 步',verdict:'漏測試 → 線上事故'}
+    },
+    good: {
+      title: '有 Skill 的執行',
+      steps: [
+        {who:'agent',icon:'🤖',label:'Agent',text:'載入「部署上線」Skill → 不可跳步。'},
+        {who:'done',icon:'✅',label:'Step 1',text:'檢查 .env 檔案完整性 → OK'},
+        {who:'done',icon:'✅',label:'Step 2',text:'執行 pytest 全量測試 → 全部透過'},
+        {who:'done',icon:'✅',label:'Step 3',text:'npm run build → 構建成功'},
+        {who:'done',icon:'✅',label:'Step 4',text:'部署到 staging → 冒煙測試通過'},
+        {who:'done',icon:'✅',label:'Step 5',text:'部署到 production → 健康檢查通過'},
+        {who:'done',icon:'🎉',label:'完成',text:'安全上線，通知團隊。'},
+      ],
+      stats:{trips:'標準流程',loops:'7 步',verdict:'步步校驗 → 安全上線'}
+    },
+    skillBody: `
+      <div class="sk-section">
+        <div class="sk-h">觸發條件</div>
+        <div class="sk-text">當使用者說「部署」「上線」「釋出到生產」時觸發。</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">執行流程（不可跳步）</div>
+        <div class="sk-code"><span class="c"># 部署上線 Skill</span>
+
+<span class="k">Step 1:</span> 檢查 .env 和配置檔案完整性
+<span class="k">Step 2:</span> 執行 <span class="fn">pytest</span> 全量測試，全部透過才繼續
+<span class="k">Step 3:</span> 執行 <span class="fn">build</span> 構建生產版本
+<span class="k">Step 4:</span> 部署到 <span class="s">staging</span>，冒煙測試
+<span class="k">Step 5:</span> 確認後部署到 <span class="s">production</span>
+<span class="k">Step 6:</span> 驗證健康檢查 + 通知團隊</div>
+      </div>
+      <div class="sk-section">
+        <div class="sk-h">安全約束</div>
+        <ul class="sk-list">
+          <li>測試未全部通過 → <b>禁止繼續</b></li>
+          <li>staging 驗證失敗 → <b>禁止部署 production</b></li>
+          <li>必須先 staging 再 production，不可跳步</li>
+        </ul>
+      </div>
+    `
+  }
+];
+
+let curScene=0, curMode='bad', curStep=0, playTimer=null, viewed=false;
+
+function buildSceneTabs(){
+  document.getElementById('sceneTabs').innerHTML=SCENES.map((s,i)=>
+    `<button class="scene-btn${i===curScene?' active':''}" onclick="pickScene(${i})">${s.name}</button>`
+  ).join('');
+}
+
+function pickScene(i){
+  curScene=i;curMode='bad';
+  buildSceneTabs();
+  renderSkill();
+  resetStage();
+  if(viewed)startPlay();
+}
+
+function setMode(m){
+  curMode=m;
+  resetStage();
+  if(viewed)startPlay();
+}
+
+function replayScene(){
+  resetStage();
+  startPlay();
+}
+
+function resetStage(){
+  if(playTimer){clearTimeout(playTimer);playTimer=null;}
+  const sc=SCENES[curScene];
+  const data=curMode==='bad'?sc.bad:sc.good;
+  document.getElementById('stageTitle').textContent=data.title;
+  document.getElementById('modeBad').className='mode-btn'+(curMode==='bad'?' on-bad':'');
+  document.getElementById('modeGood').className='mode-btn'+(curMode==='good'?' on-good':'');
+
+  document.getElementById('stageBody').innerHTML=data.steps.map((s,i)=>
+    `<div class="act ${s.who}" id="act${i}">
+      <div class="act-icon">${s.icon}</div>
+      <div class="act-body">
+        <div class="act-who">${s.label}</div>
+        <div class="act-text">${s.text}</div>
+      </div>
+    </div>`
+  ).join('');
+
+  curStep=0;
+  const fill=document.getElementById('progFill');
+  fill.style.width='0%';
+  fill.style.background=curMode==='bad'?'var(--red)':'var(--green)';
+  document.getElementById('ctrlLabel').textContent='準備開始 · 共 '+data.steps.length+' 步';
+  document.getElementById('statBar').innerHTML='';
+  document.getElementById('insightBox').classList.remove('show');
+}
+
+function playNext(){
+  const sc=SCENES[curScene];
+  const data=curMode==='bad'?sc.bad:sc.good;
+  if(curStep>=data.steps.length)return;
+
+  const el=document.getElementById('act'+curStep);
+  el.classList.add('show');
+  curStep++;
+
+  const pct=Math.round(curStep/data.steps.length*100);
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('ctrlLabel').textContent=`第 ${curStep} / ${data.steps.length} 步`;
+
+  if(curStep>=data.steps.length){
+    playTimer=null;
+    showStats(data.stats);
+
+    if(curMode==='bad'){
+      setTimeout(()=>{
+        document.getElementById('ctrlLabel').textContent='差迴圈看完了 → 點「好迴圈」看對比';
+      },600);
+    } else {
+      setTimeout(()=>{
+        document.getElementById('insightBox').classList.add('show');
+      },400);
+    }
+  }else{
+    playTimer=setTimeout(playNext,700);
+  }
+}
+
+function startPlay(){
+  if(playTimer)clearTimeout(playTimer);
+  playTimer=setTimeout(playNext,300);
+}
+
+function showStats(s){
+  const isBad=curMode==='bad';
+  document.getElementById('statBar').innerHTML=`
+    <div class="stat ${isBad?'bad':'good'}"><div class="stat-n">${s.trips}</div><div class="stat-l">往返次數</div></div>
+    <div class="stat neutral"><div class="stat-n">${s.loops}</div><div class="stat-l">總步數</div></div>
+    <div class="stat ${isBad?'bad':'good'}"><div class="stat-n" style="font-size:14px">${s.verdict}</div><div class="stat-l">結論</div></div>
+  `;
+  document.getElementById('statBar').style.animation='bounce-in .4s ease';
+}
+
+function renderSkill(){
+  const sc=SCENES[curScene];
+  document.getElementById('sfTitle').textContent=sc.skillTitle;
+  document.getElementById('sfBody').innerHTML=sc.skillBody;
+}
+
+buildSceneTabs();
+renderSkill();
+resetStage();
+
+lessonOnView(document.getElementById('skillDemo'), function(){
+  viewed=true;
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

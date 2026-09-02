@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>文件編輯的工程學：先讀後寫 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.24);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.05),0 0 0 52px rgba(77,107,254,.028)}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.prose{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.core-visual{background:var(--card);border:1px solid rgba(77,107,254,.25);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.core-visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.source{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.doc-quote{margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;box-shadow:var(--shadow-card)}.doc-quote .dq-path{font:700 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);overflow-wrap:anywhere;margin-bottom:8px}.doc-quote blockquote{margin:0;font-size:14px;line-height:1.9;color:var(--text)}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#f0f3ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.28);color:var(--text);display:flex;gap:14px;line-height:1.9;font-size:14px}.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+/* ── 交互演示 · 先读后写闯关 ── */
+.demo{background:var(--card);border:1px solid rgba(77,107,254,.25);border-radius:18px;padding:28px;box-shadow:var(--shadow-card)}
+.demo-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.demo-scenarios,.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 15px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:600 13px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+.demo button.active,.demo button:hover{border-color:var(--accent)}
+.demo button.active{background:var(--accent);color:#fff}
+.demo button svg{flex:none}
+.ed-stage{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;align-items:stretch}
+.ed-box{background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:12px;transition:border-color .3s,box-shadow .3s;display:flex;flex-direction:column}
+.ed-box.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ed-box.bad{border-color:rgba(220,38,38,.55)}
+.ed-box.ok{border-color:rgba(22,163,74,.5)}
+.ed-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+.ed-head b{font:800 12px/1.4 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:var(--accent-deep)}
+.ed-sub{font-size:11px;color:var(--sub);margin-bottom:10px;line-height:1.5}
+.ver-badge{font:800 11px/1 ui-monospace,Menlo,monospace;background:#fff;border:1px solid rgba(77,107,254,.35);color:var(--accent-deep);border-radius:999px;padding:5px 10px;transition:transform .3s}
+.ver-badge.pop{animation:edpop .45s ease}
+@keyframes edpop{50%{transform:scale(1.35)}}
+.ed-file{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font:11.5px/1.85 ui-monospace,Menlo,monospace;color:var(--text);flex:1}
+.ed-file .fl{display:flex;gap:8px;border-radius:4px;padding:0 4px;transition:background .3s}
+.ed-file .fl .ln{color:#9ca3af;flex:none;width:18px;text-align:right}
+.ed-file .fl.hl{background:var(--accent-soft)}
+.ed-file .fl.dup{background:rgba(217,119,6,.14)}
+.ed-file .fl.new{background:rgba(22,163,74,.12)}
+.ext-hand{display:inline-flex;align-items:center;gap:5px;font:700 11px/1 -apple-system,sans-serif;color:var(--amber);border:1px solid rgba(217,119,6,.45);border-radius:999px;padding:5px 9px;opacity:0;transition:opacity .3s}
+.ext-hand.show{opacity:1}
+.ledger{display:flex;flex-direction:column;gap:6px;flex:1}
+.ledger-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:8px 10px;font:11.5px/1.4 ui-monospace,Menlo,monospace;color:var(--text);transition:border-color .3s,background .3s}
+.ledger-row .obs{font-weight:800;color:var(--sub)}
+.ledger-row.seen .obs{color:var(--success)}
+.ledger-row.flash{border-color:var(--accent);background:var(--accent-soft)}
+.ledger-note{font-size:11px;color:var(--sub);line-height:1.6;margin-top:8px}
+.ed-verdict{display:flex;flex-direction:column;gap:8px;flex:1}
+.intent-chip{background:#fff;border:1px dashed rgba(77,107,254,.4);border-radius:9px;padding:8px 10px;font:11.5px/1.6 ui-monospace,Menlo,monospace;color:var(--accent-deep);min-height:38px}
+.gate-light{display:flex;align-items:center;gap:8px;border-radius:10px;padding:10px 12px;font:800 13px/1.3 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;border:1px solid var(--border);background:#fff;color:var(--sub);min-height:44px;transition:border-color .3s,color .3s,background .3s}
+.gate-light svg{flex:none}
+.gate-light.deny{border-color:rgba(220,38,38,.5);color:var(--danger);background:rgba(220,38,38,.05)}
+.gate-light.allow{border-color:rgba(22,163,74,.5);color:var(--success);background:rgba(22,163,74,.06)}
+.err-code{font:700 10.5px/1 ui-monospace,Menlo,monospace;border:1px solid rgba(220,38,38,.4);color:var(--danger);border-radius:999px;padding:4px 8px;display:none}
+.err-code.show{display:inline-block}
+.ed-status{margin-top:16px;min-height:56px;font-size:14px;color:var(--text);line-height:1.8;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.demo-note{font-size:12px;color:var(--sub);margin-top:12px;line-height:1.7}
+@media(max-width:760px){.facts{grid-template-columns:1fr}.ed-stage{grid-template-columns:1fr}.objective{grid-template-columns:1fr}.lesson-header:after{display:none}.demo-bar{flex-direction:column;align-items:stretch}.demo button{flex:1}.source-head{flex-direction:column}}
+</style>
+<meta name="description" content="拆解 DeepSeek Harness 的文件編輯防綫：read、edit、write 三件套配合 fs-observation-policy 觀測帳本，沒讀過的文件不許改，讀過之後文件被外部改動會報 FS_STALE_VERSION，唯一字面量匹配防改錯位置。">
+<meta name="author" content="洛小山">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/dsh-14.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/dsh-14.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/dsh-14.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/dsh-14.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/dsh-14.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/dsh-14.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/dsh-14.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/dsh-14.html">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"文件編輯的工程學：先讀後寫","name":"文件編輯的工程學：先讀後寫","url":"https://xueai.miyang.cn/slides/dsh-14.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 工具系統","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"拆解 DeepSeek Harness 的文件編輯防綫：read、edit、write 三件套配合 fs-observation-policy 觀測帳本，沒讀過的文件不許改，讀過之後文件被外部改動會報 FS_STALE_VERSION，唯一字面量匹配防改錯位置。","datePublished":"2026-08-13","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="文件編輯的工程學：先讀後寫"><meta property="og:description" content="拆解 DeepSeek Harness 的文件編輯防綫：read、edit、write 三件套配合 fs-observation-policy 觀測帳本，沒讀過的文件不許改，讀過之後文件被外部改動會報 FS_STALE_VERSION，唯一字面量匹配防改錯位置。"><meta property="og:url" content="https://xueai.miyang.cn/slides/dsh-14.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 工具系統</div>
+    <h1>文件編輯的工程學：先讀後寫</h1>
+    <p class="subtitle">read / edit / write 三件套，沒讀過的文件不許改。核心源碼：<code>packages/fs/fs-observation-policy/src/index.ts</code>。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>read / edit / write 三件套，沒讀過的文件不許改</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>課程目標</b>讀完你能説清三件事：DSH 怎麼用一本觀測帳本記住「這個會話讀過哪些文件、讀到的是哪個版本」；edit 為什麼在沒讀過時被 FS_NOT_OBSERVED 攔下、在文件被外部改動後被 FS_STALE_VERSION 攔下；以及這套防綫為什麼做成可拔插件，而 Claude Code 和 Grok 在同一個問題上給出了提示詞和提示語兩種不同濃度的答案。</span>
+  </div>
+
+  <div class="sec-label">互動演示 · 先讀後寫闖關</div>
+  <div id="demo-edit" class="demo reveal">
+    <div class="demo-bar">
+      <div class="demo-scenarios">
+        <button class="scn active" data-scn="A">情景 A · 沒讀就改</button>
+        <button class="scn" data-scn="B">情景 B · 讀後被外部改</button>
+        <button class="scn" data-scn="C">情景 C · 匹配了兩處</button>
+      </div>
+      <div class="demo-ctrl">
+        <button id="de-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"/></svg>播放</button>
+        <button id="de-step"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4v16l10-8z"/><path d="M19 4v16"/></svg>單步</button>
+        <button id="de-reset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>重置</button>
+      </div>
+    </div>
+    <div class="ed-stage">
+      <div class="ed-box" id="eb-file">
+        <div class="ed-head"><b>磁盤上的文件 notes.md</b><span style="display:flex;gap:6px;align-items:center"><span class="ext-hand" id="de-ext"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>外部改動</span><span class="ver-badge" id="de-ver">版本 v7</span></span></div>
+        <div class="ed-sub">版本號是後端簽發的新鮮度憑證，文件一變它就變</div>
+        <div class="ed-file" id="de-file"></div>
+      </div>
+      <div class="ed-box" id="eb-ledger">
+        <div class="ed-head"><b>觀測帳本</b></div>
+        <div class="ed-sub">observation-policy 插件的記錄：這個會話見過誰、見到的是哪個版本</div>
+        <div class="ledger" id="de-ledger"></div>
+        <div class="ledger-note">未見 = 帳本裏沒條目；present@vN = 讀到過版本 vN；absent = 確認過不存在</div>
+      </div>
+      <div class="ed-box" id="eb-gate">
+        <div class="ed-head"><b>edit 意圖判定</b></div>
+        <div class="ed-sub">工具分發 fs/edit-intent，插件對着帳本作決定</div>
+        <div class="ed-verdict">
+          <div class="intent-chip" id="de-intent">等待工具調用…</div>
+          <div class="gate-light" id="de-gate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span id="de-gate-text">待判定</span></div>
+          <span class="err-code" id="de-code"></span>
+        </div>
+      </div>
+    </div>
+    <div class="ed-status" id="de-status">選擇情景後點「播放」，或滾動到此處自動播放情景 A。</div>
+    <div class="demo-note">演示為教學化模擬：文件內容與版本號是課程化舉例，判定邏輯對應 <code>packages/fs/fs-observation-policy/src/index.ts</code> 的 writeIntent / editIntent 與 <code>docs/subsystems/filesystem.zh.md</code> 的錯誤分類。玩的時候盯住帳本：判定從來不看文件本身，只看這個會話親眼見過什麼。</div>
+  </div>
+
+  <div class="sec-label">機制拆解 · 一本賬，三個判定</div>
+  <p class="prose reveal">Agent 改文件的三大翻車現場：改錯位置、覆蓋沒讀過的文件、拿着過期內容做編輯。DSH 的對策是三件套加一本賬。三件套是面向模型的 read、edit、write 工具（<code>docs/tool-catalog.zh.md</code>）：read 窗口化讀取帶行號的文本，edit 做字面量替換，write 整文件創建或覆蓋。賬是 <code>fs-observation-policy</code> 插件肚子裏的一個弱引用映射：以會話為鍵，記下每個文件目標的觀測狀態。</p>
+  <p class="prose reveal">帳本只有三種狀態。未見：帳本裏壓根沒這個文件的條目。present@vN：讀到過，而且讀到的是版本 vN，版本號是文件系統後端簽發的不透明新鮮度憑證。absent：確認過這個路徑不存在，比如 read 撲了個空。每次 read、write、edit 成功後，工具會發一個 <code>fs/observed</code> 事件，插件同步記帳。</p>
+  <p class="prose reveal">判定發生在動手之前。工具要寫或要改時，會分發 <code>fs/write-intent</code> 或 <code>fs/edit-intent</code> 事件，這是單槽瀑布：第一個返回決定的監聽器獨佔決策權，按部署約定就是這個策略插件。它對着帳本給出守衞條件，真正的檢查由後端在一個原子臨界區裏完成：先驗版本再匹配再替換，中途誰也插不進來。</p>
+  <div class="facts">
+    <div class="fact reveal"><code>write 永遠有路走</code><p>沒讀過就 write，守衞是 createIfAbsent：文件不存在就創建，存在就拒絕（FS_NOT_OBSERVED）。讀過再 write，守衞是 replaceIfVersion：版本對上才替換。新建文件不用先讀，覆蓋別人的文件不行。</p></div>
+    <div class="fact reveal"><code>edit 一步都不讓</code><p>沒讀過直接 FS_NOT_OBSERVED，帳本記着 absent 就 FS_NOT_FOUND，讀過則帶版本守衞上路。版本檢查排在字面量匹配之前，所以拿過期內容編輯報的是 FS_STALE_VERSION，不會退化成一個誤導性的匹配失敗。</p></div>
+    <div class="fact reveal"><code>錯誤帶結構化身份</code><p>所有失敗都帶穩定的 <code>FsError</code> code，工具註冊表在錯誤結果上保留 <code>{ name, code }</code>。重試邏輯和 UI 按 code 分支就行，不用解析錯誤文案（<code>docs/subsystems/filesystem.zh.md</code>「錯誤分類體系」）。</p></div>
+  </div>
+
+  <div class="sec-label">核心視覺 · 判定流</div>
+  <div class="core-visual reveal">
+    <svg viewBox="0 0 940 310" role="img" aria-label="先讀後寫判定流結構圖">
+      <defs>
+        <linearGradient id="eg" x1="0" x2="1"><stop stop-color="#3450d4"/><stop offset="1" stop-color="#4d6bfe"/></linearGradient>
+        <marker id="ea" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#4d6bfe"/></marker>
+        <marker id="eaR" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#dc2626"/></marker>
+        <marker id="eaG" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#16a34a"/></marker>
+      </defs>
+      <rect x="20" y="30" width="170" height="64" rx="12" fill="#f0f3ff" stroke="rgba(77,107,254,.4)"/>
+      <text x="105" y="57" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">read 成功</text>
+      <text x="105" y="77" fill="#6b7280" text-anchor="middle" font-size="11">emit fs/observed present@vN</text>
+      <path fill="none" d="M190 62 H240" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ea)"/>
+      <rect x="242" y="24" width="190" height="76" rx="13" fill="url(#eg)"/>
+      <text x="337" y="54" fill="#fff" text-anchor="middle" font-size="14" font-weight="800">觀測帳本</text>
+      <text x="337" y="76" fill="#dfe6ff" text-anchor="middle" font-size="11">WeakMap: 會話 → 目標 → 狀態</text>
+      <rect x="20" y="216" width="170" height="64" rx="12" fill="#fff" stroke="rgba(77,107,254,.4)"/>
+      <text x="105" y="243" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">edit 調用到達</text>
+      <text x="105" y="263" fill="#6b7280" text-anchor="middle" font-size="11">分發 fs/edit-intent 單槽瀑布</text>
+      <path fill="none" d="M190 248 H240" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ea)"/>
+      <rect x="242" y="210" width="190" height="76" rx="13" fill="#fff" stroke="rgba(77,107,254,.4)"/>
+      <text x="337" y="240" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">editIntent(target)</text>
+      <text x="337" y="262" fill="#6b7280" text-anchor="middle" font-size="11">查帳本，不查磁盤</text>
+      <path fill="none" d="M337 100 V208" stroke="#4d6bfe" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ea)"/>
+      <path fill="none" d="M432 232 H508" stroke="#dc2626" stroke-width="2" marker-end="url(#eaR)"/>
+      <text x="470" y="224" fill="#dc2626" text-anchor="middle" font-size="10" font-weight="700">未見</text>
+      <rect x="510" y="210" width="170" height="42" rx="10" fill="rgba(220,38,38,.06)" stroke="rgba(220,38,38,.5)"/>
+      <text x="595" y="236" fill="#dc2626" text-anchor="middle" font-size="12" font-weight="700">FS_NOT_OBSERVED</text>
+      <path fill="none" d="M432 268 H508" stroke="#dc2626" stroke-width="2" marker-end="url(#eaR)"/>
+      <text x="470" y="284" fill="#dc2626" text-anchor="middle" font-size="10" font-weight="700">absent</text>
+      <rect x="510" y="258" width="170" height="42" rx="10" fill="rgba(220,38,38,.06)" stroke="rgba(220,38,38,.5)"/>
+      <text x="595" y="284" fill="#dc2626" text-anchor="middle" font-size="12" font-weight="700">FS_NOT_FOUND</text>
+      <path d="M432 248 C470 160 520 130 560 122" stroke="#16a34a" stroke-width="2" fill="none" marker-end="url(#eaG)"/>
+      <text x="510" y="150" fill="#16a34a" text-anchor="middle" font-size="10" font-weight="700">present@vN</text>
+      <rect x="562" y="92" width="200" height="60" rx="12" fill="rgba(22,163,74,.06)" stroke="rgba(22,163,74,.45)"/>
+      <text x="662" y="116" fill="#16a34a" text-anchor="middle" font-size="12" font-weight="700">帶版本守衞放行</text>
+      <text x="662" y="136" fill="#6b7280" text-anchor="middle" font-size="10">replaceIfVersion(vN)</text>
+      <path fill="none" d="M762 122 H818" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ea)"/>
+      <rect x="820" y="76" width="104" height="92" rx="12" fill="#fff" stroke="rgba(77,107,254,.4)"/>
+      <text x="872" y="104" fill="#3450d4" text-anchor="middle" font-size="12" font-weight="700">後端臨界區</text>
+      <text x="872" y="124" fill="#6b7280" text-anchor="middle" font-size="10">驗版本 → 匹配</text>
+      <text x="872" y="142" fill="#6b7280" text-anchor="middle" font-size="10">→ 原子替換</text>
+      <text x="872" y="160" fill="#dc2626" text-anchor="middle" font-size="10" font-weight="700">不符→STALE</text>
+    </svg>
+    <div class="visual-caption">教學化結構圖：判定分支對應 fs-observation-policy 的 editIntent，臨界區語義出自 docs/subsystems/filesystem.zh.md「寫入與編輯守衞」。</div>
+  </div>
+
+  <div class="sec-label">關鍵證據 · 帳本上的兩個決定</div>
+  <p class="prose reveal">整個策略插件不到 140 行，核心就是兩個查賬函式。write 的判定是一個三行的選擇：查賬發現讀到過（present），就返回帶版本號的 replaceIfVersion 守衞，版本對上才許替換；帳本裏沒條目或者確認過不存在，就返回 createIfAbsent，文件不存在才許創建。函式頭上的註釋把這張決策表用兩個箭頭寫完了。這就是「write 永遠有路走」的實現：新建文件不用先讀，覆蓋別人的文件不行。</p>
+  <p class="src-note reveal paywall-locked xa-peek">出處：<code>packages/fs/fs-observation-policy/src/index.ts</code> 第 61 至 71 行的 writeIntent，核對日期 2026-08-13。</p>
+  <p class="prose reveal paywall-locked">edit 的判定更嚴，沒讀過連守衞都拿不到，直接拋錯。這個函式值得整段看，兩個 throw 就是本章標題的全部內容：</p>
+  <div class="source reveal paywall-locked">
+    <div class="source-head"><span>packages/fs/fs-observation-policy/src/index.ts</span><span>第 78 至 88 行</span></div>
+    <pre><code>  <span class="fn">editIntent</span>(target: <span class="ty">FsTarget</span>, actor: <span class="ty">object</span> | <span class="kw">undefined</span>): { version: <span class="ty">FsVersion</span> } {
+    <span class="kw">const</span> owner = <span class="kw">this</span>.<span class="fn">owner</span>(actor)
+    <span class="kw">const</span> prior = owner ? <span class="kw">this</span>.<span class="fn">get</span>(owner, target.targetKey) : <span class="kw">undefined</span>
+    <span class="kw">if</span> (!owner || prior === <span class="kw">undefined</span>) {
+      <span class="kw">throw new</span> <span class="ty">FsError</span>(<span class="str">`edit requires reading "${target.displayPath}" first`</span>, <span class="str">'FS_NOT_OBSERVED'</span>)
+    }
+    <span class="kw">if</span> (prior.kind === <span class="str">'absent'</span>) {
+      <span class="kw">throw new</span> <span class="ty">FsError</span>(<span class="str">`cannot edit "${target.displayPath}": not found`</span>, <span class="str">'FS_NOT_FOUND'</span>)
+    }
+    <span class="kw">return</span> { version: prior.version }
+  }</code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>源碼快照説明：</b>依據本地倉庫 deepseek-harness-master，核對文件 <code>packages/fs/fs-observation-policy/src/index.ts</code>，核對日期 2026-08-13。程式碼塊保留源碼原文。</div>
+  <p class="prose reveal paywall-locked">返回的 <code>{ version: prior.version }</code> 就是那張新鮮度憑證。後端 editText 拿到它，先對當前版本，不符報 FS_STALE_VERSION；對上了才做字面量匹配，old_string 必須恰好命中一次，命中多處報 FS_AMBIGUOUS_EDIT，一處都沒有報 FS_EDIT_NOT_FOUND，除非模型顯式傳了 replace_all。匹配、行尾處理、陳舊檢查、原子替換全在一個臨界區內完成（<code>docs/subsystems/filesystem.zh.md</code> 第 151 行）。</p>
+  <p class="prose reveal paywall-locked">還有三個值得記的細節。其一，這套防綫是可拔的：卸掉插件，write 和 edit 退回無條件的裸提供方行為，工具 schema 一個字不變，因為工具只分發事件、從不直接調策略。其二，read 的授權只看新鮮度，不分整讀還是窗口讀：只要文件沒變，讀 10 行也能授權後續整個文件的 edit。其三，read_image 是條件註冊的典型：部署沒有 <code>ctx.attachments</code> 能力就根本不註冊，註冊了但當前路由的模型不吃圖，執行時也拒絕（<code>docs/tool-catalog.zh.md</code> 第 718 行）。順帶一提演進史：edit 結果裏那張帶上下文的 diff 卡，最早是靠結果時刻重算 hunk 實現的，方案記錄在已歸檔的 Agent Note <code>.agents/notes/archived/architecture/2026-07-02-result-time-applied-hunk-diffs.zh.md</code>，後來後端直接返回 before/after 全文，工具算 hunk 存進 meta，回放免重算，這條通道在 <a href="dsh-13.html">工具輸出契約</a> 一課剛講過。</p>
+
+  <div class="sec-label paywall-locked">橫向對比 · 同一條規則的三種濃度</div>
+  <p class="prose reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg><b>Claude Code</b> 也強制先讀後寫，規則直接寫進了工具説明書。FileEditTool 的 prompt 原文：</p>
+  <div class="doc-quote reveal paywall-locked">
+    <div class="dq-path">claude-code-sourcemap-main/study/chapters/14-all-prompts.md · 第 1124 行（引 restored-src/src/tools/FileEditTool/prompt.ts 第 14 至 28 行）</div>
+    <blockquote>「You must use your <code>${FILE_READ_TOOL_NAME}</code> tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.」</blockquote>
+  </div>
+  <p class="prose reveal paywall-locked">「This tool will error」説明 CC 的運行時確有強制檢查，不只是提示詞客氣一下；old_string 不唯一會失敗、要麼加上下文要麼 replace_all 這條也和 DSH 完全同構。差別在防綫的掛載位置：CC 的先讀檢查長在 FileEditTool 自己身上，DSH 把它抽成獨立插件，read、edit、write、str_replace_editor 四個工具共享同一本賬，工具本體一行權限程式碼都沒有。至於文件被外部改動後 CC 如何檢測過期讀取，已核對的書稿材料未展示實現細節，這條基於已公開證據保留。</p>
+  <p class="prose reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg><b>Grok Build</b> 的 search_replace 工具留下了同一場鬥爭的痕跡。配置裏有個 <code>skip_read_before_edit</code> 字段，註釋標着已廢棄的運行時空操作，只在配置期把關 Read 工具依賴，説明先讀後寫曾是硬開關、後來鬆了綁。對過期讀取的處理更能看出取向差異：</p>
+  <div class="doc-quote reveal paywall-locked">
+    <div class="dq-path">grok-build-main/crates/codegen/xai-grok-tools/src/implementations/grok_build/search_replace/mod.rs · 第 111 至 113 行（include_user_edit_hint 字段註釋）</div>
+    <blockquote>「When true, append a hint that the user may have changed the file to <code>NoMatchesFound</code> error messages. This nudges the model to re-read instead of blindly retrying with the same stale content.」</blockquote>
+  </div>
+  <p class="prose reveal paywall-locked">翻譯一下：文件被人改了導致匹配失敗時，Grok 在報錯文案裏加一句提示，勸模型重新讀一遍再試。這是提示語濃度的防綫，靠模型自覺。DSH 是版本憑證濃度：版本對不上就 FS_STALE_VERSION，物理上不給寫。Grok 也有自己的強項，編碼坑那關它準備了 <code>unicode_normalized_fallback</code>，智能引號、長橫綫這類肉眼難辨的字符匹配失敗時可以做歸一化重試（同文件第 103 至 110 行），DSH 的 edit 目前只按行尾規範化後精確匹配。hunk 級的變更追蹤 Grok 單獨抽了 <code>xai-hunk-tracker</code> crate 來做，Grok 工具系統的全景可以看站內 <a href="12-9.html">實現族、註冊表與動態 MCP</a>。Codex 把力氣花在了 diff 格式本身，讓模型好寫、機器好驗，站內 <a href="codex-21.html">Codex apply-patch</a> 一課拆了它的語法與校驗。</p>
+
+  <div class="sec-label paywall-locked">課堂練習</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>推演一次三連擊</h3><p>會話剛開始，模型依次做三件事：write 一個不存在的 draft.md、edit 這個 draft.md、然後你在編輯器裏手動改了 draft.md 一個字，模型又發起第二次 edit。請寫出三次調用各自的守衞（createIfAbsent / replaceIfVersion / 版本守衞）和結局，標出帳本在每一步之後的狀態。特別想一想第二步：write 成功會 emit fs/observed 嗎？如果不記這筆賬，第二步的 edit 會發生什麼？（提示：writeIntent 的決策表裏，present 走 replaceIfVersion，而 edit 沒讀過直接 FS_NOT_OBSERVED。）</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway：</b>先讀後寫在 DSH 裏是一本觀測帳本加一張版本憑證：沒讀過的文件 edit 直接 FS_NOT_OBSERVED，讀過但被外部改動的文件 FS_STALE_VERSION，判定只看帳本不看運氣。防綫做成可拔插件，工具零權限程式碼。同一條規則，CC 寫進工具自身的運行時檢查，Grok 退成報錯裏的一句勸告，濃度高下立見。</span>
+  </div>
+</article>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var cur = 'A';
+  var steps = [];
+  var idx = 0;
+  var timer = null;
+  var playing = false;
+  var runId = 0;
+
+  var SVG_LOCK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+  var SVG_CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>';
+  var SVG_CROSS = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+
+  var FILES = {
+    A: [['1', 'week: 32'], ['2', 'status: draft'], ['3', 'owner: xiaoshan']],
+    B: [['1', 'week: 32'], ['2', 'status: draft'], ['3', 'owner: xiaoshan']],
+    C: [['1', 'count += 1'], ['2', 'log(count)'], ['3', 'count += 1']]
+  };
+
+  function renderFile(lines) {
+    var el = $('de-file');
+    el.innerHTML = '';
+    lines.forEach(function (l) {
+      var d = document.createElement('div');
+      d.className = 'fl' + (l[2] ? ' ' + l[2] : '');
+      d.innerHTML = '<span class="ln">' + l[0] + '</span><span>' + l[1] + '</span>';
+      el.appendChild(d);
+    });
+  }
+  function setVer(v) {
+    var b = $('de-ver');
+    b.textContent = '版本 ' + v;
+    b.classList.remove('pop');
+    void b.offsetWidth;
+    b.classList.add('pop');
+  }
+  function ledger(state, ver, flash) {
+    var el = $('de-ledger');
+    var obs = state === 'unseen' ? '未見' : state === 'absent' ? 'absent' : 'present@' + ver;
+    el.innerHTML = '<div class="ledger-row' + (state === 'present' ? ' seen' : '') + (flash ? ' flash' : '') + '"><span>notes.md</span><span class="obs">' + obs + '</span></div>';
+  }
+  function intent(t) { $('de-intent').textContent = t; }
+  function gate(kind, text, code) {
+    var g = $('de-gate');
+    g.className = 'gate-light' + (kind ? ' ' + kind : '');
+    g.innerHTML = (kind === 'allow' ? SVG_CHECK : kind === 'deny' ? SVG_CROSS : SVG_LOCK) + '<span>' + text + '</span>';
+    var c = $('de-code');
+    if (code) { c.textContent = code; c.classList.add('show'); } else { c.classList.remove('show'); c.textContent = ''; }
+  }
+  function box(id, cls) {
+    var el = $(id);
+    el.classList.remove('on', 'bad', 'ok');
+    if (cls) el.classList.add(cls);
+  }
+  function setStatus(t) { $('de-status').textContent = t; }
+
+  function buildA() {
+    return [
+      { cap: '模型上來就想改：edit notes.md，把 status: draft 換成 status: final。它還沒讀過這個文件。', run: function () { box('eb-gate', 'on'); intent("edit: 'status: draft' → 'status: final'"); } },
+      { cap: '工具分發 fs/edit-intent，策略插件查賬：notes.md 在這個會話的帳本裏沒有條目，狀態是未見。', run: function () { box('eb-ledger', 'on'); ledger('unseen', null, true); } },
+      { cap: '判定：未見就拒絕。拋 FS_NOT_OBSERVED，錯誤文案直説：edit requires reading "notes.md" first。', run: function () { box('eb-ledger', ''); box('eb-gate', 'bad'); gate('deny', '拒絕：先去讀文件', 'FS_NOT_OBSERVED'); } },
+      { cap: '模型聽話地調 read。讀取成功，工具 emit fs/observed，帳本記下 present@v7。', run: function () { box('eb-gate', ''); box('eb-file', 'on'); ledger('present', 'v7', true); FILES.A.forEach(function (l, i) { l[2] = i === 1 ? 'hl' : ''; }); renderFile(FILES.A); } },
+      { cap: '第二次 edit 到達。查賬：present@v7，放行，隨身帶上版本守衞 replaceIfVersion(v7)。', run: function () { box('eb-file', ''); box('eb-gate', 'on'); intent("edit + 守衞 { version: v7 }"); gate('allow', '放行，帶版本守衞'); } },
+      { cap: '後端臨界區裏：當前版本 v7 對上守衞 v7，字面量恰好命中一處，原子替換。文件變成 v8。', run: function () { box('eb-gate', 'ok'); box('eb-file', 'ok'); FILES.A[1] = ['2', 'status: final', 'new']; renderFile(FILES.A); setVer('v8'); } },
+      { cap: '編輯成功也要記帳：fs/observed 更新為 present@v8。下一次 edit 憑這個新版本繼續。', run: function () { ledger('present', 'v8', true); } }
+    ];
+  }
+
+  function buildB() {
+    return [
+      { cap: '這次模型規規矩矩：先 read。帳本記下 present@v8。', run: function () { box('eb-file', 'on'); ledger('present', 'v8', true); } },
+      { cap: '模型思考期間，你在編輯器裏手動改了這個文件。磁盤版本悄悄變成 v9，帳本還停在 v8。', run: function () { $('de-ext').classList.add('show'); FILES.B[0] = ['1', 'week: 33', 'dup']; renderFile(FILES.B); setVer('v9'); } },
+      { cap: '模型基於它讀到的舊內容發起 edit，隨身守衞是 replaceIfVersion(v8)。', run: function () { box('eb-file', ''); box('eb-gate', 'on'); intent("edit + 守衞 { version: v8 }"); } },
+      { cap: '後端臨界區第一步就是驗版本：當前 v9，守衞 v8，對不上。FS_STALE_VERSION，替換根本不開始。', run: function () { box('eb-gate', 'bad'); gate('deny', '拒絕：你讀到的已過期', 'FS_STALE_VERSION'); } },
+      { cap: '注意報錯順序：版本檢查在字面量匹配之前。模型得到的信息是內容過期，它不會被一個誤導性的匹配失敗帶偏。', run: function () {} },
+      { cap: '模型重新 read，帳本刷新到 present@v9。', run: function () { box('eb-gate', ''); box('eb-file', 'on'); ledger('present', 'v9', true); } },
+      { cap: '再次 edit，守衞 v9 對上磁盤 v9，命中一處，原子替換成功，文件 v10，帳本同步。', run: function () { box('eb-file', 'ok'); box('eb-gate', 'ok'); intent("edit + 守衞 { version: v9 }"); gate('allow', '放行，編輯成功'); FILES.B[1] = ['2', 'status: final', 'new']; renderFile(FILES.B); setVer('v10'); ledger('present', 'v10', true); $('de-ext').classList.remove('show'); } }
+    ];
+  }
+
+  function buildC() {
+    return [
+      { cap: '換一個程式碼文件。模型已經讀過它，帳本 present@v3。注意第 1 行和第 3 行長得一模一樣。', run: function () { box('eb-file', 'on'); ledger('present', 'v3', true); FILES.C.forEach(function (l, i) { l[2] = (i === 0 || i === 2) ? 'dup' : ''; }); renderFile(FILES.C); } },
+      { cap: '模型發起 edit：把 count += 1 換成 count += 2，沒傳 replace_all。', run: function () { box('eb-file', ''); box('eb-gate', 'on'); intent("edit: 'count += 1' → 'count += 2'"); } },
+      { cap: '帳本沒問題，版本也對得上。但臨界區裏的字面量匹配數出了兩處命中。', run: function () { gate('', '版本通過，匹配中…'); } },
+      { cap: '預設要求恰好命中一次。兩處就是歧義，FS_AMBIGUOUS_EDIT，一個字都不改。', run: function () { box('eb-gate', 'bad'); gate('deny', '拒絕：命中兩處，有歧義', 'FS_AMBIGUOUS_EDIT'); } },
+      { cap: '模型的正確出路有兩條：把 old_string 加長到能唯一定位，或者確認兩處都要改就傳 replace_all。', run: function () {} },
+      { cap: '它選了加上下文：old_string 換成 log(count) 後面那行的組合，唯一命中第 3 行。', run: function () { box('eb-gate', 'on'); intent("edit: 'log(count)\\ncount += 1' → …"); } },
+      { cap: '唯一命中，原子替換成功。改錯位置這類事故，靠恰好一次這條規則擋在門外。', run: function () { box('eb-gate', 'ok'); box('eb-file', 'ok'); FILES.C[2] = ['3', 'count += 2', 'new']; FILES.C[0][2] = ''; renderFile(FILES.C); setVer('v4'); ledger('present', 'v4', true); gate('allow', '放行，編輯成功'); } }
+    ];
+  }
+
+  function build() { return cur === 'A' ? buildA() : cur === 'B' ? buildB() : buildC(); }
+
+  function reset() {
+    runId++;
+    playing = false;
+    clearTimeout(timer);
+    idx = 0;
+    FILES.A = [['1', 'week: 32'], ['2', 'status: draft'], ['3', 'owner: xiaoshan']];
+    FILES.B = [['1', 'week: 32'], ['2', 'status: draft'], ['3', 'owner: xiaoshan']];
+    FILES.C = [['1', 'count += 1'], ['2', 'log(count)'], ['3', 'count += 1']];
+    renderFile(FILES[cur]);
+    $('de-ver').textContent = cur === 'C' ? '版本 v3' : cur === 'B' ? '版本 v8' : '版本 v7';
+    $('de-ext').classList.remove('show');
+    ledger('unseen');
+    intent('等待工具調用…');
+    gate('', '待判定');
+    ['eb-file', 'eb-ledger', 'eb-gate'].forEach(function (b) { box(b, ''); });
+    setStatus('已重置。點「播放」運行情景 ' + cur + '，或點「單步」逐幀推進。');
+    steps = build();
+  }
+
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.cap) setStatus(s.cap);
+    if (s.run) s.run();
+    if (playing) timer = setTimeout(doStep, s.dur || 2000);
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true;
+    doStep();
+  }
+  function stepOnce() {
+    playing = false;
+    clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-edit .scn'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-edit .scn'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  $('de-play').addEventListener('click', play);
+  $('de-step').addEventListener('click', stepOnce);
+  $('de-reset').addEventListener('click', reset);
+
+  reset();
+  (function hookAutoplay(tries) {
+    if (typeof window.lessonOnView === 'function') {
+      window.lessonOnView(document.getElementById('demo-edit'), play);
+    } else if (tries > 0) {
+      setTimeout(function () { hookAutoplay(tries - 1); }, 120);
+    }
+  })(50);
+})();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

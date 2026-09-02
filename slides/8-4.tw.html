@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>綜合成本優化：從系統視角全面省錢 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+/* ── 成本模拟器 ── */
+.sim-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-card)}
+.sim-title{font-size:14px;font-weight:700;color:var(--sub)}
+
+.cost-state{display:flex;flex-direction:column;gap:8px}
+.cost-row{display:flex;align-items:center;gap:8px}
+.cost-row-label{font-size:13px;font-weight:700;color:var(--sub);width:52px;flex-shrink:0;text-align:right}
+.cost-bar-wrap{flex:1;height:28px;background:var(--bg);border-radius:6px;overflow:hidden;position:relative}
+.cost-bar-inner{height:100%;display:flex;gap:1px;transition:all .6s ease}
+.cost-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:rgba(255,255,255,.95);overflow:hidden;white-space:nowrap;padding:0 4px;transition:flex .6s ease,opacity .5s ease,min-width .6s ease;border-radius:3px}
+.cost-seg.gone{flex:0 !important;min-width:0 !important;opacity:0;padding:0}
+.cost-pct{font-size:13px;font-weight:800;min-width:40px;text-align:right;transition:color .4s}
+
+/* 节省标注 */
+.save-labels{display:flex;flex-wrap:wrap;gap:6px}
+.save-tag{padding:4px 11px;border-radius:5px;font-size:13px;font-weight:700;border:1.5px solid transparent;transition:all .3s;opacity:.35}
+.save-tag.active{opacity:1}
+.save-tag.s1{background:rgba(22,163,74,.1);border-color:rgba(22,163,74,.3);color:var(--success)}
+.save-tag.s2{background:rgba(8,145,178,.1);border-color:rgba(8,145,178,.3);color:var(--cyan)}
+.save-tag.s3{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.25);color:var(--danger)}
+.save-tag.s4{background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.3);color:var(--purple)}
+.save-tag.s5{background:rgba(217,119,6,.1);border-color:rgba(217,119,6,.3);color:var(--amber)}
+
+.total-save{text-align:center;padding:6px 0}
+.total-save .big{font-size:44px;font-weight:900;transition:all .5s}
+.total-save .lbl{font-size:14px;color:var(--sub);font-weight:600;margin-top:2px}
+
+/* 实施路径步骤 */
+.path-steps{display:flex;flex-direction:column;gap:6px;min-height:20px}
+.path-step{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--sub);line-height:1.6;padding:3px 0;opacity:0;transform:translateX(-8px);transition:all .35s ease}
+.path-step.show{opacity:1;transform:translateX(0)}
+.path-step .step-num{width:20px;height:20px;border-radius:50%;background:var(--success);color:white;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+
+/* ── 策略卡片 ── */
+.strat-list{display:flex;flex-direction:column;gap:8px}
+.strat-item{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:13px 16px;cursor:pointer;transition:all .2s;font-family:inherit;width:100%;text-align:left;box-shadow:var(--shadow-card);min-height:44px}
+.strat-item:hover{border-color:rgba(22,163,74,.3);background:rgba(22,163,74,.02)}
+.strat-item.active{border-color:var(--success);background:rgba(22,163,74,.04);box-shadow:0 2px 12px rgba(22,163,74,.1)}
+.strat-badge{padding:3px 9px;border-radius:5px;font-size:12px;font-weight:800;white-space:nowrap}
+.p1{background:rgba(22,163,74,.12);color:var(--success)}
+.p2{background:rgba(8,145,178,.12);color:var(--cyan)}
+.p3{background:rgba(220,38,38,.1);color:var(--danger)}
+.p4{background:rgba(124,58,237,.12);color:var(--purple)}
+.p5{background:rgba(217,119,6,.12);color:var(--amber)}
+.strat-name{font-size:15px;font-weight:700;color:var(--text)}
+.strat-sub{font-size:13px;color:var(--sub);margin-top:1px}
+.strat-saving{font-size:13px;font-weight:800;white-space:nowrap}
+
+/* ── 详情展开区 ── */
+.detail-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 20px;min-height:90px;overflow:hidden;position:relative;box-shadow:var(--shadow-card)}
+.detail-inner{font-size:14px;color:var(--sub);line-height:1.7;animation:fade-in .25s ease}
+@keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.detail-inner b{color:var(--text)}
+.detail-inner .flow{display:flex;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap}
+.detail-inner .flow-step{padding:3px 10px;border-radius:5px;font-size:13px;font-weight:700;background:var(--bg)}
+.detail-inner .flow-arrow{color:var(--sub);font-size:14px;font-weight:700}
+.detail-inner .flow-step.hit{background:rgba(22,163,74,.1);color:var(--success)}
+.detail-inner .flow-step.skip{background:rgba(8,145,178,.1);color:var(--cyan)}
+.detail-inner .flow-step.flag{background:rgba(220,38,38,.1);color:var(--danger)}
+
+.takeaway{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.2);border-radius:var(--radius);padding:16px 20px;font-size:15px;color:var(--text);line-height:1.7}
+.takeaway b{color:var(--success)}
+
+@media (max-width:768px){
+  .strat-item{grid-template-columns:1fr;gap:6px}
+  .strat-saving{justify-self:start}
+  .cost-row-label{width:44px;font-size:12px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="AI 系統成本優化不只是壓縮 Prompt。提供從模型選型、請求合併、快取策略、輸出截斷、批處理到流量控制的五層綜合優化框架，幫助 AI 產品經理做出有資料支撐的成本決策。">
+<meta name="keywords" content="AI成本優化,大模型成本,模型選型,批處理,API成本控制,AI降本">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/8-4.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/8-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/8-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/8-4.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/8-4.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/8-4.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/8-4.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/8-4.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="綜合成本優化：從系統視角全面省錢">
+<meta property="og:description" content="AI 系統成本優化不只是壓縮 Prompt。提供從模型選型、請求合併、快取策略、輸出截斷、批處理到流量控制的五層綜合優化框架，幫助 AI 產品經理做出有資料支撐的成本決策。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/8-4.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/8-4.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="綜合成本優化：從系統視角全面省錢">
+<meta name="twitter:description" content="AI 系統成本優化不只是壓縮 Prompt。提供從模型選型、請求合併、快取策略、輸出截斷、批處理到流量控制的五層綜合優化框架，幫助 AI 產品經理做出有資料支撐的成本決策。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"綜合成本優化：從系統角度省錢","name":"綜合成本優化：從系統角度省錢","url":"https://xueai.miyang.cn/slides/8-4.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 成本優化與選型","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"AI 系統成本優化不只是壓縮 Prompt。提供從模型選型、請求合併、快取策略、輸出截斷、批處理到流量控制的五層綜合優化框架，幫助 AI 產品經理做出有資料支撐的成本決策。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">成本優化</div>
+    <h1>綜合成本優化</h1>
+    <p class="subtitle">單一優化效果有限。分層組合策略可將 AI 成本降低 70–90%。點選下方策略卡片，即時觀察成本條的變化。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>5 層優化策略，成本構成視覺化，節省 70-90% 的系統設計</p></aside><!--seo:end-->  <div class="sec-label">五層優化策略</div>
+
+  <div style="font-size:13px;color:var(--sub);margin-bottom:10px">依次點選，疊加效果（再次點選可取消）</div>
+  <div class="strat-list" id="stratList">
+
+    <button class="strat-item" onclick="pickStrat(this,0)">
+      <span class="strat-badge p1">優先順序 1</span>
+      <div>
+        <div class="strat-name">KV Cache + 固定 System Prompt</div>
+        <div class="strat-sub">最簡單、效果最大。歷史命中快取，重算歸零</div>
+      </div>
+      <div class="strat-saving" style="color:var(--success)">節省 30–50%</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,1)">
+      <span class="strat-badge p2">優先順序 2</span>
+      <div>
+        <div class="strat-name">意圖識別 → 模型路由</div>
+        <div class="strat-sub">80% 簡單問題用小模型，複雜的才上旗艦</div>
+      </div>
+      <div class="strat-saving" style="color:var(--cyan)">節省 40–60%</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,2)">
+      <span class="strat-badge p3">優先順序 3</span>
+      <div>
+        <div class="strat-name">RAG 觸發過濾</div>
+        <div class="strat-sub">加"是否需要 RAG"判斷，跳過不必要的向量檢索</div>
+      </div>
+      <div class="strat-saving" style="color:var(--danger)">節省 20–40%</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,3)">
+      <span class="strat-badge p4">優先順序 4</span>
+      <div>
+        <div class="strat-name">對話歷史壓縮（摘要策略）</div>
+        <div class="strat-sub">超過 N 輪後，用 ~200 Token 替換 ~2000 Token 歷史</div>
+      </div>
+      <div class="strat-saving" style="color:var(--purple)">長對話節省 60–80%</div>
+    </button>
+
+    <button class="strat-item" onclick="pickStrat(this,4)">
+      <span class="strat-badge p5">優先順序 5</span>
+      <div>
+        <div class="strat-name">語義快取（Semantic Cache）</div>
+        <div class="strat-sub">語義相似問題複用同一回答，FAQ 不呼叫 LLM</div>
+      </div>
+      <div class="strat-saving" style="color:var(--amber)">FAQ 節省 70–90%</div>
+    </button>
+
+  </div>
+
+  <div class="sec-label">成本模擬器</div>
+
+  <div class="sim-box paywall-locked xa-peek">
+    <div class="sim-title">每天 10 萬次對話 · 點選上方策略疊加優化效果</div>
+
+    <div class="cost-state">
+      <div class="cost-row">
+        <div class="cost-row-label">優化前</div>
+        <div class="cost-bar-wrap">
+          <div class="cost-bar-inner">
+            <div class="cost-seg" style="flex:35;background:#dc2626" id="seg-before-hist">重複歷史 35%</div>
+            <div class="cost-seg" style="flex:25;background:#d97706" id="seg-before-rag">不必要RAG 25%</div>
+            <div class="cost-seg" style="flex:20;background:#7c3aed" id="seg-before-model">旗艦模型 20%</div>
+            <div class="cost-seg" style="flex:20;background:#0891b2" id="seg-before-real">必要計算 20%</div>
+          </div>
+        </div>
+        <div class="cost-pct" style="color:var(--danger)">100%</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-row-label">當前</div>
+        <div class="cost-bar-wrap">
+          <div class="cost-bar-inner" id="afterBar">
+            <div class="cost-seg" style="flex:35;background:#dc2626" id="seg-hist">重複歷史</div>
+            <div class="cost-seg" style="flex:25;background:#d97706" id="seg-rag">不必要RAG</div>
+            <div class="cost-seg" style="flex:20;background:#7c3aed" id="seg-model">旗艦模型</div>
+            <div class="cost-seg" style="flex:20;background:#0891b2" id="seg-real">必要 20%</div>
+            <div class="cost-seg" style="flex:0;background:rgba(22,163,74,.35);color:#16a34a;min-width:0" id="seg-saved">已節省</div>
+          </div>
+        </div>
+        <div class="cost-pct" id="afterPct" style="color:var(--text)">100%</div>
+      </div>
+    </div>
+
+    <div class="save-labels">
+      <span class="save-tag s1" id="tag1">KV Cache −35%</span>
+      <span class="save-tag s2" id="tag2">模型路由 −12%</span>
+      <span class="save-tag s3" id="tag3">RAG過濾 −18%</span>
+      <span class="save-tag s4" id="tag4">歷史壓縮 −8%</span>
+      <span class="save-tag s5" id="tag5">語義快取 −7%</span>
+    </div>
+
+    <div class="total-save">
+      <div class="big" id="totalBig" style="color:var(--sub)">0%</div>
+      <div class="lbl">已疊加節省</div>
+    </div>
+
+    <div class="path-steps" id="pathSteps"></div>
+  </div>
+
+  <div class="sec-label paywall-locked">實施詳情</div>
+
+  <div class="detail-panel paywall-locked" id="detailPanel">
+    <div class="detail-inner" style="color:var(--sub);font-size:14px;text-align:center;padding-top:18px">
+      ↑ 點選上方任意策略，查看實施流程
+    </div>
+  </div>
+
+  <div class="takeaway paywall-locked" style="margin-top:20px">
+    <b>成本優化 = 架構設計，不是事後補救。</b> 在系統設計之初就考慮這 5 層，比上線後再優化容易 10 倍。
+  </div>
+
+</article>
+
+<script>
+// 每個策略"消除"的成本段 及 疊加後剩餘百分比
+const STRATS = [
+  {
+    segId: 'seg-hist',
+    tagId: 'tag1',
+    savePct: 35,   // 消除重複歷史35%
+    tagCls: 's1',
+    steps: [
+      '在 System Prompt 裡去掉所有動態內容（時間戳、使用者 ID、隨機內容）',
+      '保持 System Prompt 完全固定 → 平臺自動命中前綴快取',
+      '所有動態資訊移入 User 訊息 → 每輪只算新增 Token',
+      'OpenAI / Claude / Gemini 均原生支援，零額外配置'
+    ],
+    flow: ['請求進入','SYS固定?','✓ 命中快取','只算新Token'],
+    detail: `<b>KV Cache 原理：</b>System Prompt 不變 → 平臺快取其 K/V 矩陣 → 後續對話無需重算。<br><br>
+      <div class="flow">
+        <span class="flow-step">新請求</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">SYS 命中快取</span><span class="flow-arrow">→</span>
+        <span class="flow-step skip">只算本輪新增</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">返回結果</span>
+      </div>
+      <b>關鍵：</b>System Prompt 每次改變一個字元，快取就完全失效。`
+  },
+  {
+    segId: 'seg-model',
+    tagId: 'tag2',
+    savePct: 12,
+    tagCls: 's2',
+    steps: [
+      '在請求入口加意圖分類器（用便宜小模型，如 gpt-4o-mini）',
+      '"簡單問答/閒聊" → 直接用小模型回答（成本約 1/10）',
+      '"專業分析/創作" → 路由到旗艦模型',
+      '小模型分類成本可忽略，節省旗艦模型費用 40–60%'
+    ],
+    detail: `<b>模型路由流程：</b>先用廉價模型判斷複雜度，再決定用哪個模型回答。<br><br>
+      <div class="flow">
+        <span class="flow-step">使用者請求</span><span class="flow-arrow">→</span>
+        <span class="flow-step">小模型分類</span><span class="flow-arrow">→</span>
+        <span class="flow-step skip">簡單: 小模型答</span>
+      </div>
+      <div class="flow" style="margin-top:2px">
+        <span style="width:80px;display:inline-block"></span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step flag">複雜: 旗艦模型</span>
+      </div>
+      <b>實測：</b>80% 的對話可由小模型處理，旗艦模型使用率降至 20%。`
+  },
+  {
+    segId: 'seg-rag',
+    tagId: 'tag3',
+    savePct: 18,
+    tagCls: 's3',
+    steps: [
+      '在 RAG 流程最前加一步判斷：這個問題需要檢索文件嗎？',
+      '"通用知識"（如"什麼是Python"）→ 跳過 RAG，直接回答',
+      '"產品特定問題"（如"你們的退款政策"）→ 觸發向量檢索',
+      '可用規則判斷（關鍵詞匹配）或小模型分類'
+    ],
+    detail: `<b>RAG 觸發過濾：</b>不是每個問題都需要檢索，過濾掉通用知識問題。<br><br>
+      <div class="flow">
+        <span class="flow-step">使用者問題</span><span class="flow-arrow">→</span>
+        <span class="flow-step">需要RAG?</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">否: 直接回答</span>
+      </div>
+      <div class="flow" style="margin-top:2px">
+        <span style="width:80px;display:inline-block"></span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step flag">是: 向量檢索 → 注入上下文</span>
+      </div>
+      <b>效果：</b>生產環境約 40–70% 的問題可跳過 RAG。`
+  },
+  {
+    segId: null,  // 消減 hist 剩餘部分
+    tagId: 'tag4',
+    savePct: 8,
+    tagCls: 's4',
+    steps: [
+      '設定閾值：對話超過 20 輪，或歷史 Token 超過 3000 時觸發',
+      '用一次 LLM 呼叫，將早期 N 輪壓縮為 ~200 Token 摘要',
+      '用摘要替換原始歷史，Context 使用量大幅下降',
+      '要壓縮得早（快溢位之前），而不是溢位後再處理'
+    ],
+    detail: `<b>歷史壓縮時機：</b>在 Context 快滿之前主動壓縮，而不是被動截斷。<br><br>
+      <div class="flow">
+        <span class="flow-step">第 N 輪對話</span><span class="flow-arrow">→</span>
+        <span class="flow-step flag">歷史 > 3000T?</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">觸發摘要壓縮</span>
+      </div>
+      <div class="flow" style="margin-top:4px">
+        <span class="flow-step">~2000T 歷史</span><span class="flow-arrow">壓縮為</span>
+        <span class="flow-step hit">~200T 摘要</span><span class="flow-arrow">節省</span>
+        <span class="flow-step hit">90%</span>
+      </div>`
+  },
+  {
+    segId: null,
+    tagId: 'tag5',
+    savePct: 7,
+    tagCls: 's5',
+    steps: [
+      '維護向量資料庫，儲存歷史高品質 Q-A 對的 Embedding',
+      '新請求先做 Embedding，搜尋相似度 > 閾值（如 0.92）的歷史回答',
+      '命中 → 直接返回快取答案，不呼叫 LLM（延遲 ~10ms）',
+      '未命中 → 正常呼叫 LLM，並將新問答存入快取庫'
+    ],
+    detail: `<b>語義快取 vs 精確快取：</b>"怎麼退款" 和 "退款流程是什麼" → 語義相似 → 複用同一回答。<br><br>
+      <div class="flow">
+        <span class="flow-step">新問題 Embedding</span><span class="flow-arrow">→</span>
+        <span class="flow-step">向量搜尋</span><span class="flow-arrow">→</span>
+        <span class="flow-step hit">相似度 > 0.92: HIT</span>
+      </div>
+      <div class="flow" style="margin-top:2px">
+        <span style="width:140px;display:inline-block"></span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step flag">未命中: 呼叫 LLM + 存快取</span>
+      </div>
+      <b>適合場景：</b>客服 FAQ、高頻同類問題系統（命中率可達 60–80%）。`
+  }
+];
+
+// 當前已開啟的策略集合
+let activeSet = new Set();
+// 當前各段 flex 值（動態）
+let segFlex = { hist: 35, rag: 25, model: 20, real: 20, saved: 0 };
+
+function pickStrat(btn, idx) {
+  const s = STRATS[idx];
+  const isOn = activeSet.has(idx);
+
+  if (isOn) {
+    // 取消
+    activeSet.delete(idx);
+    btn.classList.remove('active');
+    document.getElementById(s.tagId).classList.remove('active');
+  } else {
+    // 啟用
+    activeSet.add(idx);
+    btn.classList.add('active');
+    document.getElementById(s.tagId).classList.add('active');
+  }
+
+  // 重算 bar
+  recalcBar();
+  // 更新詳情
+  renderDetail(idx, !isOn);
+  // 更新步驟列表（展示最後啟用的策略）
+  renderSteps(idx, !isOn);
+}
+
+function recalcBar() {
+  // 重置
+  let hist = 35, rag = 25, model = 20, real = 20;
+  let saved = 0;
+
+  if (activeSet.has(0)) { saved += 35; hist = 0; }       // KV Cache 消滅重複歷史
+  if (activeSet.has(1)) { saved += 12; model = 8; }      // 路由：旗艦模型 20→8
+  if (activeSet.has(2)) { saved += 18; rag = 7; }        // RAG過濾：25→7
+  if (activeSet.has(3)) { saved += 8; hist = Math.max(0, hist - 8); }  // 歷史壓縮
+  if (activeSet.has(4)) { saved += 7; }                  // 語義快取
+
+  const total = hist + rag + model + real + saved;
+  const remaining = 100 - saved;
+
+  // 應用 flex
+  const apply = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.flex = val;
+    if (val === 0) { el.classList.add('gone'); el.textContent = ''; }
+    else { el.classList.remove('gone'); }
+  };
+  apply('seg-hist',  hist);
+  apply('seg-rag',   rag);
+  apply('seg-model', model);
+  apply('seg-real',  real);
+
+  const savedEl = document.getElementById('seg-saved');
+  savedEl.style.flex = saved;
+  savedEl.style.minWidth = saved > 0 ? '40px' : '0';
+  savedEl.textContent = saved > 0 ? `節省 ${saved}%` : '';
+
+  // 更新百分比數字
+  const pctEl = document.getElementById('afterPct');
+  pctEl.textContent = remaining + '%';
+  pctEl.style.color = saved > 50 ? 'var(--success)' : saved > 20 ? 'var(--amber)' : 'var(--text)';
+
+  // 大數字
+  const bigEl = document.getElementById('totalBig');
+  bigEl.textContent = saved + '%';
+  bigEl.style.color = saved > 60 ? 'var(--success)' : saved > 30 ? 'var(--amber)' : 'var(--sub)';
+}
+
+function renderDetail(idx, isActivating) {
+  const s = STRATS[idx];
+  const panel = document.getElementById('detailPanel');
+  if (!isActivating) {
+    panel.innerHTML = '<div class="detail-inner" style="color:var(--sub);font-size:14px;text-align:center;padding-top:18px">↑ 點選上方任意策略，查看實施流程</div>';
+    return;
+  }
+  panel.innerHTML = `<div class="detail-inner">${s.detail}</div>`;
+}
+
+function renderSteps(idx, isActivating) {
+  const s = STRATS[idx];
+  const el = document.getElementById('pathSteps');
+  el.innerHTML = '';
+  if (!isActivating) return;
+  s.steps.forEach((text, i) => {
+    const div = document.createElement('div');
+    div.className = 'path-step';
+    div.innerHTML = `<div class="step-num">${i+1}</div><div>${text}</div>`;
+    el.appendChild(div);
+    setTimeout(() => div.classList.add('show'), i * 80);
+  });
+}
+
+// 初始化
+recalcBar();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>輸出格式選擇：JSON / Markdown / 純文本的取捨 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* 页面局部别名 —— 全部映射到设计系统变量（JS 渲染函数中引用了这些名字） */
+:root {
+  --surface2: #f0ede6;
+  --muted: var(--sub);
+  --green: var(--success);
+  --red: var(--danger);
+}
+
+/* ── 格式选择列表 ── */
+.fmt-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fmt-btn {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--card);
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+  text-align: left; width: 100%; min-height: 44px;
+  box-shadow: var(--shadow-card);
+}
+.fmt-btn:hover { border-color: rgba(0,0,0,0.15); }
+.fmt-btn.active { border-color: var(--purple); background: rgba(124,58,237,0.04); }
+.badge {
+  padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800;
+  flex-shrink: 0; min-width: 48px; text-align: center;
+  font-family: "SF Mono", Menlo, monospace;
+}
+.ft h4 { font-size: 15px; font-weight: 700; color: var(--text); transition: color 0.2s; }
+.fmt-btn.active .ft h4 { color: var(--purple); }
+.ft p { font-size: 12px; color: var(--sub); margin-top: 2px; line-height: 1.5; }
+
+/* ── 评分格 ── */
+.score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sc {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 8px; text-align: center;
+}
+.sc .sl { font-size: 11px; color: var(--sub); font-weight: 600; margin-bottom: 4px; }
+.sc .sv { font-size: 15px; font-weight: 800; }
+.sv.good { color: var(--success); }
+.sv.mid { color: var(--amber); }
+.sv.bad { color: var(--danger); }
+
+/* ── 取舍说明 ── */
+.tradeoff-box {
+  background: rgba(124,58,237,0.05); border: 1.5px solid rgba(124,58,237,0.15);
+  border-radius: var(--radius); padding: 14px 18px;
+  font-size: 14px; color: var(--text); line-height: 1.8; margin-top: 12px;
+}
+.tradeoff-box b { color: var(--purple); }
+.warn-tag {
+  background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.2);
+  color: var(--danger); padding: 1px 7px; border-radius: 4px;
+  font-size: 12px; font-weight: 600;
+}
+.good-tag {
+  background: rgba(22,163,74,0.08); border: 1px solid rgba(22,163,74,0.2);
+  color: var(--success); padding: 1px 7px; border-radius: 4px;
+  font-size: 12px; font-weight: 600;
+}
+
+/* ── 流式演示区 ── */
+.demo-hd { font-size: 14px; font-weight: 800; color: var(--sub); letter-spacing: 0.4px; margin-bottom: 12px; }
+.stream-area { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.stream-panel {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sp-hd {
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: var(--surface2); font-size: 13px; font-weight: 700;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.sp-body { height: 320px; overflow-y: auto; position: relative; }
+
+/* 普通代码视图 */
+.code-view {
+  padding: 12px 14px; font-size: 13px;
+  font-family: "SF Mono", "Fira Code", Menlo, monospace;
+  line-height: 1.7; color: #cdd6f4; background: #1e1b2e;
+  min-height: 100%; white-space: pre-wrap; word-break: break-word;
+}
+/* 渲染视图 */
+.render-view { padding: 12px 14px; font-size: 14px; line-height: 1.75; color: var(--text); }
+
+/* token 流动的字符 */
+.tk { display: inline; opacity: 0; animation: tkIn 0.08s ease forwards; }
+@keyframes tkIn { to { opacity: 1; } }
+
+/* 进度条 */
+.prog-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.prog-track { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 0.2s; }
+.prog-pct { font-size: 12px; color: var(--sub); min-width: 36px; }
+
+.ctrl-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.btn {
+  padding: 11px 24px; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700; border: none; cursor: pointer;
+  font-family: inherit; transition: all 0.15s; min-height: 44px;
+}
+.btn-play { background: var(--purple); color: white; }
+.btn-play:hover { filter: brightness(1.1); }
+.btn-play:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-rst { background: var(--card); color: var(--sub); border: 1.5px solid var(--border); }
+.hint { font-size: 13px; color: var(--sub); }
+
+/* rendered MD styles */
+.r-h2 { font-size: 17px; font-weight: 800; color: var(--text); margin: 6px 0 4px; }
+.r-h3 { font-size: 15px; font-weight: 700; color: #5b4fcf; margin: 4px 0 2px; }
+.r-li::before { content: "•"; color: var(--purple); margin-right: 5px; }
+.r-li { padding-left: 10px; margin: 2px 0; font-size: 14px; }
+.r-bq { padding-left: 10px; color: var(--sub); font-style: italic; margin: 4px 0; font-size: 13px; }
+.r-strong { font-weight: 800; color: var(--text); }
+
+/* streaming status badge */
+.status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.status.live { background: #fef3c7; color: #92400e; animation: pulse 1.2s ease infinite; }
+.status.done { background: #d1fae5; color: #065f46; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+@media (max-width: 768px) {
+  .fmt-list { grid-template-columns: 1fr; }
+  .score-grid { grid-template-columns: repeat(2, 1fr); }
+  .stream-area { grid-template-columns: 1fr; }
+  .sp-body { height: 240px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="不同場景應該讓模型輸出什麼格式？對比 JSON（程式解析）、Markdown（用戶展示）、純文本（語音/簡單場景）的優缺點，以及強制結構化輸出的工程方案。">
+<meta name="keywords" content="大模型輸出格式,JSON輸出,Markdown輸出,結構化輸出,Function Calling">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/6-3.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/6-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/6-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/6-3.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/6-3.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/6-3.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/6-3.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/6-3.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="輸出格式選擇：JSON / Markdown / 純文本的取捨">
+<meta property="og:description" content="不同場景應該讓模型輸出什麼格式？對比 JSON（程式解析）、Markdown（用戶展示）、純文本（語音/簡單場景）的優缺點，以及強制結構化輸出的工程方案。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/6-3.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/6-3.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="輸出格式選擇：JSON / Markdown / 純文本的取捨">
+<meta name="twitter:description" content="不同場景應該讓模型輸出什麼格式？對比 JSON（程式解析）、Markdown（用戶展示）、純文本（語音/簡單場景）的優缺點，以及強制結構化輸出的工程方案。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"輸出格式取捨","name":"輸出格式取捨","url":"https://xueai.miyang.cn/slides/6-3.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Prompt 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"不同場景應該讓模型輸出什麼格式？對比 JSON（程式解析）、Markdown（用戶展示）、純文本（語音/簡單場景）的優缺點，以及強制結構化輸出的工程方案。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt 工程</div>
+    <h1>輸出格式取捨</h1>
+    <p class="subtitle">沒有最好的格式，只有最適合場景的格式。流式返回時，格式選擇的影響格外明顯。選一個格式，點擊「開始流式演示」，觀察 Token 生成的體驗差異。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>純文本 / JSON / Markdown / YAML / XML，場景適配度對比與權衡</p></aside><!--seo:end-->  <div class="sec-label">五種輸出格式</div>
+
+  <div class="fmt-list">
+    <button class="fmt-btn active" onclick="pickFmt(this,0)">
+      <span class="badge" style="background:#f0ede6;color:#6b6b70">TXT</span>
+      <div class="ft"><h4>純文本</h4><p>流式直接呈現，最穩定</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,1)">
+      <span class="badge" style="background:#fef3c7;color:#92400e">JSON</span>
+      <div class="ft"><h4>JSON 結構化</h4><p>流式時殘缺，無法即時解析</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,2)">
+      <span class="badge" style="background:#ede9fe;color:#6d28d9">MD</span>
+      <div class="ft"><h4>Markdown</h4><p>流式可渲染，結構提取難</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,3)">
+      <span class="badge" style="background:#d1fae5;color:#065f46">YAML</span>
+      <div class="ft"><h4>YAML</h4><p>省 Token，流式同樣殘缺</p></div>
+    </button>
+    <button class="fmt-btn" onclick="pickFmt(this,4)">
+      <span class="badge" style="background:#dbeafe;color:#1e40af">XML</span>
+      <div class="ft"><h4>XML / 自定義標籤</h4><p>流式可增量解析，最友好</p></div>
+    </button>
+  </div>
+
+  <div class="sec-label">場景適配度</div>
+
+  <div class="score-grid" id="scoreGrid"></div>
+  <div class="tradeoff-box" id="tradeoffBox"></div>
+
+  <div class="sec-label">流式演示</div>
+
+  <div class="demo-hd" id="demoHd">演示：純文本 — 流式 Token 體驗</div>
+  <div class="stream-area paywall-locked xa-peek">
+    <div class="stream-panel">
+      <div class="sp-hd">
+        <span id="rawTitle">原始 Token 流</span>
+        <span class="status live" id="rawStatus">等待</span>
+      </div>
+      <div class="sp-body">
+        <div class="code-view" id="rawView"></div>
+      </div>
+    </div>
+    <div class="stream-panel">
+      <div class="sp-hd">
+        <span id="rendTitle">前端呈現效果</span>
+        <span class="status live" id="rendStatus">等待</span>
+      </div>
+      <div class="sp-body" id="rendBody">
+        <div class="render-view" id="rendView"></div>
+      </div>
+    </div>
+  </div>
+  <div class="prog-row paywall-locked">
+    <div class="prog-track"><div class="prog-fill" id="progFill" style="background:var(--purple)"></div></div>
+    <span class="prog-pct" id="progPct">0%</span>
+  </div>
+  <div class="ctrl-row paywall-locked">
+    <button class="btn btn-play" id="btnPlay" onclick="playDemo()">▶ 開始流式演示</button>
+    <button class="btn btn-rst" onclick="resetDemo()">重置</button>
+    <span class="hint" id="playHint"></span>
+  </div>
+
+</article>
+
+<script>
+const FMTS = [
+  {
+    demoHd: '演示：純文本 — 流式 Token 體驗',
+    rawTitle: '原始 Token 流',
+    rendTitle: '前端即時呈現（可直接顯示）',
+    scores: [
+      {lbl:'前端處理',val:'直接',cls:'good'},{lbl:'Token量',val:'最少',cls:'good'},
+      {lbl:'結構解析',val:'難',cls:'bad'},{lbl:'流式體驗',val:'✓✓',cls:'good'}
+    ],
+    tradeoff: `<b>純文本適用：</b>直接展示給用戶 / 不需要程式讀取字段 / 超長內容輸出<br><br>
+<span class="good-tag">優點</span> Token 最省，流式生成即時顯示，無需等待全文<br>
+<span class="good-tag">優點</span> 不會因括號缺失而解析失敗<br>
+<span class="warn-tag">缺點</span> 結構資訊提取困難，不適合程式消費`,
+    raw: 'Notion AI\n類型：寫作輔助\n亮點：無縫集成 Notion\n適合：內容團隊\n\nMidjourney\n類型：圖像生成\n亮點：藝術風格豐富\n適合：設計師',
+    renderFn: (raw) => `<div style="white-space:pre-wrap;font-size:14px;font-family:monospace;color:var(--sub)">${escHtml(raw)}</div>`
+  },
+  {
+    demoHd: '演示：JSON — 流式時殘缺無法解析',
+    rawTitle: '原始 Token 流（JSON 未完成前…）',
+    rendTitle: '前端只能等全文才能解析',
+    scores: [
+      {lbl:'前端處理',val:'✓',cls:'good'},{lbl:'Token量',val:'中等',cls:'mid'},
+      {lbl:'結構解析',val:'✓✓',cls:'good'},{lbl:'流式體驗',val:'差',cls:'bad'}
+    ],
+    tradeoff: `<b>JSON 適用：</b>後端讀取字段 / 數據入庫 / 前端動態渲染（非流式）<br><br>
+<span class="good-tag">優點</span> JSON.parse() 字段精準，前端渲染方便<br>
+<span class="warn-tag">缺點</span> 流式時 JSON 是殘缺的，必須等全文到達才能 parse<br>
+<span class="warn-tag">缺點</span> 超長 JSON 括號缺失容易生成失敗，必須加兜底邏輯`,
+    raw: '{\n  "tools": [\n    {\n      "name": "Notion AI",\n      "type": "寫作輔助",\n      "highlight": "無縫集成 Notion"\n    },\n    {\n      "name": "Midjourney",\n      "type": "圖像生成"\n    }\n  ]\n}',
+    renderFn: (raw, pct) => {
+      if (pct < 100) {
+        return `<div style="padding:20px;text-align:center;color:var(--amber)">
+          <div style="font-size:32px;margin-bottom:8px">⏳</div>
+          <div style="font-size:15px;font-weight:700">等待 JSON 全文到達…</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:6px">流式時 JSON 殘缺無法 parse，用戶看到空白</div>
+        </div>`;
+      }
+      return `<div style="padding:12px;font-size:14px">
+        <div style="color:var(--green);font-weight:700;margin-bottom:8px">✅ JSON 接收完畢，開始解析…</div>
+        <div style="background:var(--surface2);border-radius:6px;padding:8px 10px;font-size:13px;font-family:monospace">
+          name: <b>Notion AI</b> | type: 寫作輔助<br>
+          name: <b>Midjourney</b> | type: 圖像生成
+        </div>
+      </div>`;
+    }
+  },
+  {
+    demoHd: '演示：Markdown — 流式可渲染，字符逐步出現',
+    rawTitle: '原始 Token 流（Markdown 語法）',
+    rendTitle: '前端即時渲染（逐步成形）',
+    scores: [
+      {lbl:'前端處理',val:'✓✓',cls:'good'},{lbl:'Token量',val:'中等',cls:'mid'},
+      {lbl:'結構解析',val:'難',cls:'bad'},{lbl:'流式體驗',val:'✓',cls:'good'}
+    ],
+    tradeoff: `<b>Markdown 適用：</b>直接渲染給用戶看 / 文檔類輸出 / 聊天介面<br><br>
+<span class="good-tag">優點</span> 渲染後格式美觀，標題/加粗/列表開箱即用，流式顯示自然<br>
+<span class="warn-tag">缺點</span> 格式化提取極難，不適合程式消費<br>
+<span class="warn-tag">缺點</span> 不同模型 Markdown 風格不一致（* 和 - 混用）`,
+    raw: '## AI 工具推薦\n\n### 1. Notion AI\n- **類型**：寫作輔助\n- **亮點**：無縫集成 Notion\n- **適合**：內容團隊\n\n### 2. Midjourney\n- **類型**：圖像生成\n- **亮點**：藝術風格豐富\n\n> 以上工具均支持免費試用',
+    renderFn: (raw) => mdRender(raw)
+  },
+  {
+    demoHd: '演示：YAML — Token 最省，流式同樣殘缺',
+    rawTitle: '原始 Token 流（YAML 格式）',
+    rendTitle: '前端只能等全文才能 parse',
+    scores: [
+      {lbl:'前端處理',val:'後端',cls:'mid'},{lbl:'Token量',val:'最省',cls:'good'},
+      {lbl:'結構解析',val:'✓',cls:'good'},{lbl:'流式體驗',val:'一般',cls:'mid'}
+    ],
+    tradeoff: `<b>YAML 適用：</b>後端處理 / 配置檔案生成 / 不需要前端感知的數據流<br><br>
+<span class="good-tag">優點</span> 比 JSON 省 15-30% Token（無引號/括號開銷），解析同樣精準<br>
+<span class="good-tag">優點</span> 人類可讀性好，適合生成配置檔案<br>
+<span class="warn-tag">缺點</span> 流式時同樣殘缺，縮進錯誤會導致解析失敗`,
+    raw: 'tools:\n  - name: Notion AI\n    type: 寫作輔助\n    highlight: 無縫集成 Notion\n    suitable_for: 內容團隊\n\n  - name: Midjourney\n    type: 圖像生成\n    highlight: 藝術風格豐富\n    suitable_for: 設計師',
+    renderFn: (raw, pct) => {
+      if (pct < 100) {
+        return `<div style="padding:20px;text-align:center;color:var(--amber)">
+          <div style="font-size:32px;margin-bottom:8px">⏳</div>
+          <div style="font-size:15px;font-weight:700">等待 YAML 全文…</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:6px">縮進結構未完成時無法 parse</div>
+        </div>`;
+      }
+      return `<div style="padding:12px;font-size:14px">
+        <div style="color:var(--green);font-weight:700;margin-bottom:8px">✅ YAML 完整，開始 parse…</div>
+        <div style="background:var(--surface2);border-radius:6px;padding:8px 10px;font-size:13px;font-family:monospace">
+          tools[0].name = Notion AI<br>tools[1].name = Midjourney
+        </div>
+        <div style="color:var(--muted);font-size:13px;margin-top:6px">比 JSON 節省約 20% Token ✓</div>
+      </div>`;
+    }
+  },
+  {
+    demoHd: '演示：XML — 流式可增量解析，每個標籤閉合即可用',
+    rawTitle: '原始 Token 流（XML 自定義標籤）',
+    rendTitle: '前端增量解析：標籤閉合即渲染',
+    scores: [
+      {lbl:'前端處理',val:'✓✓',cls:'good'},{lbl:'Token量',val:'較多',cls:'bad'},
+      {lbl:'Tool調用',val:'✓✓',cls:'good'},{lbl:'流式體驗',val:'✓✓',cls:'good'}
+    ],
+    tradeoff: `<b>XML 適用：</b>Tool 調用 / 流式渲染 / Claude 推薦格式<br><br>
+<span class="good-tag">優點</span> 流式時可增量解析：每捕獲到 &lt;/name&gt; 就立刻渲染，無需等全文<br>
+<span class="good-tag">優點</span> Tool 調用結構天然匹配 XML，Anthropic Claude 原生偏好<br>
+<span class="warn-tag">缺點</span> Token 消耗最高（標籤本身佔 Token）`,
+    raw: '<tool_list>\n  <tool>\n    <name>Notion AI</name>\n    <type>寫作輔助</type>\n    <highlight>無縫集成 Notion</highlight>\n  </tool>\n  <tool>\n    <name>Midjourney</name>\n    <type>圖像生成</type>\n    <highlight>藝術風格豐富</highlight>\n  </tool>\n</tool_list>',
+    renderFn: (raw) => xmlRender(raw)
+  }
+];
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function mdRender(raw) {
+  let html = escHtml(raw);
+  html = html.replace(/^## (.+)$/gm, '<div class="r-h2">$1</div>');
+  html = html.replace(/^### (.+)$/gm, '<div class="r-h3">$1</div>');
+  html = html.replace(/^\- \*\*(.+?)\*\*：(.+)$/gm, '<div class="r-li"><span class="r-strong">$1</span>：$2</div>');
+  html = html.replace(/^\- (.+)$/gm, '<div class="r-li">$1</div>');
+  html = html.replace(/^&gt; (.+)$/gm, '<div class="r-bq">$1</div>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<span class="r-strong">$1</span>');
+  html = html.replace(/\n/g, '');
+  return `<div style="padding:10px 14px">${html}</div>`;
+}
+
+function xmlRender(raw) {
+  const matches = [...raw.matchAll(/<tool>([\s\S]*?)<\/tool>/g)];
+  if (!matches.length) return `<div style="padding:12px;color:var(--muted);font-size:13px">等待第一個 &lt;/tool&gt; 閉合標籤…</div>`;
+  let html = '<div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px">';
+  matches.forEach((m, i) => {
+    const name = (m[1].match(/<name>(.*?)<\/name>/) || ['','?'])[1];
+    const type = (m[1].match(/<type>(.*?)<\/type>/) || ['',''])[1];
+    const hl   = (m[1].match(/<highlight>(.*?)<\/highlight>/) || ['',''])[1];
+    html += `<div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:14px">
+      <div style="font-weight:800;color:var(--purple);margin-bottom:3px">${escHtml(name)}</div>
+      ${type?`<div style="color:var(--sub);font-size:13px">類型：${escHtml(type)}</div>`:''}
+      ${hl?`<div style="color:var(--green);font-size:13px;margin-top:2px">✓ ${escHtml(hl)}</div>`:''}
+    </div>`;
+  });
+  html += `<div style="color:var(--green);font-size:12px;margin-top:2px">↑ 已解析 ${matches.length} 個條目（流式進行中…）</div>`;
+  html += '</div>';
+  return html;
+}
+
+let curFmt = 0, playing = false, rawTimer = null;
+
+function pickFmt(btn, idx) {
+  document.querySelectorAll('.fmt-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+  curFmt = idx;
+  resetDemo();
+  const f = FMTS[idx];
+  document.getElementById('demoHd').textContent = f.demoHd;
+  document.getElementById('rawTitle').textContent = f.rawTitle;
+  document.getElementById('rendTitle').textContent = f.rendTitle;
+  document.getElementById('scoreGrid').innerHTML = f.scores.map(s =>
+    `<div class="sc"><div class="sl">${s.lbl}</div><div class="sv ${s.cls}">${s.val}</div></div>`
+  ).join('');
+  document.getElementById('tradeoffBox').innerHTML = f.tradeoff;
+}
+
+function playDemo() {
+  if (playing) return;
+  playing = true;
+  document.getElementById('btnPlay').disabled = true;
+  document.getElementById('playHint').textContent = '流式 Token 生成中…';
+  document.getElementById('rawStatus').textContent = '生成中';
+  document.getElementById('rawStatus').className = 'status live';
+  document.getElementById('rendStatus').textContent = '渲染中';
+  document.getElementById('rendStatus').className = 'status live';
+
+  const f = FMTS[curFmt];
+  const rawEl = document.getElementById('rawView');
+  const rendEl = document.getElementById('rendView');
+  const prog = document.getElementById('progFill');
+  const progPct = document.getElementById('progPct');
+  rawEl.innerHTML = '';
+
+  const chars = f.raw.split('');
+  let i = 0, raw = '';
+
+  function tick() {
+    if (i >= chars.length) {
+      document.getElementById('rawStatus').textContent = '完成';
+      document.getElementById('rawStatus').className = 'status done';
+      document.getElementById('rendStatus').textContent = '完成';
+      document.getElementById('rendStatus').className = 'status done';
+      playing = false;
+      document.getElementById('playHint').textContent = '流式演示完成 — 觀察兩側體驗差異';
+      rendEl.innerHTML = f.renderFn(raw, 100);
+      prog.style.width = '100%'; progPct.textContent = '100%';
+      return;
+    }
+    const ch = chars[i++];
+    raw += ch;
+    // 原始流着色
+    const span = document.createElement('span');
+    span.className = 'tk';
+    if (ch === '<') span.style.color='#f38ba8';
+    else if (ch === '>') span.style.color='#f38ba8';
+    else if (ch === '"') span.style.color='#a6e3a1';
+    else if (ch === ':') span.style.color='#89dceb';
+    else span.style.color='#cdd6f4';
+    span.textContent = ch;
+    rawEl.appendChild(span);
+    rawEl.parentElement.scrollTop = rawEl.parentElement.scrollHeight;
+
+    const pct = Math.round(i / chars.length * 100);
+    prog.style.width = pct + '%'; progPct.textContent = pct + '%';
+
+    // 右側渲染（每 5 個字符刷新一次）
+    if (i % 5 === 0 || i === chars.length) {
+      rendEl.innerHTML = f.renderFn(raw, pct);
+      document.getElementById('rendBody').scrollTop = 9999;
+    }
+
+    const delay = ch === '\n' ? 60 : 18;
+    rawTimer = setTimeout(tick, delay);
+  }
+  tick();
+}
+
+function resetDemo() {
+  clearTimeout(rawTimer);
+  playing = false;
+  document.getElementById('rawView').innerHTML = '';
+  document.getElementById('rendView').innerHTML = `<div style="padding:16px;color:var(--muted);font-size:14px">點擊「開始流式演示」查看效果…</div>`;
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('btnPlay').textContent = '▶ 開始流式演示';
+  document.getElementById('playHint').textContent = '';
+  document.getElementById('progFill').style.width = '0%';
+  document.getElementById('progPct').textContent = '0%';
+  document.getElementById('rawStatus').textContent = '等待';
+  document.getElementById('rawStatus').className = 'status live';
+  document.getElementById('rendStatus').textContent = '等待';
+  document.getElementById('rendStatus').className = 'status live';
+}
+
+// 初始化
+pickFmt(document.querySelector('.fmt-btn.active'), 0);
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

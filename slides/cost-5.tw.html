@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qwen 的階梯逃逸：32k 紅線 | Token 降本增效</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<!-- SEO Start -->
+<meta name="description" content="Qwen 按輸入長度分檔：33k 的請求全部 33k Token 都按 2 倍價結算，而不是只有超出部分。RAG 場景為垃圾付雙倍錢的陷阱，以及預算感知的動態裁剪程式碼。">
+<meta name="keywords" content="Qwen,輸入分檔,全量結算,RAG 成本,預算感知截斷,上下文裁剪,32k 紅線">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/cost-5.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/cost-5.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/cost-5.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/cost-5.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/cost-5.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/cost-5.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/cost-5.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/cost-5.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="Qwen 的階梯逃逸：32k 紅線">
+<meta property="og:description" content="多 1k Token，整單翻倍：全量結算邏輯與預算感知截斷。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/cost-5.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/cost-5.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Qwen 的階梯逃逸：32k 紅線">
+<meta name="twitter:description" content="多 1k Token，整單翻倍：全量結算邏輯與預算感知截斷。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ct:#16a34a;--ct-deep:#14532d;--ct-soft:rgba(22,163,74,.08);--ct-line:rgba(22,163,74,.25);--warn:#dc2626;--warn-soft:rgba(220,38,38,.07)}
+.lesson-header .kicker{color:var(--ct)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{padding:6px 14px;border-radius:999px;background:var(--ct-soft);color:var(--ct-deep);font-size:13px;font-weight:700}
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+.desc b,.quote-card b{color:var(--ct-deep)}
+.quote-card{background:var(--ct-soft);border:1.5px solid var(--ct-line);border-radius:14px;padding:18px 22px;font-size:16px;line-height:1.8}
+.fig-wrap{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow-card)}
+.fig-wrap img{width:100%;border-radius:8px;display:block}
+.fig-cap{font-size:12.5px;color:var(--sub);padding:8px 6px 4px;line-height:1.6}
+.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card)}
+.tbl th{background:var(--ct-soft);color:var(--ct-deep);font-weight:800;text-align:left;padding:11px 14px;font-size:13px}
+.tbl td{padding:11px 14px;border-top:1px solid var(--border);color:var(--sub);line-height:1.65;vertical-align:top}
+.tbl td b{color:var(--ct-deep)}
+.tbl td.hi{color:var(--warn);font-weight:800}
+.tbl-wrap{overflow-x:auto}
+
+/* 阶梯模拟器 */
+.lad{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-top:14px;box-shadow:var(--shadow-card)}
+.lad-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.lad-row label{font-size:14px;font-weight:700;color:var(--text);min-width:120px}
+.lad-row input[type=range]{flex:1;min-width:180px;accent-color:var(--ct)}
+.lad-row .val{font-size:15px;font-weight:800;min-width:110px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ct-deep)}
+.lad-row .val.hot{color:var(--warn)}
+.lad-scale{position:relative;height:8px;border-radius:4px;margin:6px 2px 4px;opacity:.3;background:linear-gradient(to right,var(--ct) 0 16%,#f59e0b 16% 51%,var(--warn) 51% 100%)}
+.lad-mark{display:flex;font-size:11.5px;color:var(--sub);margin-bottom:12px;position:relative;height:16px}
+.lad-mark span{position:absolute;transform:translateX(-50%)}
+.lad-out{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px}
+.lo{background:rgba(0,0,0,.03);border-radius:10px;padding:12px 14px;text-align:center}
+.lo .k{font-size:12px;color:var(--sub);margin-bottom:4px}
+.lo .v{font-size:17px;font-weight:800;color:var(--ct-deep);font-variant-numeric:tabular-nums}
+.lo.hot .v{color:var(--warn)}
+.lad-note{margin-top:12px;font-size:14px;line-height:1.78;color:var(--text);background:rgba(0,0,0,.03);border-radius:10px;padding:12px 16px}
+.lad-note b{color:var(--ct-deep)}
+.lad-note.bad b{color:var(--warn)}
+
+.codebox{margin-top:12px;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:16px 18px;font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.codebox .c{color:#64748b}
+.codebox .g{color:#4ade80}
+.codebox .r{color:#f87171}
+.code-tag{display:inline-block;margin-top:14px;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:800}
+.code-tag.bad{background:var(--warn-soft);color:var(--warn)}
+.code-tag.good{background:var(--ct-soft);color:var(--ct-deep)}
+
+.takeaways{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.tk-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.tk-ic{width:22px;height:22px;border-radius:7px;background:var(--ct-soft);color:var(--ct);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:13px;margin-top:1px}
+.tk-item p{font-size:14px;line-height:1.75;color:var(--text);margin:0}
+.tk-item p b{color:var(--ct-deep)}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub);line-height:1.85}
+.src-note b{color:var(--text)}
+@media (max-width:768px){.lad-out{grid-template-columns:1fr}}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Qwen 的階梯逃逸：32k 紅線","name":"Qwen 的階梯逃逸：32k 紅線","url":"https://xueai.miyang.cn/slides/cost-5.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 三大跳檔陷阱","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Qwen 按輸入長度分檔：33k 的請求全部 33k Token 都按 2 倍價結算，而不是只有超出部分。RAG 場景為垃圾付雙倍錢的陷阱，以及預算感知的動態裁剪程式碼。","datePublished":"2026-08-10","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">Token 降本增效 · 5 / 13</div>
+    <h1>Qwen 的階梯逃逸：32k 紅線</h1>
+    <p class="subtitle">Qwen 系列的分檔邏輯和智譜完全不同：按輸入長度計費，分界線在 32k 和 128k。最容易被忽略的計費細節是——越線後不是「超出部分加價」，而是整個請求全量按高價檔結算。</p>
+    <div class="chips"><span class="chip">輸入分檔</span><span class="chip">全量結算</span><span class="chip">RAG 成本</span><span class="chip">預算感知截斷</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>多 1k Token 整單翻倍的全量結算邏輯；預算感知截斷，別再為 RAG 垃圾付雙倍的錢</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">現象：多 1k Token，整單翻倍</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>輸入長度（Qwen3-Max）</th><th>單價（元/M，折後）</th><th>相對基準</th></tr>
+      <tr><td>0 – 32k</td><td>1.6</td><td>1x</td></tr>
+      <tr><td>32k – 128k</td><td class="hi">3.2</td><td class="hi">2x</td></tr>
+      <tr><td>128k – 252k</td><td class="hi">4.8</td><td class="hi">3x</td></tr>
+    </table></div>
+    <p class="desc" style="margin-top:12px">假設你的輸入是 33,000 個 Token，僅比 32k 多了 1,000。<b>整個請求的全部 33k Token 都按 3.2 元/M 結算</b>——不是前 32k 按 1.6 元、後 1k 按 3.2 元。多出來的這 1k，直接讓整單成本翻倍。</p>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">互動演示 · 階梯上的帳單</div>
+    <p class="desc">拖動輸入長度，注意 32k 和 128k 兩條紅線附近發生了什麼。</p>
+    <div class="lad" id="lad">
+      <div class="lad-row">
+        <label for="ldIn">輸入長度</label>
+        <input type="range" id="ldIn" min="4" max="200" value="28" step="1">
+        <span class="val" id="ldInVal">28k Tokens</span>
+      </div>
+      <div class="lad-scale"></div>
+      <div class="lad-mark"><span style="left:16%">32k</span><span style="left:51%">128k</span><span style="left:97%">200k</span></div>
+      <div class="lad-out">
+        <div class="lo" id="loP"><div class="k">適用單價</div><div class="v" id="loPV"></div></div>
+        <div class="lo" id="loB"><div class="k">單次輸入成本</div><div class="v" id="loBV"></div></div>
+        <div class="lo" id="loM"><div class="k">日均 10 萬次的月帳單</div><div class="v" id="loMV"></div></div>
+      </div>
+      <div class="lad-note" id="ldNote"></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">RAG 場景：在為垃圾付雙倍的錢</div>
+    <p class="desc">在 RAG 場景這個問題尤其尖銳。假設檢索回來 5 個文件片段，拼起來剛好 33k。這時候需要問一個問題：<b>第 5 個片段對最終回答的貢獻有多大？</b></p>
+    <p class="desc" style="margin-top:10px">如果它是核心的法律條款、關鍵的技術參數，那可能值得。但如果它只是網頁頁尾、版權宣告、重複的段落，甚至只是格式帶來的多餘換行符呢？<b>一些粗放的 RAG 策略，正在為垃圾付雙倍的錢。</b></p>
+    <div class="fig-wrap">
+      <img src="images/cost/qwen-tiers.webp" alt="Qwen 計費邏輯：輸入長度決定倍數，全額結算風險" loading="lazy">
+      <div class="fig-cap">僅多出 1k Token，全部 33k 都按 2 倍價結算。RAG 檢索的第 5 個片段，真的值一倍的價錢嗎？（圖：作者分享原稿）</div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">策略：預算感知的動態裁剪</div>
+    <p class="desc">解法是把「32k」從一個事後才發現的帳單事故，變成一個<b>寫進程式碼的預算約束</b>。拼 Prompt 的邏輯不能是無腦拼接：</p>
+    <span class="code-tag bad">✗ 錯誤做法：無腦拼接</span>
+    <div class="codebox">prompt = system_prompt + context + user_query</div>
+    <span class="code-tag good">✓ 正確做法：預算感知</span>
+    <div class="codebox">def build_prompt_within_budget(system_prompt, context_chunks,
+                               user_query, budget=32000):
+    prompt = system_prompt + user_query
+    current_tokens = count_tokens(prompt)
+
+    selected_chunks = []
+    for chunk in sort_by_relevance(context_chunks):  <span class="c"># 按相關性排序</span>
+        chunk_tokens = count_tokens(chunk)
+        if current_tokens + chunk_tokens &gt; budget:
+            break  <span class="c"># 到達預算上限，停止新增</span>
+        selected_chunks.append(chunk)
+        current_tokens += chunk_tokens
+
+    return system_prompt + ''.join(selected_chunks) + user_query</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>場景</th><th>策略</th><th>說明</th></tr>
+      <tr><td><b>RAG 檢索</b></td><td>動態 Top-K</td><td>不固定取 5 個 chunk，而是取到「快到 32k」為止</td></tr>
+      <tr><td><b>多輪對話</b></td><td>歷史壓縮</td><td>歷史接近 30k 時觸發 Summarization</td></tr>
+      <tr><td><b>長文件處理</b></td><td>分段處理</td><td>不要一次性塞入，採用 Map-Reduce 模式</td></tr>
+    </table></div>
+    <div class="quote-card" style="margin-top:14px">
+      可以在業務裡畫一條紅線：<b>32k 是預算上限，除非有極強的業務理由，否則絕不踏入高價區。</b>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">三大定價策略對照</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>廠商</th><th>跳檔型別</th><th>關鍵閾值</th><th>應對策略</th></tr>
+      <tr><td><b>智譜 GLM-4.6</b></td><td>輸出長度跳檔</td><td>200 Tokens</td><td>任務拆分，或切換到非輸出分檔模型</td></tr>
+      <tr><td><b>通義 Qwen</b></td><td>輸入長度跳檔</td><td>32k / 128k</td><td>預算感知截斷，動態裁剪上下文</td></tr>
+      <tr><td><b>DeepSeek</b></td><td>思維鏈累積</td><td>多輪膨脹</td><td>上下文清洗，用完即棄</td></tr>
+    </table></div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="takeaways">
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>Qwen 全量結算：</b>33k 的請求，全部 33k 都按 2 倍價算。多 1k，翻一倍。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>問一句「第 5 個片段值不值」：</b>粗放 RAG 正在為頁尾、免責聲明和換行符付雙倍的錢。</p></div>
+      <div class="tk-item"><span class="tk-ic">✓</span><p><b>把 32k 寫成程式碼裡的預算約束：</b>按相關性排序、到預算即停。動態 Top-K 優於固定 Top-K。</p></div>
+    </div>
+    <p class="src-note">
+      <b>內容來源：</b>整理自作者團隊內部分享《AI Token 降本增效策略分享》「Qwen 的階梯逃逸」。RAG 的成本與優化策略在<a href="rag-advanced.html">大模型原理 · RAG 的代價與優化策略</a>有另一個角度的展開，可對照閱讀。
+    </p>
+  </section>
+
+</main>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ── Qwen 阶梯模拟：Qwen3-Max 折后输入价 ── */
+function ldCalc(){
+  var k = +document.getElementById('ldIn').value;   /* 单位 k */
+  var tier = k <= 32 ? 0 : (k <= 128 ? 1 : 2);
+  var price = [1.6, 3.2, 4.8][tier];
+  var cost = k * 1000 / 1e6 * price;
+  var monthly = cost * 100000 * 30;
+  var v = document.getElementById('ldInVal');
+  v.textContent = k + 'k Tokens';
+  v.className = 'val' + (tier ? ' hot' : '');
+  document.getElementById('loPV').textContent = price + ' 元/M（' + (tier+1) + 'x）';
+  document.getElementById('loBV').textContent = '¥' + cost.toFixed(4);
+  document.getElementById('loMV').textContent = '¥' + Math.round(monthly).toLocaleString();
+  ['loP','loB','loM'].forEach(function(id){ document.getElementById(id).className = 'lo' + (tier?' hot':''); });
+  var note = document.getElementById('ldNote');
+  if (k <= 32 && k >= 29) {
+    note.className='lad-note';
+    note.innerHTML='<b>貼線飛行：</b>再塞一個檢索片段就越線。這正是「動態 Top-K」的用武之地——取到快到 32k 就停手。';
+  } else if (k <= 32) {
+    note.className='lad-note';
+    note.innerHTML='基準價區。當前整單 ¥' + cost.toFixed(4) + '，規模化後月帳單 ¥' + Math.round(monthly).toLocaleString() + '。<b>把預算紅線畫在這裡。</b>';
+  } else if (k <= 36) {
+    note.className='lad-note bad';
+    note.innerHTML='<b>剛越線，整單翻倍。</b>對比 32k 時的帳單：單次從 ¥' + (32*1.6/1000).toFixed(4) + ' 漲到 ¥' + cost.toFixed(4) + '——多出的 ' + (k-32) + 'k 內容如果只是頁尾和免責聲明，你正在為垃圾付雙倍的錢。';
+  } else if (k <= 128) {
+    note.className='lad-note bad';
+    note.innerHTML='2x 高價區。月帳單 ¥' + Math.round(monthly).toLocaleString() + '。<b>問自己：這些上下文每一段都值這個價嗎？</b>長文件考慮 Map-Reduce 分段，多輪對話考慮歷史壓縮。';
+  } else {
+    note.className='lad-note bad';
+    note.innerHTML='<b>3x 深水區。</b>月帳單 ¥' + Math.round(monthly).toLocaleString() + '。除非是「一次性讀完整本合同」這類極強的業務理由，否則這個區間不該出現在高頻鏈路上。';
+  }
+}
+document.getElementById('ldIn').addEventListener('input', ldCalc);
+ldCalc();
+lessonOnView(document.getElementById('lad'), function(){});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>語法層成本優化：寫給機器的提示詞 | xueai.miyang.cn</title>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+@keyframes _si{to{opacity:1}}
+body{opacity:0;animation:_si .15s ease .08s forwards}
+
+:root{
+  --red:var(--danger);
+  --green:var(--success);
+  --surface:var(--card);
+  --surface2:#f0ede6;
+  --muted:var(--sub);
+}
+
+.lesson-header h1 em{font-style:normal;color:var(--cyan)}
+
+/* 策略按钮 */
+.strat-tabs{display:flex;flex-direction:column;gap:8px}
+.strat-btn{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;background:var(--surface);border:1.5px solid var(--border);cursor:pointer;font-family:inherit;text-align:left;transition:all .18s;width:100%}
+.strat-btn:hover,.strat-btn.active{border-color:var(--cyan);background:rgba(8,145,178,.05)}
+.strat-num{width:28px;height:28px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:var(--muted);flex-shrink:0}
+.strat-btn.active .strat-num{background:var(--cyan);color:white}
+.strat-info h5{font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px}
+.strat-info p{font-size:13px;color:var(--sub)}
+.saving-lbl{margin-left:auto;font-size:14px;font-weight:800;color:var(--success);flex-shrink:0}
+
+/* 对比面板 */
+.compare{display:flex;flex-direction:column;gap:10px}
+.compare-header{font-size:18px;font-weight:800;color:var(--text)}
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cmp-col{display:flex;flex-direction:column;gap:6px}
+.cmp-label{font-size:14px;font-weight:700;padding:6px 10px;border-radius:6px;text-align:center}
+.cmp-label.bad{background:rgba(220,38,38,.1);color:var(--danger)}
+.cmp-label.good{background:rgba(22,163,74,.1);color:var(--success)}
+.code-block{background:#1e1e2e;border-radius:10px;padding:14px 16px;font-family:"Menlo","Cascadia Code","Consolas",monospace;font-size:13.5px;line-height:1.75;color:#cdd6f4;overflow-x:auto;white-space:pre-wrap;word-break:break-all;tab-size:2;min-height:220px}
+.code-block .hl-bad{color:#f38ba8}
+.code-block .hl-good{color:#a6e3a1}
+.code-block .hl-key{color:#89b4fa}
+.code-block .hl-str{color:#f9e2af}
+.code-block .hl-cmt{color:#6c7086;font-style:italic}
+.token-count{padding:8px 10px;border-radius:7px;font-family:inherit}
+.tc-bad{background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.15)}
+.tc-good{background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.15)}
+
+/* 知识卡 */
+.insight-box{background:rgba(8,145,178,.06);border:1.5px solid rgba(8,145,178,.2);border-radius:10px;padding:14px 16px;font-size:15px;color:var(--sub);line-height:1.65;margin-top:18px}
+.insight-box strong{color:var(--cyan)}
+
+@media (max-width:768px){
+  .compare-grid{grid-template-columns:1fr}
+  .code-block{min-height:0;font-size:12.5px}
+  .strat-info h5{font-size:14px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="在 Prompt 的語法層面如何減少 Token 消耗？對比自然語言與結構化指令的 Token 效率，介紹刪除冗餘詞、使用 XML 標籤分隔、選擇 Token 高效格式等實戰技巧。">
+<meta name="keywords" content="Prompt優化,Token優化,Prompt壓縮,語法層優化,AI提示詞效率">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/8-6.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/8-6.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/8-6.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/8-6.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/8-6.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/8-6.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/8-6.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/8-6.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="語法層成本優化：寫給機器的提示詞">
+<meta property="og:description" content="在 Prompt 的語法層面如何減少 Token 消耗？對比自然語言與結構化指令的 Token 效率，介紹刪除冗餘詞、使用 XML 標籤分隔、選擇 Token 高效格式等實戰技巧。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/8-6.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/8-6.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="語法層成本優化：寫給機器的提示詞">
+<meta name="twitter:description" content="在 Prompt 的語法層面如何減少 Token 消耗？對比自然語言與結構化指令的 Token 效率，介紹刪除冗餘詞、使用 XML 標籤分隔、選擇 Token 高效格式等實戰技巧。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"語法層優化：寫給機器的提示詞","name":"語法層優化：寫給機器的提示詞","url":"https://xueai.miyang.cn/slides/8-6.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 成本優化與選型","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"在 Prompt 的語法層面如何減少 Token 消耗？對比自然語言與結構化指令的 Token 效率，介紹刪除冗餘詞、使用 XML 標籤分隔、選擇 Token 高效格式等實戰技巧。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+  <header class="lesson-header">
+    <div class="kicker">成本優化</div>
+    <h1>語法層優化：<em>寫給機器的提示詞，不要排版</em></h1>
+    <p class="subtitle">格式性 Token 最高佔提示詞 13–20%。提示詞是寫給機器的指令，不是給人看的文檔。那些 <code>**加粗**</code>、JSON 大括號、縮進換行…都是在花錢買格式。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>YAML vs JSON、CSV vs 陣列、壓縮 JSON 輸出，格式性 Token 省 10-30%</p></aside><!--seo:end-->  <div class="sec-label">四個優化策略</div>
+  <div class="strat-tabs" id="stratTabs">
+    <button class="strat-btn active" onclick="selectStrat(0)">
+      <div class="strat-num">1</div>
+      <div class="strat-info">
+        <h5>複雜對象：YAML 代替 JSON</h5>
+        <p>用縮進代替閉合符號，信噪比更高</p>
+      </div>
+      <div class="saving-lbl">省 15-30%</div>
+    </button>
+    <button class="strat-btn" onclick="selectStrat(1)">
+      <div class="strat-num">2</div>
+      <div class="strat-info">
+        <h5>扁平列表：CSV 代替 JSON 陣列</h5>
+        <p>字段名重複 N 遍是最大浪費</p>
+      </div>
+      <div class="saving-lbl">省 30-60%</div>
+    </button>
+    <button class="strat-btn" onclick="selectStrat(2)">
+      <div class="strat-num">3</div>
+      <div class="strat-info">
+        <h5>後台輸出：強制壓縮 JSON</h5>
+        <p>機器讀數據不需要美觀，只需要合法</p>
+      </div>
+      <div class="saving-lbl">省 10-20%</div>
+    </button>
+    <button class="strat-btn" onclick="selectStrat(3)">
+      <div class="strat-num">4</div>
+      <div class="strat-info">
+        <h5>去掉 Markdown 裝飾符號</h5>
+        <p>** 加粗、### 標題佔用額外 Token</p>
+      </div>
+      <div class="saving-lbl">省 8-13%</div>
+    </button>
+  </div>
+
+  <div class="sec-label">格式對比演示</div>
+  <div class="compare paywall-locked xa-peek" id="comparePanel">
+    <div class="compare-header" id="cmpTitle">YAML vs JSON：同樣的數據結構</div>
+    <div class="compare-grid">
+      <div class="cmp-col">
+        <div class="cmp-label bad">❌ JSON（高 Token 消耗）</div>
+        <pre class="code-block" id="cmpBad"></pre>
+        <div class="token-count tc-bad" id="cmpBadCount"></div>
+      </div>
+      <div class="cmp-col">
+        <div class="cmp-label good" id="cmpGoodLabel">✅ YAML（省 Token）</div>
+        <pre class="code-block" id="cmpGood"></pre>
+        <div class="token-count tc-good" id="cmpGoodCount"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight-box paywall-locked">
+    💡 實測：Lyra 提示詞中，<strong>** 加粗符號就吃掉 8.5%</strong> Token；算上列表、標題、JSON 格式化縮進，整體格式性 Token 達 <strong>13%</strong>。千萬級調用量下，每月 20% 預算花在「讓產品經理看着舒服」上。
+  </div>
+</article>
+
+<script>
+const STRATS = [
+  {
+    title: 'YAML vs JSON：同樣的數據結構',
+    goodLabel: '✅ YAML（省 Token）',
+    badTok: 48, goodTok: 34,
+    bad:
+`<span class="hl-cmt">// JSON 版本：大量符號開銷</span>
+{
+  <span class="hl-key">"user"</span>: {
+    <span class="hl-key">"name"</span>: <span class="hl-str">"Alice"</span>,
+    <span class="hl-key">"role"</span>: <span class="hl-str">"admin"</span>,
+    <span class="hl-key">"permissions"</span>: [
+      <span class="hl-str">"read"</span>,
+      <span class="hl-str">"write"</span>,
+      <span class="hl-str">"delete"</span>
+    ]
+  }
+}`,
+    good:
+`<span class="hl-cmt"># YAML 版本：縮進代替符號</span>
+user:
+  name: <span class="hl-str">Alice</span>
+  role: <span class="hl-str">admin</span>
+  permissions:
+    - <span class="hl-str">read</span>
+    - <span class="hl-str">write</span>
+    - <span class="hl-str">delete</span>
+
+<span class="hl-cmt"># 省掉 { } [ ] " " , 等符號
+# 冒號+引號 → 只剩冒號</span>`,
+  },
+  {
+    title: 'CSV vs JSON 陣列：扁平列表場景',
+    goodLabel: '✅ CSV（省 Token）',
+    badTok: 1500, goodTok: 600,
+    bad:
+`<span class="hl-cmt">// JSON 陣列：字段名重複 N 遍</span>
+[
+  {<span class="hl-key">"id"</span>: 1, <span class="hl-key">"name"</span>: <span class="hl-str">"Alice"</span>, <span class="hl-key">"role"</span>: <span class="hl-str">"Admin"</span>},
+  {<span class="hl-key">"id"</span>: 2, <span class="hl-key">"name"</span>: <span class="hl-str">"Bob"</span>,   <span class="hl-key">"role"</span>: <span class="hl-str">"User"</span>},
+  {<span class="hl-key">"id"</span>: 3, <span class="hl-key">"name"</span>: <span class="hl-str">"Carol"</span>, <span class="hl-key">"role"</span>: <span class="hl-str">"Admin"</span>},
+  <span class="hl-cmt">// ... 50 條記錄
+  // "id" "name" "role" 重複了 50 次！</span>
+]`,
+    good:
+`<span class="hl-cmt"># 帶表頭 CSV：字段名只出現一次</span>
+id  name   role
+1   Alice  Admin
+2   Bob    User
+3   Carol  Admin
+<span class="hl-cmt">... (共 50 條)</span>
+
+<span class="hl-cmt"># 字段名從 50 份 → 1 份
+# 50 條數據節省約 60% Token
+# 同樣窗口可容納更多記錄</span>`,
+  },
+  {
+    title: '後台任務輸出：強制 Minified JSON',
+    goodLabel: '✅ Minified JSON（速度更快）',
+    badTok: 70, goodTok: 50,
+    bad:
+`<span class="hl-cmt">// 模型預設輸出：格式化 JSON</span>
+{
+    <span class="hl-key">"sentiment"</span>: <span class="hl-str">"positive"</span>,
+    <span class="hl-key">"score"</span>: 0.92,
+    <span class="hl-key">"aspects"</span>: [
+        <span class="hl-str">"電池續航"</span>,
+        <span class="hl-str">"拍照效果"</span>
+    ],
+    <span class="hl-key">"summary"</span>: <span class="hl-str">"用戶滿意"</span>
+}`,
+    good:
+`<span class="hl-cmt"># System Prompt 加約束：
+# "輸出必須是 Minified JSON，
+#  不加任何空格、換行、註釋"</span>
+
+<span class="hl-cmt"># 模型輸出變成：</span>
+{<span class="hl-key">"sentiment"</span>:<span class="hl-str">"positive"</span>,<span class="hl-key">"score"</span>:0.92,<span class="hl-key">"aspects"</span>:[<span class="hl-str">"電池續航"</span>,<span class="hl-str">"拍照效果"</span>],<span class="hl-key">"summary"</span>:<span class="hl-str">"用戶滿意"</span>}
+
+<span class="hl-cmt"># 換行/縮進/空格全省掉
+# 批量任務生成速度顯著提升</span>`,
+  },
+  {
+    title: 'Markdown 裝飾符號：能省則省',
+    goodLabel: '✅ 純文本指令（省 Token）',
+    badTok: 72, goodTok: 52,
+    bad:
+`<span class="hl-cmt">// 對人友好的 System Prompt</span>
+<span class="hl-key">## 角色設定</span>
+你是一個<span class="hl-bad">**專業**</span>的客服助手。
+
+<span class="hl-key">## 任務説明</span>
+<span class="hl-bad">-</span> 回答用戶關於訂單的問題
+<span class="hl-bad">-</span> <span class="hl-bad">**必須**</span>保持禮貌
+<span class="hl-bad">-</span> 不要透露內部系統信息
+
+<span class="hl-bad">> 注意：</span>所有回覆需<span class="hl-bad">**簡潔**</span>`,
+    good:
+`<span class="hl-cmt"># 對機器友好的版本</span>
+你是專業客服助手。
+任務：回答訂單相關問題，保持禮貌，
+不透露內部系統信息，回覆簡潔。
+
+<span class="hl-good"># 邏輯完全保留，語義零損失
+# ## ** - > 符號全部去掉
+# 機器只關注語義，不關注排版</span>`,
+  },
+];
+
+let cur = 0;
+function selectStrat(i) {
+  cur = i;
+  document.querySelectorAll('.strat-btn').forEach((b,idx)=>b.classList.toggle('active', idx===i));
+  const s = STRATS[i];
+  document.getElementById('cmpTitle').textContent = s.title;
+  document.getElementById('cmpGoodLabel').textContent = s.goodLabel;
+  document.getElementById('cmpBad').innerHTML = s.bad;
+  document.getElementById('cmpGood').innerHTML = s.good;
+
+  // Token 數量條形對比
+  const badTok = s.badTok, goodTok = s.goodTok;
+  const maxTok = badTok;
+  const savePct = Math.round((1 - goodTok / badTok) * 100);
+  const badPct = 100, goodPct = Math.round(goodTok / badTok * 100);
+
+  const badEl = document.getElementById('cmpBadCount');
+  const goodEl = document.getElementById('cmpGoodCount');
+
+  badEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+        <div id="barBad" style="height:100%;background:var(--red);border-radius:4px;width:0%;transition:width .5s ease"></div>
+      </div>
+      <span style="font-size:13px;font-weight:800;color:var(--red);min-width:36px">${badTok}T</span>
+    </div>
+    <span style="font-size:12px;font-weight:600">高 Token 消耗</span>`;
+
+  goodEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+        <div id="barGood" style="height:100%;background:var(--green);border-radius:4px;width:0%;transition:width .5s ease"></div>
+      </div>
+      <span style="font-size:13px;font-weight:800;color:var(--green);min-width:36px">${goodTok}T</span>
+    </div>
+    <span style="font-size:12px;font-weight:600;color:var(--green)">節省 ${savePct}%</span>`;
+
+  // 觸發動畫
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      document.getElementById('barBad').style.width = badPct + '%';
+      document.getElementById('barGood').style.width = goodPct + '%';
+    }, 50);
+  });
+}
+selectStrat(0);
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

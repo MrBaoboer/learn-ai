@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>上下文壓縮：四層防線 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--l1:#16a34a;--l2:#d97706;--l3:#ea580c;--l4:#dc2626}
+
+/* ── 布局：水箱 + 四层防线 ── */
+.tank-layout{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+
+/* 左：水箱 */
+.tank-col{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);position:sticky;top:16px}
+.tank-info{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;line-height:1.7}
+.tank-info b{font-weight:800}
+.tank-info .model-max{color:var(--danger)}
+.tank-info .safe-val{color:var(--success)}
+.tank-area{display:flex;align-items:center;justify-content:center;padding:16px}
+.tank-vis{display:flex;align-items:stretch;gap:10px;height:320px}
+
+.tank-outer{width:120px;position:relative;border-radius:12px;border:2px solid #ccc;background:#eae7df;overflow:visible;flex-shrink:0}
+.tank-fill{position:absolute;bottom:0;left:0;right:0;border-radius:0 0 10px 10px;transition:height .5s cubic-bezier(.4,0,.2,1);background:linear-gradient(180deg,rgba(8,145,178,.25),rgba(8,145,178,.5))}
+.tank-fill-shine{position:absolute;top:0;left:0;right:0;height:6px;background:rgba(255,255,255,.3);filter:blur(3px)}
+
+/* 阈值线 */
+.tl{position:absolute;left:-6px;right:-6px;height:0;border-top:2px dashed;z-index:3;pointer-events:none}
+.tl-label{position:absolute;left:calc(100% + 8px);top:-9px;font-size:11px;font-weight:800;white-space:nowrap;padding:1px 6px;border-radius:4px}
+.tl1{border-color:var(--l1)}.tl1 .tl-label{color:var(--l1);background:rgba(22,163,74,.08)}
+.tl2{border-color:var(--l2)}.tl2 .tl-label{color:var(--l2);background:rgba(217,119,6,.08)}
+.tl3{border-color:var(--l3)}.tl3 .tl-label{color:var(--l3);background:rgba(234,88,12,.08)}
+.tl4{border-color:var(--l4)}.tl4 .tl-label{color:var(--l4);background:rgba(220,38,38,.08)}
+.tl-safe{border-color:var(--danger);border-top-style:solid}
+.tl-safe .tl-label{color:white;background:var(--danger);font-size:12px}
+/* 危险区域 */
+.danger-zone{position:absolute;left:0;right:0;top:0;background:repeating-linear-gradient(-45deg,transparent,transparent 3px,rgba(220,38,38,.05) 3px,rgba(220,38,38,.05) 6px);z-index:1;border-radius:10px 10px 0 0;pointer-events:none}
+
+/* 压缩闪光 */
+.compress-flash{position:absolute;left:50%;transform:translateX(-50%);padding:4px 10px;border-radius:6px;font-size:13px;font-weight:800;white-space:nowrap;opacity:0;z-index:10;pointer-events:none;transition:opacity .3s}
+.compress-flash.show{opacity:1;animation:flashPop .8s ease}
+@keyframes flashPop{0%{transform:translateX(-50%) scale(.8)}30%{transform:translateX(-50%) scale(1.15)}100%{transform:translateX(-50%) scale(1)}}
+
+/* 统计 */
+.tank-stats{padding:10px 16px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border)}
+.ts-row{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.ts-label{color:var(--sub)}
+.ts-val{font-weight:800;font-size:15px;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.ts-val.total{color:var(--cyan)}
+.ts-val.current{color:var(--text)}
+.ts-val.saved{color:var(--success)}
+.ts-bar{height:4px;border-radius:2px;background:rgba(0,0,0,.05);overflow:hidden}
+.ts-bar-fill{height:100%;border-radius:2px;transition:width .5s}
+
+/* 滑块 */
+.slider-area{padding:10px 16px 8px;border-top:1px solid var(--border)}
+.slider-label{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-bottom:2px}
+.tank-slider{width:100%;accent-color:var(--cyan);cursor:pointer;height:28px}
+.ctrl-row{display:flex;gap:6px;padding:4px 16px 14px}
+.btn{padding:9px 16px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:40px}
+.btn-p{background:var(--accent);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-r{background:rgba(0,0,0,.04);color:var(--sub);border:1px solid var(--border)}
+
+/* 右：四层详情 */
+.layers-col{min-width:0;display:flex;flex-direction:column;gap:10px}
+.layers-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.layers-title{font-size:14px;font-weight:800;color:var(--text)}
+.status-badge{padding:4px 10px;border-radius:6px;font-size:13px;font-weight:800;margin-left:auto;transition:all .3s}
+.layers-scroll{display:flex;flex-direction:column;gap:8px}
+
+.layer-card{border:2px solid var(--border);border-radius:12px;overflow:hidden;transition:all .35s;opacity:.4;transform:scale(.98);background:var(--card)}
+.layer-card.active{opacity:1;transform:scale(1)}
+.layer-card.firing{animation:fireGlow .8s ease}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(234,88,12,.3)}50%{box-shadow:0 0 20px 6px rgba(234,88,12,.2)}100%{box-shadow:none}}
+
+.lc-hd{padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:800;transition:background .3s;flex-wrap:wrap}
+.lc-name{flex:1;min-width:160px}
+.lc-trigger{font-size:13px;font-weight:800;padding:2px 8px;border-radius:5px;white-space:nowrap}
+.lc-saved{font-size:12px;font-weight:800;margin-left:6px;padding:2px 8px;border-radius:5px;opacity:0;transition:opacity .3s}
+.layer-card.active .lc-saved{opacity:1}
+
+.lc-body{padding:0 14px;max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease}
+.layer-card.active .lc-body{max-height:300px;padding:6px 14px 12px}
+
+.lc-desc{font-size:13px;line-height:1.6;color:var(--sub);margin-bottom:6px}
+.lc-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:start}
+.lc-cmp-box{border-radius:8px;padding:6px 10px;font-size:12px;line-height:1.5}
+.lc-cmp-label{font-size:11px;font-weight:800;margin-bottom:2px;letter-spacing:.3px}
+.lc-cmp-arrow{align-self:center;font-size:16px;color:var(--sub);font-weight:700}
+
+/* 决策卡 */
+.dec-area{margin-top:2px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text);line-height:1.6;transition:all .3s}
+.dec-card b{color:var(--accent)}
+
+@keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}50%{box-shadow:0 0 16px 4px rgba(220,38,38,.25)}}
+.tank-outer.danger{animation:pulse-red 1.2s ease infinite;border-color:var(--danger)}
+
+@media (max-width:768px){
+  .tank-layout{grid-template-columns:1fr}
+  .tank-col{position:static}
+  .tank-vis{height:280px}
+  .lc-compare{grid-template-columns:1fr}
+  .lc-cmp-arrow{transform:rotate(90deg);justify-self:center}
+  .layer-card.active .lc-body{max-height:420px}
+}
+</style>
+<meta name="description" content="上下文壓縮四層防線：60% 裁剪、75% 微壓縮、85% 摺疊、95% 緊急壓縮。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/7-3b.tw.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_TW">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/7-3b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/7-3b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/7-3b.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/7-3b.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/7-3b.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/7-3b.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/7-3b.html">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"上下文壓縮：四層防線","name":"上下文壓縮：四層防線","url":"https://xueai.miyang.cn/slides/7-3b.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"上下文壓縮四層防線：60% 裁剪、75% 微壓縮、85% 摺疊、95% 緊急壓縮。","datePublished":"2026-04-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="上下文壓縮：四層防線"><meta property="og:description" content="上下文壓縮四層防線：60% 裁剪、75% 微壓縮、85% 摺疊、95% 緊急壓縮。"><meta property="og:url" content="https://xueai.miyang.cn/slides/7-3b.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/7-3b.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 工程</div>
+    <h1>上下文壓縮：四層防線</h1>
+    <p class="subtitle">拖動滑塊模擬對話增長，觀察壓縮如何延長上下文壽命。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>60% 裁剪 → 75% 微壓縮 → 85% 摺疊 → 95% 緊急，拖動滑塊看壓縮過程</p></aside><!--seo:end-->  <div class="tank-layout paywall-locked xa-peek">
+    <!-- 左：水箱 -->
+    <aside class="tank-col">
+      <div class="tank-info">
+        模型上下文視窗 = <b class="model-max">256K</b> Token<br>
+        安全空間 = <b class="safe-val">200K</b>（預留 56K 給模型回覆）
+      </div>
+      <div class="tank-area">
+        <div class="tank-vis">
+          <div class="tank-outer" id="tankOuter">
+            <div class="danger-zone" id="dangerZone"></div>
+            <div class="tank-fill" id="tankFill"><div class="tank-fill-shine"></div></div>
+
+            <div class="tl tl1" id="line1"><span class="tl-label">60% 裁剪</span></div>
+            <div class="tl tl2" id="line2"><span class="tl-label">75% 微壓縮</span></div>
+            <div class="tl tl3" id="line3"><span class="tl-label">85% 摺疊</span></div>
+            <div class="tl tl4" id="line4"><span class="tl-label">95% 緊急</span></div>
+            <div class="tl tl-safe" id="lineSafe"><span class="tl-label">安全上限</span></div>
+
+            <div class="compress-flash" id="compFlash"></div>
+          </div>
+        </div>
+      </div>
+      <div class="tank-stats">
+        <div class="ts-row">
+          <span class="ts-label">累計產出</span>
+          <span class="ts-val total" id="vTotal">0K</span>
+        </div>
+        <div class="ts-row">
+          <span class="ts-label">當前上下文</span>
+          <span class="ts-val current" id="vCurrent">0K / 200K</span>
+        </div>
+        <div class="ts-bar"><div class="ts-bar-fill" id="tsBar" style="width:0;background:var(--cyan)"></div></div>
+        <div class="ts-row">
+          <span class="ts-label">已壓縮節省</span>
+          <span class="ts-val saved" id="vSaved">0K</span>
+        </div>
+      </div>
+      <div class="slider-area">
+        <div class="slider-label"><span>對話開始</span><span>持續對話 →</span></div>
+        <input type="range" min="0" max="500" value="0" class="tank-slider" id="slider" oninput="onSlider(+this.value)">
+      </div>
+      <div class="ctrl-row">
+        <button class="btn btn-p" onclick="autoPlay()" id="autoBtn">▶ 自動演示</button>
+        <button class="btn btn-r" onclick="resetAll()">重置</button>
+      </div>
+    </aside>
+
+    <!-- 右：四层防线 -->
+    <div class="layers-col">
+      <div class="layers-top">
+        <span class="layers-title">四層壓縮策略</span>
+        <span class="status-badge" id="statusBadge" style="background:rgba(8,145,178,.08);color:var(--cyan)">安全區間</span>
+      </div>
+      <div class="layers-scroll" id="layersScroll">
+        <div class="layer-card" id="lc0">
+          <div class="lc-hd" style="background:rgba(22,163,74,.04)">
+            <span class="lc-name" style="color:var(--l1)">第一層 · 裁剪 Snip</span>
+            <span class="lc-trigger" style="background:rgba(22,163,74,.1);color:var(--l1)">120K（60%）</span>
+            <span class="lc-saved" style="background:rgba(22,163,74,.1);color:var(--l1)">-36K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">刪掉早期工具返回的超長原始資料，只保留摘要。使用者<b>完全無感</b>。</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">壓縮前</div>
+                天氣 API 返回 1200 Token 的 JSON：未來 7 天逐小時預報…
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(22,163,74,.04)">
+                <div class="lc-cmp-label" style="color:var(--l1)">壓縮後</div>
+                工具摘要：北京明日多雲 12-20°C（80 Token）
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card" id="lc1">
+          <div class="lc-hd" style="background:rgba(217,119,6,.04)">
+            <span class="lc-name" style="color:var(--l2)">第二層 · 微壓縮 MicroCompact</span>
+            <span class="lc-trigger" style="background:rgba(217,119,6,.1);color:var(--l2)">150K（75%）</span>
+            <span class="lc-saved" style="background:rgba(217,119,6,.1);color:var(--l2)">-50K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">把早期的長對話生成簡短摘要替換。<b>輕微資訊損失</b>，關鍵資訊保留。</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">壓縮前</div>
+                第 3 輪：「那個檔案不是 PDF 格式的，我需要 Word 版本，標題改成…」
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(217,119,6,.04)">
+                <div class="lc-cmp-label" style="color:var(--l2)">壓縮後</div>
+                摘要：使用者要求 Word 格式、改標題、調配色
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card" id="lc2">
+          <div class="lc-hd" style="background:rgba(234,88,12,.04)">
+            <span class="lc-name" style="color:var(--l3)">第三層 · 摺疊 Collapse</span>
+            <span class="lc-trigger" style="background:rgba(234,88,12,.1);color:var(--l3)">170K（85%）</span>
+            <span class="lc-saved" style="background:rgba(234,88,12,.1);color:var(--l3)">-80K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">將多輪早期對話摺疊成一條摘要訊息。<b>細節丟失</b>，但主線保留。</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">壓縮前</div>
+                第 1-8 輪（12 條訊息，4200 Token）：討論需求、確認方案、修改三次…
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(234,88,12,.04)">
+                <div class="lc-cmp-label" style="color:var(--l3)">壓縮後</div>
+                會話摘要：React + TS 專案，當前修改報表頁（350 Token）
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer-card" id="lc3">
+          <div class="lc-hd" style="background:rgba(220,38,38,.04)">
+            <span class="lc-name" style="color:var(--l4)">第四層 · 緊急壓縮 AutoCompact</span>
+            <span class="lc-trigger" style="background:rgba(220,38,38,.1);color:var(--l4)">190K（95%）</span>
+            <span class="lc-saved" style="background:rgba(220,38,38,.1);color:var(--l4)">-110K</span>
+          </div>
+          <div class="lc-body">
+            <div class="lc-desc">全面壓縮：只保留 system + 全域摘要 + 最近 3 輪。<b>明顯資訊損失</b>，但避免崩潰。</div>
+            <div class="lc-compare">
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--danger)">壓縮前</div>
+                20 輪完整對話（38 條訊息，18000 Token）
+              </div>
+              <div class="lc-cmp-arrow">→</div>
+              <div class="lc-cmp-box" style="background:rgba(220,38,38,.04)">
+                <div class="lc-cmp-label" style="color:var(--l4)">壓縮後</div>
+                system + 摘要 + 最近 3 輪（2500 Token）
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dec-area" id="decArea">
+        <div class="dec-card" id="decCard">
+          <b>📌 設計決策：</b>拖動滑塊觀察：沒有壓縮的話，200K 的上下文只夠一次長對話。有了四層壓縮，同樣的視窗可以支撐 5 倍以上的對話量。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b>　模型視窗 256K，安全空間 200K。四層壓縮像防洪堤：每次快滿時自動洩洪降水位，讓同一個視窗承載遠超 200K 的對話量。直到真的刪無可刪，才會超限。
+  </div>
+</article>
+
+<script>
+var SAFE = 200, MAX_CTX = 256;
+
+var KF = [
+  [0,   0],
+  [100, 120],
+  [101, 84],
+  [200, 150],
+  [201, 100],
+  [310, 170],
+  [311, 90],
+  [420, 190],
+  [421, 80],
+  [500, 260]
+];
+
+var COMP_POINTS = [
+  {at:100, layer:0, from:120, to:84,  label:'裁剪! -36K',  color:'var(--l1)'},
+  {at:200, layer:1, from:150, to:100, label:'微壓縮! -50K', color:'var(--l2)'},
+  {at:310, layer:2, from:170, to:90,  label:'摺疊! -80K',  color:'var(--l3)'},
+  {at:420, layer:3, from:190, to:80,  label:'緊急! -110K', color:'var(--l4)'}
+];
+
+var DECISIONS = [
+  '<b>📌 設計決策：</b>上下文低於 60%，一切安全。但每輪對話都在消耗 Token。產品經理需要預判：使用者平均對話多長？什麼時候觸碰第一道防線？',
+  '<b>📌 設計決策：</b>裁剪只刪工具返回的冗餘資料，使用者完全無感。需要決定：哪些工具輸出可以摘要？哪些必須保留（比如程式碼執行結果）？',
+  '<b>📌 設計決策：</b>微壓縮開始精簡早期對話。為什麼不一開始就壓縮？因為模型需要完整上下文理解使用者意圖，過早壓縮會導致失憶。',
+  '<b>📌 設計決策：</b>摺疊把多輪對話變成一段摘要。摘要由誰寫？讓模型自己總結？還是用專門的壓縮 Prompt？摘要品質直接影響後續準確性。',
+  '<b>📌 設計決策：</b>緊急壓縮是最後一道防線，資訊損失明顯，但對話不會中斷。Alice 的四層策略 vs 簡單的「滿了就報錯」，哪種體驗更好？',
+  '<b>📌 ⚠️ 超限！</b>四層壓縮全部用盡，上下文已超過安全空間。如果繼續增長超過 256K 模型上限，API 將返回 context_length_exceeded 錯誤。這就是為什麼還需要上下文急救作為最終兜底。'
+];
+
+function lerp(val) {
+  if (val <= 0) return 0;
+  for (var i = 0; i < KF.length - 1; i++) {
+    if (val >= KF[i][0] && val <= KF[i + 1][0]) {
+      var r = KF[i + 1][0] - KF[i][0];
+      if (r === 0) return KF[i][1];
+      var t = (val - KF[i][0]) / r;
+      return KF[i][1] + t * (KF[i + 1][1] - KF[i][1]);
+    }
+  }
+  return KF[KF.length - 1][1];
+}
+
+function getActiveLayer(val) {
+  if (val >= 420) return 3;
+  if (val >= 310) return 2;
+  if (val >= 200) return 1;
+  if (val >= 100) return 0;
+  return -1;
+}
+
+function positionLines() {
+  var pcts = [120, 150, 170, 190, 200];
+  var ids = ['line1','line2','line3','line4','lineSafe'];
+  for (var i = 0; i < ids.length; i++) {
+    document.getElementById(ids[i]).style.bottom = ((pcts[i] / MAX_CTX) * 100) + '%';
+  }
+  document.getElementById('dangerZone').style.height = ((1 - SAFE / MAX_CTX) * 100) + '%';
+}
+
+function update(val) {
+  var ctxK = lerp(val);
+  var fillPct = Math.min((ctxK / MAX_CTX) * 100, 100);
+  var safePct = (ctxK / SAFE) * 100;
+
+  var fill = document.getElementById('tankFill');
+  fill.style.height = fillPct + '%';
+
+  if (ctxK > SAFE) {
+    fill.style.background = 'linear-gradient(180deg,rgba(220,38,38,.35),rgba(220,38,38,.65))';
+    document.getElementById('tankOuter').classList.add('danger');
+  } else if (safePct > 95) {
+    fill.style.background = 'linear-gradient(180deg,rgba(220,38,38,.25),rgba(220,38,38,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else if (safePct > 85) {
+    fill.style.background = 'linear-gradient(180deg,rgba(234,88,12,.25),rgba(234,88,12,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else if (safePct > 75) {
+    fill.style.background = 'linear-gradient(180deg,rgba(217,119,6,.25),rgba(217,119,6,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else if (safePct > 60) {
+    fill.style.background = 'linear-gradient(180deg,rgba(22,163,74,.2),rgba(22,163,74,.45))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  } else {
+    fill.style.background = 'linear-gradient(180deg,rgba(8,145,178,.25),rgba(8,145,178,.5))';
+    document.getElementById('tankOuter').classList.remove('danger');
+  }
+
+  var totalK = Math.round(val * 0.6);
+  var curK = Math.round(ctxK);
+  var savedK = Math.max(0, totalK - curK);
+  document.getElementById('vTotal').textContent = totalK + 'K';
+  document.getElementById('vCurrent').textContent = curK + 'K / ' + SAFE + 'K';
+  document.getElementById('vSaved').textContent = savedK + 'K';
+  document.getElementById('tsBar').style.width = Math.min(safePct, 130) + '%';
+  var bar = document.getElementById('tsBar');
+  bar.style.background = ctxK > SAFE ? 'var(--danger)' : safePct > 85 ? 'var(--l3)' : safePct > 60 ? 'var(--amber)' : 'var(--cyan)';
+
+  var active = getActiveLayer(val);
+  for (var i = 0; i < 4; i++) {
+    var card = document.getElementById('lc' + i);
+    var on = i <= active;
+    card.classList.toggle('active', on);
+    card.style.borderColor = on ? ['var(--l1)','var(--l2)','var(--l3)','var(--l4)'][i] : '';
+  }
+
+  var badge = document.getElementById('statusBadge');
+  if (ctxK > SAFE) {
+    badge.textContent = '⚠️ 超過安全上限！';
+    badge.style.color = 'var(--danger)';
+    badge.style.background = 'rgba(220,38,38,.1)';
+  } else if (active === 3) {
+    badge.textContent = '緊急壓縮中';
+    badge.style.color = 'var(--l4)';
+    badge.style.background = 'rgba(220,38,38,.08)';
+  } else if (active === 2) {
+    badge.textContent = '摺疊中';
+    badge.style.color = 'var(--l3)';
+    badge.style.background = 'rgba(234,88,12,.08)';
+  } else if (active === 1) {
+    badge.textContent = '微壓縮中';
+    badge.style.color = 'var(--l2)';
+    badge.style.background = 'rgba(217,119,6,.08)';
+  } else if (active === 0) {
+    badge.textContent = '裁剪中';
+    badge.style.color = 'var(--l1)';
+    badge.style.background = 'rgba(22,163,74,.08)';
+  } else {
+    badge.textContent = '安全區間';
+    badge.style.color = 'var(--cyan)';
+    badge.style.background = 'rgba(8,145,178,.08)';
+  }
+
+  var di = ctxK > SAFE ? 5 : active >= 0 ? active + 1 : 0;
+  document.getElementById('decCard').innerHTML = DECISIONS[di];
+
+  document.getElementById('slider').value = val;
+}
+
+function showFlash(cp) {
+  var fl = document.getElementById('compFlash');
+  var pct = (cp.from / MAX_CTX) * 100;
+  fl.style.bottom = pct + '%';
+  fl.style.background = cp.color;
+  fl.style.color = 'white';
+  fl.textContent = cp.label;
+  fl.classList.remove('show');
+  void fl.offsetWidth;
+  fl.classList.add('show');
+  setTimeout(function() { fl.classList.remove('show'); }, 1200);
+}
+
+function fireCard(idx) {
+  var card = document.getElementById('lc' + idx);
+  card.classList.remove('firing');
+  void card.offsetWidth;
+  card.classList.add('firing');
+}
+
+function onSlider(val) {
+  if (autoId) { cancelAnimationFrame(autoId); autoId = null; document.getElementById('autoBtn').textContent = '▶ 自動演示'; }
+  update(val);
+}
+
+var autoId = null;
+function autoPlay() {
+  if (autoId) { cancelAnimationFrame(autoId); autoId = null; document.getElementById('autoBtn').textContent = '▶ 自動演示'; return; }
+  document.getElementById('autoBtn').textContent = '⏸ 暫停';
+  var v = 0;
+  var compIdx = 0;
+  var pauseUntil = 0;
+  var speed = 0.8;
+
+  function step(ts) {
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(step); return; }
+
+    if (compIdx < COMP_POINTS.length && v >= COMP_POINTS[compIdx].at && v < COMP_POINTS[compIdx].at + 2) {
+      showFlash(COMP_POINTS[compIdx]);
+      fireCard(COMP_POINTS[compIdx].layer);
+      pauseUntil = ts + 1200;
+      compIdx++;
+      v = v + 1;
+      update(v);
+      autoId = requestAnimationFrame(step);
+      return;
+    }
+
+    v += speed;
+    if (v > 500) {
+      v = 500;
+      update(v);
+      autoId = null;
+      document.getElementById('autoBtn').textContent = '▶ 重播';
+      return;
+    }
+    update(v);
+    autoId = requestAnimationFrame(step);
+  }
+  update(0);
+  autoId = requestAnimationFrame(step);
+}
+
+function resetAll() {
+  if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+  document.getElementById('autoBtn').textContent = '▶ 自動演示';
+  update(0);
+}
+
+positionLines();
+update(0);
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

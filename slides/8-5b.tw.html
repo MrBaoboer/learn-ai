@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>圖片解析度策略：按任務匹配，不做無謂消耗 | xueai.miyang.cn</title>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+@keyframes _si{to{opacity:1}}
+body{opacity:0;animation:_si .15s ease .08s forwards}
+
+:root{
+  --red:var(--danger);
+  --green:var(--success);
+  --orange:var(--amber);
+  --surface:var(--card);
+  --surface2:#f0ede6;
+  --muted:var(--sub);
+}
+
+.lesson-header h1 em{font-style:normal;color:var(--success)}
+
+/* 双栏布局 */
+.task-layout{display:grid;grid-template-columns:1fr 1.15fr;gap:18px;align-items:start}
+
+/* 任务选择 */
+.task-list{display:flex;flex-direction:column;gap:8px}
+.task-card{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:13px 14px;cursor:pointer;transition:all .2s;font-family:inherit;width:100%;text-align:left}
+.task-card:hover{border-color:rgba(0,102,255,.25);background:rgba(0,102,255,.02)}
+.task-card.active{border-color:var(--accent);background:rgba(0,102,255,.04);box-shadow:0 2px 12px rgba(0,102,255,.1)}
+.task-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.task-body{flex:1}
+.task-name{font-size:16px;font-weight:800;color:var(--text);margin-bottom:2px}
+.task-desc{font-size:14px;color:var(--sub);line-height:1.5}
+.task-badge{display:inline-block;margin-top:5px;padding:2px 9px;border-radius:5px;font-size:12px;font-weight:700}
+
+/* 推荐结果 */
+.rec-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;overflow:hidden}
+.rec-head{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2);font-size:15px;font-weight:700;color:var(--muted)}
+.rec-body{padding:16px 18px;display:flex;flex-direction:column;gap:16px;min-height:300px}
+
+/* 推荐分辨率卡片 */
+.res-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.res-card{border-radius:9px;padding:10px 12px;text-align:center;border:1.5px solid transparent;transition:all .2s}
+.res-card.recommended{border-color:var(--success);background:rgba(22,163,74,.06)}
+.res-card.too-low{border-color:var(--border);background:var(--surface2);opacity:.6}
+.res-card.too-high{border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.04)}
+.res-card .rc-res{font-size:14px;font-weight:800;color:var(--text)}
+.res-card .rc-tok{font-size:22px;font-weight:900}
+.res-card .rc-lbl{font-size:11px;font-weight:700;margin-top:2px}
+.res-card .rc-verdict{font-size:12px;margin-top:4px;font-weight:700}
+
+/* 动画对比条 */
+.compare-section{display:flex;flex-direction:column;gap:6px}
+.compare-title{font-size:14px;font-weight:700;color:var(--muted)}
+.compare-row{display:flex;align-items:center;gap:8px}
+.compare-res{font-size:13px;font-weight:700;min-width:80px;color:var(--text)}
+.compare-bar-wrap{flex:1;height:22px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+.compare-bar{height:100%;border-radius:5px;display:flex;align-items:center;padding-left:8px;font-size:12px;font-weight:800;color:white;white-space:nowrap;overflow:hidden;transition:width .6s ease}
+.compare-tok{font-size:13px;font-weight:800;min-width:60px;text-align:right}
+
+/* 精度说明 */
+.quality-section{display:flex;flex-direction:column;gap:6px}
+.quality-row{display:flex;align-items:center;gap:10px}
+.quality-label{font-size:13px;font-weight:700;min-width:80px;color:var(--sub)}
+.quality-dots{display:flex;gap:3px}
+.q-dot{width:14px;height:14px;border-radius:3px;transition:all .3s}
+.q-dot.filled{background:var(--accent)}
+.q-dot.empty{background:var(--surface2)}
+.quality-note{font-size:12px;color:var(--muted)}
+
+.insight-box{background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);border-radius:10px;padding:14px 16px;font-size:14px;color:var(--text);line-height:1.6;margin-top:16px}
+.insight-box b{color:var(--success)}
+
+@keyframes slide-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.animate-in{animation:slide-in .3s ease}
+
+@media (max-width:768px){
+  .task-layout{grid-template-columns:1fr}
+  .res-cards{grid-template-columns:repeat(3,1fr)}
+  .res-card .rc-tok{font-size:17px}
+  .compare-res,.quality-label{min-width:70px;font-size:12px}
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="不同任務對圖片解析度的需求差異巨大：OCR 需要高畫質，情感分析用低解析度就夠。根據任務類型選擇合適的圖片解析度，避免為不必要的畫素買單。">
+<meta name="keywords" content="圖片解析度優化,多模態成本,Vision模型優化,圖片Token優化,AI圖像處理">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/8-5b.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/8-5b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/8-5b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/8-5b.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/8-5b.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/8-5b.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/8-5b.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/8-5b.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="圖片解析度策略：按任務匹配，不做無謂消耗">
+<meta property="og:description" content="不同任務對圖片解析度的需求差異巨大：OCR 需要高畫質，情感分析用低解析度就夠。根據任務類型選擇合適的圖片解析度，避免為不必要的畫素買單。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/8-5b.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/8-5b.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="圖片解析度策略：按任務匹配，不做無謂消耗">
+<meta name="twitter:description" content="不同任務對圖片解析度的需求差異巨大：OCR 需要高畫質，情感分析用低解析度就夠。根據任務類型選擇合適的圖片解析度，避免為不必要的畫素買單。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"按任務匹配解析度","name":"按任務匹配解析度","url":"https://xueai.miyang.cn/slides/8-5b.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 成本優化與選型","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"不同任務對圖片解析度的需求差異巨大：OCR 需要高畫質，情感分析用低解析度就夠。根據任務類型選擇合適的圖片解析度，避免為不必要的畫素買單。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">成本優化</div>
+    <h1>圖片 Token：<em>按任務匹配解析度</em></h1>
+    <p class="subtitle">不同任務對圖片細節要求不同，用最低解析度滿足任務 = 最省錢。選一個任務類型，看推薦的解析度方案。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>高/中/低三檔解析度策略，不同場景的 Token 消耗對比與選型建議</p></aside><!--seo:end-->  <div class="task-layout paywall-locked xa-peek">
+    <!-- 任务类型 -->
+    <div>
+      <div class="sec-label">選擇你的視覺任務類型</div>
+      <div class="task-list" id="taskList">
+        <button class="task-card" onclick="pickTask(this,0)">
+          <div class="task-icon" style="background:rgba(22,163,74,.12)">🐱</div>
+          <div class="task-body">
+            <div class="task-name">粗分類</div>
+            <div class="task-desc">這是貓還是狗？圖裡有沒有人？圖像內容是什麼大類？</div>
+            <span class="task-badge" style="background:rgba(22,163,74,.1);color:var(--success)">低精度需求</span>
+          </div>
+        </button>
+        <button class="task-card" onclick="pickTask(this,1)">
+          <div class="task-icon" style="background:rgba(8,145,178,.12)">🏙️</div>
+          <div class="task-body">
+            <div class="task-name">場景理解</div>
+            <div class="task-desc">圖裡在幹什麼？有哪些物體？場景是室內還是室外？</div>
+            <span class="task-badge" style="background:rgba(8,145,178,.1);color:var(--cyan)">中等精度</span>
+          </div>
+        </button>
+        <button class="task-card" onclick="pickTask(this,2)">
+          <div class="task-icon" style="background:rgba(217,119,6,.12)">📄</div>
+          <div class="task-body">
+            <div class="task-name">OCR / 圖表識別</div>
+            <div class="task-desc">識別圖中的文字、表格資料、圖表數字。需要文字清晰。</div>
+            <span class="task-badge" style="background:rgba(217,119,6,.1);color:var(--amber)">高精度需求</span>
+          </div>
+        </button>
+        <button class="task-card" onclick="pickTask(this,3)">
+          <div class="task-icon" style="background:rgba(124,58,237,.12)">🔬</div>
+          <div class="task-body">
+            <div class="task-name">高精檢測 / 醫療影像</div>
+            <div class="task-desc">病理切片、衛星圖像、精密零件檢測，需要最高解析度。</div>
+            <span class="task-badge" style="background:rgba(124,58,237,.1);color:var(--purple)">極高精度</span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- 推荐结果 -->
+    <div>
+      <div class="sec-label">推薦方案</div>
+      <div class="rec-panel" id="recPanel">
+        <div class="rec-head" id="recHead">← 選擇左側任務類型，查看推薦方案</div>
+        <div class="rec-body" id="recBody">
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:16px;min-height:260px">
+            點選任意任務類型
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight-box paywall-locked" id="insightBox">
+    <b>核心原則：</b>解析度不是越高越好。用最低滿足任務需求的解析度，Token 數可相差 <b>10–100 倍</b>。
+  </div>
+</article>
+
+<script>
+const TASKS = [
+  {
+    name: '粗分類',
+    icon: '🐱',
+    color: 'var(--green)',
+    colorRgb: '22,163,74',
+    recommended: 1,  // index in resolutions
+    resolutions: [
+      { label: '256×256', w: 256, h: 256, tokens: 64,   quality: 2, verdict: '夠用', cls: 'too-low' },
+      { label: '512×512', w: 512, h: 512, tokens: 258,  quality: 3, verdict: '推薦', cls: 'recommended' },
+      { label: '1024×768',w:1024, h: 768, tokens: 770,  quality: 4, verdict: '浪費', cls: 'too-high' },
+    ],
+    insight: '粗分類任務對細節不敏感，512×512 已包含充足語義資訊。用 1024×768 效果幾乎無提升，Token 卻多 3 倍。',
+    qualityLabels: ['太模糊', '夠用', '無提升', '無提升']
+  },
+  {
+    name: '場景理解',
+    icon: '🏙️',
+    color: 'var(--cyan)',
+    colorRgb: '8,145,178',
+    recommended: 1,
+    resolutions: [
+      { label: '512×512',  w: 512,  h: 512,  tokens: 258,  quality: 2, verdict: '太模糊', cls: 'too-low' },
+      { label: '1024×1024',w: 1024, h: 1024, tokens: 1026, quality: 4, verdict: '推薦',   cls: 'recommended' },
+      { label: '2560×1440',w: 2560, h: 1440, tokens: 3602, quality: 5, verdict: '過度',   cls: 'too-high' },
+    ],
+    insight: '場景理解需要識別物體和關係，~1000×1000 足夠。超過此範圍精度提升微乎其微，成本卻漲 3.5 倍。',
+    qualityLabels: ['難辨細節', '夠用', '明顯提升', '無感知提升', '無感知提升']
+  },
+  {
+    name: 'OCR / 圖表識別',
+    icon: '📄',
+    color: 'var(--orange)',
+    colorRgb: '217,119,6',
+    recommended: 1,
+    resolutions: [
+      { label: '1024×768', w: 1024, h: 768,  tokens: 770,  quality: 2, verdict: '模糊',  cls: 'too-low' },
+      { label: '2048×1536',w: 2048, h: 1536, tokens: 3074, quality: 5, verdict: '推薦',  cls: 'recommended' },
+      { label: '3840×2160',w: 3840, h: 2160, tokens: 8194, quality: 5, verdict: '過度',  cls: 'too-high' },
+    ],
+    insight: 'OCR 對文字清晰度要求高，~2000×1500 是最佳平衡點。4K 對文字識別效果幾乎沒有額外提升，卻多花 2.7 倍。',
+    qualityLabels: ['字跡模糊', '勉強', '清晰', '非常清晰', '與上檔相同', '與上檔相同']
+  },
+  {
+    name: '高精檢測',
+    icon: '🔬',
+    color: 'var(--purple)',
+    colorRgb: '124,58,237',
+    recommended: 1,
+    resolutions: [
+      { label: '2048×2048',w: 2048, h: 2048, tokens: 4098,  quality: 3, verdict: '不夠',  cls: 'too-low' },
+      { label: '4096×4096',w: 4096, h: 4096, tokens: 16386, quality: 6, verdict: '推薦',  cls: 'recommended' },
+      { label: '5 張 4K×4K',w:4096, h: 4096, tokens: 81930, quality: 6, verdict: '危險',  cls: 'too-high' },
+    ],
+    insight: '醫療影像等場景確實需要高解析度。但批次處理時，5 張 4K 圖即跳入高價檔。需要啟用 vl_high_resolution_images 並控制批次大小。',
+    qualityLabels: ['','','細節丟失','合格','足夠','推薦','極限']
+  }
+];
+
+function pickTask(btn, idx) {
+  document.querySelectorAll('.task-card').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRec(idx);
+}
+
+function renderRec(idx) {
+  const t = TASKS[idx];
+  document.getElementById('recHead').textContent = `${t.icon} ${t.name} — 解析度推薦方案`;
+
+  const maxTok = Math.max(...t.resolutions.map(r => r.tokens));
+
+  const body = document.getElementById('recBody');
+  body.innerHTML = `
+    <div class="res-cards animate-in" id="resCards"></div>
+    <div class="compare-section animate-in" id="compareSection">
+      <div class="compare-title">Token 數量對比（越短越省錢）</div>
+    </div>
+    <div class="quality-section animate-in" id="qualitySection">
+      <div class="compare-title">精度感知對比（越多格越清晰）</div>
+    </div>
+    <div style="font-size:14px;color:var(--sub);line-height:1.6;flex-shrink:0;padding-top:4px" id="insightText"></div>
+  `;
+
+  // 解析度卡片
+  const cards = document.getElementById('resCards');
+  t.resolutions.forEach((r, i) => {
+    const tokColor = r.cls === 'recommended' ? `rgb(${t.colorRgb})` :
+                     r.cls === 'too-high' ? 'var(--red)' : 'var(--muted)';
+    const card = document.createElement('div');
+    card.className = 'res-card ' + r.cls;
+    card.innerHTML = `
+      <div class="rc-res">${r.label}</div>
+      <div class="rc-tok" style="color:${tokColor}">${r.tokens.toLocaleString()}</div>
+      <div class="rc-lbl" style="color:${tokColor}">Token</div>
+      <div class="rc-verdict" style="color:${tokColor}">${r.verdict}</div>
+    `;
+    cards.appendChild(card);
+  });
+
+  // 對比條
+  const compareSection = document.getElementById('compareSection');
+  t.resolutions.forEach((r, i) => {
+    const barColor = r.cls === 'recommended' ? `rgb(${t.colorRgb})` :
+                     r.cls === 'too-high' ? 'var(--red)' : 'var(--muted)';
+    const pct = Math.round(r.tokens / maxTok * 100);
+    const row = document.createElement('div');
+    row.className = 'compare-row';
+    row.innerHTML = `
+      <div class="compare-res">${r.label}</div>
+      <div class="compare-bar-wrap">
+        <div class="compare-bar" style="width:0%;background:${barColor}">${r.verdict}</div>
+      </div>
+      <div class="compare-tok" style="color:${barColor}">${r.tokens.toLocaleString()} T</div>
+    `;
+    compareSection.appendChild(row);
+    // 動畫延遲
+    setTimeout(() => {
+      row.querySelector('.compare-bar').style.width = pct + '%';
+    }, 50 + i * 100);
+  });
+
+  // 精度點點
+  const qualitySection = document.getElementById('qualitySection');
+  t.resolutions.forEach((r, i) => {
+    const dotColor = r.cls === 'recommended' ? `rgb(${t.colorRgb})` :
+                     r.cls === 'too-high' ? 'var(--red)' : 'var(--muted)';
+    const row = document.createElement('div');
+    row.className = 'quality-row';
+    const dots = Array.from({length:6}, (_,j) =>
+      `<div class="q-dot ${j < r.quality ? 'filled' : 'empty'}" style="${j < r.quality ? `background:${dotColor}` : ''}"></div>`
+    ).join('');
+    row.innerHTML = `
+      <div class="quality-label">${r.label}</div>
+      <div class="quality-dots">${dots}</div>
+      <div class="quality-note" style="color:${dotColor}">${r.verdict}</div>
+    `;
+    qualitySection.appendChild(row);
+  });
+
+  document.getElementById('insightText').innerHTML =
+    `<b style="color:rgb(${t.colorRgb})">結論：</b>${t.insight}`;
+}
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

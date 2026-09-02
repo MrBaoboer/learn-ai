@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>權限與安全：Agent 能做什麼、不能做什麼 | xueai.miyang.cn</title>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--green:var(--success);--orange:var(--amber);--red:var(--danger);--muted:var(--sub);--surface:var(--card);--surface2:rgba(0,0,0,.04)}
+
+/* ── 模式选择 ── */
+.mode-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.mode-tab{padding:14px 16px;cursor:pointer;border:1.5px solid var(--border);border-radius:12px;transition:all .15s;position:relative;background:var(--card);min-height:44px}
+.mode-tab:hover{border-color:rgba(217,119,6,.4)}
+.mode-tab.active{background:rgba(217,119,6,.04);border-color:var(--orange)}
+.mt-name{font-size:15px;font-weight:800;color:var(--text);margin-bottom:3px}
+.mode-tab.active .mt-name{color:var(--orange)}
+.mt-desc{font-size:13px;color:var(--sub);line-height:1.5}
+.mt-tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:800;margin-left:6px;vertical-align:middle}
+
+/* ── 模式详情 ── */
+.mode-detail{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.md-section{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px}
+.md-label{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin-bottom:6px}
+.md-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);padding:3px 0}
+.md-icon{font-size:15px;flex-shrink:0;width:20px;text-align:center}
+.pros{color:var(--green)}
+.cons{color:var(--red)}
+
+/* ── 场景模拟 ── */
+.sim-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.r-bar{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.r-title{font-size:14px;font-weight:700;color:var(--text)}
+.r-sub{font-size:13px;color:var(--muted)}
+
+.sim-grid{padding:6px 12px;overflow-x:auto}
+.sim-table{width:100%;border-collapse:separate;border-spacing:0;min-width:640px}
+.sim-table th{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.3px;padding:8px 10px;text-align:left;border-bottom:2px solid var(--border)}
+.sim-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}
+.sim-table tr:last-child td{border-bottom:none}
+
+.action-cell{display:flex;flex-direction:column;gap:3px}
+.ac-name{font-size:14px;font-weight:700;color:var(--text)}
+.ac-detail{font-size:12px;color:var(--sub)}
+
+.meta-cell{display:flex;flex-direction:column;gap:3px}
+.meta-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:700}
+.meta-ro{background:rgba(22,163,74,.06);color:var(--green)}
+.meta-rw{background:rgba(217,119,6,.06);color:var(--orange)}
+.meta-danger{background:rgba(220,38,38,.06);color:var(--red)}
+
+.result-cell{min-width:100px;text-align:center}
+.rc-badge{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:8px;font-size:13px;font-weight:700;transition:all .3s}
+
+/* 确认弹窗 */
+.confirm-popup{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:100;align-items:center;justify-content:center}
+.confirm-popup.show{display:flex}
+.cp-card{background:var(--card);border-radius:16px;padding:24px 28px;max-width:420px;width:90%;box-shadow:var(--shadow-pop);text-align:center;animation:popIn .25s ease}
+@keyframes popIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.cp-icon{font-size:36px;margin-bottom:10px}
+.cp-title{font-size:18px;font-weight:800;color:var(--text);margin-bottom:6px}
+.cp-desc{font-size:14px;color:var(--sub);line-height:1.6;margin-bottom:16px;white-space:pre-line}
+.cp-actions{display:flex;gap:10px;justify-content:center}
+.cp-btn{padding:10px 24px;border-radius:10px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:44px;display:flex;align-items:center}
+.cp-allow{background:var(--red);color:white}
+.cp-allow:hover{filter:brightness(1.1)}
+.cp-deny{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+.cp-deny:hover{background:rgba(0,0,0,.08)}
+
+/* 风险仪表 */
+.risk-gauge{display:flex;align-items:center;gap:8px}
+.rg-bar{flex:1;height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;max-width:80px}
+.rg-fill{height:100%;border-radius:4px;transition:width .4s ease}
+.rg-label{font-size:12px;font-weight:700;min-width:36px}
+
+/* 决策卡 */
+.decisions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.dec-card{background:rgba(217,119,6,.05);border:1.5px solid rgba(217,119,6,.18);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text);line-height:1.6}
+.dec-card b{color:var(--orange)}
+
+.ctrl{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+.btn{padding:8px 16px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .15s;min-height:38px}
+.btn-p{background:var(--orange);color:white}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.3;cursor:not-allowed}
+.btn-r{background:var(--surface2);color:var(--sub);border:1px solid var(--border)}
+.ctrl-hint{font-size:12px;color:var(--muted)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .3s ease forwards}
+
+@media (max-width:768px){
+  .mode-tabs{grid-template-columns:1fr}
+  .mode-detail{grid-template-columns:1fr}
+  .decisions{grid-template-columns:1fr}
+}
+</style>
+<meta name="description" content="Agent 權限與安全設計：確認模式、自動模式、智能模式的交互對比。產品經理需要在安全和效率之間找到平衡。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/7-4c.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/7-4c.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/7-4c.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/7-4c.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/7-4c.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/7-4c.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/7-4c.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/7-4c.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="權限與安全：Agent 能做什麼、不能做什麼">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/7-4c.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/7-4c.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"權限與安全","name":"權限與安全","url":"https://xueai.miyang.cn/slides/7-4c.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Agent 權限與安全設計：確認模式、自動模式、智能模式的交互對比。產品經理需要在安全和效率之間找到平衡。","datePublished":"2026-04-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:description" content="Agent 權限與安全設計：確認模式、自動模式、智能模式的交互對比。產品經理需要在安全和效率之間找到平衡。"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 工程</div>
+    <h1>權限與安全</h1>
+    <p class="subtitle">Agent 能做什麼、不能做什麼？切換三種權限模式，觀察同一批操作的不同處理方式。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>5 種權限模式 + LLM 風險分級 + Human-in-the-loop 設計</p></aside><!--seo:end-->  <div class="sec-label">選擇權限模式</div>
+  <div class="mode-tabs" id="modeTabs">
+    <div class="mode-tab active" onclick="pickMode(0)">
+      <div class="mt-name">確認模式 <span class="mt-tag" style="background:rgba(8,145,178,.08);color:var(--cyan)">預設</span></div>
+      <div class="mt-desc">每個危險操作都需用戶確認</div>
+    </div>
+    <div class="mode-tab" onclick="pickMode(1)">
+      <div class="mt-name">自動模式 <span class="mt-tag" style="background:rgba(220,38,38,.08);color:var(--red)">危險</span></div>
+      <div class="mt-desc">所有操作自動放行，無需確認</div>
+    </div>
+    <div class="mode-tab" onclick="pickMode(2)">
+      <div class="mt-name">智能模式 <span class="mt-tag" style="background:rgba(22,163,74,.08);color:var(--green)">Alice</span></div>
+      <div class="mt-desc">LLM 分類器評估風險等級，按級處理</div>
+    </div>
+  </div>
+  <div class="mode-detail" id="modeDetail"></div>
+
+  <div class="sec-label">場景模擬</div>
+  <div class="sim-panel paywall-locked xa-peek">
+    <div class="r-bar">
+      <div>
+        <div class="r-title">場景模擬：Agent 想執行 5 個操作</div>
+        <div class="r-sub">觀察當前模式下每個操作的處理方式</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-p" id="btnRun" onclick="runSim()">▶ 運行模擬</button>
+        <button class="btn btn-r" onclick="resetSim()">重置</button>
+      </div>
+    </div>
+    <div class="sim-grid">
+      <table class="sim-table">
+        <thead>
+          <tr>
+            <th style="width:36px">#</th>
+            <th style="width:32%">操作</th>
+            <th style="width:22%">工具元數據</th>
+            <th style="width:20%">風險評估</th>
+            <th>處理結果</th>
+          </tr>
+        </thead>
+        <tbody id="simBody"></tbody>
+      </table>
+    </div>
+    <div class="ctrl">
+      <span class="ctrl-hint" id="simHint">選擇權限模式 → 點擊運行 → 觀察差異</span>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">三個設計決策</div>
+  <div class="decisions paywall-locked">
+    <div class="dec-card"><b>📌 設計決策 1：</b>權限設計的核心矛盾：安全 vs 效率。每次彈窗確認都會打斷用戶流程，但不確認就可能造成不可逆破壞。你的產品選哪個？</div>
+    <div class="dec-card"><b>📌 設計決策 2：</b>Alice 的「智能模式」用 LLM 來判斷風險，但 LLM 判斷也可能出錯。一次誤判可能刪掉用戶數據。這個風險你能接受嗎？</div>
+    <div class="dec-card"><b>📌 設計決策 3：</b>「只讀」和「破壞性」是工具級別的標記。產品經理要決定：你的每個工具屬於哪個風險等級？這是產品決策，不能推給工程。</div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b>　Agent 權限設計的本質是在安全和效率之間找平衡：全部確認最安全但最慢，全部放行最快但最危險。Alice 的做法是用 AI 判斷風險等級：低風險自動放行，高風險攔截確認。
+  </div>
+</article>
+
+<!-- 确认弹窗 -->
+<div class="confirm-popup" id="confirmPopup">
+  <div class="cp-card">
+    <div class="cp-icon" id="cpIcon">⚠️</div>
+    <div class="cp-title" id="cpTitle">Agent 請求權限</div>
+    <div class="cp-desc" id="cpDesc"></div>
+    <div class="cp-actions">
+      <div class="cp-btn cp-deny" onclick="resolveConfirm(false)">拒絕</div>
+      <div class="cp-btn cp-allow" onclick="resolveConfirm(true)">允許</div>
+    </div>
+  </div>
+</div>
+
+<script>
+var ACTIONS = [
+  { name:'read_file("src/app.ts")', label:'讀取檔案', desc:'只讀操作', isReadOnly:true, isDestructive:false, risk:'low' },
+  { name:'search_files("TODO")', label:'搜索檔案', desc:'只讀操作', isReadOnly:true, isDestructive:false, risk:'low' },
+  { name:'edit_file("src/app.ts", ...)', label:'編輯檔案', desc:'編輯操作', isReadOnly:false, isDestructive:false, risk:'medium' },
+  { name:'run_command("rm -rf node_modules")', label:'刪除目錄', desc:'危險操作！', isReadOnly:false, isDestructive:true, risk:'high' },
+  { name:'run_command("npm install")', label:'安裝依賴', desc:'中等風險', isReadOnly:false, isDestructive:false, risk:'medium' }
+];
+
+var MODES = [
+  {
+    name:'確認模式',
+    detail:'用戶對每一個非只讀操作都需要手動批准。這是最保守的策略，確保用戶對 Agent 的每一步操作都有完全控制權。',
+    how:'只讀操作自動放行，其他操作彈窗等待用戶確認',
+    pros:['最高安全性，用戶完全掌控','不可能發生意外的破壞性操作','適合處理敏感數據的場景'],
+    cons:['頻繁彈窗打斷工作流程','5 個操作可能需要確認 3 次','用戶疲勞後可能盲目點「允許」'],
+    results:[
+      {status:'auto', icon:'✅', text:'自動放行', color:'var(--green)', bg:'rgba(22,163,74,.06)'},
+      {status:'auto', icon:'✅', text:'自動放行', color:'var(--green)', bg:'rgba(22,163,74,.06)'},
+      {status:'confirm', icon:'⚠️', text:'等待確認…', color:'var(--amber)', bg:'rgba(217,119,6,.06)', popup:'Agent 想要編輯 src/app.ts，是否允許？'},
+      {status:'confirm', icon:'🚫', text:'等待確認…', color:'var(--red)', bg:'rgba(220,38,38,.06)', popup:'Agent 想要執行 rm -rf node_modules，是否允許？'},
+      {status:'confirm', icon:'⚠️', text:'等待確認…', color:'var(--amber)', bg:'rgba(217,119,6,.06)', popup:'Agent 想要執行 npm install，是否允許？'}
+    ]
+  },
+  {
+    name:'自動模式',
+    detail:'所有操作自動放行（bypass_permissions），Agent 擁有完全執行權。效率最高，但一旦 Agent 判斷失誤，後果不可逆。',
+    how:'不做任何攔截，所有操作直接執行',
+    pros:['零打斷，最快的工作流','適合信任度高的簡單任務','開發/調試場景下非常方便'],
+    cons:['Agent 可能刪除關鍵檔案','誤操作不可逆','完全依賴 Agent 的判斷力'],
+    results:[
+      {status:'auto', icon:'✅', text:'自動執行', color:'var(--green)', bg:'rgba(22,163,74,.06)'},
+      {status:'auto', icon:'✅', text:'自動執行', color:'var(--green)', bg:'rgba(22,163,74,.06)'},
+      {status:'auto', icon:'✅', text:'自動執行', color:'var(--green)', bg:'rgba(22,163,74,.06)'},
+      {status:'danger', icon:'✅', text:'自動執行(!)', color:'var(--red)', bg:'rgba(220,38,38,.06)'},
+      {status:'auto', icon:'✅', text:'自動執行', color:'var(--green)', bg:'rgba(22,163,74,.06)'}
+    ]
+  },
+  {
+    name:'智能模式',
+    detail:'Alice 的做法：用 LLM 分類器即時評估每個操作的風險等級。低風險自動放行，中等風險放行但通知用戶，高風險攔截並要求確認。',
+    how:'LLM 分類器根據工具元數據 + 上下文判斷風險',
+    pros:['平衡了安全和效率','只在真正危險時才打斷用戶','用戶體驗最接近「有個可靠助手」'],
+    cons:['LLM 判斷可能出錯（誤放/誤攔）','分類器本身消耗額外 Token','需要維護風險分類規則'],
+    results:[
+      {status:'auto', icon:'✅', text:'自動放行', color:'var(--green)', bg:'rgba(22,163,74,.06)', riskNote:'低風險'},
+      {status:'auto', icon:'✅', text:'自動放行', color:'var(--green)', bg:'rgba(22,163,74,.06)', riskNote:'低風險'},
+      {status:'notify', icon:'✅', text:'自動(已通知)', color:'var(--cyan)', bg:'rgba(8,145,178,.06)', riskNote:'中風險'},
+      {status:'block', icon:'🚫', text:'攔截確認', color:'var(--red)', bg:'rgba(220,38,38,.06)', riskNote:'高風險', popup:'檢測到高風險操作：rm -rf node_modules\n\nLLM 分類器判斷：破壞性命令，需要用戶確認。'},
+      {status:'auto', icon:'✅', text:'自動(已通知)', color:'var(--cyan)', bg:'rgba(8,145,178,.06)', riskNote:'中風險'}
+    ]
+  }
+];
+
+var curMode = 0, simRunning = false, simStep = 0, confirmResolver = null;
+
+function pickMode(idx) {
+  curMode = idx;
+  var tabs = document.querySelectorAll('.mode-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].classList.toggle('active', i === idx);
+  }
+  renderDetail();
+  resetSim();
+}
+
+function renderDetail() {
+  var m = MODES[curMode];
+  var h = '';
+  h += '<div class="md-section">';
+  h += '<div class="md-label">工作原理</div>';
+  h += '<div style="font-size:13px;color:var(--text);line-height:1.6">' + m.detail + '</div>';
+  h += '</div>';
+
+  h += '<div class="md-section">';
+  h += '<div class="md-label">判斷邏輯</div>';
+  h += '<div style="font-size:13px;color:var(--text);line-height:1.6">' + m.how + '</div>';
+  h += '</div>';
+
+  h += '<div class="md-section">';
+  h += '<div class="md-label">優勢</div>';
+  for (var i = 0; i < m.pros.length; i++) {
+    h += '<div class="md-row"><span class="md-icon">✓</span><span class="pros">' + m.pros[i] + '</span></div>';
+  }
+  h += '</div>';
+
+  h += '<div class="md-section">';
+  h += '<div class="md-label">劣勢</div>';
+  for (var j = 0; j < m.cons.length; j++) {
+    h += '<div class="md-row"><span class="md-icon">✗</span><span class="cons">' + m.cons[j] + '</span></div>';
+  }
+  h += '</div>';
+
+  document.getElementById('modeDetail').innerHTML = h;
+}
+
+function renderTable() {
+  var h = '';
+  for (var i = 0; i < ACTIONS.length; i++) {
+    var a = ACTIONS[i];
+    var riskColors = {low:'var(--green)', medium:'var(--amber)', high:'var(--red)'};
+    var riskLabels = {low:'低', medium:'中', high:'高'};
+    var riskBg = {low:'rgba(22,163,74,.06)', medium:'rgba(217,119,6,.06)', high:'rgba(220,38,38,.06)'};
+
+    h += '<tr>';
+    h += '<td style="font-size:14px;font-weight:800;color:var(--muted)">' + (i + 1) + '</td>';
+    h += '<td><div class="action-cell"><span class="ac-name">' + a.label + '</span><span class="ac-detail" style="font-family:\'SF Mono\',\'Cascadia Code\',monospace;font-size:12px">' + a.name + '</span></div></td>';
+
+    h += '<td><div class="meta-cell">';
+    if (a.isReadOnly) {
+      h += '<span class="meta-chip meta-ro">isReadOnly: true</span>';
+    } else {
+      h += '<span class="meta-chip meta-rw">isReadOnly: false</span>';
+    }
+    if (a.isDestructive) {
+      h += '<span class="meta-chip meta-danger">isDestructive: true</span>';
+    }
+    h += '</div></td>';
+
+    h += '<td>';
+    if (curMode === 2) {
+      var pct = {low:20, medium:55, high:95};
+      h += '<div class="risk-gauge">';
+      h += '<div class="rg-bar"><div class="rg-fill" style="width:' + pct[a.risk] + '%;background:' + riskColors[a.risk] + '"></div></div>';
+      h += '<span class="rg-label" style="color:' + riskColors[a.risk] + '">' + riskLabels[a.risk] + '風險</span>';
+      h += '</div>';
+    } else {
+      h += '<span style="font-size:12px;color:var(--muted)">—</span>';
+    }
+    h += '</td>';
+
+    h += '<td class="result-cell" id="result_' + i + '"><span style="font-size:13px;color:var(--muted)">待運行</span></td>';
+    h += '</tr>';
+  }
+  document.getElementById('simBody').innerHTML = h;
+}
+
+function resetSim() {
+  simRunning = false;
+  simStep = 0;
+  renderTable();
+  document.getElementById('btnRun').disabled = false;
+  document.getElementById('btnRun').textContent = '▶ 運行模擬';
+  document.getElementById('simHint').textContent = '當前：' + MODES[curMode].name + ' · 點擊運行觀察每個操作的處理方式';
+  document.getElementById('confirmPopup').classList.remove('show');
+}
+
+function showPopup(text) {
+  return new Promise(function(resolve) {
+    confirmResolver = resolve;
+    document.getElementById('cpDesc').textContent = text;
+    if (text.indexOf('rm -rf') !== -1 || text.indexOf('刪除') !== -1) {
+      document.getElementById('cpIcon').textContent = '🚨';
+      document.getElementById('cpTitle').textContent = 'Agent 請求危險操作權限';
+    } else {
+      document.getElementById('cpIcon').textContent = '⚠️';
+      document.getElementById('cpTitle').textContent = 'Agent 請求操作權限';
+    }
+    document.getElementById('confirmPopup').classList.add('show');
+  });
+}
+
+function resolveConfirm(allowed) {
+  document.getElementById('confirmPopup').classList.remove('show');
+  if (confirmResolver) {
+    confirmResolver(allowed);
+    confirmResolver = null;
+  }
+}
+
+function setResult(idx, result) {
+  var cell = document.getElementById('result_' + idx);
+  cell.innerHTML = '<span class="rc-badge fade-up" style="background:' + result.bg + ';color:' + result.color + '">' + result.icon + ' ' + result.text + '</span>';
+}
+
+function runSim() {
+  if (simRunning) return;
+  simRunning = true;
+  simStep = 0;
+  renderTable();
+  document.getElementById('btnRun').disabled = true;
+
+  var m = MODES[curMode];
+  var results = m.results;
+  var counter = { auto:0, confirm:0, block:0 };
+
+  function runStep(idx) {
+    if (idx >= ACTIONS.length) {
+      simRunning = false;
+      document.getElementById('btnRun').textContent = '✓ 模擬完成';
+      var summary = '';
+      if (curMode === 0) summary = '確認模式：3 次彈窗打斷，最安全但最慢';
+      else if (curMode === 1) summary = '自動模式：0 次打斷，但 rm -rf 被直接執行了！';
+      else summary = '智能模式：僅 1 次攔截（高風險），中風險自動放行並通知';
+      document.getElementById('simHint').textContent = summary;
+      return;
+    }
+
+    var r = results[idx];
+
+    if (r.popup) {
+      setResult(idx, {icon:r.icon, text:r.text, color:r.color, bg:r.bg});
+      setTimeout(function() {
+        showPopup(r.popup).then(function(allowed) {
+          if (allowed) {
+            setResult(idx, {icon:'✅', text:'用戶已允許', color:'var(--green)', bg:'rgba(22,163,74,.06)'});
+          } else {
+            setResult(idx, {icon:'🚫', text:'用戶已拒絕', color:'var(--red)', bg:'rgba(220,38,38,.06)'});
+          }
+          setTimeout(function() { runStep(idx + 1); }, 400);
+        });
+      }, 500);
+    } else {
+      setResult(idx, {icon:r.icon, text:r.text, color:r.color, bg:r.bg});
+      setTimeout(function() { runStep(idx + 1); }, 600);
+    }
+  }
+
+  runStep(0);
+}
+
+pickMode(0);
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

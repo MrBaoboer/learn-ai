@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>圖：從知識圖譜到多 Agent 協作 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<!-- SEO Start -->
+<meta name="description" content="節點加關係就是圖：社交網路、知識圖譜、Agent 工作流 DAG。點一個節點，看關係怎麼一層層擴散出去。">
+<meta name="keywords" content="圖 資料結構,知識圖譜,DAG 有向無環圖,多 Agent 協作,工作流依賴,圖遍歷">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/ds-8.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/ds-8.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/ds-8.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/ds-8.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/ds-8.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/ds-8.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/ds-8.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/ds-8.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="圖：從知識圖譜到多 Agent 協作">
+<meta property="og:description" content="節點 + 關係 = 圖。點一個節點看知識怎麼兩跳擴散，再親手給工作流製造一個環，看它為什麼會卡死。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/ds-8.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/ds-8.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="圖：從知識圖譜到多 Agent 協作">
+<meta name="twitter:description" content="節點 + 關係 = 圖。點一個節點看知識怎麼兩跳擴散，再親手給工作流製造一個環，看它為什麼會卡死。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── 知识图谱 ── */
+.kg-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.kg-stage{padding:10px 12px 4px;display:flex;justify-content:center}
+.kg-stage svg{width:100%;max-width:660px;height:auto;display:block}
+.kg-edge{stroke:rgba(0,0,0,.14);stroke-width:1.5;transition:stroke .3s,stroke-width .3s}
+.kg-edge.lit{stroke:var(--ds);stroke-width:2.5}
+.kg-elabel{fill:var(--sub);font-size:9.5px;font-weight:600;opacity:.75}
+.kg-node{cursor:pointer;transition:opacity .3s}
+.kg-node circle.kg-dot{stroke:#fff;stroke-width:2;transition:r .25s}
+.kg-node text{fill:var(--text);font-size:12px;font-weight:800;pointer-events:none}
+.kg-node.dim{opacity:.22}
+.kg-node.h0 circle.kg-dot{r:15}
+.kg-ring{fill:none;stroke-width:2.5;opacity:0;pointer-events:none}
+.kg-node.h0 .kg-ring,.kg-node.h1 .kg-ring,.kg-node.h2 .kg-ring{animation:kgRipple .7s ease-out}
+@keyframes kgRipple{0%{opacity:.85;transform:scale(1)}100%{opacity:0;transform:scale(2.6)}}
+.kg-hop{fill:#fff;font-size:9px;font-weight:900;pointer-events:none;opacity:0;transition:opacity .3s}
+.kg-node.h0 .kg-hop,.kg-node.h1 .kg-hop,.kg-node.h2 .kg-hop{opacity:1}
+.kg-legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 22px;font-size:12px;color:var(--sub);border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)}
+.kg-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.kg-narr{margin:8px 22px 18px;padding:13px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.8;color:var(--sub);min-height:52px}
+.kg-narr b{color:var(--ds-deep)}
+
+/* ── DAG 工作流 ── */
+.dag-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.dag-stage{padding:12px 12px 4px;display:flex;justify-content:center}
+.dag-stage svg{width:100%;max-width:760px;height:auto;display:block}
+.dag-edge{stroke:rgba(0,0,0,.2);stroke-width:2;fill:none;transition:stroke .3s}
+.dag-edge.lit{stroke:var(--success)}
+.dag-edge.cycle{stroke:var(--danger);stroke-dasharray:6 5;opacity:0;transition:opacity .4s}
+.dag-edge.cycle.on{opacity:1}
+.dag-node rect{fill:#fff;stroke:rgba(0,0,0,.18);stroke-width:1.5;transition:fill .3s,stroke .3s}
+.dag-node text{fill:var(--text);font-size:12.5px;font-weight:800;pointer-events:none}
+.dag-node.running rect{fill:#fef3c7;stroke:var(--amber);animation:dagPulse .8s ease-in-out infinite}
+@keyframes dagPulse{50%{stroke-width:3.5}}
+.dag-node.done rect{fill:#dcfce7;stroke:var(--success)}
+.dag-node.done text{fill:#14532d}
+.dag-node.stuck rect{fill:#fee2e2;stroke:var(--danger);animation:dagBlink .5s step-end infinite}
+@keyframes dagBlink{50%{fill:#fff}}
+.dag-narr{margin:8px 22px 0;padding:13px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.8;color:var(--sub);min-height:52px}
+.dag-narr b{color:var(--ds-deep)}
+.dag-narr .warn{color:var(--danger);font-weight:800}
+.dag-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 22px}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.btn-ghost{background:none;color:var(--danger);border:1.5px solid rgba(220,38,38,.4);padding:9px 22px;border-radius:999px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:background .15s}
+.btn-ghost:hover:not(:disabled){background:rgba(220,38,38,.06)}
+.btn-ghost:disabled{opacity:.45;cursor:not-allowed}
+.btn-ghost.armed{background:var(--danger);color:#fff;border-color:var(--danger)}
+.dag-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── 概念卡 ── */
+.concept-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.concept-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-card)}
+.concept-card .cc-icon{font-size:24px;margin-bottom:8px}
+.concept-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px}
+.concept-card p{font-size:13px;color:var(--sub);line-height:1.75}
+.concept-card p b{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .kg-node text{font-size:13px}
+  .concept-grid{grid-template-columns:1fr}
+  .kg-narr,.dag-narr{margin-left:14px;margin-right:14px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"圖：從知識圖譜到多 Agent 協作","name":"圖：從知識圖譜到多 Agent 協作","url":"https://xueai.miyang.cn/slides/ds-8.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 樹與圖：AI 的主場","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"節點加關係就是圖：社交網路、知識圖譜、Agent 工作流 DAG。點一個節點，看關係怎麼一層層擴散出去。","datePublished":"2026-08-10","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">程式設計基礎篇 · 樹與圖：AI 的主場</div>
+    <h1>圖：從知識圖譜到多 Agent 協作</h1>
+    <p class="subtitle">上一課的樹規矩得很：每個節點只有一個爹，永遠不繞圈。可現實世界的關係亂多了——你的朋友互相也是朋友，公司和學校和人攪在一起。把「每個節點只能有一個爹」這條規矩撕掉，樹就升級成了<b>圖：節點 + 關係，想怎麼連怎麼連</b>。這一課看圖在 AI 世界的兩大主場。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>節點加關係就是圖：社交網路、知識圖譜、Agent 工作流 DAG。點一個節點，看關係怎麼一層層擴散出去</p></aside><!--seo:end-->  <div class="sec-label">主場一 · 知識圖譜：點一下，看知識擴散</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">下面是一張迷你知識圖譜：圓點是<b style="color:var(--text)">實體</b>（人、公司、學校、產品），連線是<b style="color:var(--text)">關係</b>。<b style="color:var(--text)">點選任意一個節點</b>，看它的關係怎麼一圈圈擴散出去——留意擴散的「跳數」：一跳是直接認識的，兩跳是「朋友的朋友」。</p>
+
+  <div class="kg-box">
+    <div class="kg-legend">
+      <span><i style="background:#7c3aed"></i>人物</span>
+      <span><i style="background:#0284c7"></i>公司</span>
+      <span><i style="background:#16a34a"></i>學校</span>
+      <span><i style="background:#d97706"></i>產品</span>
+      <span style="margin-left:auto">👆 點節點試試</span>
+    </div>
+    <div class="kg-stage">
+      <svg id="kgSvg" viewBox="0 0 660 400" aria-label="迷你知識圖譜"></svg>
+    </div>
+    <div class="kg-narr" id="kgNarr">還沒有點過節點。試試點<b>「雷軍」</b>——看兩跳之內能擴散到哪些知識。</div>
+  </div>
+
+  <div class="l-callout" style="margin-top:18px;">
+    <b>AI 回答複雜問題，靠的就是這種「多跳」。</b>「雷軍母校的知名校友還有誰？」——沒有任何一段資料直接寫著答案，但沿著圖走兩跳（雷軍 → 武漢大學 → 陳東昇）就拼出來了。知識圖譜把散落的事實連成網，RAG 檢索到一個節點後還能順藤摸瓜，這叫<b>圖檢索增強（GraphRAG）</b>，比單純搜文字能回答更繞的問題。
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">主場二 · 多 Agent 工作流：為什麼必須是 DAG</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">現在讓一隊 Agent 合寫一份調研報告。每個方框是一個任務，箭頭表示「必須等前面的完成才能開工」。<b style="color:var(--text)">點「執行」</b>，留意兩件事：沒有互相依賴的任務會<b style="color:var(--text)">同時亮起（並行）</b>；每個任務都要等它的箭頭來源全部變綠才動工。然後<b style="color:var(--text)">點「製造環」再執行一次</b>，看看會發生什麼。</p>
+
+  <div class="dag-box paywall-locked">
+    <div class="dag-stage">
+      <svg id="dagSvg" viewBox="0 0 760 260" aria-label="多 Agent 工作流依賴圖"></svg>
+    </div>
+    <div class="dag-narr" id="dagNarr">7 個 Agent 待命中。黃色 = 正在幹活，綠色 = 完成。</div>
+    <div class="dag-foot">
+      <button class="btn-ds" id="btnDagRun">執行工作流 ▶</button>
+      <button class="btn-ghost" id="btnDagCycle">製造環 💥</button>
+      <span class="dag-status" id="dagStatus"></span>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked" style="margin-top:18px;">
+    <b>「有向無環圖」（DAG）不是黑話，是常識：</b>任務的依賴箭頭有方向（先後），而且不能繞成圈——一旦有環，就成了「你等我、我等他、他等你」的三角債，誰也開不了工。所有多 Agent 編排框架在你提交工作流時都會先做一次「查環」，查出來直接拒絕執行，就是為了避免你剛才親眼看到的死鎖。
+  </div>
+
+  <div class="sec-label paywall-locked">把兩課串起來</div>
+
+  <div class="concept-grid paywall-locked">
+    <div class="concept-card">
+      <div class="cc-icon">🌳</div>
+      <h4>樹是圖的「乖孩子」</h4>
+      <p>樹也是圖，只是加了兩條家規：<b>每個節點只有一個爹，且不許繞圈</b>。所以上一課的檔案目錄、AST 都可以用圖的演算法來處理——圖是更大的那把傘。</p>
+    </div>
+    <div class="concept-card">
+      <div class="cc-icon">🕸</div>
+      <h4>圖 = 節點 + 關係</h4>
+      <p>就這一個公式。社交網路（人 + 關注）、地圖導航（路口 + 道路）、知識圖譜（實體 + 事實）、Agent 工作流（任務 + 依賴）——<b>只要你能說出「誰和誰有關係」，就能畫成圖</b>。</p>
+    </div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 這一課想和你分享的</h3>
+    <ul>
+      <li><b>關係即圖</b>：節點 + 關係就是圖；樹只是「一個爹、不繞圈」的特殊圖</li>
+      <li><b>多跳出答案</b>：知識圖譜沿關係走兩三跳，就能回答沒有現成資料的問題</li>
+      <li><b>無環才能開工</b>：工作流一旦有環就互相等待、集體卡死，所以必須是 DAG</li>
+      <li><b>並行藏在圖裡</b>：沒有依賴關係的任務可以同時幹——這是多 Agent 提速的來源</li>
+      <li><b>驗收時問一句</b>：AI 編排的工作流，「查過環嗎？哪些步驟在並行？」</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── 知识图谱扩散 ──
+   点节点做 BFS：hop0 立即亮，hop1 延迟 400ms，hop2 再 400ms，
+   连线随目标节点点亮，两跳之外的整体变暗。 */
+const KG_TYPES = { person:'#7c3aed', company:'#0284c7', school:'#16a34a', product:'#d97706' };
+const KG_NODES = [
+  { id:0, label:'雷軍',     type:'person',  x:300, y:195 },
+  { id:1, label:'小米',     type:'company', x:465, y:120 },
+  { id:2, label:'武漢大學', type:'school',  x:150, y:105 },
+  { id:3, label:'金山軟體', type:'company', x:175, y:295 },
+  { id:4, label:'SU7',      type:'product', x:610, y:205 },
+  { id:5, label:'小米手機', type:'product', x:575, y:48  },
+  { id:6, label:'林斌',     type:'person',  x:475, y:280 },
+  { id:7, label:'陳東昇',   type:'person',  x:52,  y:180 },
+  { id:8, label:'谷歌',     type:'company', x:610, y:345 },
+  { id:9, label:'WPS',      type:'product', x:60,  y:350 },
+];
+const KG_EDGES = [
+  { a:0, b:1, rel:'創辦' },
+  { a:0, b:2, rel:'畢業於' },
+  { a:0, b:3, rel:'曾任 CEO' },
+  { a:1, b:4, rel:'釋出' },
+  { a:1, b:5, rel:'釋出' },
+  { a:1, b:6, rel:'聯合創始人' },
+  { a:6, b:8, rel:'曾就職' },
+  { a:3, b:9, rel:'開發' },
+  { a:2, b:7, rel:'校友' },
+];
+const KG_QUESTIONS = {
+  0: '從<b>「雷軍」</b>出發兩跳：雷軍 → 武漢大學 → 陳東昇。AI 就能回答<b>「雷軍母校的知名校友還有誰」</b>——答案是陳東昇，雖然沒有任何一段資料直接寫過這句話。',
+  1: '從<b>「小米」</b>出發兩跳能摸到「谷歌」（小米 → 林斌 → 谷歌）。AI 可以回答<b>「小米的聯合創始人之前在哪家公司」</b>。',
+  2: '從<b>「武漢大學」</b>出發兩跳能摸到「小米」和「金山軟體」。AI 可以回答<b>「武大畢業生創辦或執掌過哪些公司」</b>。',
+  6: '從<b>「林斌」</b>出發兩跳能同時摸到「雷軍」「SU7」「谷歌」。AI 可以回答<b>「林斌和雷軍是什麼關係」</b>這類跨節點的問題。',
+};
+
+const kgSvg = document.getElementById('kgSvg');
+const kgNarr = document.getElementById('kgNarr');
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag, attrs){
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+/* 邻接表 */
+const kgAdj = KG_NODES.map(() => []);
+KG_EDGES.forEach((e, i) => { kgAdj[e.a].push({ to:e.b, ei:i }); kgAdj[e.b].push({ to:e.a, ei:i }); });
+
+/* 画边（先画，压在节点下面） */
+const kgEdgeEls = KG_EDGES.map(e => {
+  const n1 = KG_NODES[e.a], n2 = KG_NODES[e.b];
+  const line = svgEl('line', { class:'kg-edge', x1:n1.x, y1:n1.y, x2:n2.x, y2:n2.y });
+  kgSvg.appendChild(line);
+  const label = svgEl('text', { class:'kg-elabel', x:(n1.x+n2.x)/2, y:(n1.y+n2.y)/2 - 5, 'text-anchor':'middle' });
+  label.textContent = e.rel;
+  kgSvg.appendChild(label);
+  return line;
+});
+
+/* 画节点 */
+const kgNodeEls = KG_NODES.map(n => {
+  const g = svgEl('g', { class:'kg-node', 'data-id':n.id });
+  g.appendChild(svgEl('circle', { class:'kg-ring', cx:n.x, cy:n.y, r:13, stroke:KG_TYPES[n.type], style:`transform-origin:${n.x}px ${n.y}px` }));
+  g.appendChild(svgEl('circle', { class:'kg-dot', cx:n.x, cy:n.y, r:12, fill:KG_TYPES[n.type] }));
+  const hop = svgEl('text', { class:'kg-hop', x:n.x, y:n.y+3.5, 'text-anchor':'middle' });
+  g.appendChild(hop);
+  const t = svgEl('text', { x:n.x, y:n.y+27, 'text-anchor':'middle' });
+  t.textContent = n.label;
+  g.appendChild(t);
+  kgSvg.appendChild(g);
+  return g;
+});
+
+let kgTimer = [];
+function kgClear(){
+  kgTimer.forEach(clearTimeout); kgTimer = [];
+  kgNodeEls.forEach(g => { g.classList.remove('dim','h0','h1','h2'); g.querySelector('.kg-hop').textContent=''; });
+  kgEdgeEls.forEach(l => l.classList.remove('lit'));
+}
+
+function kgSpread(start){
+  kgClear();
+  /* BFS 求跳数 */
+  const hop = KG_NODES.map(() => -1);
+  hop[start] = 0;
+  const q = [start];
+  const litEdges = { 1:[], 2:[] };
+  while (q.length){
+    const cur = q.shift();
+    if (hop[cur] >= 2) continue;
+    kgAdj[cur].forEach(({to, ei}) => {
+      if (hop[to] === -1){
+        hop[to] = hop[cur] + 1;
+        litEdges[hop[to]].push(ei);
+        q.push(to);
+      }
+    });
+  }
+  /* 分批点亮：0ms / 400ms / 800ms */
+  const names = { 1:[], 2:[] };
+  KG_NODES.forEach((n, i) => { if (hop[i] === 1) names[1].push(n.label); if (hop[i] === 2) names[2].push(n.label); });
+  [0,1,2].forEach(h => {
+    kgTimer.push(setTimeout(() => {
+      KG_NODES.forEach((n, i) => {
+        if (hop[i] === h){
+          kgNodeEls[i].classList.add('h'+h);
+          kgNodeEls[i].querySelector('.kg-hop').textContent = h === 0 ? '★' : h;
+        }
+      });
+      (litEdges[h] || []).forEach(ei => kgEdgeEls[ei].classList.add('lit'));
+    }, h * 400));
+  });
+  kgTimer.push(setTimeout(() => {
+    KG_NODES.forEach((n, i) => { if (hop[i] === -1) kgNodeEls[i].classList.add('dim'); });
+  }, 900));
+  /* 旁白 */
+  const startName = KG_NODES[start].label;
+  const special = KG_QUESTIONS[start];
+  let text = `從<b>「${startName}」</b>出發：一跳（直接關係）→ ${names[1].join('、') || '無'}；兩跳（關係的關係）→ ${names[2].join('、') || '無'}。`;
+  if (special) text = special + ' ' + `一跳：${names[1].join('、')}；兩跳：${names[2].join('、') || '無'}。`;
+  kgNarr.innerHTML = text;
+}
+
+kgSvg.addEventListener('click', e => {
+  const g = e.target.closest('.kg-node');
+  if (g) kgSpread(+g.dataset.id);
+});
+
+/* ── 多 Agent 工作流 DAG ──
+   按依赖调度：每一波把「前置全部完成」的节点同时点亮（并行），
+   900ms 后变绿完成。加环后调度器会发现没有节点能开工——死锁演示。 */
+const DAG_NODES = [
+  { id:'A', label:'搜資料 A', x:85,  y:70  },
+  { id:'B', label:'搜資料 B', x:85,  y:190 },
+  { id:'C', label:'彙總',     x:250, y:130 },
+  { id:'D', label:'寫初稿',   x:415, y:70  },
+  { id:'E', label:'做圖表',   x:415, y:190 },
+  { id:'F', label:'合稿',     x:575, y:130 },
+  { id:'G', label:'審校',     x:700, y:130 },
+];
+const DAG_EDGES = [
+  ['A','C'], ['B','C'], ['C','D'], ['C','E'], ['D','F'], ['E','F'], ['F','G'],
+];
+const CYCLE_EDGE = ['G','C'];   // 製造環：審校完才許彙總——荒謬但常見
+
+const dagSvg = document.getElementById('dagSvg');
+const dagNarr = document.getElementById('dagNarr');
+const dagStatus = document.getElementById('dagStatus');
+const btnDagRun = document.getElementById('btnDagRun');
+const btnDagCycle = document.getElementById('btnDagCycle');
+
+const NW = 100, NH = 44;
+const dagPos = {};
+DAG_NODES.forEach(n => { dagPos[n.id] = n; });
+
+/* 箭头 marker */
+const defs = svgEl('defs', {});
+defs.innerHTML = '<marker id="dagArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="rgba(0,0,0,.3)"/></marker>'
+  + '<marker id="dagArrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker>';
+dagSvg.appendChild(defs);
+
+/* 边：从源节点右缘到目标节点左缘 */
+function edgePoints(a, b){
+  const p1 = dagPos[a], p2 = dagPos[b];
+  return { x1: p1.x + NW/2, y1: p1.y, x2: p2.x - NW/2 - 8, y2: p2.y };
+}
+const dagEdgeEls = {};
+DAG_EDGES.forEach(([a, b]) => {
+  const p = edgePoints(a, b);
+  const l = svgEl('line', { class:'dag-edge', x1:p.x1, y1:p.y1, x2:p.x2, y2:p.y2, 'marker-end':'url(#dagArrow)' });
+  dagSvg.appendChild(l);
+  dagEdgeEls[a+b] = l;
+});
+/* 环边：审校 → 汇总，走下方的弧线 */
+const cyc = svgEl('path', {
+  class:'dag-edge cycle',
+  d:`M ${dagPos.G.x} ${dagPos.G.y + NH/2} C ${dagPos.G.x - 120} 258, ${dagPos.C.x + 120} 258, ${dagPos.C.x + 12} ${dagPos.C.y + NH/2 + 8}`,
+  'marker-end':'url(#dagArrowRed)',
+});
+dagSvg.appendChild(cyc);
+
+const dagNodeEls = {};
+DAG_NODES.forEach(n => {
+  const g = svgEl('g', { class:'dag-node', 'data-id':n.id });
+  g.appendChild(svgEl('rect', { x:n.x-NW/2, y:n.y-NH/2, width:NW, height:NH, rx:12 }));
+  const t = svgEl('text', { x:n.x, y:n.y+4.5, 'text-anchor':'middle' });
+  t.textContent = n.label;
+  g.appendChild(t);
+  dagSvg.appendChild(g);
+  dagNodeEls[n.id] = g;
+});
+
+let hasCycle = false, dagRunning = false;
+function dagSleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function dagDeps(){
+  const deps = {};
+  DAG_NODES.forEach(n => { deps[n.id] = []; });
+  DAG_EDGES.forEach(([a, b]) => deps[b].push(a));
+  if (hasCycle) deps[CYCLE_EDGE[1]].push(CYCLE_EDGE[0]);
+  return deps;
+}
+
+function dagReset(){
+  DAG_NODES.forEach(n => dagNodeEls[n.id].classList.remove('running','done','stuck'));
+  Object.values(dagEdgeEls).forEach(l => l.classList.remove('lit'));
+}
+
+btnDagRun.addEventListener('click', async () => {
+  if (dagRunning) return;
+  dagRunning = true;
+  btnDagRun.disabled = true; btnDagCycle.disabled = true;
+  dagReset();
+  const deps = dagDeps();
+  const done = new Set();
+  let wave = 0;
+  dagNarr.innerHTML = '開工！';
+  while (done.size < DAG_NODES.length){
+    const ready = DAG_NODES.map(n => n.id).filter(id =>
+      !done.has(id) && deps[id].every(d => done.has(d)));
+    if (!ready.length){
+      /* 死锁：剩下的节点互相等待 */
+      const stuck = DAG_NODES.map(n => n.id).filter(id => !done.has(id));
+      stuck.forEach(id => dagNodeEls[id].classList.add('stuck'));
+      dagNarr.innerHTML = `<span class="warn">💀 卡死了！</span>「彙總」在等「審校」，「審校」在等「合稿」，「合稿」在等「寫初稿」……繞一圈又回到「彙總」自己。<b>${stuck.length} 個 Agent 互相等待，永遠開不了工</b>——這就是環的代價。點「拆掉環」再執行一次試試。`;
+      dagStatus.textContent = '死鎖：紅色節點在互相等待';
+      btnDagRun.disabled = false; btnDagCycle.disabled = false;
+      btnDagRun.textContent = '再執行一次 ↻';
+      dagRunning = false;
+      return;
+    }
+    wave++;
+    ready.forEach(id => dagNodeEls[id].classList.add('running'));
+    const names = ready.map(id => `「${dagPos[id].label}」`).join(' 和 ');
+    dagNarr.innerHTML = ready.length > 1
+      ? `<b>第 ${wave} 波：</b>${names} 之間沒有依賴——<b>同時開工（並行）</b>，這是多 Agent 快的原因。`
+      : `<b>第 ${wave} 波：</b>${names} 的前置任務全變綠了，輪到它。`;
+    await dagSleep(1100);
+    ready.forEach(id => {
+      dagNodeEls[id].classList.remove('running');
+      dagNodeEls[id].classList.add('done');
+      done.add(id);
+      DAG_EDGES.forEach(([a, b]) => { if (a === id) dagEdgeEls[a+b].classList.add('lit'); });
+    });
+    await dagSleep(350);
+  }
+  dagNarr.innerHTML = '<b>✅ 全部完成！</b>7 個任務只用了 5 波——因為「搜資料 A / B」和「寫初稿 / 做圖表」兩對任務是並行乾的。依賴畫成圖，並行機會一眼可見。';
+  dagStatus.textContent = '';
+  btnDagRun.disabled = false; btnDagCycle.disabled = false;
+  btnDagRun.textContent = '再執行一次 ↻';
+  dagRunning = false;
+});
+
+btnDagCycle.addEventListener('click', () => {
+  if (dagRunning) return;
+  hasCycle = !hasCycle;
+  cyc.classList.toggle('on', hasCycle);
+  btnDagCycle.classList.toggle('armed', hasCycle);
+  btnDagCycle.textContent = hasCycle ? '拆掉環 🔧' : '製造環 💥';
+  dagReset();
+  dagNarr.innerHTML = hasCycle
+    ? '加了一條紅色反向邊：<b>「審校」完成後才允許「彙總」</b>（聽起來像不像某些公司的流程？）。現在點「執行」，看會發生什麼。'
+    : '環拆掉了，工作流恢復成 DAG。再點「執行」，應該能順利跑完。';
+  dagStatus.textContent = '';
+  btnDagRun.textContent = '執行工作流 ▶';
+});
+
+/* 进入视野时提示（lessonOnView 由页尾 lesson.js 提供，等 DOM 就绪后再挂） */
+document.addEventListener('DOMContentLoaded', () => {
+  lessonOnView(dagSvg, () => { dagStatus.textContent = '👆 先「執行」，再「製造環」對比'; });
+});
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

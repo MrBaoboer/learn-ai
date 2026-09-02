@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>上下文窗口是關鍵：為什麼提示詞這麼重要 | xueai.miyang.cn</title>
+<script src="../global-attn.js"></script>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* ── 推理链（纵向逐步揭示） ── */
+.logic-chain {
+  display: flex; flex-direction: column; gap: 0;
+  position: relative;
+}
+.lc-step {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--card); border-radius: var(--radius-sm); padding: 13px 18px;
+  border: 1.5px solid var(--border);
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.lc-step.show { opacity: 1; transform: translateY(0); }
+.lc-dot {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800;
+}
+.lc-text { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.5; }
+.lc-text b { margin-left: 8px; font-size: 13px; font-weight: 700; }
+.lc-arrow {
+  font-size: 18px; color: #ccc; text-align: center; line-height: 1.4;
+  opacity: 0; transition: opacity 0.3s 0.2s;
+}
+.lc-arrow.show { opacity: 1; }
+
+/* ── 结论条 ── */
+.conclusion-bar {
+  background: rgba(0,102,255,0.06); border: 1.5px solid rgba(0,102,255,0.18);
+  border-radius: var(--radius); padding: 14px 20px;
+  margin-top: 18px;
+  opacity: 0; transform: translateY(-6px);
+  transition: opacity 0.4s, transform 0.4s;
+}
+.conclusion-bar.show { opacity: 1; transform: translateY(0); }
+.cb-q { font-size: 13px; font-weight: 700; color: var(--sub); }
+.cb-a { font-size: 14px; font-weight: 700; color: var(--accent); line-height: 1.7; display: block; margin-top: 4px; }
+
+/* ── 交互演示区 ── */
+.demo-area {
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* 滑块 */
+.slider-row {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 20px;
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.sl-label { font-size: 13px; font-weight: 700; color: var(--text); }
+input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; height: 28px; }
+.sl-val { font-size: 14px; font-weight: 800; color: var(--accent); white-space: nowrap; min-width: 170px; text-align: right; }
+
+/* 窗口大小只有 5 个离散档位。不把档位标出来，用户拖一点点看不到变化会以为卡住了 */
+.sl-track { flex: 1; min-width: 200px; }
+.sl-ticks { position: relative; height: 24px; margin: 0 9px; }  /* 左右留出半个滑块，让刻度对准可停位置 */
+.sl-ticks span {
+  position: absolute; transform: translateX(-50%);
+  font-size: 10.5px; font-weight: 700; color: var(--sub);
+  white-space: nowrap; transition: color 0.15s;
+}
+.sl-ticks span::before {
+  content: ''; display: block; width: 1px; height: 5px;
+  margin: 0 auto 3px; background: var(--border); transition: background 0.15s;
+}
+.sl-ticks span:nth-child(1) { left: 0; }
+.sl-ticks span:nth-child(2) { left: 25%; }
+.sl-ticks span:nth-child(3) { left: 50%; }
+.sl-ticks span:nth-child(4) { left: 75%; }
+.sl-ticks span:nth-child(5) { left: 100%; }
+.sl-ticks span.on { color: var(--accent); }
+.sl-ticks span.on::before { background: var(--accent); }
+
+/* Token 可视化 */
+.token-vis {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 18px;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.tv-header {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; flex-wrap: wrap;
+  font-size: 11px; font-weight: 700; color: var(--sub); letter-spacing: 0.3px;
+}
+.tv-tokens {
+  display: flex; gap: 4px; align-items: center;
+  flex-wrap: wrap;
+}
+.tv-tk {
+  padding: 4px 8px; border-radius: 6px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  transition: all 0.4s ease;
+}
+.tv-tk-sys  { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+.tv-tk-user { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.tv-tk-ex   { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+.tv-tk-cut  { background: rgba(0,0,0,0.04); color: #d1d5db; border: 1px solid rgba(0,0,0,0.06); text-decoration: line-through; opacity: 0.45; }
+.tv-sep { font-size: 13px; color: #ccc; padding: 0 2px; }
+.tv-cut-badge {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 800;
+  background: rgba(229,62,62,0.1); color: var(--danger);
+  border: 1px solid rgba(229,62,62,0.25); white-space: nowrap;
+}
+
+/* 对比两栏 */
+.compare-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.cmp-col {
+  border-radius: var(--radius-sm); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 7px;
+  border: 1.5px solid;
+  transition: border-color 0.3s, background 0.3s;
+}
+.cmp-col.bad  { background: rgba(229,62,62,0.04); border-color: rgba(229,62,62,0.22); }
+.cmp-col.ok   { background: rgba(22,163,74,0.04);  border-color: rgba(22,163,74,0.2);  }
+.cmp-label { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; flex-shrink: 0; margin-bottom: 2px; }
+.cmp-col.bad .cmp-label { color: var(--danger); }
+.cmp-col.ok  .cmp-label { color: var(--success); }
+
+.msg { border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.6; }
+.msg-sys  { background: #fef9c3; color: #854d0e; }
+.msg-user { background: #eff6ff; color: #1d4ed8; }
+.msg-cut  { background: rgba(0,0,0,0.04); color: #9ca3af; font-style: italic; }
+.msg-ai-bad  { background: rgba(229,62,62,0.08); color: #991b1b; font-weight: 600; min-height: 24px; }
+.msg-ai-good { background: #dcfce7; color: #14532d; font-weight: 600; min-height: 24px; }
+.msg-lbl { font-size: 10px; font-weight: 800; opacity: 0.65; margin-bottom: 2px; letter-spacing: 0.3px; }
+
+@keyframes blink { 50% { opacity: 0; } }
+.cur { display: inline-block; width: 2px; height: 1em; vertical-align: text-bottom; animation: blink 0.85s step-start infinite; }
+.cur-r { background: #991b1b; }
+.cur-g { background: #15803d; }
+
+/* 截断文字样式 */
+#sysCut {
+  background: rgba(229,62,62,0.08);
+  border-radius: 3px;
+  padding: 0 2px;
+  transition: all 0.3s;
+}
+
+/* 重播按钮 */
+.chain-replay-row { display: flex; justify-content: flex-end; margin-bottom: 8px; min-height: 28px; }
+.btn-replay {
+  background: var(--card); color: var(--sub); border: 1px solid rgba(0,0,0,0.12);
+  padding: 4px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-replay:hover { background: rgba(0,0,0,0.05); color: var(--text); }
+
+@media (max-width: 768px) {
+  .compare-row { grid-template-columns: 1fr; }
+  .sl-val { text-align: left; min-width: 0; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="大模型的每次推理只能看到上下文窗口內的內容。理解上下文窗口的工作機制，才能理解為什麼好的 Prompt 能讓模型表現天差地別。">
+<meta name="keywords" content="上下文窗口,Context Window,Prompt工程,大模型注意力,KV Cache">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/1-2-prompt-power.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/1-2-prompt-power.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/1-2-prompt-power.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/1-2-prompt-power.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/1-2-prompt-power.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/1-2-prompt-power.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/1-2-prompt-power.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/1-2-prompt-power.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="上下文窗口是關鍵：為什麼提示詞這麼重要">
+<meta property="og:description" content="大模型的每次推理只能看到上下文窗口內的內容。理解上下文窗口的工作機制，才能理解為什麼好的 Prompt 能讓模型表現天差地別。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/1-2-prompt-power.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/1-2-prompt-power.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="上下文窗口是關鍵：為什麼提示詞這麼重要">
+<meta name="twitter:description" content="大模型的每次推理只能看到上下文窗口內的內容。理解上下文窗口的工作機制，才能理解為什麼好的 Prompt 能讓模型表現天差地別。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"上下文窗口是關鍵","name":"上下文窗口是關鍵","url":"https://xueai.miyang.cn/slides/1-2-prompt-power.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 從補全到對話","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"大模型的每次推理只能看到上下文窗口內的內容。理解上下文窗口的工作機制，才能理解為什麼好的 Prompt 能讓模型表現天差地別。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">從補全到對話</div>
+    <h1>為什麼用提示詞就夠了？答案在上下文窗口</h1>
+    <p class="subtitle">PreTraining 之後：不用重新訓練，把任務描述餵進去就行。但為什麼？</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>提示詞為什麼夠用？Token 截斷可視化，無需重新訓練</p></aside><!--seo:end-->  <div class="sec-label">推理鏈：一步步想清楚</div>
+
+  <!-- 推理链（进入视野自动逐步播放） -->
+  <div class="logic-chain" id="logicChain">
+    <div class="lc-step" id="s0">
+      <div class="lc-dot" style="background:rgba(229,62,62,0.1);color:var(--danger);">舊</div>
+      <div class="lc-text">換任務<b style="color:var(--danger);">= 重新訓練</b></div>
+    </div>
+    <div class="lc-arrow" id="a0">↓</div>
+    <div class="lc-step" id="s1">
+      <div class="lc-dot" style="background:rgba(22,163,74,0.1);color:var(--success);">新</div>
+      <div class="lc-text">PreTraining 後<b style="color:var(--success);">提示詞就夠了！</b></div>
+    </div>
+    <div class="lc-arrow" id="a1">↓</div>
+    <div class="lc-step" id="s2">
+      <div class="lc-dot" style="background:rgba(217,119,6,0.1);color:var(--amber);">?</div>
+      <div class="lc-text">為什麼？<b style="color:var(--amber);">Token 推 Token</b></div>
+    </div>
+    <div class="lc-arrow" id="a2">↓</div>
+    <div class="lc-step" id="s3">
+      <div class="lc-dot" style="background:rgba(124,58,237,0.1);color:var(--purple);">本</div>
+      <div class="lc-text">提示詞 = 高質素前文<b style="color:var(--purple);">前文好 → 後文好</b></div>
+    </div>
+    <div class="lc-arrow" id="a3">↓</div>
+    <div class="lc-step" id="s4">
+      <div class="lc-dot" style="background:rgba(0,102,255,0.1);color:var(--accent);">關</div>
+      <div class="lc-text">窗口越大<b style="color:var(--accent);">能放的指令越多</b></div>
+    </div>
+  </div>
+
+  <!-- 结论条（最后一步出现） -->
+  <div class="conclusion-bar" id="conclusionBar">
+    <span class="cb-q">核心結論：</span>
+    <span class="cb-a">提示詞夠用，因為大模型支持<span style="color:var(--success);">超大上下文窗口</span>：把任務説明、規則、樣例全塞進前文，模型按前文推，<span style="color:var(--amber);">效果等同於專門訓練</span>。</span>
+  </div>
+
+  <div class="chain-replay-row">
+    <button class="btn-replay" id="replayBtn" onclick="playChain()" style="display:none;">↺ 重播推理鏈</button>
+  </div>
+
+  <div class="sec-label">動手試試：窗口大小如何影響輸出</div>
+
+  <!-- 交互演示 -->
+  <div class="demo-area paywall-locked xa-peek">
+
+    <!-- 滑块 -->
+    <div class="slider-row">
+      <span class="sl-label">拖動調整窗口大小，看 Token 怎麼被截斷</span>
+      <div class="sl-track">
+        <input type="range" id="winSlider" min="0" max="4" value="1" step="1" list="winTicks" oninput="render(+this.value)">
+        <datalist id="winTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option></datalist>
+        <div class="sl-ticks" id="slTicks" aria-hidden="true">
+          <span>極小</span><span>偏小</span><span>中等</span><span>充足</span><span>超大</span>
+        </div>
+      </div>
+      <span class="sl-val" id="slVal"></span>
+    </div>
+
+    <!-- Token 可视化 -->
+    <div class="token-vis">
+      <div class="tv-header">
+        <span>提示詞 Token 全貌（黃=System / 藍=User / 綠=示例）</span>
+        <span id="tvCount"></span>
+      </div>
+      <div class="tv-tokens" id="tvTokens"></div>
+    </div>
+
+    <!-- 对比两栏 -->
+    <div class="compare-row">
+      <div class="cmp-col bad" id="colBad">
+        <div class="cmp-label" id="badLabel">❌ 窗口過小：系統指令被截斷</div>
+
+        <!-- SYSTEM 框：完整内容 + 截断遮罩 -->
+        <div class="msg msg-sys" style="position:relative;overflow:hidden;">
+          <div class="msg-lbl">SYSTEM（完整原文）</div>
+          <!-- 被挤出窗口的开头（灰色删除线），顺序必须排在可见部分之前：
+               截断从最前面吃起，剪刀条紧跟在它后面才对得上「以上内容」 -->
+          <span id="sysCut" style="color:#d1d5db;text-decoration:line-through;"></span>
+          <div id="cutMask" style="display:none;margin:4px 0;background:rgba(229,62,62,0.08);border:1px dashed rgba(229,62,62,0.4);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;color:#dc2626;">
+            ✂ 以上內容超出窗口，模型完全看不到
+          </div>
+          <!-- 留在窗口里的结尾 -->
+          <span id="sysVisible"></span>
+        </div>
+
+        <div class="msg msg-user">
+          <div class="msg-lbl">USER</div>
+          請翻譯：「大模型的上下文窗口是關鍵。」
+        </div>
+        <div class="msg msg-ai-bad" id="badAi">
+          <div class="msg-lbl">AI 輸出</div>
+          <span id="badAiT"></span><span class="cur cur-r" id="badCur" style="display:none;"></span>
+        </div>
+      </div>
+
+      <div class="cmp-col ok" id="colGood">
+        <div class="cmp-label" id="goodLabel">✅ 窗口充足：完整讀取所有指令</div>
+        <div class="msg msg-sys">
+          <div class="msg-lbl">SYSTEM（完整）</div>
+          你是專業翻譯。將中文譯為正式英文，保持語氣，注意專業術語。
+        </div>
+        <div class="msg msg-user" id="goodEx" style="display:none;">
+          <div class="msg-lbl">FEW-SHOT 示例（大窗口才放得下）</div>
+          「人工智能」→「Artificial Intelligence」
+        </div>
+        <div class="msg msg-user">
+          <div class="msg-lbl">USER</div>
+          請翻譯：「大模型的上下文窗口是關鍵。」
+        </div>
+        <div class="msg msg-ai-good" id="goodAi">
+          <div class="msg-lbl">AI 輸出</div>
+          <span id="goodAiT"></span><span class="cur cur-g" id="goodCur" style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /demo-area -->
+
+</article>
+
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+// ── Token 數據 ──
+const TOKENS = [
+  { t:'你是', c:'sys'  }, { t:'專業', c:'sys'  }, { t:'翻譯', c:'sys'  },
+  { t:'將中文', c:'sys' }, { t:'譯為', c:'sys'  }, { t:'正式英文', c:'sys' },
+  { t:'保持', c:'sys'  }, { t:'語氣', c:'sys'  }, { t:'注意', c:'sys'  }, { t:'專業術語', c:'sys' },
+  { t:'SEP', sep:true },
+  { t:'示例:', c:'ex'  }, { t:'人工智能', c:'ex' }, { t:'→AI', c:'ex'  },
+  { t:'SEP', sep:true },
+  { t:'請翻譯', c:'user' }, { t:'大模型', c:'user' }, { t:'上下文', c:'user' },
+  { t:'窗口', c:'user' }, { t:'是關鍵', c:'user' },
+];
+const TOTAL = TOKENS.filter(t => !t.sep).length;
+const SYS_TOKENS = TOKENS.filter(t => t.c === 'sys').length;
+const USER_TOKENS = TOKENS.filter(t => t.c === 'user').length;
+
+const CLS = { sys:'tv-tk-sys', user:'tv-tk-user', ex:'tv-tk-ex' };
+
+/* keep = 这一档窗口放得下多少 Token。标签里的数字一律现算，不写死：
+   原先「充足」档写死「全部 17 Token」，而 TOKENS 实际有 18 个，滑块写 17、
+   右边计数器写 18，同屏自相矛盾（吐槽 #36）。
+   最小档至少留住整条 USER 提问：截断从最前面吃起，keep 小于 USER 的 Token 数时
+   连「请翻译」都会被截掉，可下面那个 USER 消息框是写死的完整句子，又对不上。 */
+const LEVELS = [
+  { keep: USER_TOKENS, lbl: n => `極小（僅 ${n} Token）` },
+  { keep: 9,           lbl: n => `偏小（僅 ${n} Token）` },
+  { keep: 14,          lbl: n => `中等（${n} Token）` },
+  { keep: TOTAL,       lbl: n => `充足（全部 ${n} Token）` },
+  { keep: TOTAL,       lbl: () => '超大（128K Token）' },
+];
+
+// SYSTEM prompt 各段，每段對應一組 sys token
+// sys tokens 共 10 個：你是 專業 翻譯 將中文 譯為 正式英文 保持 語氣 注意 專業術語
+const SYS_SEGMENTS = [
+  { text: '你是專業翻譯，' },
+  { text: '將中文譯為正式英文，' },
+  { text: '保持語氣，' },
+  { text: '注意專業術語。' },
+];
+// 每個 segment 對應的 sys token 數量（前置累積）
+const SYS_SEG_TOKENS = [3, 5, 7, 10]; // 到第 i 段末尾共用了多少 sys token
+
+const BAD_AI_OUT = [
+  'The context of... ⚠ 指令丟失，輸出不可信',
+  '大語言模型的窗口是… (不穩定，指令不完整)',
+  'The context window of large language models is key.',
+  'The context window is a critical capability of large language models.',
+  'The context window is a critical capability of large language models.',
+];
+const GOOD_AI_OUT = 'The context window is a critical capability of large language models.';
+
+let typingTimer = null;
+
+function render(lv) {
+  const lvl = LEVELS[lv];
+  document.getElementById('slVal').textContent = lvl.lbl(lvl.keep);
+  document.querySelectorAll('#slTicks span').forEach((t, i) => t.classList.toggle('on', i === lv));
+  const keep = lvl.keep;
+  const nonSepTokens = TOKENS.filter(t => !t.sep);
+  const cutCount = nonSepTokens.length - keep;
+
+  // ── Token 可視化 ──
+  const tv = document.getElementById('tvTokens');
+  tv.innerHTML = '';
+  let nonSepIdx = 0;
+  TOKENS.forEach(tk => {
+    if (tk.sep) {
+      const s = document.createElement('span');
+      s.className = 'tv-sep'; s.textContent = '│';
+      tv.appendChild(s);
+      return;
+    }
+    const isCut = nonSepIdx < cutCount;
+    const el = document.createElement('span');
+    el.className = 'tv-tk ' + (isCut ? 'tv-tk-cut' : CLS[tk.c]);
+    el.textContent = tk.t;
+    tv.appendChild(el);
+    nonSepIdx++;
+  });
+
+  // 截斷標記
+  const countEl = document.getElementById('tvCount');
+  if (cutCount > 0) {
+    countEl.innerHTML = `<span class="tv-cut-badge">⚠ 截掉 ${cutCount} 個 Token，剩餘 ${keep} 個</span>`;
+  } else {
+    countEl.innerHTML = `<span style="color:var(--success);font-weight:800;">✓ 全部 ${TOTAL} 個 Token 均在窗口內</span>`;
+  }
+
+  // ── 左欄 SYSTEM 截斷可視化 ──
+  /* 非 sep token 的排列顺序是 sys → ex → user，窗口装不下时从最前面开始挤，
+     所以被截掉的永远是 SYSTEM 的开头，活下来的是它的结尾。
+     原来这里按 sysKeepCount 从头往后算「可见」，等于把结尾划掉、开头留着，
+     和上方 Token 条涂灰的方向正好相反：条子灰的是「你是/专业/翻译」，
+     框里划掉的却是「注意专业术语」，同一次截断给了两个相反的说法（吐槽 #36）。 */
+  const sysCutCount = Math.min(cutCount, SYS_TOKENS);
+
+  let cutText = '';
+  let visibleText = '';
+  SYS_SEGMENTS.forEach((seg, si) => {
+    const prevTokens = si === 0 ? 0 : SYS_SEG_TOKENS[si - 1];
+    const segEndTokens = SYS_SEG_TOKENS[si];
+    if (sysCutCount >= segEndTokens) {
+      // 整段被擠出窗口
+      cutText += seg.text;
+    } else if (sysCutCount <= prevTokens) {
+      // 整段還在窗口內
+      visibleText += seg.text;
+    } else {
+      // 截斷落在段中間（按字符粗略取一半）
+      const half = Math.floor(seg.text.length / 2);
+      cutText += seg.text.slice(0, half) + '…';
+      visibleText += '…' + seg.text.slice(half);
+    }
+  });
+
+  document.getElementById('sysVisible').textContent = visibleText;
+  const sysCutEl = document.getElementById('sysCut');
+  const cutMask  = document.getElementById('cutMask');
+  if (cutText) {
+    sysCutEl.textContent = cutText;
+    cutMask.style.display = 'block';
+  } else {
+    sysCutEl.textContent = '';
+    cutMask.style.display = 'none';
+  }
+
+  // ── 左欄標籤 ──
+  const hasCut = lv <= 1;
+  document.getElementById('colBad').className = 'cmp-col ' + (lv >= 3 ? 'ok' : 'bad');
+  document.getElementById('badLabel').textContent =
+    lv >= 3 ? '✅ 窗口充足：系統指令完整讀取' :
+    hasCut   ? `❌ 窗口僅 ${keep} Token：系統指令嚴重截斷` :
+               `⚠ 窗口偏小：指令部分截斷`;
+
+  // ── 右欄 ──
+  document.getElementById('goodEx').style.display = lv >= 3 ? 'block' : 'none';
+  document.getElementById('goodLabel').textContent = lv >= 3
+    ? '✅ 大窗口：指令 + Few-Shot 示例全放得下'
+    : '✅ 窗口充足：完整讀取所有指令';
+
+  // ── 打字動畫 ──
+  if (typingTimer) clearInterval(typingTimer);
+  const badAiEl  = document.getElementById('badAiT');
+  const goodAiEl = document.getElementById('goodAiT');
+  const badCur   = document.getElementById('badCur');
+  const goodCur  = document.getElementById('goodCur');
+  badAiEl.textContent = ''; goodAiEl.textContent = '';
+  badCur.style.display = 'inline-block';
+  goodCur.style.display = 'inline-block';
+
+  const badOut  = BAD_AI_OUT[lv];
+  badAiEl.style.color = lv <= 1 ? '#991b1b' : lv === 2 ? '#b45309' : '#14532d';
+  document.getElementById('badAi').className = 'msg ' + (lv <= 2 ? 'msg-ai-bad' : 'msg-ai-good');
+
+  let bi = 0, gi = 0;
+  typingTimer = setInterval(() => {
+    let done = true;
+    if (bi < badOut.length)      { badAiEl.textContent  += badOut[bi++];       done = false; }
+    if (gi < GOOD_AI_OUT.length) { goodAiEl.textContent += GOOD_AI_OUT[gi++];  done = false; }
+    if (done) {
+      clearInterval(typingTimer);
+      badCur.style.display = 'none'; goodCur.style.display = 'none';
+    }
+  }, 28);
+}
+
+// ── 推理鏈：進入視野自動逐步播放，可重播 ──
+const CHAIN_STEPS = ['s0','s1','s2','s3','s4'];
+const CHAIN_ARROWS = ['a0','a1','a2','a3'];
+let chainTimer = null;
+
+function playChain() {
+  if (chainTimer) { clearInterval(chainTimer); chainTimer = null; }
+  document.getElementById('replayBtn').style.display = 'none';
+  document.getElementById('conclusionBar').classList.remove('show');
+  CHAIN_STEPS.forEach(id => document.getElementById(id).classList.remove('show'));
+  CHAIN_ARROWS.forEach(id => document.getElementById(id).classList.remove('show'));
+
+  let i = 0;
+  document.getElementById(CHAIN_STEPS[0]).classList.add('show');
+  chainTimer = setInterval(() => {
+    i++;
+    if (i >= CHAIN_STEPS.length) {
+      clearInterval(chainTimer);
+      chainTimer = null;
+      document.getElementById('conclusionBar').classList.add('show');
+      document.getElementById('replayBtn').style.display = 'inline-block';
+      return;
+    }
+    document.getElementById(CHAIN_ARROWS[i - 1]).classList.add('show');
+    document.getElementById(CHAIN_STEPS[i]).classList.add('show');
+  }, 550);
+}
+
+lessonOnView(document.getElementById('logicChain'), playChain);
+
+// 初始渲染
+render(1);
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice-principles.js?v=20260827a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding 項目最典型的技術債：同一個按鈕攢出八套 CSS。這一節講樣式為什麼會增殖、怎麼收斂進 token 與公共組件，以及哪些差異該留着。">
+<meta name="keywords" content="CSS 收斂,重複造輪子,design token,樣式複用,技術債,Vibe Coding">
+<meta name="author" content="洛小山">
+<title>樣式收斂：一個按鈕不要八套 CSS | AI 系統課</title>
+<link rel="canonical" href="https://xueai.miyang.cn/slides/vibe-3b.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vibe-3b.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vibe-3b.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vibe-3b.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vibe-3b.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vibe-3b.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vibe-3b.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vibe-3b.html">
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e}
+.lesson-header .kicker{color:var(--vibe)}
+.desc{font-size:16px;color:var(--sub);line-height:1.8}
+
+/* 熵增模拟器 */
+.ent-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px}
+.ent-stage{padding:18px 20px;min-height:150px;background:repeating-conic-gradient(rgba(0,0,0,.025) 0% 25%, transparent 0% 50%) 0 0 / 22px 22px}
+.ent-row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.ent-item{animation:entIn .28s ease}
+@keyframes entIn{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+.ent-item button{border:none;color:#fff;font-family:inherit;font-weight:700;cursor:default;display:block}
+.ent-cls{display:block;margin-top:5px;font-family:"SF Mono",Menlo,monospace;font-size:11.5px;color:var(--sub);text-align:center}
+.ent-empty{font-size:14px;color:var(--sub);line-height:1.7}
+.ent-log{border-top:1px solid var(--border);padding:12px 20px;background:rgba(0,0,0,.02);font-size:13.5px;color:var(--sub);line-height:1.7;min-height:44px}
+.ent-log b{color:var(--text)}
+.ent-stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border)}
+.ent-stat{padding:12px 8px;text-align:center;border-right:1px solid var(--border)}
+.ent-stat:last-child{border-right:none}
+.ent-stat .n{display:block;font-size:24px;font-weight:800;color:var(--vibe);font-variant-numeric:tabular-nums;transition:color .2s}
+.ent-stat.hot .n{color:var(--danger)}
+.ent-stat .k{font-size:12px;color:var(--sub)}
+.ent-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.ent-btns button{padding:12px 22px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-size:14.5px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;min-height:44px;transition:all .15s}
+.ent-btns button.pri{background:var(--vibe);border-color:var(--vibe);color:#fff}
+.ent-btns button.pri:hover{filter:brightness(1.08)}
+.ent-btns button:disabled{opacity:.42;cursor:default}
+.ent-token{margin-top:14px;padding:14px 18px;border-radius:12px;background:#0e1c1a;color:#d9f2ec;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.75;white-space:pre;overflow-x:auto;display:none}
+.ent-token.on{display:block}
+
+/* 三个原因 */
+.why-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:12px}
+.why-grid .l-card h3{font-size:16px;margin-bottom:4px}
+.why-grid .l-card p{font-size:14px;color:var(--sub);line-height:1.7}
+.why-tag{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--vibe);background:rgba(13,148,136,.1);border-radius:6px;padding:3px 10px;margin-bottom:8px}
+
+/* 判断题 */
+.jd-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:16px 20px;margin-top:12px}
+.jd-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.jd-side{border:1.5px solid var(--border);border-radius:11px;padding:12px 14px;background:rgba(0,0,0,.015)}
+.jd-side .nm{font-family:"SF Mono",Menlo,monospace;font-size:12.5px;font-weight:700;color:var(--vibe-deep);display:block;margin-bottom:5px}
+.jd-side .vl{font-size:13.5px;color:var(--sub);line-height:1.65}
+.jd-ask{font-size:15px;font-weight:700;color:var(--text);line-height:1.6;margin-bottom:10px}
+.jd-opts{display:flex;gap:8px;flex-wrap:wrap}
+.jd-opts button{flex:1;min-width:150px;padding:12px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-size:14.5px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;min-height:44px;transition:all .15s}
+.jd-opts button:hover:not(:disabled){border-color:rgba(0,0,0,.2)}
+.jd-opts button.right{border-color:rgba(22,163,74,.5);background:rgba(22,163,74,.07);color:var(--success)}
+.jd-opts button.wrong{border-color:rgba(220,38,38,.4);background:rgba(220,38,38,.05);color:var(--danger)}
+.jd-opts button:disabled{cursor:default}
+.jd-fb{margin-top:11px;border-radius:10px;padding:12px 15px;font-size:14px;line-height:1.7;display:none}
+.jd-fb.on{display:block}
+.jd-fb.ok{background:rgba(22,163,74,.06);border:1.5px solid rgba(22,163,74,.3);color:var(--text)}
+.jd-fb.no{background:rgba(220,38,38,.05);border:1.5px solid rgba(220,38,38,.28);color:var(--text)}
+.jd-fb b.y{color:var(--success)}
+.jd-fb b.n{color:var(--danger)}
+
+/* 四步 */
+.step-list{margin-top:12px;display:flex;flex-direction:column;gap:11px}
+.step-item{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 18px}
+.step-n{flex-shrink:0;width:30px;height:30px;border-radius:9px;background:rgba(13,148,136,.1);color:var(--vibe);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+.step-item h3{font-size:15.5px;margin:0 0 3px}
+.step-item p{font-size:14px;color:var(--sub);line-height:1.72;margin:0}
+
+code{color:var(--vibe-deep);background:rgba(13,148,136,.08)}
+.vibe-callout{background:rgba(13,148,136,.05);border:1.5px solid rgba(13,148,136,.25);border-radius:14px;padding:18px 22px}
+.vibe-callout b{color:var(--vibe)}
+.vibe-callout p{line-height:1.8}
+.src-note{margin-top:28px;font-size:13px;color:var(--sub)}
+.src-note a{color:var(--vibe-deep)}
+.ctrl-hint{font-size:13px;color:var(--sub);margin-top:10px}
+.xref{margin-top:14px;font-size:14.5px;color:var(--sub);line-height:1.8}
+.xref a{color:var(--vibe-deep);font-weight:700}
+
+@media (max-width:768px){
+  .why-grid,.jd-pair{grid-template-columns:1fr}
+  .ent-stats{grid-template-columns:1fr 1fr}
+  .ent-stat:nth-child(2){border-right:none}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"樣式收斂：一個按鈕不要八套 CSS","name":"樣式收斂：一個按鈕不要八套 CSS","url":"https://xueai.miyang.cn/slides/vibe-3b.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 質素底綫","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Vibe Coding 項目最典型的技術債：同一個按鈕攢出八套 CSS。這一節講樣式為什麼會增殖、怎麼收斂進 token 與公共組件，以及哪些差異該留着。","datePublished":"2026-08-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="樣式收斂：一個按鈕不要八套 CSS"><meta property="og:description" content="Vibe Coding 項目最典型的技術債：同一個按鈕攢出八套 CSS。這一節講樣式為什麼會增殖、怎麼收斂進 token 與公共組件，以及哪些差異該留着。"><meta property="og:url" content="https://xueai.miyang.cn/slides/vibe-3b.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/vibe-3b.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Vibe Coding 方法論 · 質素底綫</div>
+    <h1>樣式收斂：一個按鈕不要八套 CSS</h1>
+    <p class="subtitle">讓 AI 連着做十個功能，你會攢出八個長得差不多的按鈕類。它不是不會複用，是每輪對話都不知道你已經有什麼。這一節講樣式為什麼會增殖、怎麼收乾淨，以及哪些差異該留着。</p>
+    <div class="chips"><span class="chip">複用優先</span><span class="chip">design token</span><span class="chip">技術債</span></div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>樣式為什麼會增殖、怎麼分批收進 token，以及哪些差異該留着</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">交互演示一 · 親手攢一堆按鈕</div>
+    <p class="desc">下面模擬一個真實項目的迭代。每點一次「再加個功能」，就是你開一輪新對話讓 AI 做一個頁面。注意看它每次是怎麼處理按鈕的，以及底下四個數字怎麼漲。</p>
+    <div class="ent-wrap">
+      <div class="ent-stage">
+        <div class="ent-row" id="entRow"><p class="ent-empty">項目還是空的。點下面的按鈕開始迭代。</p></div>
+      </div>
+      <div class="ent-log" id="entLog">第 0 輪：還沒開始。</div>
+      <div class="ent-stats">
+        <div class="ent-stat" id="stImpl"><span class="n">0</span><span class="k">按鈕實現</span></div>
+        <div class="ent-stat" id="stColor"><span class="n">0</span><span class="k">種主色</span></div>
+        <div class="ent-stat" id="stRadius"><span class="n">0</span><span class="k">種圓角</span></div>
+        <div class="ent-stat" id="stLine"><span class="n">0</span><span class="k">行 CSS</span></div>
+      </div>
+    </div>
+    <div class="ent-btns">
+      <button type="button" class="pri" id="entNext" onclick="entNext()">再加個功能</button>
+      <button type="button" id="entFix" onclick="entConverge()" disabled>執行收斂</button>
+      <button type="button" onclick="entReset()">重來</button>
+    </div>
+    <p class="ctrl-hint" id="entHint">八輪之後再看這堆按鈕，你分不清該改哪個——這就是「散裝」的手感。</p>
+    <div class="ent-token" id="entToken"></div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">別急着罵 AI，它是被環境逼的</div>
+    <p class="desc">重複造樣式不是模型偷懶，是三個結構性原因疊出來的。看懂原因，才知道該在哪兒設閘。</p>
+    <div class="why-grid">
+      <div class="l-card">
+        <span class="why-tag">看不見</span>
+        <h3>你的 CSS 不在它眼前</h3>
+        <p>新開一輪對話，上下文裏只有你這次給的幾個文件。項目裏已經有 <code>.btn-primary</code> 這件事，它無從得知，於是按需求現寫一個。</p>
+      </div>
+      <div class="l-card">
+        <span class="why-tag">更省事</span>
+        <h3>新寫比讀懂舊的便宜</h3>
+        <p>讀懂一套現有樣式要把相關文件全看一遍，還得擔心改了影響別處。新起一個類名零風險、零閲讀成本，這是它的最優解，不是你的。</p>
+      </div>
+      <div class="l-card">
+        <span class="why-tag">不敢碰</span>
+        <h3>怕改壞，於是並列一份</h3>
+        <p>需要一個帶陰影的按鈕時，它寧可寫 <code>.btn-primary-new</code> 也不改原來那個——改動別人在用的樣式屬於高風險操作，它選擇了安全但會增殖的做法。</p>
+      </div>
+    </div>
+    <div class="vibe-callout" style="margin-top:16px">
+      <p><b>三個原因都指向同一件事：它缺一份「我們已經有什麼」的清單。</b>把這份清單寫進項目規則文件，它每輪都能看見，增殖才會停。這也是<a href="vibe-8.html" style="color:var(--vibe-deep);font-weight:700">第 8 節把環境事實寫進 Rule</a> 的同一個道理，只不過這次寫進去的是樣式資產。</p>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">收斂四步：先盤點，再合併，最後設閘</div>
+    <p class="desc">已經亂掉的項目不要指望一把重構收乾淨。按下面四步走，每一步都能單獨停下來驗證。</p>
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-n">1</div>
+        <div>
+          <h3>盤點，先只看不改</h3>
+          <p>讓 AI 掃全項目的樣式，產出一張重複清單：哪幾個類在實現同一種控件、散落着多少個顏色值和圓角值。這一步不許動程式碼，你先看清欠了多少債。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-n">2</div>
+        <div>
+          <h3>定 token，把魔法數字收成檔位</h3>
+          <p>從盤點結果裏挑出真正在用的值，定成一小套變數：主色、語義色、圓角兩三檔、間距四檔、控件高度。檔位要少，少才守得住。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-n">3</div>
+        <div>
+          <h3>分批合併，一次一種控件</h3>
+          <p>先按鈕，驗證；再卡片，驗證；再輸入框。每批單獨提交，出問題能單獨回滾。收斂是等價替換，視覺上應該看不出變化——真需要改樣子，那是另一個任務。</p>
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-n">4</div>
+        <div>
+          <h3>設閘，防它明天再長出來</h3>
+          <p>把「寫新樣式前先搜 token 和公共組件，搜到就複用，搜不到才新建並説明搜過什麼」寫進規則文件。不設這道閘，你三個月後還得再收一遍。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">交互演示二 · 該合併，還是合理差異</div>
+    <p class="desc">收斂最容易過頭的地方是把該有的區別也抹平了。五組真實的樣式差異，你判斷哪些是手滑攢出來的、哪些是有理由的。</p>
+    <div id="jdWrap"></div>
+    <p class="ctrl-hint" id="jdScore"></p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">一條判據：差異有沒有名字</div>
+    <div class="vibe-callout">
+      <p><b>判斷該不該合併，只問一句：這個差異叫什麼？</b>叫得出名字的留着——「次要按鈕」「危險操作」「觸摸目標下限」「彈層比卡片高一檔」，這些是設計決策，理由寫進註釋就行。叫不出名字的合掉——兩個差 2px 的圓角、兩個肉眼分不出的藍，它們不叫什麼，它們是當時隨手寫的。</p>
+    </div>
+    <p class="desc" style="margin-top:16px">審美篇講一致性那節有句話是一個意思：差異不是罪，沒理由才是。那一節從設計側講怎麼定變數表，這一節從程式碼側講已經散了怎麼收回來。兩節配着看，一節給你標準，一節給你手術方案。</p>
+    <p class="xref">配套閲讀：<a href="taste-6.html">審美工程 · 一致性：系統感從哪來</a>（token 該怎麼定）· <a href="vibe-3.html">上一節 PlayGround</a>（收斂完的組件放哪兒調）</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">收斂時最容易踩的三個坑</div>
+    <div class="l-cols">
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">一把梭全量重構</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">讓 AI「把全站樣式統一一下」，它會給你一個改了 60 個文件的 diff，你審不完也不敢發。永遠按控件分批。</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">順手改視覺</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">收斂過程中它常「順便優化」一下圓角和配色。這會讓你分不清頁面變樣是合併出的 bug 還是它的審美發揮。收斂只做等價替換。</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:4px">token 定太細</h3>
+        <p style="font-size:14px;color:var(--sub);line-height:1.7">定出 12 檔圓角、9 種灰，等於沒定——下次它還是要挑，挑就會挑錯。檔位少到「幾乎沒得選」才有約束力。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="vibe-callout">
+      <p><b>AI 不會複用你沒告訴它存在的東西。</b>樣式增殖的根因是它每輪都失憶，所以解法有兩半：已經亂的按控件分批收進 token，往後的用一條規則擋住——先搜再寫。頂上那份 Skill 就是這兩半的可執行版本，複製給你的 Agent，它會先給你一張欠債清單，而不是直接開始改。</p>
+    </div>
+    <p class="src-note">配套規則可參考倉庫 <a href="https://github.com/itshen/xs_vibe_rules">itshen/xs_vibe_rules</a> 中「新功能先查重」一條，本節把它從功能層面延伸到樣式層面。</p>
+  </section>
+
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ── 交互一：样式熵增模拟器 ──
+   八轮迭代都取自真实项目里见过的类名，颜色和圆角的微小差异是刻意的：
+   肉眼几乎分不出，但正是这种「差一点」让人不敢动手合并。 */
+var ENT = [
+  { cls:'.btn-primary',     c:'#0d9488', r:10, pad:'11px 26px', fs:15, lines:6,
+    log:'第 1 輪：做首頁，AI 寫了第一個主按鈕。這時候一切都好。' },
+  { cls:'.submit-btn',      c:'#0f9d8f', r:8,  pad:'12px 24px', fs:15, lines:6,
+    log:'第 2 輪：做表單頁。新對話看不到首頁的 CSS，於是重寫了一個——顏色差了一點點。' },
+  { cls:'.btn-blue',        c:'#0ea5e9', r:12, pad:'10px 22px', fs:14, lines:7,
+    log:'第 3 輪：做詳情頁。你説「按鈕藍一點」，它直接按顏色命名了一個新類。' },
+  { cls:'.primaryButton',   c:'#0d9488', r:10, pad:'14px 28px', fs:16, lines:6,
+    log:'第 4 輪：做設定頁。樣式和第 1 個幾乎一樣，只是命名風格換成了駝峯。' },
+  { cls:'.action-btn',      c:'#14b8a6', r:6,  pad:'10px 20px', fs:14, lines:7,
+    log:'第 5 輪：做列表頁的操作列。又一套，圓角這次是 6。' },
+  { cls:'.btn-primary-new', c:'#0d9488', r:10, pad:'11px 26px', fs:15, lines:8,
+    log:'第 6 輪：你要按鈕帶陰影。它不敢改第 1 個（怕影響首頁），並列加了個 -new。' },
+  { cls:'.form-submit',     c:'#0f766e', r:10, pad:'12px 30px', fs:15, lines:6,
+    log:'第 7 輪：另一個表單。這次顏色深了一檔，你也沒注意到。' },
+  { cls:'.cta',             c:'#0d9488', r:999,pad:'13px 32px', fs:16, lines:6,
+    log:'第 8 輪：落地頁要個膠囊按鈕。八個類了，你已經不知道改哪個才對。' }
+];
+
+var entStep = 0, entFixed = false;
+
+function entRender() {
+  var row = document.getElementById('entRow');
+  if (!entStep) {
+    row.innerHTML = '<p class="ent-empty">項目還是空的。點下面的按鈕開始迭代。</p>';
+  } else if (entFixed) {
+    row.innerHTML =
+      '<div class="ent-item"><button style="background:var(--brand,#0d9488);border-radius:10px;padding:11px 26px;font-size:15px">主要操作</button>' +
+      '<span class="ent-cls">Button/primary</span></div>' +
+      '<div class="ent-item"><button style="background:#fff;color:#0f766e;border:1.5px solid #0d9488;border-radius:10px;padding:11px 26px;font-size:15px">次要操作</button>' +
+      '<span class="ent-cls">Button/secondary</span></div>' +
+      '<div class="ent-item"><button style="background:#dc2626;border-radius:10px;padding:11px 26px;font-size:15px">刪除</button>' +
+      '<span class="ent-cls">Button/danger</span></div>';
+  } else {
+    row.innerHTML = ENT.slice(0, entStep).map(function (b) {
+      return '<div class="ent-item"><button style="background:' + b.c + ';border-radius:' + b.r +
+        'px;padding:' + b.pad + ';font-size:' + b.fs + 'px">主要操作</button>' +
+        '<span class="ent-cls">' + b.cls + '</span></div>';
+    }).join('');
+  }
+  entStats();
+}
+
+function entStats() {
+  var used = ENT.slice(0, entStep);
+  var impl, colors, radii, lines;
+  if (entFixed) {
+    impl = 1;
+    colors = 1;
+    radii = 1;
+    lines = 22;
+  } else {
+    impl = used.length;
+    colors = new Set(used.map(function (b) { return b.c; })).size;
+    radii = new Set(used.map(function (b) { return b.r; })).size;
+    lines = used.reduce(function (s, b) { return s + b.lines; }, 0);
+  }
+  var set = [['stImpl', impl, 3], ['stColor', colors, 2], ['stRadius', radii, 2], ['stLine', lines, 24]];
+  set.forEach(function (t) {
+    var el = document.getElementById(t[0]);
+    el.querySelector('.n').textContent = t[1];
+    el.classList.toggle('hot', !entFixed && t[1] > t[2]);
+  });
+}
+
+function entNext() {
+  if (entFixed) entReset();
+  if (entStep >= ENT.length) return;
+  var b = ENT[entStep];
+  entStep++;
+  document.getElementById('entLog').innerHTML = '<b>' + b.cls + '</b> — ' + b.log;
+  document.getElementById('entFix').disabled = entStep < 3;
+  if (entStep >= ENT.length) {
+    document.getElementById('entNext').disabled = true;
+    document.getElementById('entHint').textContent =
+      '八個類、七種主色、六種圓角、五十來行重複 CSS。現在點「執行收斂」，看該剩下什麼。';
+  }
+  entRender();
+}
+
+function entConverge() {
+  entFixed = true;
+  document.getElementById('entLog').innerHTML =
+    '<b>收斂完成。</b>八個類合成一個組件的三種語義變體，顏色和圓角全部從 token 取值。視覺上沒有任何東西改變，改的只是「下次該改哪裏」這個問題有了唯一答案。';
+  document.getElementById('entHint').textContent =
+    '注意剩下的三個按鈕：主要、次要、危險。它們的差異叫得出名字，所以留着；剛才那八個叫不出名字，所以合掉。';
+  document.getElementById('entToken').className = 'ent-token on';
+  document.getElementById('entToken').textContent =
+    ':root {\n' +
+    '  --brand:        #0d9488;   /* 八种绿收成一种 */\n' +
+    '  --danger:       #dc2626;\n' +
+    '  --radius-ctl:   10px;      /* 控件圆角只留一档 */\n' +
+    '  --ctl-h:        44px;      /* 触摸目标下限 */\n' +
+    '  --pad-ctl:      11px 26px;\n' +
+    '}';
+  document.getElementById('entNext').disabled = true;
+  document.getElementById('entFix').disabled = true;
+  entRender();
+}
+
+function entReset() {
+  entStep = 0;
+  entFixed = false;
+  document.getElementById('entLog').textContent = '第 0 輪：還沒開始。';
+  document.getElementById('entHint').textContent =
+    '八輪之後再看這堆按鈕，你分不清該改哪個——這就是「散裝」的手感。';
+  document.getElementById('entToken').className = 'ent-token';
+  document.getElementById('entNext').disabled = false;
+  document.getElementById('entFix').disabled = true;
+  entRender();
+}
+
+/* ── 交互二：该合并还是合理差异 ── */
+var JD = [
+  {
+    a: { nm:'.btn-primary', vl:'背景 #0d9488 · 圓角 10px · 內邊距 11/26' },
+    b: { nm:'.submit-btn',  vl:'背景 #0f9d8f · 圓角 8px · 內邊距 12/24' },
+    ask: '兩個都是頁面主按鈕，差在顏色和圓角上。',
+    merge: true,
+    why: '這兩個色值肉眼分不出，圓角差 2px 也沒人能察覺。它們不是設計決策，是兩輪對話各寫一次的產物。合成一個，取其中一個值當 token。'
+  },
+  {
+    a: { nm:'.btn-primary',   vl:'實心填充 · 品牌色背景 · 白字' },
+    b: { nm:'.btn-secondary', vl:'描邊 · 白底 · 品牌色文字' },
+    ask: '同一個彈窗裏的兩個按鈕，一個實心一個描邊。',
+    merge: false,
+    why: '這個差異叫「主次」：一屏只能有一個主角，次要操作必須在視覺重量上退後一步。該做的不是合併，而是讓兩者的顏色都從同一個 token 取值，風格才統一。'
+  },
+  {
+    a: { nm:'.btn (桌面)', vl:'高度 36px' },
+    b: { nm:'.btn (移動)', vl:'高度 44px' },
+    ask: '同一個按鈕，在兩種螢幕上高度不同。',
+    merge: false,
+    why: '這個差異叫「觸摸目標下限」：手指按不準 36px 的東西。但正確寫法是一個類配響應式斷點，而不是兩個並列的類——差異保留，實現要合併。'
+  },
+  {
+    a: { nm:'.card',  vl:'圓角 12px · 陰影 0 2px 8px' },
+    b: { nm:'.panel', vl:'圓角 13px · 陰影 0 2px 8px' },
+    ask: '兩種容器，圓角差 1px，陰影完全相同。',
+    merge: true,
+    why: '13px 一定是手滑或者是某次「稍微調大一點」的遺留。1px 的差異連設計師都量不出來，卻讓後來的人以為這裏有講究，不敢動。合掉。'
+  },
+  {
+    a: { nm:'.btn-primary', vl:'背景 #0d9488（品牌色）' },
+    b: { nm:'.btn-danger',  vl:'背景 #dc2626（紅）' },
+    ask: '確認按鈕和刪除按鈕用了完全不同的顏色。',
+    merge: false,
+    why: '這個差異叫「語義色」：紅色在按下前就該讓人猶豫一秒。它屬於必須留的差異，做法是把它也收進 token（--danger），而不是散落在各處寫 #dc2626。'
+  }
+];
+var jdDone = 0;
+
+function buildJd() {
+  document.getElementById('jdWrap').innerHTML = JD.map(function (it, i) {
+    return '<div class="jd-card">' +
+      '<div class="jd-pair">' +
+        '<div class="jd-side"><span class="nm">' + it.a.nm + '</span><span class="vl">' + it.a.vl + '</span></div>' +
+        '<div class="jd-side"><span class="nm">' + it.b.nm + '</span><span class="vl">' + it.b.vl + '</span></div>' +
+      '</div>' +
+      '<div class="jd-ask">' + it.ask + '</div>' +
+      '<div class="jd-opts">' +
+        '<button type="button" onclick="jdPick(' + i + ',1,this)">該合併</button>' +
+        '<button type="button" onclick="jdPick(' + i + ',0,this)">合理差異，留着</button>' +
+      '</div>' +
+      '<div class="jd-fb" id="jdFb' + i + '"></div>' +
+    '</div>';
+  }).join('');
+}
+
+function jdPick(i, saidMerge, btn) {
+  var card = btn.closest('.jd-card');
+  if (card.getAttribute('data-done')) return;
+  card.setAttribute('data-done', '1');
+  var it = JD[i];
+  var right = (!!saidMerge) === it.merge;
+  var btns = card.querySelectorAll('.jd-opts button');
+  btns.forEach(function (b, bi) {
+    b.disabled = true;
+    var isMergeBtn = bi === 0;
+    if (isMergeBtn === it.merge) b.classList.add('right');
+    else if ((isMergeBtn ? 1 : 0) === saidMerge) b.classList.add('wrong');
+  });
+  var fb = document.getElementById('jdFb' + i);
+  fb.className = 'jd-fb on ' + (right ? 'ok' : 'no');
+  fb.innerHTML = (right ? '<b class="y">判對了。</b>' : '<b class="n">再想想。</b>') + it.why;
+  jdDone++;
+  document.getElementById('jdScore').textContent = jdDone >= JD.length
+    ? '五組判完了。規律很簡單：説得出這個差異叫什麼，就留着並收進 token；説不出，就是手滑，合掉。'
+    : '已判 ' + jdDone + ' / ' + JD.length + ' 組。';
+}
+
+entRender();
+buildJd();
+</script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

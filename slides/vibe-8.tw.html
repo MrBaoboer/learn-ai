@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding 方法論第 8 節：把模型配置、技術棧、資料格式等環境事實寫死在 Rule 裡。含 isComposing 真實輸入體驗區與資料格式三分法選擇器。">
+<meta name="author" content="洛小山">
+<title>第8節：把環境事實寫進 Rule | AI 系統課</title>
+<link rel="canonical" href="https://xueai.miyang.cn/slides/vibe-8.tw.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_TW">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vibe-8.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vibe-8.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vibe-8.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vibe-8.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vibe-8.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vibe-8.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vibe-8.html">
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e;--vibe-soft:rgba(13,148,136,.08);--vibe-line:rgba(13,148,136,.25)}
+.lesson-header .kicker{color:var(--vibe)}
+a{color:var(--vibe-deep)}
+code{color:var(--vibe-deep);background:rgba(13,148,136,.08)}
+.l-callout{background:rgba(13,148,136,.04);border-color:var(--vibe-line)}
+.l-callout b{color:var(--vibe)}
+.desc{font-size:15px;color:var(--sub);line-height:1.8;margin-bottom:12px}
+pre{margin:12px 0 0;padding:16px 18px;overflow:auto;border:1.5px solid var(--border);border-radius:12px;background:#0e1c1a;color:#d9f2ec;font-size:12.5px;line-height:1.7}
+pre code{background:none;padding:0;color:#d9f2ec}
+.demo-hd{font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.4px;text-transform:uppercase;margin-bottom:10px}
+
+/* ── 通用控制按钮 ── */
+.btn{padding:11px 22px;border-radius:10px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-p{background:var(--vibe);color:#fff}
+.btn-p:hover{filter:brightness(1.08)}
+.btn-r{background:rgba(0,0,0,.05);color:var(--sub);border:1.5px solid var(--border)}
+.ctrl-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.hint{font-size:13px;color:var(--sub)}
+
+/* ── 交互一：isComposing 体验区 ── */
+.ime-input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-family:inherit;background:var(--bg);color:var(--text);outline:none;min-height:44px;transition:border-color .15s}
+.ime-input:focus{border-color:var(--vibe)}
+.ime-state{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;font-weight:700;color:var(--sub);flex-wrap:wrap}
+.flag{padding:3px 13px;border-radius:999px;font-family:"SF Mono",Menlo,monospace;font-size:13px;font-weight:800;border:1.5px solid var(--border);background:rgba(0,0,0,.04);color:var(--sub);transition:all .15s}
+.flag.on{border-color:rgba(217,119,6,.4);background:rgba(217,119,6,.1);color:var(--amber)}
+.ime-log{display:flex;flex-direction:column;gap:8px;margin-top:12px;max-height:280px;overflow-y:auto}
+.ime-entry{padding:10px 13px;border:1.5px solid var(--border);border-radius:10px;background:rgba(0,0,0,.02);font-size:13.5px;line-height:1.7}
+.ime-entry .ihd{font-weight:800;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;margin-bottom:3px}
+.ime-entry .ihd.warm{color:var(--amber)}
+.ime-entry .ihd.cool{color:var(--vibe-deep)}
+.j-bad{color:var(--danger);display:block}
+.j-good{color:var(--success);display:block}
+.j-mid{color:var(--sub);display:block}
+.ime-note{margin:0;padding:0;font-size:13.5px;color:var(--sub);line-height:1.85;padding-left:20px}
+.ime-note li+li{margin-top:4px}
+
+/* ── 交互二：格式三分法 ── */
+.scn-list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.scn-btn{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:13px 15px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;text-align:left;min-height:44px;transition:all .2s}
+.scn-btn:hover{border-color:rgba(0,0,0,.18)}
+.scn-btn.active{border-color:var(--vibe);background:var(--vibe-soft)}
+.scn-btn h4{font-size:15px;font-weight:800;color:var(--text)}
+.scn-btn.active h4{color:var(--vibe-deep)}
+.scn-btn p{font-size:12.5px;color:var(--sub);margin:0}
+.fmt-q{margin-top:16px;padding:13px 16px;border:1.5px solid var(--border);border-radius:10px;background:rgba(0,0,0,.025);font-size:15px;line-height:1.7}
+.fmt-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.fmt-btn{padding:11px 28px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-family:"SF Mono",Menlo,monospace;font-size:15px;font-weight:800;color:var(--text);cursor:pointer;min-height:44px;transition:all .2s}
+.fmt-btn:hover{border-color:rgba(0,0,0,.18)}
+.fmt-btn.right{border-color:rgba(22,163,74,.5);background:rgba(22,163,74,.07);color:var(--success)}
+.fmt-btn.wrong{border-color:rgba(220,38,38,.45);background:rgba(220,38,38,.06);color:var(--danger)}
+.fmt-verdict{display:none;margin-top:12px;padding:13px 16px;border-radius:10px;font-size:14px;line-height:1.75;border:1.5px solid var(--border)}
+.fmt-verdict.ok{display:block;border-color:rgba(22,163,74,.35);background:rgba(22,163,74,.05)}
+.fmt-verdict.no{display:block;border-color:rgba(220,38,38,.32);background:rgba(220,38,38,.045)}
+.fmt-verdict b{color:var(--text)}
+.hell-wrap{display:none;margin-top:14px}
+.hell-wrap.show{display:block}
+.hell-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hell-grid .hh{font-size:13px;font-weight:800;margin-bottom:2px}
+.hell-grid .hh.bad{color:var(--danger)}
+.hell-grid .hh.good{color:var(--success)}
+.hell-grid pre{margin-top:6px;font-size:11.5px}
+
+/* ── 环境事实清单 ── */
+.fact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.fact-grid h3,.stack-cols h3{font-size:15.5px;font-weight:800;margin-bottom:5px}
+.fact-grid p{font-size:13.5px;color:var(--sub);line-height:1.75}
+.fact-tag{display:inline-block;margin-bottom:8px;padding:2px 10px;border:1px solid var(--vibe-line);border-radius:999px;background:var(--vibe-soft);color:var(--vibe-deep);font-family:"SF Mono",Menlo,monospace;font-size:11px;font-weight:800;letter-spacing:.04em}
+.stack-cols ul{margin:0;padding-left:20px;font-size:13.5px;color:var(--sub);line-height:1.85}
+
+@media (max-width:768px){
+  .scn-list,.fact-grid,.hell-grid{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"把環境事實寫進 Rule","name":"把環境事實寫進 Rule","url":"https://xueai.miyang.cn/slides/vibe-8.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 環境與安全","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Vibe Coding 方法論第 8 節：把模型配置、技術棧、資料格式等環境事實寫死在 Rule 裡。含 isComposing 真實輸入體驗區與資料格式三分法選擇器。","datePublished":"2026-08-04","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="把環境事實寫進 Rule"><meta property="og:description" content="Vibe Coding 方法論第 8 節：把模型配置、技術棧、資料格式等環境事實寫死在 Rule 裡。含 isComposing 真實輸入體驗區與資料格式三分法選擇器。"><meta property="og:url" content="https://xueai.miyang.cn/slides/vibe-8.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/vibe-8.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">VIBE CODING 方法論 · 第 8 節</div>
+    <h1>把環境事實寫進 Rule</h1>
+    <p class="subtitle">每次新開對話，AI 都不知道該調哪個模型、超時設多少、專案用什麼框架。把這些環境事實一次性寫死在 Rule 裡，相當於給 AI 一份預填好的 .env 說明書，每輪對話自動帶入。本頁兩個演示都可以真實操作。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>模型配置、技術棧鎖定、資料格式三分法與 isComposing 這類必踩的坑</p></aside><!--seo:end-->  <div class="l-callout reveal">
+    <p style="font-size:14.5px;line-height:1.8"><b>為什麼是 Rule：</b>把配置寫在 .env 裡讓 AI 自己讀，它不一定每次都主動讀；寫在對話裡，對話一長就被截斷遺忘。Rule 在每輪對話開始前就被載入進上下文，是最穩的注入方式。</p>
+  </div>
+
+  <section>
+    <div class="sec-label">互動體驗一 · isComposing，用中文輸入法親自試</div>
+    <p class="desc">中文輸入法確認候選詞時會觸發 Enter，只判斷 <code>e.key === 'Enter'</code> 的輸入框會把半段內容直接發出去。AI 訓練資料裡 isComposing 覆蓋率不高，不寫進 Rule 就一定會忘。切換到中文輸入法，在下面的輸入框裡打幾個字試試。</p>
+    <div class="l-cols">
+      <div class="l-card reveal">
+        <div class="demo-hd">真實體驗區</div>
+        <input class="ime-input" id="imeInput" type="text" autocomplete="off" placeholder="用中文輸入法打拼音，按回車確認候選詞，再直接回車傳送">
+        <div class="ime-state">isComposing：<span class="flag" id="imeFlag">false</span><span class="hint">（輸入法組合中會變為 true）</span></div>
+        <div class="ime-log" id="imeLog"><div class="hint" id="imeEmpty">按鍵記錄會出現在這裡。先打一段拼音按回車選詞，再直接按一次回車，對比兩次的判定結果。英文鍵盤使用者可以直接打字回車，觀察 false 的情況。</div></div>
+        <div class="ctrl-row"><button class="btn btn-r" onclick="imeReset()">清空記錄</button></div>
+      </div>
+      <div class="l-card reveal">
+        <div class="demo-hd">標準寫法</div>
+<pre><code>const handleKeyDown = (e: React.KeyboardEvent) =&gt; {
+  if (e.key === 'Enter' &amp;&amp; !e.shiftKey
+      &amp;&amp; !e.nativeEvent.isComposing) {
+    e.preventDefault()
+    handleSend()
+  }
+}</code></pre>
+        <ul class="ime-note" style="margin-top:12px">
+          <li><code>isComposing</code> 為 <code>true</code>：輸入法正在組合中，回車只確認候選詞，不觸發傳送</li>
+          <li><code>isComposing</code> 為 <code>false</code>：普通鍵盤直接輸入，回車正常傳送</li>
+          <li>規則原文：禁止只判斷 <code>e.key === 'Enter'</code> 而不檢查 <code>isComposing</code></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="paywall-locked xa-peek">
+    <div class="sec-label">互動練習二 · 這個場景該用什麼格式</div>
+    <p class="desc">資料格式三分法：三種格式各管一個領域，互不混用。點選場景，再選一個你認為合適的格式。</p>
+    <div class="l-card reveal">
+      <div class="scn-list">
+        <button class="scn-btn active" id="scnBtn0" onclick="pickScn(0)">
+          <h4>Agent 工具呼叫參數</h4><p>工具入參、呼叫請求、返回結果</p>
+        </button>
+        <button class="scn-btn" id="scnBtn1" onclick="pickScn(1)">
+          <h4>專案配置檔案</h4><p>應用配置、資料儲存</p>
+        </button>
+        <button class="scn-btn" id="scnBtn2" onclick="pickScn(2)">
+          <h4>對外 REST API</h4><p>給外部呼叫方的介面</p>
+        </button>
+      </div>
+      <div class="fmt-q" id="fmtQ"></div>
+      <div class="fmt-row">
+        <button class="fmt-btn" id="fmtBtn0" onclick="pickFmt(0)">XML</button>
+        <button class="fmt-btn" id="fmtBtn1" onclick="pickFmt(1)">YAML</button>
+        <button class="fmt-btn" id="fmtBtn2" onclick="pickFmt(2)">JSON</button>
+      </div>
+      <div class="fmt-verdict" id="fmtVerdict"></div>
+      <div class="hell-wrap" id="hellWrap">
+        <div class="hell-grid">
+          <div>
+            <div class="hh bad">❌ JSON 的 escape hell：字串裡再套 JSON</div>
+<pre><code>{
+  "tool": "send_message",
+  "arguments": "{\"channel\": \"dev\",
+    \"payload\": \"{\\\"title\\\":
+      \\\"發布提醒\\\", \\\"body\\\":
+      \\\"v1.4 已上線\\\"}\"}"
+}</code></pre>
+          </div>
+          <div>
+            <div class="hh good">✅ 同樣的內容，XML 版本</div>
+<pre><code>&lt;tool_call name="send_message"&gt;
+  &lt;channel&gt;dev&lt;/channel&gt;
+  &lt;payload&gt;
+    &lt;title&gt;發布提醒&lt;/title&gt;
+    &lt;body&gt;v1.4 已上線&lt;/body&gt;
+  &lt;/payload&gt;
+&lt;/tool_call&gt;</code></pre>
+          </div>
+        </div>
+        <p class="hint" style="margin-top:8px">JSON 版每層巢狀翻一倍反斜槓，LLM 逐 token 生成時極易配錯括號和引號。XML 標籤閉合直觀，模型出錯率更低。</p>
+      </div>
+      <p class="hint" id="scnHint" style="margin-top:12px">進度：0 / 3 個場景</p>
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">模型配置：一次寫死，輪輪生效</div>
+    <div class="fact-grid">
+      <div class="l-card reveal">
+        <span class="fact-tag">超時</span>
+        <h3>圖像生成至少 120-180 秒</h3>
+        <p>圖像 API 經常因為預設 30 秒超時失敗，AI 還會反覆嘗試相同的錯誤配置。HTTP 客戶端的超時值寫進 Rule，一次解決。</p>
+      </div>
+      <div class="l-card reveal">
+        <span class="fact-tag">代理回退</span>
+        <h3>網路失敗先掛代理重試</h3>
+        <p>網路請求失敗時必須嘗試代理重試（預設 <code>127.0.0.1:7890</code>），仍失敗才向使用者報告，禁止跳過代理直接報錯。</p>
+      </div>
+      <div class="l-card reveal">
+        <span class="fact-tag">流式</span>
+        <h3>前端可見響應必須流式</h3>
+        <p>前端可見的所有大模型響應必須用 Streaming 返回，後端內部呼叫才允許非流式。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">技術棧鎖定與品味規則</div>
+    <div class="l-cols stack-cols">
+      <div class="l-card reveal">
+        <h3>選型是人的決策</h3>
+        <ul>
+          <li>後端 FastAPI、前端 React + Tailwind + Vite、資料庫 SQLite、向量庫 Chroma</li>
+          <li>一旦定了就不再討論替代方案，AI 的職責是在確定的棧內把程式碼寫好</li>
+          <li>埠避開 5000，從 8000-9000 隨機分配，多專案同開也不衝突</li>
+        </ul>
+      </div>
+      <div class="l-card reveal">
+        <h3>圖示與細節規範</h3>
+        <ul>
+          <li>禁止用 emoji 做按鈕圖示，圖示必須用 SVG</li>
+          <li>看產品調性選圖示集：SaaS 用 Lucide，溫暖調性用 Tabler Icons</li>
+          <li>圖示直接下載到本地使用，不依賴 CDN</li>
+        </ul>
+      </div>
+    </div>
+    <div class="l-callout reveal" style="margin-top:14px">
+      <p style="font-size:14px;line-height:1.8"><b>補充說明：</b>只用 GPT 系列的專案可以把工具呼叫改回 JSON，它的 function calling 原生就是 JSON。「Agent 用 XML」是多模型混用場景的最大公約數選擇，Claude 系模型在 XML 格式上表現更穩定。</p>
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">課堂練習 · 20 分鐘</div>
+    <div class="l-card reveal">
+      <p style="font-size:14px;color:var(--sub);line-height:1.9;margin:0">提交物：Rule 的環境配置章節。① 列出你專案的環境事實：模型、API 服務商、超時、代理、技術棧、資料庫；② 寫成 Rule 章節，敏感的 Key 放獨立的 secrets 檔案並加入 .gitignore；③ 新開一個對話驗證：不做任何交代，AI 能否直接說出你的技術棧和模型配置。</p>
+    </div>
+  </section>
+
+  <div class="l-card reveal paywall-locked" style="margin-top:28px">
+    <p style="font-size:12.5px;color:var(--sub);line-height:1.8;margin:0">素材來源：開源倉庫 <a href="https://github.com/itshen/xs_vibe_rules">itshen/xs_vibe_rules</a> 中 <code>rule-opensource.mdc</code> 第一章「模型配置」、第四章「文件與設計規範」、第五章「資料格式規範」、第六章「技術棧與框架」。</p>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ═══ 交互一：isComposing 真实体验区 ═══ */
+const imeInput = document.getElementById('imeInput');
+const imeFlag = document.getElementById('imeFlag');
+const imeLog = document.getElementById('imeLog');
+
+function setFlag(on) {
+  imeFlag.textContent = on ? 'true' : 'false';
+  imeFlag.classList.toggle('on', on);
+}
+
+function imeAddEntry(composing, val) {
+  const empty = document.getElementById('imeEmpty');
+  if (empty) empty.remove();
+
+  const entry = document.createElement('div');
+  entry.className = 'ime-entry';
+
+  const hd = document.createElement('div');
+  hd.className = 'ihd ' + (composing ? 'warm' : 'cool');
+  hd.textContent = 'Enter 按下 · isComposing: ' + composing + (composing ? '（輸入法選詞確認）' : '（真回車）');
+  entry.appendChild(hd);
+
+  if (composing) {
+    const bad = document.createElement('span');
+    bad.className = 'j-bad';
+    bad.textContent = '只判斷 Enter 的輸入框：誤傳送「' + (val || '（組合中的內容）') + '」，半段內容被發出去';
+    const good = document.createElement('span');
+    good.className = 'j-good';
+    good.textContent = '加 isComposing 判斷：不傳送，回車只確認候選詞';
+    entry.appendChild(bad);
+    entry.appendChild(good);
+  } else {
+    const mid = document.createElement('span');
+    mid.className = 'j-mid';
+    mid.textContent = '兩種寫法此時行為一致：正常傳送「' + (val || '（空內容）') + '」';
+    const good = document.createElement('span');
+    good.className = 'j-good';
+    good.textContent = '訊息已傳送，輸入框已清空';
+    entry.appendChild(mid);
+    entry.appendChild(good);
+  }
+  imeLog.insertBefore(entry, imeLog.firstChild);
+}
+
+imeInput.addEventListener('compositionstart', function () { setFlag(true); });
+imeInput.addEventListener('compositionend', function () { setFlag(false); });
+imeInput.addEventListener('keydown', function (e) {
+  setFlag(e.isComposing);
+  if (e.key !== 'Enter') return;
+  const composing = e.isComposing;
+  imeAddEntry(composing, imeInput.value);
+  if (!composing) {
+    e.preventDefault();
+    imeInput.value = '';
+  }
+});
+
+function imeReset() {
+  imeLog.innerHTML = '<div class="hint" id="imeEmpty">按鍵記錄會出現在這裡。先打一段拼音按回車選詞，再直接按一次回車，對比兩次的判定結果。</div>';
+  imeInput.value = '';
+  setFlag(false);
+}
+
+/* ═══ 交互二：数据格式三分法选择器 ═══ */
+const FMT_NAMES = ['XML', 'YAML', 'JSON'];
+const SCENES = [
+  {
+    q: '場景：Agentic / ReAct 架構裡，工具（Tool）的入參定義、呼叫請求、返回結果，該用什麼格式？',
+    ans: 0,
+    right: 'Agent 工具呼叫統一用 XML。標籤閉合直觀，LLM 逐 token 生成時出錯率低；字串裡再套結構也不需要轉義。下面是 escape hell 對比。',
+    wrong: [
+      '',
+      '應該用 XML。YAML 靠縮排表達層級，LLM 生成時縮排極易漂移，一格之差整棵結構就歪了，不適合當呼叫協議。下面看看 JSON 會遇到的 escape hell，XML 是怎麼避開的。',
+      '應該用 XML。JSON 巢狀深了容易配錯括號，字串裡再套 JSON 就是 escape hell。看下面這段真實對比。'
+    ],
+    hell: true
+  },
+  {
+    q: '場景：專案的配置檔案和資料儲存（比如應用設定、部署參數），該用什麼格式？',
+    ans: 1,
+    right: '配置檔案用 YAML。讀寫的主體是人，YAML 沒有括號引號噪音，支援註釋，「這個值為什麼這麼設」可以直接寫在旁邊。',
+    wrong: [
+      '應該用 YAML。XML 標籤冗長，人手工維護成本高。配置檔案讀寫的主體是人，格式要優先照顧可讀性。',
+      '',
+      '應該用 YAML。JSON 不支援註釋，配置背後的原因寫不進去；每個鍵都要引號，維護起來噪音大。'
+    ],
+    hell: false
+  },
+  {
+    q: '場景：對外提供的 REST API，請求和響應體該用什麼格式？',
+    ans: 2,
+    right: 'REST API 用 JSON。這是行業標準，所有客戶端生態預設支援，對外介面的原則是不折騰呼叫方。',
+    wrong: [
+      '應該用 JSON。對外介面用 XML 會讓每個呼叫方多做一層解析，HTTP 生態的預設約定就是 JSON。',
+      '應該用 JSON。YAML 沒有主流的 HTTP 傳輸約定，Content-Type 和解析器都要呼叫方自己配，徒增成本。',
+      ''
+    ],
+    hell: false
+  }
+];
+
+let curScn = 0;
+const scnDone = [false, false, false];
+
+function pickScn(i) {
+  curScn = i;
+  for (let j = 0; j < 3; j++) {
+    document.getElementById('scnBtn' + j).classList.toggle('active', j === i);
+    document.getElementById('fmtBtn' + j).className = 'fmt-btn';
+  }
+  document.getElementById('fmtQ').textContent = SCENES[i].q;
+  const v = document.getElementById('fmtVerdict');
+  v.className = 'fmt-verdict';
+  v.textContent = '';
+  document.getElementById('hellWrap').classList.remove('show');
+}
+
+function pickFmt(i) {
+  const s = SCENES[curScn];
+  for (let j = 0; j < 3; j++) document.getElementById('fmtBtn' + j).className = 'fmt-btn';
+  const v = document.getElementById('fmtVerdict');
+  if (i === s.ans) {
+    document.getElementById('fmtBtn' + i).classList.add('right');
+    v.className = 'fmt-verdict ok';
+    v.innerHTML = '<b>選對了：' + FMT_NAMES[i] + '。</b>' + s.right;
+  } else {
+    document.getElementById('fmtBtn' + i).classList.add('wrong');
+    document.getElementById('fmtBtn' + s.ans).classList.add('right');
+    v.className = 'fmt-verdict no';
+    v.innerHTML = '<b>' + FMT_NAMES[i] + ' 在這個場景不合適。</b>' + s.wrong[i];
+  }
+  document.getElementById('hellWrap').classList.toggle('show', s.hell);
+  scnDone[curScn] = true;
+  const n = scnDone.filter(Boolean).length;
+  document.getElementById('scnHint').textContent = n === 3
+    ? '3 個場景都試過了。三分法：Agent 工具呼叫用 XML，配置儲存用 YAML，REST API 用 JSON。'
+    : '進度：' + n + ' / 3 個場景';
+}
+
+/* 初始化 */
+pickScn(0);
+</script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

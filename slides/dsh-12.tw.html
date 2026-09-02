@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>工具執行流水線：三段瀑布與單調 Guard | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.24);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.05),0 0 0 52px rgba(77,107,254,.028)}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.prose{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}
+.src-note code{font-size:11.5px}
+.facts{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}.fact{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}.fact code{color:var(--accent);font-weight:800}.fact p{font-size:14px;line-height:1.9;color:var(--sub);margin:9px 0 0}
+.core-visual{background:var(--card);border:1px solid rgba(77,107,254,.25);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.core-visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.source{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:12px;box-shadow:var(--shadow-card)}
+.source-head{display:flex;justify-content:space-between;gap:12px;padding:12px 18px;background:var(--accent-soft);color:var(--accent-deep);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.source pre{margin:0;padding:20px;overflow:auto}.source code{color:var(--text);font:12.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;background:none;padding:0}
+.kw{color:#3450d4}.ty{color:#7c3aed}.fn{color:#0891b2}.cm{color:#9ca3af}.str{color:#16a34a}
+.snapshot{margin-top:14px;padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;line-height:1.8;color:var(--sub)}.snapshot code{color:var(--text)}
+.doc-quote{margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;box-shadow:var(--shadow-card)}.doc-quote .dq-path{font:700 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);overflow-wrap:anywhere;margin-bottom:8px}.doc-quote blockquote{margin:0;font-size:14px;line-height:1.9;color:var(--text)}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#f0f3ff,var(--card));border:1px solid rgba(77,107,254,.3);border-radius:14px;padding:24px;margin-top:12px}.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.28);color:var(--text);display:flex;gap:14px;line-height:1.9;font-size:14px}.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+/* ── 交互演示 · 流水线闯关 ── */
+.demo{background:var(--card);border:1px solid rgba(77,107,254,.25);border-radius:18px;padding:28px;box-shadow:var(--shadow-card)}
+.demo-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.demo-scenarios,.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 15px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:600 13px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+.demo button.active,.demo button:hover{border-color:var(--accent)}
+.demo button.active{background:var(--accent);color:#fff}
+.demo button svg{flex:none}
+.pipe-call{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.call-chip{display:inline-flex;align-items:center;gap:8px;background:var(--bg);border:1.5px solid rgba(77,107,254,.35);border-radius:999px;padding:8px 16px;font:700 13px/1.2 ui-monospace,Menlo,monospace;color:var(--accent-deep)}
+.call-chip svg{color:var(--accent)}
+.verdict{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:13px;min-height:24px}
+.verdict.yes{color:var(--success)}.verdict.no{color:var(--danger)}
+.pipe-track{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stage-col{background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:12px;transition:border-color .3s,box-shadow .3s}
+.stage-col.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.stage-col.done{border-color:rgba(22,163,74,.45)}
+.stage-col.bad{border-color:rgba(220,38,38,.55)}
+.stage-col.skip{opacity:.45}
+.st-head{font:800 12px/1.4 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:var(--accent-deep);margin-bottom:2px}
+.st-sub{font-size:11px;color:var(--sub);margin-bottom:10px;line-height:1.5}
+.chip{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 10px;font-size:12px;color:var(--text);margin-top:6px;transition:background .25s,border-color .25s,transform .25s}
+.chip .mark{flex:none;width:18px;height:18px;display:grid;place-items:center;color:var(--sub)}
+.chip.active{border-color:var(--accent);background:var(--accent-soft);transform:translateX(2px)}
+.chip.pass{border-color:rgba(22,163,74,.4)}.chip.pass .mark{color:var(--success)}
+.chip.deny{border-color:rgba(220,38,38,.5);background:rgba(220,38,38,.06)}.chip.deny .mark{color:var(--danger)}
+.chip.abstain .mark{color:var(--sub)}
+.chip.evil{border-style:dashed;border-color:rgba(217,119,6,.6)}
+.chip.gone{opacity:.4}
+.pipe-status{margin-top:16px;min-height:56px;font-size:14px;color:var(--text);line-height:1.8;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.demo-note{font-size:12px;color:var(--sub);margin-top:12px;line-height:1.7}
+@media(max-width:760px){.facts{grid-template-columns:1fr}.pipe-track{grid-template-columns:1fr}.objective{grid-template-columns:1fr}.lesson-header:after{display:none}.demo-bar{flex-direction:column;align-items:stretch}.demo button{flex:1}.source-head{flex-direction:column}}
+</style>
+<meta name="description" content="拆解 DeepSeek Harness 的工具執行流水線：pre-execute、execute、post-execute 三段瀑布各管什麼，單調 Guard 為什麼在型別上就沒有放行這個選項，拒絕的呼叫如何物化成模型可見的錯誤結果。">
+<meta name="author" content="洛小山">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/dsh-12.tw.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_TW">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/dsh-12.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/dsh-12.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/dsh-12.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/dsh-12.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/dsh-12.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/dsh-12.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/dsh-12.html">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"工具執行流水線：三段瀑布與單調 Guard","name":"工具執行流水線：三段瀑布與單調 Guard","url":"https://xueai.miyang.cn/slides/dsh-12.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 工具系統","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"拆解 DeepSeek Harness 的工具執行流水線：pre-execute、execute、post-execute 三段瀑布各管什麼，單調 Guard 為什麼在型別上就沒有放行這個選項，拒絕的呼叫如何物化成模型可見的錯誤結果。","datePublished":"2026-08-13","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="工具執行流水線：三段瀑布與單調 Guard"><meta property="og:description" content="拆解 DeepSeek Harness 的工具執行流水線：pre-execute、execute、post-execute 三段瀑布各管什麼，單調 Guard 為什麼在型別上就沒有放行這個選項，拒絕的呼叫如何物化成模型可見的錯誤結果。"><meta property="og:url" content="https://xueai.miyang.cn/slides/dsh-12.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 工具系統</div>
+    <h1>工具執行流水線：三段瀑布與單調 Guard</h1>
+    <p class="subtitle">pre-execute 到 post-execute 的三段管線，Guard 只能收緊不能放行。核心原始碼：<code>packages/core/tools/src/index.ts</code>。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>pre-execute 到 post-execute 的三段管線，Guard 只能收緊不能放行</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>課程目標</b>讀完你能說清三件事：一次工具呼叫在 DSH 裡要過哪三段瀑布，每段各管什麼；Guard 為什麼在型別上就沒有放行這個選項，外掛順序怎麼排都翻不了案；被拒絕的呼叫不會消失，它會物化成一條模型看得見的錯誤結果，繼續走完流水線。</span>
+  </div>
+
+  <div class="sec-label">互動演示 · 流水線闖關</div>
+  <div id="demo-pipeline" class="demo reveal">
+    <div class="demo-bar">
+      <div class="demo-scenarios">
+        <button class="scn active" data-scn="A">情景 A · 一路放行</button>
+        <button class="scn" data-scn="B">情景 B · Guard 攔下</button>
+        <button class="scn" data-scn="C">情景 C · 惡意放行外掛</button>
+      </div>
+      <div class="demo-ctrl">
+        <button id="dp-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"/></svg>播放</button>
+        <button id="dp-step"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4v16l10-8z"/><path d="M19 4v16"/></svg>單步</button>
+        <button id="dp-reset"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>重置</button>
+      </div>
+    </div>
+    <div class="pipe-call">
+      <span class="call-chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg><span id="dp-call">bash: rm -rf build/</span></span>
+      <span class="verdict" id="dp-verdict"></span>
+    </div>
+    <div class="pipe-track">
+      <div class="stage-col" id="st-pre">
+        <div class="st-head">第 1 段 · pre-execute 瀑布</div>
+        <div class="st-sub">進門前表態：allow / deny / ask，監聽器可重排</div>
+        <div id="chips-pre"></div>
+      </div>
+      <div class="stage-col" id="st-guard">
+        <div class="st-head">Guard 層 · 單調守衛</div>
+        <div class="st-sub">只能給拒絕理由或棄權，型別上沒有放行</div>
+        <div id="chips-guard"></div>
+      </div>
+      <div class="stage-col" id="st-exec">
+        <div class="st-head">第 2 段 · execute 瀑布</div>
+        <div class="st-sub">圍著執行包一層：超時、重試、指標</div>
+        <div id="chips-exec"></div>
+      </div>
+      <div class="stage-col" id="st-post">
+        <div class="st-head">第 3 段 · post-execute 瀑布</div>
+        <div class="st-sub">出門前改寫：accept / block，換內容或換值</div>
+        <div id="chips-post"></div>
+      </div>
+    </div>
+    <div class="pipe-status" id="dp-status">選擇情景後點「播放」，或滾動到此處自動播放情景 A。</div>
+    <div class="demo-note">演示為教學化模擬：監聽器與守衛的名字是課程化舉例，段與段的順序、Guard 的單調語義對應 <code>packages/core/tools/src/index.ts</code> 與 <code>docs/tool-execution-pipeline.zh.md</code>。玩的時候盯住一件事：只要有一個環節給出拒絕理由，後面誰也翻不了案。</div>
+  </div>
+
+  <div class="sec-label">機制拆解 · 三段各管什麼</div>
+  <p class="prose reveal">先說清問題。權限檢查、人工審批、超時、結果改寫、UI 渲染，全都想掛進工具執行這一個動作裡。如果讓每個工具自己處理，40 個工具就有 40 份權限程式碼。DSH 的做法是把工具執行做成一條流水線，策略全部住在流水線的固定工位上，工具本體只做一件事：執行並返回值。</p>
+  <p class="prose reveal">流水線的順序寫在 <code>docs/tool-execution-pipeline.zh.md</code> 第 8 行：<code>tools/pre-execute</code> 先跑，隨後是單調守衛，然後是 <code>tools/execute</code> 和 <code>tools/post-execute</code>。瀑布（waterfall）是 DSH 的監聽器排隊模式：每個監聽器拿到 <code>(exec, next)</code>，可以調 <code>next()</code> 把決定權交給下一位，也可以直接返回一個決定當場定案。</p>
+  <p class="prose reveal">三段的分工很清楚。第 1 段 pre-execute 在工具跑之前表態，返回值只有三種：allow 放行、deny 拒絕、ask 轉人工審批。ask 只有拿到審批服務的 allowed-once 才繼續，沒接審批通道就當 deny 處理。第 2 段 execute 是環繞式包裝，超時策略、重試、指標都在這裡給真正的執行包一層，它能替換取消訊號但動不了呼叫身份。第 3 段 post-execute 在結果出來之後檢查：原樣接受、換掉內容、換掉值，或者 block 把結果改寫成一條糾正性錯誤。</p>
+  <div class="facts">
+    <div class="fact reveal"><code>拒絕不是沉默</code><p>被 deny 的呼叫會物化成 <code>Error: 理由</code> 的 isError 結果，而且照樣走 post-execute 和 <code>tools/result</code>。模型能看到自己為什麼被拒，迴圈不會因為一次拒絕卡死。</p></div>
+    <div class="fact reveal"><code>參數改不了</code><p>pre-execute 可以否決但不能改寫參數。因為 <code>tool/call</code> 事件在執行前就落了日誌，UI 的待執行卡片也已經按原參數渲染，改參數會讓歷史、介面、執行三方對不上（<code>index.ts</code> 第 583 至 586 行的型別註釋寫明了這條排除）。</p></div>
+    <div class="fact reveal"><code>Guard 是同步終審</code><p>Guard 在 pre-execute 全部表態之後、工具本體之前跑，簽名是同步函式：返回字串就是拒絕理由，返回 <code>undefined</code> 就是棄權。全域 Guard 先問，再沿 agent 的作用域鏈從遠到近問（<code>index.ts</code> 第 1118 至 1127 行）。</p></div>
+  </div>
+
+  <div class="sec-label">核心視覺 · 一次呼叫的完整路徑</div>
+  <div class="core-visual reveal">
+    <svg viewBox="0 0 940 300" role="img" aria-label="工具執行流水線結構圖">
+      <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#4d6bfe"/></marker></defs>
+      <rect x="16" y="26" width="150" height="66" rx="12" fill="#f0f3ff" stroke="rgba(77,107,254,.4)"/>
+      <text x="91" y="54" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">tool/call 落日誌</text>
+      <text x="91" y="74" fill="#6b7280" text-anchor="middle" font-size="11">UI 同步渲染待執行卡</text>
+      <path fill="none" d="M166 59 H210" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="212" y="26" width="170" height="66" rx="12" fill="#fff" stroke="rgba(77,107,254,.4)"/>
+      <text x="297" y="54" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">pre-execute 瀑布</text>
+      <text x="297" y="74" fill="#6b7280" text-anchor="middle" font-size="11">allow / deny / ask</text>
+      <path fill="none" d="M297 92 V140" stroke="#4d6bfe" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+      <rect x="222" y="144" width="150" height="52" rx="12" fill="#fff" stroke="rgba(77,107,254,.3)" stroke-dasharray="5 4"/>
+      <text x="297" y="166" fill="#3450d4" text-anchor="middle" font-size="12" font-weight="700">ctx.approval 審批</text>
+      <text x="297" y="184" fill="#6b7280" text-anchor="middle" font-size="10">僅 allowed-once 繼續</text>
+      <path fill="none" d="M382 59 H426" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="428" y="26" width="150" height="66" rx="12" fill="url(#gg)" stroke="#3450d4"/>
+      <defs><linearGradient id="gg" x1="0" x2="1"><stop stop-color="#3450d4"/><stop offset="1" stop-color="#4d6bfe"/></linearGradient></defs>
+      <text x="503" y="54" fill="#fff" text-anchor="middle" font-size="13" font-weight="800">單調 Guard</text>
+      <text x="503" y="74" fill="#dfe6ff" text-anchor="middle" font-size="11">deny 或棄權，無 allow</text>
+      <path fill="none" d="M578 59 H622" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="624" y="26" width="140" height="66" rx="12" fill="#fff" stroke="rgba(77,107,254,.4)"/>
+      <text x="694" y="54" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">execute 瀑布</text>
+      <text x="694" y="74" fill="#6b7280" text-anchor="middle" font-size="11">超時 / 重試 / 工具本體</text>
+      <path fill="none" d="M764 59 H808" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ar)"/>
+      <rect x="810" y="26" width="116" height="66" rx="12" fill="#fff" stroke="rgba(77,107,254,.4)"/>
+      <text x="868" y="54" fill="#3450d4" text-anchor="middle" font-size="13" font-weight="700">post-execute</text>
+      <text x="868" y="74" fill="#6b7280" text-anchor="middle" font-size="11">accept / block</text>
+      <path fill="none" d="M503 92 V236 H560" stroke="#dc2626" stroke-width="2" marker-end="url(#ar2)"/>
+      <defs><marker id="ar2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#dc2626"/></marker></defs>
+      <rect x="562" y="210" width="200" height="52" rx="12" fill="rgba(220,38,38,.06)" stroke="rgba(220,38,38,.5)"/>
+      <text x="662" y="232" fill="#dc2626" text-anchor="middle" font-size="12" font-weight="700">deny 物化為 Error 結果</text>
+      <text x="662" y="250" fill="#6b7280" text-anchor="middle" font-size="10">跳過工具本體，仍走 post-execute</text>
+      <path fill="none" d="M762 236 H830 V96" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar2)"/>
+      <text x="868" y="130" fill="#6b7280" text-anchor="middle" font-size="11">finalizeContent 後</text>
+      <text x="868" y="148" fill="#6b7280" text-anchor="middle" font-size="11">tools/result 凍結定稿</text>
+    </svg>
+    <div class="visual-caption">教學化結構圖：路徑對應 docs/tool-execution-pipeline.zh.md 的官方流程圖，節點文案經過課程化整理。</div>
+  </div>
+
+  <div class="sec-label">Guard 的單調性 · 為什麼型別裡沒有 allow</div>
+  <p class="prose reveal">先看邊界問題：兩個 pre-execute 監聽器，一個想 allow 一個想 ask，最終聽誰的？答案是排在前面的那個。瀑布是短路的，第一個不調 <code>next()</code> 直接返回決定的監聽器就定了案。所以 pre-execute 天然順序敏感，外掛載入順序一變，安全結論就可能跟著變。</p>
+  <p class="prose reveal paywall-locked xa-peek">DSH 的解法是在 pre-execute 後面加一層順序不敏感的終審。Guard 的返回型別只有兩種：一個字串（拒絕理由），或者 <code>undefined</code>（棄權）。沒有任何返回值能表達同意。這樣一來，註冊十個 Guard 還是一百個，隨便怎麼排，結論只可能更嚴不可能更松。型別定義就是證據：</p>
+  <div class="source reveal paywall-locked">
+    <div class="source-head"><span>packages/core/tools/src/index.ts</span><span>第 703 至 711 行</span></div>
+    <pre><code><span class="cm">/**
+ * A monotonic execution guard evaluated after every `tools/pre-execute`
+ * listener and before the tool body. Returning a reason denies the call;
+ * returning `undefined` leaves it unchanged. Because guards have no allow
+ * result, listener ordering cannot turn a denial back into permission.
+ * @param execution - the identity-protected call after extensible pre-execute policy completed.
+ * @returns a final denial reason, or `undefined` to leave the call allowed.
+ */</span>
+<span class="kw">export type</span> <span class="ty">ToolGuard</span> = (execution: <span class="ty">Readonly</span>&lt;<span class="ty">ToolExecution</span>&gt;) =&gt; <span class="ty">string</span> | <span class="kw">undefined</span></code></pre>
+  </div>
+  <div class="snapshot paywall-locked"><b>原始碼快照說明：</b>依據本地倉庫 deepseek-harness-master，核對檔案 <code>packages/core/tools/src/index.ts</code>，核對日期 2026-08-13。程式碼塊保留原始碼原文。</div>
+  <p class="prose reveal paywall-locked">註釋裡那句原話值得抄下來：「guards have no allow result, listener ordering cannot turn a denial back into permission」。惡意外掛想放行一個被拒的呼叫，不需要防，因為它在型別系統裡就寫不出這個動作。這比在執行時檢查放行權限乾淨得多，問題類別直接被消滅了。</p>
+  <p class="prose reveal paywall-locked">再看拒絕之後發生什麼。排程器的定案邏輯分兩步：只有 pre-execute 的決定是 allow（含審批通過的 ask），才輪到 Guard 逐個表態；pre-execute 的拒絕理由和 Guard 的拒絕理由匯到同一個變數裡，任何一方給出理由，呼叫就地物化成一條 <code>Error: 理由</code> 的錯誤結果。工具本體連碰都不碰，但這個結果帶著 post-result 標記繼續交給 post-execute 和最終觀察者。</p>
+  <p class="prose reveal paywall-locked">所以審計外掛、上下文注入外掛在拒絕場景下照常工作，拒絕對流水線的其餘部分只是一種普通結果。工具拋異常、找不到工具（UNKNOWN_TOOL）也走同樣的歸一化路徑。</p>
+  <p class="src-note reveal paywall-locked">出處：定案與物化在 <code>packages/core/tools/src/index.ts</code> 第 1486 至 1499 行，異常與 UNKNOWN_TOOL 的歸一化在第 1546 至 1555 行，核對日期 2026-08-13。</p>
+
+  <div class="sec-label paywall-locked">橫向對比 · 同一個位置，三家三種答案</div>
+  <p class="prose reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg><b>Claude Code</b> 把權限判斷分散在 Tool 介面的方法上：每個工具自帶 <code>checkPermissions</code>、<code>validateInput</code>、<code>isReadOnly</code>，BashTool 還要再串白名單和 ML 分類器（書稿 study/chapters/02-tool-system.md 第 350 至 376 行）。外掛擴充套件走 PreToolUse / PostToolUse hooks。有意思的是 DSH 自己實現了一個 CC hooks 橋接外掛 <code>packages/hooks/hooks-claude-code</code>，把 CC 的 hook 掛到 DSH 的瀑布上跑，橋接文件順手暴露了兩個協議差異：</p>
+  <div class="doc-quote reveal paywall-locked">
+    <div class="dq-path">packages/hooks/hooks-claude-code/README.zh.md · 第 92 行（已知限制）</div>
+    <blockquote>「<code>PreToolUse</code> 只支援部分功能：<code>deny</code> 與 <code>ask</code> 決策可用；<code>allow</code> 不會預審批，不支援 <code>defer</code>，<code>additionalContext</code> 會被忽略，<code>updatedInput</code> 會被記錄 + 警告但不應用」</blockquote>
+  </div>
+  <p class="prose reveal paywall-locked">這兩條限制另有原因：流水線的不變式在擋路。CC 原生 hook 可以 allow 預審批、可以用 updatedInput 改寫工具參數；DSH 的橋接把前者降級、把後者只記日誌不執行，因為放行權在 DSH 裡不外借，參數在 <code>tool/call</code> 落日誌之後不可變。同一份 CC hook 配置，換個宿主，能做的事就變少了，這正好量出了兩套協議的表達力邊界。另外多個 CC hook 在橋接裡按最嚴格方式摺疊（deny 優先於 ask 優先於 allow），摺疊結果與順序無關（README 第 49 行），和 Guard 的單調思路一脈相承。</p>
+  <p class="prose reveal paywall-locked"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg><b>Grok Build</b> 的 hooks 系統（<code>crates/codegen/xai-grok-hooks</code>）只有 pre_tool_use 一個點能攔截，決策型別是 Allow 或 Deny 兩個值（<code>src/result.rs</code> 第 5 至 10 行），而且模組註釋直接寫明了失敗語義：</p>
+  <div class="doc-quote reveal paywall-locked">
+    <div class="dq-path">grok-build-main/crates/codegen/xai-grok-hooks/src/lib.rs · 第 16 至 17 行</div>
+    <blockquote>「- <code>pre_tool_use</code> hooks can deny/allow (blocking); all others are non-blocking<br>- Fail-open by default: hook failures do not block normal operation」</blockquote>
+  </div>
+  <p class="prose reveal paywall-locked">Fail-open 的意思是 hook 自己崩了、超時了，呼叫照常放行。DSH 反過來：pre-execute 監聽器拋異常，這次呼叫直接歸一化成錯誤結果，寧可錯殺。兩種取向都講得通，Grok 把 hooks 當外掛增強，不讓使用者腳本拖垮主流程；DSH 把策略當流水線的正式工位，工位塌了呼叫就不該過。Grok 工具系統的登錄檔與只讀語義，站內 <a href="12-8.html">ToolKind 提供預設只讀語義</a> 一課有完整拆解。</p>
+
+  <div class="sec-label paywall-locked">課堂練習</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>手推一次 rm -rf 的完整路徑</h3><p>部署裡註冊了兩個 pre-execute 監聽器（先 CC hooks 橋接，配置了一條 ask 規則；後一個白名單外掛，對 rm 直接返回 allow）和一個沙箱 Guard（對寫出工作區的命令返回理由）。模型發起 <code>bash: rm -rf /tmp/x</code>。第一問：審批彈窗會不會出現？第二問：把兩個 pre-execute 監聽器對調註冊順序，答案變不變？第三問：沙箱 Guard 的結論受這個順序影響嗎？為什麼？（提示：瀑布短路 + 第 1486 行的 denialReason 只在 allow 之後才問 Guard。）</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway：</b>三段瀑布各管一段：進門前表態、圍著執行包一層、出門前改寫結果。順序敏感的擴充套件放瀑布裡，順序不敏感的否決權交給 Guard，Guard 的型別裡沒有 allow，拒絕一旦成立誰也翻不了案。拒絕也是一等結果：物化成 Error 文字給模型，流水線照常走完。</span>
+  </div>
+</article>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var statusEl = $('dp-status');
+  var verdictEl = $('dp-verdict');
+  var cur = 'A';
+  var steps = [];
+  var idx = 0;
+  var timer = null;
+  var playing = false;
+  var runId = 0;
+
+  var SVG_DOT = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>';
+  var SVG_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>';
+  var SVG_CROSS = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  var SVG_SKIP = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>';
+
+  var CHIPS = {
+    A: { pre: [['hook', 'CC hooks 橋接'], ['appr', '審批策略']], guard: [['sand', '沙箱守衛'], ['ro', '只讀模式守衛']], exec: [['to', '超時包裝層'], ['body', '工具本體 bash']], post: [['audit', '審計外掛']] },
+    B: { pre: [['hook', 'CC hooks 橋接'], ['appr', '審批策略']], guard: [['sand', '沙箱守衛'], ['ro', '只讀模式守衛']], exec: [['to', '超時包裝層'], ['body', '工具本體 bash']], post: [['audit', '審計外掛']] },
+    C: { pre: [['hook', 'CC hooks 橋接']], guard: [['evil', '惡意放行外掛', 'evil'], ['sand', '沙箱守衛']], exec: [['to', '超時包裝層'], ['body', '工具本體 bash']], post: [['audit', '審計外掛']] }
+  };
+
+  function buildChips() {
+    var conf = CHIPS[cur];
+    ['pre', 'guard', 'exec', 'post'].forEach(function (st) {
+      var wrap = $('chips-' + st);
+      wrap.innerHTML = '';
+      conf[st].forEach(function (c) {
+        var d = document.createElement('div');
+        d.className = 'chip' + (c[2] ? ' ' + c[2] : '');
+        d.id = 'ch-' + c[0];
+        d.innerHTML = '<span>' + c[1] + '</span><span class="mark">' + SVG_DOT + '</span>';
+        wrap.appendChild(d);
+      });
+    });
+  }
+
+  function setChip(id, state, mark) {
+    var el = $('ch-' + id);
+    if (!el) return;
+    el.classList.remove('active', 'pass', 'deny', 'abstain', 'gone');
+    if (state) el.classList.add(state);
+    if (mark) el.querySelector('.mark').innerHTML = mark;
+  }
+  function setStage(id, cls) {
+    var el = $('st-' + id);
+    el.classList.remove('on', 'done', 'bad', 'skip');
+    if (cls) cls.split(' ').forEach(function (c) { el.classList.add(c); });
+  }
+  function setStatus(t) { statusEl.textContent = t; }
+  function setVerdict(ok, text) {
+    verdictEl.className = 'verdict ' + (ok ? 'yes' : 'no');
+    verdictEl.innerHTML = (ok ? SVG_CHECK : SVG_CROSS) + '<span>' + text + '</span>';
+  }
+
+  function buildA() {
+    return [
+      { cap: '模型發起工具呼叫。tool/call 事件先落日誌，UI 同步亮出待執行卡片。', run: function () { setStage('pre', 'on'); } },
+      { cap: '第 1 段開始。CC hooks 橋接沒配這條命令的規則，調 next() 把話筒遞給下一位。', run: function () { setChip('hook', 'active'); } },
+      { cap: '審批策略看了看：命令在白名單裡，放行（allow）。第 1 段結論：allow。', run: function () { setChip('hook', 'pass', SVG_CHECK); setChip('appr', 'pass', SVG_CHECK); } },
+      { cap: '進入 Guard 層。沙箱守衛檢查路徑：build/ 在工作區內，棄權（返回 undefined）。', run: function () { setStage('pre', 'done'); setStage('guard', 'on'); setChip('sand', 'abstain', SVG_SKIP); } },
+      { cap: '只讀模式守衛：當前不是只讀模式，同樣棄權。沒人給出理由，呼叫繼續。', run: function () { setChip('ro', 'abstain', SVG_SKIP); } },
+      { cap: '第 2 段。超時包裝層起一個計時器，把執行交給工具本體。', run: function () { setStage('guard', 'done'); setStage('exec', 'on'); setChip('to', 'active'); } },
+      { cap: '工具本體真正跑 bash，返回規範值。', run: function () { setChip('to', 'pass', SVG_CHECK); setChip('body', 'pass', SVG_CHECK); } },
+      { cap: '第 3 段。審計外掛檢查結果後 accept，結果原樣透過。', run: function () { setStage('exec', 'done'); setStage('post', 'on'); setChip('audit', 'pass', SVG_CHECK); } },
+      { cap: '結果凍結，tools/result 廣播定稿，模型在下一步看到輸出。', run: function () { setStage('post', 'done'); setVerdict(true, '結果返回模型'); } }
+    ];
+  }
+
+  function buildB() {
+    return [
+      { cap: '同一條命令再來一次，這次部署開了只讀模式。tool/call 照常落日誌。', run: function () { setStage('pre', 'on'); } },
+      { cap: '第 1 段兩位監聽器都沒意見，結論 allow。注意：allow 只是不反對，不是通行證。', run: function () { setChip('hook', 'pass', SVG_CHECK); setChip('appr', 'pass', SVG_CHECK); } },
+      { cap: '進入 Guard 層。沙箱守衛棄權。', run: function () { setStage('pre', 'done'); setStage('guard', 'on'); setChip('sand', 'abstain', SVG_SKIP); } },
+      { cap: '只讀模式守衛給出理由：只讀模式禁止刪除。第一個理由出現，當場定案。', run: function () { setChip('ro', 'deny', SVG_CROSS); setStage('guard', 'bad'); } },
+      { cap: '工具本體被整段跳過，rm 一個位元組都沒執行。拒絕被物化成 Error: 只讀模式禁止刪除。', run: function () { setStage('exec', 'skip'); setChip('to', 'gone'); setChip('body', 'gone'); } },
+      { cap: '但拒絕不是沉默：這條錯誤結果照樣走第 3 段，審計外掛照常記錄。', run: function () { setStage('post', 'on'); setChip('audit', 'pass', SVG_CHECK); } },
+      { cap: '模型收到 isError 結果，知道自己為什麼被拒，可以換個思路繼續，迴圈不會卡死。', run: function () { setStage('post', 'done'); setVerdict(false, '拒絕，模型收到 Error 文字'); } }
+    ];
+  }
+
+  function buildC() {
+    return [
+      { cap: '有人裝了一個惡意外掛，想在 Guard 層把被拒的呼叫放出去。看看它能做什麼。', run: function () { setStage('pre', 'on'); } },
+      { cap: '第 1 段放行。進入 Guard 層，惡意外掛排在最前面，第一個被問到。', run: function () { setChip('hook', 'pass', SVG_CHECK); setStage('pre', 'done'); setStage('guard', 'on'); setChip('evil', 'active'); } },
+      { cap: '它想返回同意，但 Guard 的返回型別只有兩種：拒絕理由，或 undefined。它最多只能棄權。', run: function () { setChip('evil', 'abstain', SVG_SKIP); } },
+      { cap: '輪到沙箱守衛：路徑越界，給出拒絕理由。定案。', run: function () { setChip('sand', 'deny', SVG_CROSS); setStage('guard', 'bad'); setStage('exec', 'skip'); setChip('to', 'gone'); setChip('body', 'gone'); setVerdict(false, '拒絕'); } },
+      { cap: '換個順序再試：把惡意外掛挪到沙箱守衛後面，重放同一次呼叫。', run: function () { setStage('guard', 'on'); setStage('exec', ''); setChip('evil', null, SVG_DOT); setChip('sand', null, SVG_DOT); setChip('to', null, SVG_DOT); setChip('body', null, SVG_DOT); verdictEl.innerHTML = ''; verdictEl.className = 'verdict'; var g = $('chips-guard'); g.appendChild($('ch-evil')); } },
+      { cap: '這次沙箱守衛先表態：拒絕理由照舊。', run: function () { setChip('sand', 'deny', SVG_CROSS); } },
+      { cap: '惡意外掛排在後面也沒用：guardReason 找到第一個理由就返回，它連被問到的機會都沒有。', run: function () { setChip('evil', 'gone'); setStage('guard', 'bad'); setStage('exec', 'skip'); setChip('to', 'gone'); setChip('body', 'gone'); } },
+      { cap: '結論：deny 過的呼叫永遠無法復活。不靠執行時檢查，靠型別裡根本沒有 allow 這個動作。', run: function () { setVerdict(false, '順序怎麼排都翻不了案'); } }
+    ];
+  }
+
+  function build() { return cur === 'A' ? buildA() : cur === 'B' ? buildB() : buildC(); }
+
+  function reset() {
+    runId++;
+    playing = false;
+    clearTimeout(timer);
+    idx = 0;
+    buildChips();
+    ['pre', 'guard', 'exec', 'post'].forEach(function (s) { setStage(s, ''); });
+    verdictEl.innerHTML = '';
+    verdictEl.className = 'verdict';
+    $('dp-call').textContent = cur === 'C' ? 'bash: rm -rf /etc/x' : 'bash: rm -rf build/';
+    setStatus('已重置。點「播放」執行情景 ' + cur + '，或點「單步」逐幀推進。');
+    steps = build();
+  }
+
+  function doStep() {
+    if (idx >= steps.length) { playing = false; return; }
+    var s = steps[idx++];
+    if (s.cap) setStatus(s.cap);
+    if (s.run) s.run();
+    if (playing) timer = setTimeout(doStep, s.dur || 1600);
+  }
+  function play() {
+    if (playing) return;
+    if (idx >= steps.length) reset();
+    playing = true;
+    doStep();
+  }
+  function stepOnce() {
+    playing = false;
+    clearTimeout(timer);
+    if (idx >= steps.length) { reset(); return; }
+    doStep();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#demo-pipeline .scn'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#demo-pipeline .scn'), function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      cur = btn.getAttribute('data-scn');
+      reset();
+    });
+  });
+  $('dp-play').addEventListener('click', play);
+  $('dp-step').addEventListener('click', stepOnce);
+  $('dp-reset').addEventListener('click', reset);
+
+  reset();
+  (function hookAutoplay(tries) {
+    if (typeof window.lessonOnView === 'function') {
+      window.lessonOnView(document.getElementById('demo-pipeline'), play);
+    } else if (tries > 0) {
+      setTimeout(function () { hookAutoplay(tries - 1); }, 120);
+    }
+  })(50);
+})();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

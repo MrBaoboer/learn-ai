@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>工具調用的真相：一次對話背後的 5 條消息 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* ── 双栏：用户视角 | Message List ── */
+.duo{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
+
+/* 左：用户视角（聊天模拟窗口，保留内部滚动） */
+.chat-panel{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card);position:sticky;top:16px}
+.l-label{padding:10px 16px;font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.chat-area{padding:12px;min-height:180px;max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;background:#eae7df}
+.chat-bubble{max-width:88%;padding:9px 13px;border-radius:14px;font-size:15px;line-height:1.6;opacity:0;transform:translateY(6px);transition:all .3s ease}
+.chat-bubble.show{opacity:1;transform:translateY(0)}
+.chat-user{align-self:flex-end;background:var(--cyan);color:white;border-bottom-right-radius:4px}
+.chat-bot{align-self:flex-start;background:var(--card);color:var(--text);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.chat-loading{align-self:flex-start;background:var(--card);color:var(--sub);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);font-size:14px;display:flex;align-items:center;gap:6px}
+.typing-dots span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--sub);animation:blink 1.4s infinite both}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
+.chat-tool-card{align-self:flex-start;background:var(--card);border:1.5px solid rgba(22,163,74,.2);border-radius:12px;padding:10px 12px;box-shadow:0 1px 4px rgba(0,0,0,.06);max-width:88%}
+.ctc-hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--success);margin-bottom:5px}
+.ctc-row{display:flex;justify-content:space-between;font-size:13px;padding:2px 0}
+.ctc-label{color:var(--sub)}
+.ctc-val{font-weight:600;color:var(--text)}
+
+/* 产品决策卡片 */
+.decision{padding:12px}
+.dec-card{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.2);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);line-height:1.6;opacity:0;transform:translateY(4px);transition:all .35s}
+.dec-card.show{opacity:1;transform:translateY(0)}
+.dec-card b{color:var(--accent)}
+
+/* 右：Message List */
+.ml-panel{min-width:0}
+.r-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.r-title{font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.5px}
+.r-stats{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.r-stat{font-size:13px;color:var(--sub);font-weight:600}
+.r-stat span{font-weight:800;color:var(--text)}
+.btn-reset{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--sub);cursor:pointer;font-family:inherit;min-height:32px}
+
+.ml-area{display:flex;flex-direction:column;gap:8px}
+
+/* 消息条目 — 仿 API 调试器 */
+.ml-entry{border:1.5px solid var(--border);border-radius:10px;overflow:hidden;opacity:0;transform:translateY(8px);transition:all .35s ease;background:var(--card)}
+.ml-entry.show{opacity:1;transform:translateY(0)}
+.ml-head{padding:6px 12px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;background:rgba(0,0,0,.025);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:4px}
+.ml-idx{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;font-weight:800;color:var(--sub)}
+.ml-role{display:flex;align-items:center;gap:6px}
+.ml-role-badge{padding:2px 7px;border-radius:4px;font-size:12px;font-weight:800;letter-spacing:.3px}
+.ml-tokens{color:var(--sub);font-weight:600;font-size:13px}
+.ml-body{padding:10px 12px 12px;font-size:14px;line-height:1.6;color:var(--text)}
+.ml-field{font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;color:var(--sub);font-weight:600;margin-bottom:1px;word-break:break-word}
+.ml-field-val{color:var(--text);font-weight:400}
+.ml-body-muted{color:var(--sub);font-size:13px}
+.ml-tool-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:13px;font-weight:700;margin:2px 0}
+.ml-param{display:flex;gap:8px;font-size:13px;padding:2px 0;padding-left:16px;font-family:"SF Mono","Fira Code",Menlo,monospace}
+.ml-param-k{color:var(--sub);min-width:40px}
+.ml-param-v{color:var(--text);font-weight:600}
+
+/* 框架动作行 */
+.ml-action{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;background:rgba(217,119,6,.04);border:1px dashed rgba(217,119,6,.3);font-size:13px;color:var(--amber);font-weight:600;opacity:0;transform:translateY(6px);transition:all .3s}
+.ml-action.show{opacity:1;transform:translateY(0)}
+.ml-action-icon{font-size:15px}
+
+/* 请求方向标记 */
+.ml-dir{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:13px;font-weight:700;color:var(--sub);opacity:0;transition:opacity .3s}
+.ml-dir.show{opacity:1}
+.ml-dir-arrow{font-size:15px}
+
+/* 折叠的工具列表 */
+.ml-tools-summary{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.ml-ts-chip{padding:3px 8px;border-radius:4px;font-size:13px;font-weight:700;background:rgba(0,0,0,.05);color:var(--sub)}
+
+/* JSON 格式参考（可折叠卡片） */
+.json-panel{border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:var(--shadow-card)}
+.json-toggle{padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--sub);user-select:none;transition:all .15s;min-height:44px}
+.json-toggle:hover{background:rgba(0,0,0,.02)}
+.json-panel.closed .json-ref{display:none}
+.json-ref{background:#1e1e2e;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12.5px;line-height:1.7;color:#cdd6f4;white-space:pre;padding:14px 16px;overflow-x:auto}
+.json-ref .jr-k{color:#89b4fa}
+.json-ref .jr-v{color:#a6e3a1}
+.json-ref .jr-null{color:#f38ba8;font-style:italic}
+.json-ref .jr-cm{color:#6c7086}
+.json-ref .jr-brace{color:#cdd6f4}
+
+.hint-line{font-size:13px;color:var(--sub);margin-top:10px;min-height:20px}
+
+@media (max-width:768px){
+  .duo{grid-template-columns:1fr}
+  .chat-panel{position:static}
+  .chat-area{max-height:260px}
+}
+</style>
+<meta name="description" content="工具調用（Function Calling）完整解剖：左邊是用戶看到的對話，右邊是 API 實際傳輸的 Message List。每一步標註產品經理需要做的設計決策。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/7-2a.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/7-2a.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/7-2a.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/7-2a.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/7-2a.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/7-2a.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/7-2a.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/7-2a.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="工具調用的真相：一次對話背後的 5 條消息">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/7-2a.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/7-2a.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"一次對話背後的 5 條消息","name":"一次對話背後的 5 條消息","url":"https://xueai.miyang.cn/slides/7-2a.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"工具調用（Function Calling）完整解剖：左邊是用戶看到的對話，右邊是 API 實際傳輸的 Message List。每一步標註產品經理需要做的設計決策。","datePublished":"2026-04-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:description" content="工具調用（Function Calling）完整解剖：左邊是用戶看到的對話，右邊是 API 實際傳輸的 Message List。每一步標註產品經理需要做的設計決策。"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 工程</div>
+    <h1>一次對話背後的 5 條消息</h1>
+    <p class="subtitle">左邊：用戶看到的介面 ｜ 右邊：API 裏真正發生的。向下滾動，自動演示一次查天氣背後發生了什麼。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>拆解 Function Calling 真實鏈路：用戶看到 1 條回覆，背後是 5 條 API 消息</p></aside><!--seo:end-->  <div class="duo reveal" id="duoDemo">
+    <!-- 左：用户视角 + 设计决策 -->
+    <aside class="chat-panel">
+      <div class="l-label">用戶看到的介面</div>
+      <div class="chat-area" id="chatArea"></div>
+      <div class="decision" id="decArea"></div>
+    </aside>
+
+    <!-- 右：Message List -->
+    <div class="ml-panel">
+      <div class="r-bar">
+        <div class="r-title">實際運行過程</div>
+        <div class="r-stats">
+          <div class="r-stat">消息 <span id="msgCount">0</span></div>
+          <div class="r-stat">Token <span id="tokenCount">0</span></div>
+          <div class="r-stat">API <span id="apiCount">0</span></div>
+          <button class="btn-reset" onclick="reset()">↺ 重播</button>
+        </div>
+      </div>
+      <div class="ml-area" id="mlArea"></div>
+      <div class="hint-line" id="hint">共 7 步 · 看一次查天氣背後發生了什麼</div>
+    </div>
+  </div>
+
+  <div class="sec-label reveal">JSON 格式參考</div>
+  <div class="json-panel open reveal paywall-locked xa-peek" id="jsonPanel">
+    <div class="json-toggle" onclick="toggleJson()">
+      <span id="jsonArrow">▼</span>
+      <span class="json-toggle-label">messages 陣列的完整格式</span>
+    </div>
+    <div class="json-ref"><span class="jr-brace">{</span>
+  <span class="jr-k">"messages"</span>: [
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"system"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"指令"</span>
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"user"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"用戶的話"</span>
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"assistant"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-null">null</span>,
+      <span class="jr-k">"tool_calls"</span>: [{
+        <span class="jr-k">"name"</span>: <span class="jr-v">"…"</span>,
+        <span class="jr-k">"arguments"</span>: {…}
+      }]
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"tool"</span>,
+      <span class="jr-k">"tool_call_id"</span>: <span class="jr-v">"…"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"結果"</span>
+    },
+    {
+      <span class="jr-k">"role"</span>: <span class="jr-v">"assistant"</span>,
+      <span class="jr-k">"content"</span>: <span class="jr-v">"最終回答"</span>
+    }
+  ]
+<span class="jr-brace">}</span>
+
+<span class="jr-cm">// 共 5 條消息</span>
+<span class="jr-cm">// 2 次模型調用</span>
+<span class="jr-cm">// 1 次工具調用</span></div>
+  </div>
+
+  <div class="sec-label reveal paywall-locked">Takeaway</div>
+  <div class="l-callout reveal paywall-locked" id="insightBar">
+    <b>Takeaway</b>　用戶看到的是一句回答，API 裏跑了 5 條消息、2 次模型調用、1 次外部 API。產品設計的本質就是：決定這些環節中，哪些讓用戶感知、哪些靜默處理。
+  </div>
+</article>
+
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+var msgIdx = 0;
+
+var STEPS = [
+  {
+    msgs: 1, tokens: 220, apis: 0,
+    hint: '1/7 · 每次對話開始前，你的程式碼先塞一條 system 消息',
+    chat: [],
+    decision: '<b>📌 設計決策：</b>你要在 system 裏註冊哪些工具？每多一個工具 ≈ +60 Token/輪。10 個工具的產品，100 輪對話/天 = 每天多花 6 萬 Token 在工具定義上。',
+    ml: [
+      { type:'dir', arrow:'→', text:'你的程式碼發送第 1 次請求給模型 API' },
+      { type:'entry', role:'system', roleColor:'#6b6b70', roleBg:'rgba(0,0,0,.06)', tokens: 220,
+        fields:[
+          {k:'role', v:'"system"'},
+          {k:'content', v:'"你是一個智能助手，可以使用以下工具幫助用戶…"'},
+          {k:'tools', special:'chips', chips:['get_weather','send_email','web_search']}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 2, tokens: 250, apis: 0,
+    hint: '2/7 · 用戶的問題被追加到 Message List',
+    chat: [{ type:'user', text:'北京明天天氣怎麼樣？' }],
+    decision: '<b>📌 設計決策：</b>用戶發完消息後你展示什麼？大多數產品會先顯示「思考中…」的加載態。但用戶不知道接下來會觸發工具調用，要不要告訴他？',
+    ml: [
+      { type:'entry', role:'user', roleColor:'#0891b2', roleBg:'rgba(8,145,178,.1)', tokens: 30,
+        fields:[
+          {k:'role', v:'"user"'},
+          {k:'content', v:'"北京明天天氣怎麼樣？"'}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 3, tokens: 310, apis: 1,
+    hint: '3/7 · 模型沒有直接回答，它返回了一個 tool_call',
+    chat: [{ type:'loading', text:'思考中' }],
+    decision: '<b>📌 關鍵認知：</b>注意看右邊：content 是 <b>null</b>！模型沒有回答用戶，而是輸出了 tool_calls：一段結構化文字，告訴你的程式碼「我想調這個工具」。模型自己什麼都沒執行。',
+    ml: [
+      { type:'dir', arrow:'←', text:'模型 API 返回（第 1 次調用完成，耗時 1.8s）' },
+      { type:'entry', role:'assistant', roleColor:'#7c3aed', roleBg:'rgba(124,58,237,.1)', tokens: 60,
+        fields:[
+          {k:'role', v:'"assistant"'},
+          {k:'content', v:'null', muted:true},
+          {k:'tool_calls', special:'tool_call', name:'get_weather', id:'call_abc123', args:[['city','"北京"'],['date','"2026-04-23"']]}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 3, tokens: 310, apis: 1,
+    hint: '4/7 · 你的程式碼接管：校驗參數 → 調真實 API',
+    chat: [{ type:'remove-loading' }, { type:'loading', text:'正在查詢天氣' }],
+    decision: '<b>📌 設計決策：</b>這裏是你的工程程式碼在運行，不是模型。你需要決定：① 參數校驗多嚴格？② 超時設多久？③ 失敗了重試幾次？④ 給用戶顯示「正在查詢天氣」還是繼續顯示「思考中」？',
+    ml: [
+      { type:'action', icon:'⚙️', text:'你的程式碼：解析 tool_calls → 校驗參數 → city 合法 ✓、date 格式正確 ✓ → 調用天氣 API…' }
+    ]
+  },
+  {
+    msgs: 4, tokens: 360, apis: 1,
+    hint: '5/7 · 天氣 API 返回結果，你的程式碼把它塞回 messages 陣列',
+    chat: [],
+    decision: '<b>📌 設計決策：</b>工具返回了原始數據。你可以選擇：直接把原始數據放進 messages（簡單但 Token 多），還是先處理/精簡（省 Token 但需要額外程式碼）。',
+    ml: [
+      { type:'action', icon:'✅', text:'天氣 API 返回成功（耗時 0.8s）→ 你的程式碼構造一條 tool 消息追加到 messages' },
+      { type:'entry', role:'tool', roleColor:'#16a34a', roleBg:'rgba(22,163,74,.1)', tokens: 50,
+        fields:[
+          {k:'role', v:'"tool"'},
+          {k:'tool_call_id', v:'"call_abc123"', muted:true},
+          {k:'content', special:'json', rows:[['weather','"小雨轉多雲"'],['temp','"12°C ~ 20°C"'],['wind','"北風 3 級"']]}
+        ],
+        footnote:'這條消息由你的程式碼注入，不是模型生成的'
+      }
+    ]
+  },
+  {
+    msgs: 5, tokens: 480, apis: 2,
+    hint: '6/7 · 你的程式碼第 2 次調用模型 API：把完整 4 條消息都發過去',
+    chat: [{ type:'remove-loading' }],
+    decision: '<b>📌 設計決策：</b>現在要第 2 次調用模型 API，把全部 4 條消息一起發過去，讓模型看到工具結果後生成回答。注意：之前的 system、user、assistant、tool 四條消息會再次發送，Token 再算一遍。',
+    ml: [
+      { type:'dir', arrow:'→', text:'你的程式碼發送第 2 次請求（攜帶完整 4 條消息 + 工具結果）' },
+      { type:'dir', arrow:'←', text:'模型返回最終回答（耗時 1.5s）' },
+      { type:'entry', role:'assistant', roleColor:'#7c3aed', roleBg:'rgba(124,58,237,.1)', tokens: 120,
+        fields:[
+          {k:'role', v:'"assistant"'},
+          {k:'content', v:'"明天北京小雨轉多雲，氣温 12-20°C，北風 3 級，出門建議帶把傘。"'}
+        ]
+      }
+    ]
+  },
+  {
+    msgs: 5, tokens: 480, apis: 2,
+    hint: '7/7 · 用戶看到最終回答。整個過程：2 次模型調用 + 1 次天氣 API',
+    chat: [
+      { type:'bot', text:'明天北京小雨轉多雲，氣温 12-20°C，北風 3 級，出門建議帶把傘。☂️' }
+    ],
+    decision: '<b>📌 設計決策：</b>最終展示形式：只顯示文字？還是額外展示一張結構化卡片？卡片體驗更好，但需要前端額外開發。<br><b>全流程總結：</b>用戶等了約 4 秒，你的系統跑了 5 條消息、調了 2 次模型 + 1 次天氣 API、花了 480 Token（約 ¥0.003）。',
+    ml: []
+  }
+];
+
+var cur = 0;
+
+function addChat(item) {
+  var area = document.getElementById('chatArea');
+  if (item.type === 'remove-loading') {
+    var ld = area.querySelector('.chat-loading');
+    if (ld) ld.remove();
+    return;
+  }
+  var el = document.createElement('div');
+  if (item.type === 'user') {
+    el.className = 'chat-bubble chat-user';
+    el.textContent = item.text;
+  } else if (item.type === 'bot') {
+    el.className = 'chat-bubble chat-bot';
+    el.textContent = item.text;
+  } else if (item.type === 'loading') {
+    el.className = 'chat-bubble chat-loading';
+    el.innerHTML = item.text + ' <span class="typing-dots"><span></span><span></span><span></span></span>';
+  } else if (item.type === 'tool-card') {
+    el.className = 'chat-tool-card';
+    var h = '<div class="ctc-hd">' + item.title + '</div>';
+    for (var i = 0; i < item.rows.length; i++) {
+      h += '<div class="ctc-row"><span class="ctc-label">' + item.rows[i][0] + '</span><span class="ctc-val">' + item.rows[i][1] + '</span></div>';
+    }
+    el.innerHTML = h;
+  }
+  area.appendChild(el);
+  requestAnimationFrame(function() { requestAnimationFrame(function() {
+    el.classList.add('show');
+    area.scrollTop = area.scrollHeight;
+  })});
+}
+
+function renderField(f) {
+  var h = '<div class="ml-field"><span style="color:var(--sub)">' + f.k + ':</span> ';
+  if (f.special === 'chips') {
+    h += '[</div><div class="ml-tools-summary" style="padding-left:16px">';
+    for (var c = 0; c < f.chips.length; c++) {
+      h += '<div class="ml-ts-chip">' + f.chips[c] + '</div>';
+    }
+    h += '</div><div class="ml-field" style="margin-top:2px">]</div>';
+  } else if (f.special === 'tool_call') {
+    h += '[{</div>';
+    h += '<div class="ml-param"><span class="ml-param-k">name</span><span class="ml-param-v">"' + f.name + '"</span></div>';
+    h += '<div class="ml-param"><span class="ml-param-k">id</span><span class="ml-param-v" style="color:var(--sub);font-weight:400">"' + f.id + '"</span></div>';
+    h += '<div class="ml-param"><span class="ml-param-k">arguments</span><span class="ml-param-v">{</span></div>';
+    for (var a = 0; a < f.args.length; a++) {
+      h += '<div class="ml-param" style="padding-left:32px"><span class="ml-param-k">' + f.args[a][0] + '</span><span class="ml-param-v">' + f.args[a][1] + '</span></div>';
+    }
+    h += '<div class="ml-param"><span class="ml-param-k"></span><span class="ml-param-v">}</span></div>';
+    h += '<div class="ml-field">}]</div>';
+  } else if (f.special === 'json') {
+    h += '{</div>';
+    for (var r = 0; r < f.rows.length; r++) {
+      h += '<div class="ml-param"><span class="ml-param-k">' + f.rows[r][0] + '</span><span class="ml-param-v">' + f.rows[r][1] + '</span></div>';
+    }
+    h += '<div class="ml-field">}</div>';
+  } else {
+    var valStyle = f.muted ? 'color:var(--sub);font-style:italic' : 'color:var(--text)';
+    h += '<span class="ml-field-val" style="' + valStyle + '">' + f.v + '</span></div>';
+  }
+  return h;
+}
+
+function addML(item) {
+  var area = document.getElementById('mlArea');
+  var el = document.createElement('div');
+  if (item.type === 'dir') {
+    el.className = 'ml-dir';
+    el.innerHTML = '<span class="ml-dir-arrow">' + item.arrow + '</span> ' + item.text;
+  } else if (item.type === 'action') {
+    el.className = 'ml-action';
+    el.innerHTML = '<span class="ml-action-icon">' + item.icon + '</span> ' + item.text;
+  } else if (item.type === 'entry') {
+    el.className = 'ml-entry';
+    var bodyHtml = '';
+    for (var i = 0; i < item.fields.length; i++) {
+      bodyHtml += renderField(item.fields[i]);
+    }
+    if (item.footnote) {
+      bodyHtml += '<div class="ml-body-muted" style="margin-top:4px;font-style:italic">' + item.footnote + '</div>';
+    }
+    el.innerHTML =
+      '<div class="ml-head">' +
+        '<div class="ml-role">' +
+          '<span class="ml-idx">messages[' + msgIdx + ']</span>' +
+          '<span class="ml-role-badge" style="background:' + item.roleBg + ';color:' + item.roleColor + '">' + item.role + '</span>' +
+        '</div>' +
+        '<span class="ml-tokens">' + item.tokens + ' Token</span>' +
+      '</div>' +
+      '<div class="ml-body">' + bodyHtml + '</div>';
+    msgIdx++;
+  }
+  area.appendChild(el);
+  setTimeout(function() {
+    el.classList.add('show');
+  }, 60);
+}
+
+var playTimer = null;
+
+function playStep() {
+  if (cur >= STEPS.length) return;
+  var s = STEPS[cur];
+
+  document.getElementById('msgCount').textContent = s.msgs;
+  document.getElementById('tokenCount').textContent = s.tokens;
+  document.getElementById('apiCount').textContent = s.apis;
+  document.getElementById('hint').textContent = s.hint;
+
+  for (var i = 0; i < s.chat.length; i++) addChat(s.chat[i]);
+  for (var j = 0; j < s.ml.length; j++) {
+    (function(item, delay) {
+      setTimeout(function() { addML(item); }, delay);
+    })(s.ml[j], j * 150);
+  }
+
+  var da = document.getElementById('decArea');
+  da.innerHTML = '<div class="dec-card">' + s.decision + '</div>';
+  requestAnimationFrame(function() { requestAnimationFrame(function() {
+    var dc = da.querySelector('.dec-card');
+    if (dc) dc.classList.add('show');
+  })});
+
+  cur++;
+  if (cur >= STEPS.length) {
+    playTimer = null;
+  } else {
+    playTimer = setTimeout(playStep, 900);
+  }
+}
+
+function startPlay() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = setTimeout(playStep, 300);
+}
+
+function toggleJson() {
+  var p = document.getElementById('jsonPanel');
+  var a = document.getElementById('jsonArrow');
+  if (p.classList.contains('open')) {
+    p.classList.remove('open');
+    p.classList.add('closed');
+    a.textContent = '▶';
+  } else {
+    p.classList.remove('closed');
+    p.classList.add('open');
+    a.textContent = '▼';
+  }
+}
+
+function reset() {
+  if (playTimer) clearTimeout(playTimer);
+  playTimer = null;
+  cur = 0;
+  msgIdx = 0;
+  document.getElementById('chatArea').innerHTML = '';
+  document.getElementById('mlArea').innerHTML = '';
+  document.getElementById('decArea').innerHTML = '';
+  document.getElementById('msgCount').textContent = '0';
+  document.getElementById('tokenCount').textContent = '0';
+  document.getElementById('apiCount').textContent = '0';
+  document.getElementById('hint').textContent = '共 7 步 · 自動播放中…';
+  startPlay();
+}
+
+lessonOnView(document.getElementById('duoDemo'), function() {
+  document.getElementById('hint').textContent = '共 7 步 · 自動播放中…';
+  startPlay();
+}, 0.2);
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

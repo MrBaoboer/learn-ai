@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>評測 + Human-in-the-Loop：讓 AI 可信可控 | xueai.miyang.cn</title>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root {
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+.section-label {
+  font-size: 12px; font-weight: 800; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+.phase-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.phase-card {
+  background: var(--card); border-radius: 12px; padding: 14px 18px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+}
+.phase-card:hover { border-color: rgba(217,119,6,0.25); }
+.phase-card.active { border-color: var(--amber); background: rgba(217,119,6,0.03); }
+.phase-tag { font-size: 12px; font-weight: 800; color: var(--amber); margin-bottom: 5px; }
+.phase-name { font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.phase-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+.insight-box {
+  background: rgba(22,163,106,0.04);
+  border: 1px solid rgba(22,163,106,0.15);
+  border-radius: 12px; padding: 14px 18px;
+}
+.insight-title { font-size: 12px; font-weight: 800; color: var(--success); margin-bottom: 10px; letter-spacing: 0.3px; }
+.insight-item {
+  font-size: 13px; color: var(--text-sub); line-height: 1.8; margin-bottom: 6px;
+}
+.insight-item:last-child { margin-bottom: 0; }
+.insight-item b { color: var(--text-main); }
+
+/* Right（改造后为下半部分演示区） */
+.right-panel {
+  display: flex; flex-direction: column; min-width: 0; gap: 14px; margin-top: 28px;
+}
+.right-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.right-top .subtitle { font-size: 13px; color: var(--text-sub); margin-top: 2px; }
+
+.right-top .tab-btn {
+  padding: 9px 18px; border-radius: 9px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer; min-height: 44px;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.right-top .tab-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Review simulator */
+.review-area {
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.review-card {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px 22px;
+}
+.review-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;
+}
+.review-card-meta { display: flex; gap: 8px; align-items: center; }
+.meta-tag {
+  font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 5px;
+}
+.meta-tag.q { background: rgba(0,102,255,0.08); color: var(--accent); }
+.meta-tag.risk-high { background: rgba(229,62,62,0.1); color: var(--danger); }
+.meta-tag.risk-med { background: rgba(217,119,6,0.1); color: var(--amber); }
+.meta-tag.risk-low { background: rgba(22,163,106,0.1); color: var(--success); }
+.review-card-scene { font-size: 13px; color: var(--text-sub); }
+
+.qa-row { display: flex; gap: 12px; margin-bottom: 8px; }
+.qa-q { font-size: 14px; font-weight: 700; color: var(--text-sub); min-width: 20px; }
+.qa-content { font-size: 15px; color: var(--text-main); line-height: 1.7; flex: 1; }
+.qa-content .hl-red { color: var(--danger); font-weight: 600; text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }
+.qa-content .hl-green { color: var(--success); font-weight: 600; }
+
+.review-actions {
+  display: flex; gap: 8px; align-items: center; border-top: 1px solid rgba(0,0,0,0.05);
+  padding-top: 10px; margin-top: 2px;
+}
+.review-actions .action-label { font-size: 14px; color: var(--text-sub); font-weight: 700; margin-right: 4px; }
+.action-btn {
+  padding: 10px 18px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s;
+  background: var(--card); color: var(--text-main); min-height: 44px;
+  font-family: inherit;
+}
+.action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.action-btn.approve { border-color: rgba(22,163,106,0.3); color: var(--success); }
+.action-btn.approve:hover { background: rgba(22,163,106,0.06); }
+.action-btn.reject { border-color: rgba(229,62,62,0.3); color: var(--danger); }
+.action-btn.reject:hover { background: rgba(229,62,62,0.06); }
+.action-btn.edit { border-color: rgba(217,119,6,0.3); color: var(--amber); }
+.action-btn.edit:hover { background: rgba(217,119,6,0.06); }
+
+.review-result {
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  display: none; align-items: center; gap: 8px; flex: 1;
+}
+.review-result.visible { display: flex; }
+.review-result.approved { background: rgba(22,163,106,0.06); color: var(--success); border: 1px solid rgba(22,163,106,0.15); }
+.review-result.rejected { background: rgba(229,62,62,0.06); color: var(--danger); border: 1px solid rgba(229,62,62,0.15); }
+.review-result.edited { background: rgba(217,119,6,0.06); color: var(--amber); border: 1px solid rgba(217,119,6,0.15); }
+
+/* Metrics panel */
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.metric-card {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px;
+  text-align: center;
+}
+.metric-val { font-size: 28px; font-weight: 800; color: var(--text-main); }
+.metric-val.good { color: var(--success); }
+.metric-val.bad { color: var(--danger); }
+.metric-val.neutral { color: var(--amber); }
+.metric-label { font-size: 13px; color: var(--text-sub); margin-top: 4px; font-weight: 600; }
+.metric-desc { font-size: 12px; color: var(--text-sub); margin-top: 3px; opacity: 0.8; }
+
+/* Why it works */
+.why-box {
+  background: #1c1c1e; border-radius: 12px; padding: 14px 16px;
+  flex-shrink: 0;
+}
+.why-title {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.gen-flow {
+  display: flex; align-items: center; gap: 3px; flex-wrap: wrap; gap: 3px; margin-bottom: 10px;
+}
+.gen-tok {
+  padding: 3px 8px; border-radius: 5px; font-size: 12px; font-weight: 700;
+  background: rgba(255,255,255,0.08); color: #9ca3af;
+}
+.gen-tok.emitted { background: rgba(0,102,255,0.2); color: #93c5fd; }
+.gen-tok.halluc { background: rgba(229,62,62,0.2); color: #fca5a5; border: 1px dashed rgba(229,62,62,0.5); }
+.gen-tok.checked { background: rgba(22,163,106,0.2); color: #6ee7b7; border: 1px solid rgba(22,163,106,0.4); }
+.gen-arrow { color: #374151; font-size: 13px; align-self: center; }
+.why-insight {
+  font-size: 13px; color: #9ca3af; line-height: 1.7;
+  border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;
+}
+.why-insight b { color: #e5e7eb; }
+.why-insight .key { color: #fbbf24; font-weight: 700; }
+
+.eval-table-wrap { overflow-x: auto; }
+.why-compare { display: flex; gap: 16px; }
+.why-compare-divider { width: 1px; background: rgba(0,0,0,0.06); flex-shrink: 0; }
+.review-actions { flex-wrap: wrap; }
+.fb-kpis { display: flex; gap: 24px; flex-wrap: wrap; }
+
+@media (max-width: 768px) {
+  .phase-grid { grid-template-columns: 1fr; }
+  .metrics-row { grid-template-columns: 1fr 1fr; }
+  .why-compare { flex-direction: column; }
+  .why-compare-divider { width: auto; height: 1px; }
+  .review-card-header { flex-direction: column; gap: 6px; }
+  .fb-kpis { gap: 10px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="自動化評測與人工審核（Human-in-the-Loop）是 AI 產品品質保障的最後防線。瞭解如何設計評測指標、構建評測集，以及人工審核流程如何嵌入 AI 產品。">
+<meta name="keywords" content="大模型評測,Human in the loop,AI品質保障,RLHF,自動評測,AI審核">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/1-2-mitigation-eval.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/1-2-mitigation-eval.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/1-2-mitigation-eval.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/1-2-mitigation-eval.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/1-2-mitigation-eval.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/1-2-mitigation-eval.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/1-2-mitigation-eval.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/1-2-mitigation-eval.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="評測 + Human-in-the-Loop：讓 AI 可信可控">
+<meta property="og:description" content="自動化評測與人工審核（Human-in-the-Loop）是 AI 產品品質保障的最後防線。瞭解如何設計評測指標、構建評測集，以及人工審核流程如何嵌入 AI 產品。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/1-2-mitigation-eval.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/1-2-mitigation-eval.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="評測 + Human-in-the-Loop：讓 AI 可信可控">
+<meta name="twitter:description" content="自動化評測與人工審核（Human-in-the-Loop）是 AI 產品品質保障的最後防線。瞭解如何設計評測指標、構建評測集，以及人工審核流程如何嵌入 AI 產品。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"應對 4：評測 + 人工審核","name":"應對 4：評測 + 人工審核","url":"https://xueai.miyang.cn/slides/1-2-mitigation-eval.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 幻覺與四種應對","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"自動化評測與人工審核（Human-in-the-Loop）是 AI 產品品質保障的最後防線。瞭解如何設計評測指標、構建評測集，以及人工審核流程如何嵌入 AI 產品。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">幻覺與應對</div>
+    <h1>應對 4：評測 + 人工審核</h1>
+    <p class="subtitle">PM 視角：如何量化幻覺風險、設計分級審核流程、讓「人在迴路中」成為產品安全網。手段 04 / 04 · 檢測 + 糾正。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>外部糾錯層，冷啟動階段兜底策略（HITL）</p></aside><!--seo:end-->  <section>
+    <div class="sec-label">PM 需要設計的三個環節</div>
+    <div class="phase-grid">
+          <div class="phase-card active" onclick="selectPhase(0)">
+            <div class="phase-tag">環節 1 · 上線前</div>
+            <div class="phase-name">評測基線：建立幻覺測試集</div>
+            <div class="phase-desc">用一批已知正確答案的問題測試模型，量化幻覺率，設定準入門檻。</div>
+          </div>
+          <div class="phase-card" onclick="selectPhase(1)">
+            <div class="phase-tag">環節 2 · 上線後</div>
+            <div class="phase-name">分級審核：高風險內容人工把關</div>
+            <div class="phase-desc">按風險等級自動路由：低風險直接發出，高風險先人工審核再傳送。</div>
+          </div>
+          <div class="phase-card" onclick="selectPhase(2)">
+            <div class="phase-tag">環節 3 · 持續優化</div>
+            <div class="phase-name">錯誤回饋閉環：用線上資料迭代</div>
+            <div class="phase-desc">把審核中發現的幻覺案例收集為 Bad Case，反哺模型優化和 Prompt 調整。</div>
+          </div>
+    </div>
+
+    <div class="right-panel paywall-locked xa-peek" id="rightPanel">
+      <!-- rendered by JS -->
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">PM 核心認知</div>
+    <div class="insight-box">
+        <div class="insight-title">PM 核心認知</div>
+        <div class="insight-item">
+          <b>幻覺率 ≠ 0</b>：所有 LLM 都有幻覺，PM 的目標是把它控制在<b>業務可接受的閾值內</b>，追求消滅並不現實。
+        </div>
+        <div class="insight-item">
+          <b>高風險 = 人工兜底</b>：醫療、法律、金融場景，AI 只做初稿，<b>最終確認必須有人簽字</b>。
+        </div>
+        <div class="insight-item">
+          <b>指標要寫進 PRD</b>：「幻覺率 &lt; 3%」要像「載入時間 &lt; 2s」一樣，成為可量化的驗收標準。
+        </div>
+    </div>
+  </section>
+</article>
+
+<script>
+const PHASES = [
+  {
+    title: '評測基線 Demo',
+    subtitle: '模擬執行一批測試用例，統計幻覺率',
+    view: 'metrics'
+  },
+  {
+    title: '人工審核臺 Demo',
+    subtitle: '模擬高風險回答的人工審核流程',
+    view: 'review'
+  },
+  {
+    title: '錯誤回饋閉環 Demo',
+    subtitle: '審核中發現的 Bad Case 如何驅動優化',
+    view: 'feedback'
+  }
+];
+
+const REVIEW_CASES = [
+  {
+    scene: '金融客服 · 理財建議',
+    riskLevel: 'risk-high',
+    riskLabel: '高風險',
+    q: '我有50萬，想買一個年化8%的低風險產品，有推薦嗎？',
+    a: '我們有一款<span class="hl-red">固定年化8.5%的低風險理財產品</span>，<span class="hl-red">100%保本保息</span>，起購金額5萬元…',
+    resultText: { approve: '已通過傳送（風險：此類表述可能違反監管規定）', reject: '已拒絕，轉人工處理 ✓', edit: '已編輯：移除「保本保息」等不合規表述' }
+  },
+  {
+    scene: '醫療諮詢 · 用藥建議',
+    riskLevel: 'risk-high',
+    riskLabel: '高風險',
+    q: '我最近血糖高，可以自己加大二甲雙胍劑量嗎？',
+    a: '血糖高時可以適當<span class="hl-red">自行增加二甲雙胍劑量至每日3g</span>，同時注意多喝水…',
+    resultText: { approve: '已通過傳送（風險：劑量建議需醫生指導）', reject: '已拒絕，強制轉接醫生 ✓', edit: '已編輯：移除具體劑量，新增「請諮詢醫生」提示' }
+  },
+  {
+    scene: '產品支援 · 功能諮詢',
+    riskLevel: 'risk-low',
+    riskLabel: '低風險',
+    q: '如何匯出資料到 Excel？',
+    a: '<span class="hl-green">點選右上角「匯出」按鈕，選擇「Excel格式」，即可下載。支援自訂時間範圍和欄位篩選。</span>',
+    resultText: { approve: '已通過直接傳送 ✓', reject: '已拒絕並重新生成', edit: '已編輯並補充截圖連結' }
+  }
+];
+
+const METRICS = [
+  { val: '94.2%', cls: 'good', label: '事實準確率', desc: '測試集 200 題中 188 題無幻覺' },
+  { val: '5.8%', cls: 'bad', label: '幻覺率', desc: '目標 < 3%，當前未達標' },
+  { val: '2.3s', cls: 'neutral', label: '平均響應時延', desc: '含檢索時間' },
+  { val: '78%', cls: 'neutral', label: 'RAG 檢索命中率', desc: '目標 > 85%，需優化' },
+];
+
+const FEEDBACK_STEPS = [
+  { icon: '🔴', title: 'Bad Case 發現', desc: '審核員標記了一條「編造利率」的錯誤回答，打上 bad-case 標籤', tag: '來源：人工審核' },
+  { icon: '📋', title: '歸因分析', desc: '分析根因：Prompt 中未限制「不得引用具體利率數字」，模型自行補全', tag: '根因：Prompt 缺約束' },
+  { icon: '🔧', title: 'Prompt 迭代', desc: '更新 System Prompt，新增約束：禁止提及具體利率，改為「請諮詢理財顧問」', tag: '修復：Prompt 工程' },
+  { icon: '✅', title: '迴歸驗證', desc: '將該 bad case 加入測試集，重新評測，驗證修復有效、無新增問題', tag: '驗證：迴歸測試' },
+];
+
+let currentPhase = 0;
+let currentTab = 'demo';
+
+function selectPhase(i) {
+  currentPhase = i;
+  currentTab = 'demo';
+  document.querySelectorAll('.phase-card').forEach((c, j) => c.classList.toggle('active', j === i));
+  renderPhase();
+}
+
+const WHY_HTML = `
+  <div style="display:none;" id="viewWhy" style="flex:1;min-height:0;">
+    <div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:28px 32px;height:100%;display:flex;flex-direction:column;gap:20px;overflow-y:auto;">
+      <div style="display:flex;gap:16px;flex:1;min-height:0;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:#6b7280;letter-spacing:0.5px;text-transform:uppercase;">無人工攔截</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">試用期</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">最長</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:#dc2626;border:1px dashed rgba(229,62,62,0.35);">20天</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:#dc2626;border:1px dashed rgba(229,62,62,0.35);">…繼續編</span>
+          </div>
+          <div style="font-size:14px;color:#6b7280;line-height:1.7;">錯了但不知道：模型以錯誤 Token 為<br>基礎繼續推，誤差不斷累積</div>
+        </div>
+        <div style="width:1px;background:rgba(0,0,0,0.07);flex-shrink:0;"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:#6b7280;letter-spacing:0.5px;text-transform:uppercase;">有評測 + 人工攔截</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">試用期</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:#1d4ed8;border:1px solid rgba(0,102,255,0.2);">最長</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:#dc2626;border:1px dashed rgba(229,62,62,0.35);">20天</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.08);color:#15803d;border:1px solid rgba(22,163,106,0.3);">⏸ 攔截</span>
+            <span style="color:#9ca3af;font-size:16px;">→</span>
+            <span style="padding:6px 12px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.08);color:#15803d;border:1px solid rgba(22,163,106,0.3);">✓ 糾正</span>
+          </div>
+          <div style="font-size:14px;color:#6b7280;line-height:1.7;">外部糾錯層在輸出端架設審查網，<br>彌補模型單向生成的根本缺陷</div>
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,0.03);border-radius:10px;padding:18px 22px;flex-shrink:0;">
+        <div style="font-size:16px;color:#374151;line-height:1.9;">
+          模型<b style="color:#111827;">沒有自我檢查機制</b>：推出一個錯誤 Token 後，它會以這個錯誤為基礎繼續往下推，誤差累積。
+          評測 + 人工審核是<span style="color:#d97706;font-weight:700;">在模型輸出端架一個外部糾錯層</span>，
+          彌補了「Token 推 Token 單向不回頭」的根本缺陷。
+          <b style="color:#111827;">前三個手段改變機率，這一手段攔截結果。</b>
+        </div>
+      </div>
+      <div style="background:rgba(229,62,62,0.04);border:1px solid rgba(229,62,62,0.15);border-radius:12px;padding:16px 22px;flex-shrink:0;">
+        <div style="font-size:13px;font-weight:800;color:#dc2626;margin-bottom:10px;letter-spacing:0.3px;">⚠ 侷限性：評測 + 人工審核不是終點</div>
+        <div style="display:flex;gap:20px;">
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#111827;font-weight:700;margin-bottom:4px;">人工成本不可線性擴展</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.7;">
+              使用者量增長後，每條輸出都依賴人工審核的模式難以持續，<span style="color:#dc2626;font-weight:600;">HITL 是冷啟動階段的兜底策略，不是規模化階段的長期方案</span>
+            </div>
+          </div>
+          <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#111827;font-weight:700;margin-bottom:4px;">評測指標有滯後盲區</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.7;">
+              評測集覆蓋的是已知風險點，模型在<span style="color:#dc2626;font-weight:600;">評測集之外的長尾問題上仍可能大量幻覺</span>，評測通過 ≠ 全面可靠
+            </div>
+          </div>
+          <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:14px;color:#111827;font-weight:700;margin-bottom:4px;">PM 應對策略</div>
+            <div style="font-size:13px;color:#6b7280;line-height:1.7;">
+              HITL 積累的審核資料應轉化為<span style="color:#2563eb;font-weight:600;">評測集持續擴充</span>與<span style="color:#15803d;font-weight:600;">模型微調訓練</span>，讓人工成本隨時間遞減，避免線性增長
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+function setTab(t) {
+  currentTab = t;
+  const tabs = ['demo', 'why'];
+  document.querySelectorAll('.right-tab-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === t));
+  document.getElementById('viewDemo').style.display = t === 'demo' ? 'flex' : 'none';
+  document.getElementById('viewWhy').style.display = t === 'why' ? 'flex' : 'none';
+}
+
+function renderPhase() {
+  const p = PHASES[currentPhase];
+  const panel = document.getElementById('rightPanel');
+
+  const tabHeader = `
+    <div class="right-top" style="flex-shrink:0;">
+      <div><h3>${p.title}</h3><div class="subtitle">${p.subtitle}</div></div>
+      <div style="display:flex;gap:5px;">
+        <button class="right-tab-btn tab-btn ${currentTab === 'demo' ? 'active' : ''}" onclick="setTab('demo')">演示</button>
+        <button class="right-tab-btn tab-btn ${currentTab === 'why' ? 'active' : ''}" onclick="setTab('why')">為什麼有效</button>
+      </div>
+    </div>`;
+
+  let demoContent = '';
+  if (p.view === 'metrics') {
+    demoContent = `
+      <div class="metrics-row">
+        ${METRICS.map(m => `
+          <div class="metric-card">
+            <div class="metric-val ${m.cls}">${m.val}</div>
+            <div class="metric-label">${m.label}</div>
+            <div class="metric-desc">${m.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px 22px;" class="eval-table-wrap">
+        <div class="section-label" style="margin-bottom:12px;">評測用例樣例</div>
+        <table style="width:100%;min-width:560px;border-collapse:collapse;font-size:14px;">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.06);">
+              <th style="text-align:left;padding:8px 12px;color:var(--text-sub);font-weight:700;">測試問題</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-sub);font-weight:700;">標準答案</th>
+              <th style="text-align:left;padding:8px 12px;color:var(--text-sub);font-weight:700;">模型輸出</th>
+              <th style="text-align:center;padding:8px 12px;color:var(--text-sub);font-weight:700;">判定</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:10px 12px;color:var(--text-main);">試用期最長多久？</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">3年以上合同不超過6個月</td>
+              <td style="padding:10px 12px;color:var(--success);">3年以上合同不超過6個月</td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--success);font-weight:700;">✓ 正確</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:10px 12px;color:var(--text-main);">工資必須每月發嗎？</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">至少每月支付一次</td>
+              <td style="padding:10px 12px;color:var(--success);">至少每月支付一次</td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--success);font-weight:700;">✓ 正確</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.04);">
+              <td style="padding:10px 12px;color:var(--text-main);">年假最多多少天？</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">工齡20年以上：15天</td>
+              <td style="padding:10px 12px;color:var(--danger);">工齡20年以上：<b>20天</b></td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--danger);font-weight:700;">✗ 幻覺</span></td>
+            </tr>
+            <tr>
+              <td style="padding:10px 12px;color:var(--text-main);">哺乳期多少月內不能解僱？</td>
+              <td style="padding:10px 12px;color:var(--text-sub);">哺乳期結束前（約12個月）</td>
+              <td style="padding:10px 12px;color:var(--danger);">哺乳期結束前（約<b>18個月</b>）</td>
+              <td style="padding:10px 12px;text-align:center;"><span style="color:var(--danger);font-weight:700;">✗ 幻覺</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+  } else if (p.view === 'review') {
+    demoContent = `
+      <div class="review-area">
+        ${REVIEW_CASES.map((c, idx) => `
+          <div class="review-card" id="card${idx}">
+            <div class="review-card-header">
+              <div class="review-card-meta">
+                <span class="meta-tag q">Q${idx + 1}</span>
+                <span class="meta-tag ${c.riskLevel}">${c.riskLabel}</span>
+              </div>
+              <div class="review-card-scene">${c.scene}</div>
+            </div>
+            <div class="qa-row"><div class="qa-q">用</div><div class="qa-content">${c.q}</div></div>
+            <div class="qa-row"><div class="qa-q">AI</div><div class="qa-content">${c.a}</div></div>
+            <div class="review-actions">
+              <span class="action-label">稽核：</span>
+              <button class="action-btn approve" onclick="doAction(${idx},'approve')">✓ 通過</button>
+              <button class="action-btn reject" onclick="doAction(${idx},'reject')">✗ 拒絕</button>
+              <button class="action-btn edit" onclick="doAction(${idx},'edit')">✎ 編輯後通過</button>
+              <div class="review-result" id="result${idx}"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+  } else {
+    demoContent = `
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          ${FEEDBACK_STEPS.map((step, i) => `
+            <div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;gap:16px;align-items:flex-start;">
+              <div style="width:42px;height:42px;border-radius:12px;background:rgba(0,0,0,0.04);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${step.icon}</div>
+              <div style="flex:1;">
+                <div style="font-size:16px;font-weight:700;color:var(--text-main);margin-bottom:5px;">${i + 1}. ${step.title}</div>
+                <div style="font-size:14px;color:var(--text-sub);line-height:1.7;">${step.desc}</div>
+                <div style="margin-top:8px;display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:5px;background:rgba(0,102,255,0.08);color:var(--accent);">${step.tag}</div>
+              </div>
+            </div>
+          `).join('<div style="text-align:center;font-size:18px;color:var(--text-sub);">↓</div>')}
+        </div>
+        <div style="background:rgba(22,163,106,0.04);border:1px solid rgba(22,163,106,0.15);border-radius:12px;padding:16px 20px;">
+          <div style="font-size:13px;font-weight:800;color:var(--success);margin-bottom:8px;">PM 指標看板：Bad Case 閉環效率</div>
+          <div class="fb-kpis">
+            <div style="font-size:14px;color:var(--text-sub);">發現→修復平均週期：<b style="color:var(--text-main);">3.2天</b></div>
+            <div style="font-size:14px;color:var(--text-sub);">本週新增 bad case：<b style="color:var(--danger);">12條</b></div>
+            <div style="font-size:14px;color:var(--text-sub);">已修復歸檔：<b style="color:var(--success);">47條</b></div>
+            <div style="font-size:14px;color:var(--text-sub);">迴歸通過率：<b style="color:var(--text-main);">96.8%</b></div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  panel.innerHTML = tabHeader + `
+    <div id="viewDemo" style="display:flex;flex-direction:column;gap:12px;">
+      ${demoContent}
+    </div>
+    <div id="viewWhy" style="display:none;background:var(--card);border-radius:14px;padding:24px 26px;flex-direction:column;gap:20px;border:1.5px solid var(--border);">
+      <div class="why-compare">
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">無人工攔截</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">試用期</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">最長</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px dashed rgba(229,62,62,0.3);">20天</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px dashed rgba(229,62,62,0.3);">…繼續編</span>
+          </div>
+          <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">錯了但不知道：模型以錯誤 Token 為基礎繼續推，誤差不斷累積</div>
+        </div>
+        <div class="why-compare-divider"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">有評測 + 人工攔截</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">試用期</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(0,102,255,0.08);color:var(--accent);border:1px solid rgba(0,102,255,0.15);">最長</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px dashed rgba(229,62,62,0.3);">20天</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">⏸ 攔截</span>
+            <span style="color:var(--text-sub);font-size:16px;">→</span>
+            <span style="padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">✓ 糾正</span>
+          </div>
+          <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">外部糾錯層在輸出端架設審查網，彌補模型單向生成的根本缺陷</div>
+        </div>
+      </div>
+      <div style="background:rgba(217,119,6,0.05);border:1px solid rgba(217,119,6,0.15);border-radius:12px;padding:20px 24px;">
+        <div style="font-size:16px;color:var(--text-main);line-height:1.9;">
+          模型<b>沒有自我檢查機制</b>：推出一個錯誤 Token 後，它會以這個錯誤為基礎繼續往下推，誤差累積。
+          評測 + 人工審核是<span style="color:var(--amber);font-weight:700;">在模型輸出端架一個外部糾錯層</span>，
+          彌補了「Token 推 Token 單向不回頭」的根本缺陷。
+          <b>前三個手段改變機率，這一手段攔截結果。</b>
+        </div>
+      </div>
+    </div>`;
+
+  if (currentTab === 'why') {
+    document.getElementById('viewDemo').style.display = 'none';
+    document.getElementById('viewWhy').style.display = 'flex';
+  }
+}
+
+function doAction(idx, action) {
+  const c = REVIEW_CASES[idx];
+  const result = document.getElementById(`result${idx}`);
+  result.className = `review-result visible ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'edited'}`;
+  result.textContent = c.resultText[action];
+
+  // Disable buttons
+  document.querySelectorAll(`#card${idx} .action-btn`).forEach(b => {
+    b.disabled = true;
+    b.style.opacity = '0.4';
+    b.style.cursor = 'default';
+  });
+}
+
+renderPhase();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice-principles.js?v=20260827a"></script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

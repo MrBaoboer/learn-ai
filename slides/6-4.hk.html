@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>流式返回與格式配合：讓 AI 產品秒響應 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* 页面局部别名 —— 映射到设计系统变量（JS 中引用了这些名字） */
+:root {
+  --surface2: #f0ede6;
+  --muted: var(--sub);
+  --green: var(--success);
+  --red: var(--danger);
+  --orange: #ea580c;
+}
+
+/* ── 场景选择 ── */
+.mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mode-btn {
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--card);
+  cursor: pointer; font-family: inherit; text-align: left;
+  transition: all 0.2s; display: flex; align-items: center; gap: 10px;
+  min-height: 44px; box-shadow: var(--shadow-card);
+}
+.mode-btn .badge {
+  font-size: 11px; font-weight: 800; font-family: "SF Mono", Menlo, monospace;
+  padding: 3px 8px; border-radius: 4px; flex-shrink: 0;
+}
+.mode-btn .txt h4 { font-size: 14px; font-weight: 700; color: var(--text); }
+.mode-btn .txt p { font-size: 12px; color: var(--sub); margin-top: 1px; line-height: 1.5; }
+.mode-btn.active { border-color: var(--purple); }
+.mode-btn.active .txt h4 { color: var(--purple); }
+
+/* ── 控制按钮 ── */
+.ctrl-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.ctrl-btn {
+  padding: 11px 24px; background: var(--purple); color: white;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: opacity 0.2s; min-height: 44px;
+}
+.ctrl-btn:hover { opacity: 0.85; }
+.ctrl-btn:disabled { opacity: 0.45; cursor: default; }
+
+.insight-row {
+  font-size: 14px; color: var(--text); line-height: 1.7;
+  background: rgba(124,58,237,0.06); border: 1.5px solid rgba(124,58,237,0.18);
+  border-radius: var(--radius); padding: 14px 18px; margin-top: 16px;
+}
+.insight-row b { color: var(--purple); }
+
+/* ── 三列对比 ── */
+.compare-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.col-panel {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column;
+  overflow: hidden; transition: border-color 0.3s;
+}
+.col-panel.streaming { border-color: var(--purple); }
+.col-panel.done-good { border-color: var(--success); }
+.col-panel.done-bad { border-color: var(--danger); }
+.col-header {
+  padding: 10px 14px; background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.col-header .fmt-badge {
+  font-size: 12px; font-weight: 800; font-family: "SF Mono", Menlo, monospace;
+  padding: 2px 8px; border-radius: 4px;
+}
+.col-header .status { font-size: 12px; font-weight: 600; }
+.col-body { min-height: 260px; max-height: 380px; overflow: auto; padding: 12px; }
+
+/* 渲染区域 */
+.render-area { font-size: 14px; line-height: 1.7; min-height: 60px; }
+.render-area .chunk { display: inline; }
+.render-area .visible { color: var(--text); }
+.render-area .pending { color: var(--sub); opacity: 0.4; }
+
+/* 原始流 */
+.raw-stream {
+  font-size: 12px; font-family: "SF Mono", "Fira Code", Menlo, monospace;
+  color: #6c7086; background: #1e1b2e; border-radius: 6px;
+  padding: 8px; margin-top: 8px; line-height: 1.6;
+  max-height: 120px; overflow: auto; word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* 解析结果卡片 */
+.parsed-card {
+  background: rgba(22,163,74,0.06); border: 1px solid rgba(22,163,74,0.2);
+  border-radius: 7px; padding: 8px 10px; margin-top: 6px;
+  font-size: 13px; color: var(--text); line-height: 1.6; display: none;
+}
+.parsed-card.show { display: block; }
+.parsed-card .pc-label { font-size: 11px; font-weight: 800; color: var(--success); margin-bottom: 4px; }
+.parsed-field { display: flex; gap: 6px; margin-bottom: 2px; }
+.parsed-field .k { color: var(--cyan); font-weight: 700; flex-shrink: 0; font-size: 12px; }
+.parsed-field .v { color: var(--text); font-size: 12px; }
+
+.wait-card {
+  background: rgba(220,38,38,0.05); border: 1px solid rgba(220,38,38,0.15);
+  border-radius: 7px; padding: 8px 10px; margin-top: 6px;
+  font-size: 12px; color: var(--danger); display: none; line-height: 1.6;
+}
+.wait-card.show { display: block; }
+
+/* 底部说明 */
+.bottom-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.insight-cell {
+  background: rgba(124,58,237,0.06); border: 1.5px solid rgba(124,58,237,0.15);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+  font-size: 13px; color: var(--text); line-height: 1.6;
+}
+.insight-cell b { color: var(--purple); }
+
+@keyframes blink-cur { 0%,100%{opacity:1} 50%{opacity:0} }
+.cursor::after { content: '▋'; animation: blink-cur 0.8s infinite; font-size: 14px; color: var(--purple); }
+
+@media (max-width: 768px) {
+  .mode-tabs { grid-template-columns: 1fr; }
+  .compare-cols { grid-template-columns: 1fr; }
+  .bottom-bar { grid-template-columns: 1fr; }
+  .col-body { min-height: 0; max-height: 300px; }
+}
+</style>
+<!-- SEO Start -->
+<meta name="description" content="流式返回（Streaming）是 AI 產品用戶體驗的關鍵。本頁講解 SSE 協議原理、流式輸出與 Markdown 渲染的配合、流式 JSON 解析的挑戰與解決方案。">
+<meta name="keywords" content="流式返回,Streaming,SSE,大模型流式輸出,即時輸出,AI產品體驗">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/6-4.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/6-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/6-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/6-4.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/6-4.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/6-4.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/6-4.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/6-4.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="流式返回與格式配合：讓 AI 產品秒響應">
+<meta property="og:description" content="流式返回（Streaming）是 AI 產品用戶體驗的關鍵。本頁講解 SSE 協議原理、流式輸出與 Markdown 渲染的配合、流式 JSON 解析的挑戰與解決方案。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/6-4.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/6-4.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="流式返回與格式配合：讓 AI 產品秒響應">
+<meta name="twitter:description" content="流式返回（Streaming）是 AI 產品用戶體驗的關鍵。本頁講解 SSE 協議原理、流式輸出與 Markdown 渲染的配合、流式 JSON 解析的挑戰與解決方案。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"流式返回與格式配合","name":"流式返回與格式配合","url":"https://xueai.miyang.cn/slides/6-4.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Prompt 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"流式返回（Streaming）是 AI 產品用戶體驗的關鍵。本頁講解 SSE 協議原理、流式輸出與 Markdown 渲染的配合、流式 JSON 解析的挑戰與解決方案。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">Prompt 工程</div>
+    <h1>流式返回與格式配合</h1>
+    <p class="subtitle">LLM 是<b>逐 Token 輸出</b>的。同一個響應內容，格式不同，流式體驗完全不同。選擇場景後點擊播放，觀察三種格式的渲染差異。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>JSON 全文才能解析 / MD 逐字顯示 / XML 捕獲標籤即渲染，動態演示</p></aside><!--seo:end-->  <div class="sec-label">選擇演示場景</div>
+
+  <div class="mode-tabs">
+    <button class="mode-btn active" onclick="selectMode(this,0)">
+      <span class="badge" style="background:#ede9fe;color:#6d28d9">工具推薦</span>
+      <div class="txt"><h4>結構化列表輸出</h4><p>3 個工具，包含名稱/類型/亮點</p></div>
+    </button>
+    <button class="mode-btn" onclick="selectMode(this,1)">
+      <span class="badge" style="background:#dbeafe;color:#1e40af">分析報告</span>
+      <div class="txt"><h4>多字段結論輸出</h4><p>結論/原因/建議/置信度</p></div>
+    </button>
+  </div>
+
+  <div class="ctrl-btns">
+    <button class="ctrl-btn" id="playBtn" onclick="startStream()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+      開始播放流式輸出
+    </button>
+    <button class="ctrl-btn" id="resetBtn" onclick="resetAll()" style="background:var(--card);color:var(--text);border:1.5px solid var(--border)">重置</button>
+  </div>
+
+  <div class="sec-label">三種格式即時對比</div>
+
+  <div class="compare-cols paywall-locked xa-peek">
+    <!-- JSON 列 -->
+    <div class="col-panel" id="panelJson">
+      <div class="col-header">
+        <span class="fmt-badge" style="background:#fef3c7;color:#92400e">JSON</span>
+        <span class="status" id="statusJson" style="color:var(--muted)">等待中</span>
+      </div>
+      <div class="col-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">原始流 Token（逐字累積）</div>
+        <div class="raw-stream" id="rawJson"></div>
+        <div class="wait-card" id="waitJson">
+          ⏳ 等待完整 JSON 到達後才能解析…<br>
+          流式過程中 JSON 是殘缺的，<br>
+          無法中途解析渲染
+        </div>
+        <div class="parsed-card" id="parsedJson">
+          <div class="pc-label">✓ JSON 解析完成（全文到達後）</div>
+          <div id="parsedJsonContent"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Markdown 列 -->
+    <div class="col-panel" id="panelMd">
+      <div class="col-header">
+        <span class="fmt-badge" style="background:#ede9fe;color:#6d28d9">Markdown</span>
+        <span class="status" id="statusMd" style="color:var(--muted)">等待中</span>
+      </div>
+      <div class="col-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">渲染區域（逐字顯示）</div>
+        <div class="render-area cursor" id="renderMd"></div>
+        <div class="wait-card" id="waitMd" style="background:rgba(234,88,12,.05);border-color:rgba(234,88,12,.2);color:var(--orange)">
+          ⚠️ 雖然逐字顯示流暢，<br>
+          但無法從 Markdown 中<br>
+          可靠提取結構化字段
+        </div>
+      </div>
+    </div>
+
+    <!-- XML 列 -->
+    <div class="col-panel" id="panelXml">
+      <div class="col-header">
+        <span class="fmt-badge" style="background:#dbeafe;color:#1e40af">XML 自定義標籤</span>
+        <span class="status" id="statusXml" style="color:var(--muted)">等待中</span>
+      </div>
+      <div class="col-body">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">增量解析渲染（捕獲到 &lt;/tag&gt; 即渲染）</div>
+        <div id="xmlCards"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">核心結論</div>
+
+  <div class="bottom-bar paywall-locked">
+    <div class="insight-cell">
+      <b>JSON 流式</b><br>
+      後端友好但流式不佳：<br>
+      必須<b>等全文</b>才能解析，<br>
+      用戶看到的是 loading 狀態
+    </div>
+    <div class="insight-cell">
+      <b>Markdown 流式</b><br>
+      用戶體驗最流暢：<br>
+      逐字顯示有打字感，<br>
+      但<b>無法提取字段</b>做程式處理
+    </div>
+    <div class="insight-cell">
+      <b>XML 流式</b><br>
+      <b>兩全其美</b>：流式 + 結構化<br>
+      捕獲到 <code>&lt;/name&gt;</code> 立刻渲染，<br>
+      Claude 原生推薦此方式
+    </div>
+  </div>
+
+  <div class="insight-row paywall-locked">
+    <b>核心結論：</b>
+    XML 捕獲標籤 → 立刻渲染字段；JSON 等全文 → 解析一次；MD 逐字顯示 → 無法提取字段。
+  </div>
+
+</article>
+
+<script>
+// ── 兩個場景的數據 ──
+const MODES = [
+  {
+    // 場景0：工具推薦
+    jsonTokens: `{\n  "tools": [\n    {\n      "name": "Notion AI",\n      "type": "寫作輔助",\n      "highlight": "一鍵總結改寫"\n    },\n    {\n      "name": "Midjourney",\n      "type": "圖像生成",\n      "highlight": "藝術風格豐富"\n    },\n    {\n      "name": "Copilot",\n      "type": "程式碼補全",\n      "highlight": "支持 50+ 語言"\n    }\n  ]\n}`,
+    jsonFields: [
+      {k:'name', v:'Notion AI'},{k:'type', v:'寫作輔助'},{k:'highlight', v:'一鍵總結改寫'},
+      {k:'name', v:'Midjourney'},{k:'type', v:'圖像生成'},{k:'highlight', v:'藝術風格豐富'},
+      {k:'name', v:'Copilot'},{k:'type', v:'程式碼補全'},{k:'highlight', v:'支持 50+ 語言'},
+    ],
+    mdTokens: `## AI 工具推薦\n\n### 1. Notion AI\n- **類型**：寫作輔助\n- **亮點**：一鍵總結改寫\n\n### 2. Midjourney\n- **類型**：圖像生成\n- **亮點**：藝術風格豐富\n\n### 3. Copilot\n- **類型**：程式碼補全\n- **亮點**：支持 50+ 語言`,
+    xmlTokens: `<tool_list>\n  <tool>\n    <name>Notion AI</name>\n    <type>寫作輔助</type>\n    <highlight>一鍵總結改寫</highlight>\n  </tool>\n  <tool>\n    <name>Midjourney</name>\n    <type>圖像生成</type>\n    <highlight>藝術風格豐富</highlight>\n  </tool>\n  <tool>\n    <name>Copilot</name>\n    <type>程式碼補全</type>\n    <highlight>支持 50+ 語言</highlight>\n  </tool>\n</tool_list>`,
+    // XML 捕獲事件：[tokenIndex, fieldLabel, fieldValue, isNewCard]
+    xmlEvents: [
+      [18, 'name', 'Notion AI', true],
+      [24, 'type', '寫作輔助', false],
+      [32, 'highlight', '一鍵總結改寫', false],
+      [52, 'name', 'Midjourney', true],
+      [58, 'type', '圖像生成', false],
+      [66, 'highlight', '藝術風格豐富', false],
+      [86, 'name', 'Copilot', true],
+      [92, 'type', '程式碼補全', false],
+      [100, 'highlight', '支持 50+ 語言', false],
+    ]
+  },
+  {
+    // 場景1：分析報告
+    jsonTokens: `{\n  "conclusion": "建議採用 RAG 方案",\n  "reason": "幻覺率高，知識庫已準備",\n  "action": "第一步部署向量數據庫",\n  "confidence": "0.87"\n}`,
+    jsonFields: [
+      {k:'conclusion', v:'建議採用 RAG 方案'},
+      {k:'reason', v:'幻覺率高，知識庫已準備'},
+      {k:'action', v:'第一步部署向量數據庫'},
+      {k:'confidence', v:'0.87'},
+    ],
+    mdTokens: `## 分析結論\n\n**結論**：建議採用 RAG 方案\n\n**原因**：幻覺率高，知識庫已準備\n\n**建議行動**：第一步部署向量數據庫\n\n**置信度**：0.87`,
+    xmlTokens: `<report>\n  <conclusion>建議採用 RAG 方案</conclusion>\n  <reason>幻覺率高，知識庫已準備</reason>\n  <action>第一步部署向量數據庫</action>\n  <confidence>0.87</confidence>\n</report>`,
+    xmlEvents: [
+      [14, 'conclusion', '建議採用 RAG 方案', true],
+      [22, 'reason', '幻覺率高，知識庫已準備', false],
+      [30, 'action', '第一步部署向量數據庫', false],
+      [38, 'confidence', '0.87', false],
+    ]
+  }
+];
+
+let curMode = 0;
+let timers = [];
+let playing = false;
+
+function selectMode(btn, i) {
+  if (playing) return;
+  curMode = i;
+  document.querySelectorAll('.mode-btn').forEach((b,j) => b.classList.toggle('active', j===i));
+  resetAll();
+}
+
+function resetAll() {
+  timers.forEach(clearTimeout); timers = [];
+  playing = false;
+  document.getElementById('playBtn').disabled = false;
+  // reset JSON
+  document.getElementById('rawJson').textContent = '';
+  document.getElementById('waitJson').classList.remove('show');
+  document.getElementById('parsedJson').classList.remove('show');
+  document.getElementById('statusJson').textContent = '等待中';
+  document.getElementById('statusJson').style.color = 'var(--muted)';
+  document.getElementById('panelJson').className = 'col-panel';
+  // reset MD
+  document.getElementById('renderMd').className = 'render-area cursor';
+  document.getElementById('renderMd').textContent = '';
+  document.getElementById('waitMd').classList.remove('show');
+  document.getElementById('statusMd').textContent = '等待中';
+  document.getElementById('statusMd').style.color = 'var(--muted)';
+  document.getElementById('panelMd').className = 'col-panel';
+  // reset XML
+  document.getElementById('xmlCards').innerHTML = '';
+  document.getElementById('statusXml').textContent = '等待中';
+  document.getElementById('statusXml').style.color = 'var(--muted)';
+  document.getElementById('panelXml').className = 'col-panel';
+}
+
+function startStream() {
+  if (playing) return;
+  playing = true;
+  document.getElementById('playBtn').disabled = true;
+  const m = MODES[curMode];
+  streamJson(m);
+  streamMd(m);
+  streamXml(m);
+}
+
+function streamJson(m) {
+  const chars = m.jsonTokens.split('');
+  const rawEl = document.getElementById('rawJson');
+  const statusEl = document.getElementById('statusJson');
+  const panelEl = document.getElementById('panelJson');
+  panelEl.classList.add('streaming');
+  statusEl.textContent = '流式接收中…';
+  statusEl.style.color = 'var(--purple)';
+  // show wait card early
+  const t0 = setTimeout(() => document.getElementById('waitJson').classList.add('show'), 400);
+  timers.push(t0);
+  chars.forEach((ch, i) => {
+    const t = setTimeout(() => {
+      rawEl.textContent += ch;
+      rawEl.scrollTop = rawEl.scrollHeight;
+    }, i * 22);
+    timers.push(t);
+  });
+  const totalMs = chars.length * 22 + 200;
+  const tf = setTimeout(() => {
+    document.getElementById('waitJson').classList.remove('show');
+    panelEl.classList.remove('streaming');
+    panelEl.classList.add('done-good');
+    statusEl.textContent = '✓ 解析完成';
+    statusEl.style.color = 'var(--green)';
+    const pc = document.getElementById('parsedJson');
+    pc.classList.add('show');
+    document.getElementById('parsedJsonContent').innerHTML = m.jsonFields.map(f =>
+      `<div class="parsed-field"><span class="k">${f.k}:</span><span class="v">${f.v}</span></div>`
+    ).join('');
+  }, totalMs);
+  timers.push(tf);
+}
+
+function streamMd(m) {
+  const chars = m.mdTokens.split('');
+  const renderEl = document.getElementById('renderMd');
+  const statusEl = document.getElementById('statusMd');
+  const panelEl = document.getElementById('panelMd');
+  panelEl.classList.add('streaming');
+  statusEl.textContent = '流式渲染中…';
+  statusEl.style.color = 'var(--purple)';
+  chars.forEach((ch, i) => {
+    const t = setTimeout(() => {
+      if (ch === '\n') {
+        renderEl.appendChild(document.createElement('br'));
+      } else {
+        const span = document.createElement('span');
+        // Style markdown syntax chars differently
+        if (['#','*','-'].includes(ch)) span.style.color = 'var(--purple)';
+        span.textContent = ch;
+        renderEl.appendChild(span);
+      }
+    }, i * 22);
+    timers.push(t);
+  });
+  const totalMs = chars.length * 22 + 200;
+  const tm = setTimeout(() => {
+    renderEl.classList.remove('cursor');
+    document.getElementById('waitMd').classList.add('show');
+    panelEl.classList.remove('streaming');
+    panelEl.classList.add('done-bad');
+    statusEl.textContent = '⚠ 無法提取字段';
+    statusEl.style.color = 'var(--orange)';
+  }, totalMs);
+  timers.push(tm);
+}
+
+function streamXml(m) {
+  const chars = m.xmlTokens.split('');
+  const cardsEl = document.getElementById('xmlCards');
+  const statusEl = document.getElementById('statusXml');
+  const panelEl = document.getElementById('panelXml');
+  panelEl.classList.add('streaming');
+  statusEl.textContent = '流式解析中…';
+  statusEl.style.color = 'var(--purple)';
+
+  // Build event map: token index → xml event
+  const eventMap = {};
+  m.xmlEvents.forEach(ev => { eventMap[ev[0]] = ev; });
+
+  // track current card element
+  let currentCard = null;
+
+  chars.forEach((ch, i) => {
+    const t = setTimeout(() => {
+      if (eventMap[i]) {
+        const [, field, value, isNew] = eventMap[i];
+        if (isNew) {
+          currentCard = document.createElement('div');
+          currentCard.style.cssText = 'background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:8px 10px;margin-bottom:7px;animation:_si .25s ease';
+          currentCard.innerHTML = `<div style="font-size:11px;font-weight:800;color:var(--green);margin-bottom:4px">✓ 增量捕獲</div>`;
+          cardsEl.appendChild(currentCard);
+        }
+        if (currentCard) {
+          const row = document.createElement('div');
+          row.className = 'parsed-field';
+          row.innerHTML = `<span class="k" style="color:var(--cyan);font-weight:700;font-size:12px;min-width:60px">${field}:</span><span style="font-size:13px;color:var(--text)">${value}</span>`;
+          currentCard.appendChild(row);
+          cardsEl.scrollTop = cardsEl.scrollHeight;
+        }
+      }
+    }, i * 22);
+    timers.push(t);
+  });
+
+  const totalMs = chars.length * 22 + 200;
+  const tf = setTimeout(() => {
+    panelEl.classList.remove('streaming');
+    panelEl.classList.add('done-good');
+    statusEl.textContent = '✓ 全部字段已渲染';
+    statusEl.style.color = 'var(--green)';
+    playing = false;
+    document.getElementById('playBtn').disabled = false;
+  }, totalMs);
+  timers.push(tf);
+}
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

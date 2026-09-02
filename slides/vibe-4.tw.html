@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding 方法論第 4 節：註釋三要素（背景、設計意圖、關鍵約束），註釋保護、程式碼刪除宣告、依賴變更宣告與錯誤處理規範。">
+<meta name="author" content="洛小山">
+<title>第4節：註釋三要素與程式碼保護 | AI 系統課</title>
+<link rel="canonical" href="https://xueai.miyang.cn/slides/vibe-4.tw.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_TW">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vibe-4.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vibe-4.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vibe-4.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vibe-4.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vibe-4.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vibe-4.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vibe-4.html">
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e;--vibe-soft:rgba(13,148,136,.08)}
+.lesson-header .kicker{color:var(--vibe)}
+
+.desc{font-size:15px;color:var(--sub);line-height:1.8}
+
+/* 三要素卡片 */
+.tri-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.tri-grid .l-card h3{font-size:16px;margin-bottom:6px}
+.tri-num{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:var(--vibe-soft);color:var(--vibe-deep);font-size:14px;font-weight:800;margin-bottom:10px}
+.tri-grid p{font-size:13.5px;color:var(--sub);line-height:1.7}
+
+/* 切换按钮组（延续 5-2 的按钮组写法） */
+.tab-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.tab-btn{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;transition:all .2s;font-family:inherit;text-align:left;width:100%;min-height:44px;box-shadow:var(--shadow-card)}
+.tab-btn:hover{border-color:rgba(0,0,0,.15)}
+.tab-btn.active{border-color:var(--vibe);background:rgba(13,148,136,.05)}
+.tab-btn h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px}
+.tab-btn.active h4{color:var(--vibe-deep)}
+.tab-btn p{font-size:13px;color:var(--sub)}
+.tab-mark{width:34px;height:34px;border-radius:9px;background:rgba(0,0,0,.05);color:var(--sub);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tab-btn.active .tab-mark{background:var(--vibe);color:#fff}
+
+/* 代码演示面板 */
+.code-panel{margin-top:14px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;overflow:hidden}
+.code-panel-hd{padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.02);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.code-panel-hd .fname{font-family:"SF Mono",Menlo,monospace;font-size:13px;font-weight:700;color:var(--sub)}
+.legend{display:flex;gap:8px;flex-wrap:wrap}
+.legend span{font-size:12px;font-weight:700;padding:2px 9px;border-radius:5px}
+.lg-bg{background:rgba(13,148,136,.16);color:var(--vibe-deep)}
+.lg-int{background:rgba(217,119,6,.16);color:var(--amber)}
+.lg-con{background:rgba(124,58,237,.14);color:var(--purple)}
+.code-box{margin:0;padding:16px 18px;font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:13px;line-height:1.85;color:var(--text);white-space:pre-wrap;word-break:break-word;overflow-x:auto;background:transparent}
+.hl{border-radius:4px;padding:1px 4px}
+.hl-bg{background:rgba(13,148,136,.16)}
+.hl-int{background:rgba(217,119,6,.16)}
+.hl-con{background:rgba(124,58,237,.14)}
+.hidden{display:none}
+.verdict{padding:12px 16px;border-radius:10px;font-size:13.5px;line-height:1.7;margin-top:12px;border:1.5px solid transparent}
+.verdict.bad{background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.22);color:#991b1b}
+.verdict.good{background:rgba(22,163,74,.06);border-color:rgba(22,163,74,.25);color:#166534}
+
+/* 判断题 */
+.quiz-card{margin-top:14px}
+.quiz-scene{font-size:14.5px;color:var(--text);line-height:1.75;padding:12px 15px;background:var(--vibe-soft);border:1.5px solid rgba(13,148,136,.2);border-radius:10px}
+.quiz-scene b{color:var(--vibe-deep)}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.opt{display:block;width:100%;text-align:left;padding:12px 15px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);cursor:pointer;min-height:44px;font-family:inherit;font-size:14px;line-height:1.6;color:var(--text);transition:all .15s}
+.opt:hover:not(:disabled){border-color:rgba(0,0,0,.18)}
+.opt:disabled{cursor:default}
+.opt.right{border-color:rgba(22,163,74,.5);background:rgba(22,163,74,.07);color:#15803d;font-weight:700}
+.opt.wrong{border-color:rgba(220,38,38,.45);background:rgba(220,38,38,.06);color:#b91c1c}
+.opt.dim{opacity:.45}
+.fb{display:none;margin-top:10px;padding:12px 15px;border-radius:10px;font-size:13.5px;line-height:1.7;border:1.5px solid transparent}
+.fb.show{display:block}
+.fb.ok{background:rgba(22,163,74,.06);border-color:rgba(22,163,74,.25);color:#166534}
+.fb.no{background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.22);color:#991b1b}
+.fb b{color:inherit}
+.quiz-score{font-size:13px;color:var(--sub);margin-top:12px}
+.quiz-score b{color:var(--vibe-deep)}
+
+/* 底部说明 */
+.src-note{margin-top:24px;font-size:12.5px;color:var(--sub)}
+.src-note a{color:var(--vibe-deep)}
+
+.ctrl-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.btn{padding:11px 22px;border-radius:9px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-p{background:var(--vibe);color:#fff}
+.btn-p:hover{filter:brightness(1.1)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.05);color:var(--sub);border:1px solid var(--border)}
+
+@media (max-width:768px){
+  .tri-grid{grid-template-columns:1fr}
+  .tab-row{grid-template-columns:1fr}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"註釋三要素與程式碼保護","name":"註釋三要素與程式碼保護","url":"https://xueai.miyang.cn/slides/vibe-4.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 品質底線","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Vibe Coding 方法論第 4 節：註釋三要素（背景、設計意圖、關鍵約束），註釋保護、程式碼刪除宣告、依賴變更宣告與錯誤處理規範。","datePublished":"2026-08-04","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="註釋三要素與程式碼保護"><meta property="og:description" content="Vibe Coding 方法論第 4 節：註釋三要素（背景、設計意圖、關鍵約束），註釋保護、程式碼刪除宣告、依賴變更宣告與錯誤處理規範。"><meta property="og:url" content="https://xueai.miyang.cn/slides/vibe-4.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/vibe-4.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson">
+  <header class="lesson-header">
+    <div class="kicker">Vibe Coding 方法論 · 第 4 節</div>
+    <h1>註釋三要素與程式碼保護</h1>
+    <p class="subtitle">AI 寫的註釋多是功能複述，三個月後回來看程式碼，想不起當初為什麼這樣實現。這一節給註釋立結構，也給「刪程式碼」立規矩。頁面裡有兩個可動手的演示。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>背景、設計意圖、關鍵約束缺一不可；禁止靜默刪除程式碼與依賴</p></aside><!--seo:end-->  <section class="reveal">
+    <div class="sec-label">問題在哪</div>
+    <div class="l-callout">
+      <p>程式碼只能表達「做了什麼」。<b>為什麼存在、為什麼這樣實現、呼叫時要注意什麼</b>，這些資訊只有寫進註釋才能跨時間留存。「寫好註釋」四個字 AI 執行不了，必須給出固定結構和示例。</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">三要素結構</div>
+    <div class="tri-grid">
+      <div class="l-card">
+        <div class="tri-num">1</div>
+        <h3>背景</h3>
+        <p>這個函式為了解決什麼業務問題、在什麼場景下被呼叫。沒有背景，讀程式碼的人只能看到實現，看不到它為什麼存在。</p>
+      </div>
+      <div class="l-card">
+        <div class="tri-num">2</div>
+        <h3>設計意圖</h3>
+        <p>為什麼這樣實現，選擇這種方案的理由，以及放棄了哪些備選方案。git log 裡找不到這些，註釋是唯一載體。</p>
+      </div>
+      <div class="l-card">
+        <div class="tri-num">3</div>
+        <h3>關鍵約束</h3>
+        <p>呼叫方須知：副作用、依賴關係、邊界條件等非顯而易見的注意點。少了這條，下一個呼叫者就會踩坑。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="sec-label">互動演示一 · 同一個函式，兩種註釋</div>
+    <p class="desc">點選切換同一個 <code>merge_chat_history</code> 函式的兩種註釋寫法，對比它們留下的資訊量。</p>
+
+    <div class="tab-row">
+      <button class="tab-btn active" id="tabBad" onclick="pickComment(0)">
+        <div class="tab-mark">✕</div>
+        <div><h4>功能複述註釋</h4><p>AI 的預設寫法，複述函式名</p></div>
+      </button>
+      <button class="tab-btn" id="tabGood" onclick="pickComment(1)">
+        <div class="tab-mark">✓</div>
+        <div><h4>三要素註釋</h4><p>背景 + 設計意圖 + 關鍵約束</p></div>
+      </button>
+    </div>
+
+    <div class="code-panel">
+      <div class="code-panel-hd">
+        <span class="fname">chat/history.py</span>
+        <div class="legend hidden" id="legend">
+          <span class="lg-bg">背景</span><span class="lg-int">設計意圖</span><span class="lg-con">關鍵約束</span>
+        </div>
+      </div>
+      <div class="code-box" id="codeBad">def merge_chat_history(existing: list, incoming: list) -> list:
+    """
+    合併兩個聊天記錄列表，返回合併後的結果。
+    """
+    ...</div>
+      <div class="code-box hidden" id="codeGood">def merge_chat_history(existing: list, incoming: list) -> list:
+    """
+    <span class="hl hl-bg">背景：前端每次會話恢復時會帶上本地快取的歷史訊息，
+    但服務端也保留了一份持久化記錄，兩者可能因網路中斷出現分叉。</span>
+    <span class="hl hl-int">設計意圖：以服務端記錄為權威，僅追加本地獨有的訊息，
+    不做全量替換，避免覆蓋掉服務端已有的 AI 回覆中繼資料。</span>
+    <span class="hl hl-con">約束：incoming 中 role=system 的訊息一律丟棄，不合併入結果。</span>
+    """
+    ...</div>
+    </div>
+
+    <div class="verdict bad" id="verdictBad">這條註釋複述了函式名，讀一眼程式碼就能得到同樣的資訊。三個月後想知道「為什麼以服務端為權威」「為什麼丟棄 system 訊息」，什麼線索都沒有。</div>
+    <div class="verdict good hidden" id="verdictGood">三段各管一件事：背景說清它為什麼存在，設計意圖記錄了放棄全量替換的理由，約束提醒呼叫方 system 訊息會被丟棄。這些是程式碼本身無法表達的決策資訊。</div>
+  </section>
+
+  <section class="reveal paywall-locked xa-peek">
+    <div class="sec-label">互動演示二 · 刪不刪，你來判</div>
+    <p class="desc">三個真實情景，判斷 AI 應該怎麼做。點選項即時判定，並給出對應的規則依據。</p>
+
+    <div class="l-card quiz-card">
+      <div class="quiz-scene"><b>情景 1</b> · AI 在重構時發現一段相容舊資料格式的程式碼，它覺得「看起來沒用」，想順手刪掉。</div>
+      <div class="opts" id="q1">
+        <button class="opt" onclick="answer(this,'q1',false)">直接刪，程式碼越少越好，刪了跑得通就行</button>
+        <button class="opt" onclick="answer(this,'q1',true)">先標註 <b>// TODO: 建議移除 - 原因：xxx</b> 並告知使用者，拿到許可再刪</button>
+        <button class="opt" onclick="answer(this,'q1',false)">整段註釋掉留在原地，誰也別動</button>
+      </div>
+      <div class="fb" id="q1fb"></div>
+    </div>
+
+    <div class="l-card quiz-card">
+      <div class="quiz-scene"><b>情景 2</b> · 重構後實現方式變了，原有的「設計意圖」註釋已經和程式碼對不上了。</div>
+      <div class="opts" id="q2">
+        <button class="opt" onclick="answer(this,'q2',false)">註釋不準了就刪掉，免得誤導人</button>
+        <button class="opt" onclick="answer(this,'q2',false)">保持原樣不動，註釋的事以後再說</button>
+        <button class="opt" onclick="answer(this,'q2',true)">同步更新註釋內容，讓它繼續說明「現在為什麼這樣做」</button>
+      </div>
+      <div class="fb" id="q2fb"></div>
+    </div>
+
+    <div class="l-card quiz-card">
+      <div class="quiz-scene"><b>情景 3</b> · AI 覺得 fetch 比 axios 更輕量，想把專案裡的 axios 換成 fetch，順手改掉 <b>package.json</b>。</div>
+      <div class="opts" id="q3">
+        <button class="opt" onclick="answer(this,'q3',false)">直接換，反正功能等價，使用者看結果就行</button>
+        <button class="opt" onclick="answer(this,'q3',true)">先宣告三件事：新增或移除了什麼依賴、為什麼需要、版本選擇理由，再動手</button>
+        <button class="opt" onclick="answer(this,'q3',false)">悄悄換掉，在 commit message 裡提一句就算交代了</button>
+      </div>
+      <div class="fb" id="q3fb"></div>
+    </div>
+
+    <p class="quiz-score" id="quizScore">已答對 <b>0</b> / 3 題</p>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">兩條保護規則</div>
+    <div class="l-cols">
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:6px;color:var(--vibe-deep)">註釋保護</h3>
+        <p class="desc" style="font-size:13.5px">重構時禁止以「註釋太長」「程式碼自解釋」「順便清理」為由刪除背景和設計意圖註釋。實現變了導致註釋不準確時，必須同步更新內容。判斷標準只有一條：未來接手的人，沒有這條註釋還能理解當初為什麼這樣做嗎？</p>
+      </div>
+      <div class="l-card">
+        <h3 style="font-size:16px;margin-bottom:6px;color:var(--vibe-deep)">程式碼刪除宣告</h3>
+        <p class="desc" style="font-size:13.5px">刪除任何已有功能程式碼前，必須明確告知使用者並說明理由，禁止以「順手清理」「看起來沒用」為由靜默刪除。認為某段程式碼該移除時，先標註 <code>// TODO: 建議移除 - 原因：xxx</code>，拿到許可再刪。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">配套規範 · 錯誤處理</div>
+    <div class="l-callout" style="background:rgba(220,38,38,.04);border-color:rgba(220,38,38,.22)">
+      <p><b style="color:var(--danger)">禁止空 catch。</b>所有 try/catch 和錯誤分支必須有實質性處理：日誌記錄 + 使用者可見的錯誤提示，或合理的降級邏輯。僅 <code>console.log(e)</code>、<code>pass</code>、<code>// ignore</code> 都屬於靜默吞錯，一律不允許。</p>
+    </div>
+  </section>
+
+  <section class="reveal paywall-locked">
+    <div class="sec-label">本節要點</div>
+    <div class="l-callout" style="background:var(--vibe-soft);border-color:rgba(13,148,136,.3)">
+      <p><b style="color:var(--vibe-deep)">註釋的使命是留存程式碼無法表達的決策資訊。</b>三要素結構讓 AI 寫得出來，保護規則讓它刪不掉，兩者配合才能跨越時間。</p>
+    </div>
+    <div class="l-card src-note">素材來源：本節內容整理自開源倉庫 <a href="https://github.com/itshen/xs_vibe_rules" target="_blank" rel="noopener">itshen/xs_vibe_rules</a> 的 rule-opensource.mdc 第七章「程式碼組織與規範」。</div>
+  </section>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ── 交互一：注释写法切换 ── */
+function pickComment(idx) {
+  document.getElementById('tabBad').classList.toggle('active', idx === 0);
+  document.getElementById('tabGood').classList.toggle('active', idx === 1);
+  document.getElementById('codeBad').classList.toggle('hidden', idx !== 0);
+  document.getElementById('codeGood').classList.toggle('hidden', idx !== 1);
+  document.getElementById('verdictBad').classList.toggle('hidden', idx !== 0);
+  document.getElementById('verdictGood').classList.toggle('hidden', idx !== 1);
+  document.getElementById('legend').classList.toggle('hidden', idx !== 1);
+}
+
+/* ── 交互二：删不删判断题 ── */
+const QUIZ_FB = {
+  q1: {
+    ok: '<b>判定正確。</b>規則依據：程式碼刪除宣告。刪除任何已有功能程式碼前必須告知使用者並說明理由，先用 TODO 標註建議移除的原因，拿到明確許可再刪。「看起來沒用」不構成刪除理由。',
+    no: '<b>再想想。</b>規則依據：程式碼刪除宣告。禁止靜默刪除，也不鼓勵把程式碼註釋掉堆在原地。正確動作是標註 // TODO: 建議移除 - 原因：xxx，告知使用者，拿到許可再刪。'
+  },
+  q2: {
+    ok: '<b>判定正確。</b>規則依據：註釋保護規範。實現變化導致註釋不準確時，必須同步更新註釋內容。刪除前先問一句：未來接手的人，沒有這條註釋還能理解當初為什麼這樣做嗎？',
+    no: '<b>再想想。</b>規則依據：註釋保護規範。直接刪會丟掉決策資訊，原樣不動會誤導後來人。唯一正確的動作是同步更新註釋，讓它繼續說明「現在為什麼這樣做」。'
+  },
+  q3: {
+    ok: '<b>判定正確。</b>規則依據：依賴變更宣告。任何 package.json、requirements.txt 的變更都必須主動說明三件事：改了什麼依賴、為什麼需要、版本選擇理由。禁止靜默安裝或移除。',
+    no: '<b>再想想。</b>規則依據：依賴變更宣告。依賴變更牽動整個專案的構建和執行環境，禁止靜默替換。必須先宣告三件事：改了什麼依賴、為什麼需要、版本選擇理由。'
+  }
+};
+const quizDone = {};
+let quizRight = 0;
+
+function answer(btn, qid, correct) {
+  if (quizDone[qid]) return;
+  quizDone[qid] = true;
+
+  const opts = document.getElementById(qid).querySelectorAll('.opt');
+  opts.forEach(function (o) {
+    o.disabled = true;
+    if (o !== btn) o.classList.add('dim');
+  });
+  btn.classList.add(correct ? 'right' : 'wrong');
+  btn.classList.remove('dim');
+  if (!correct) {
+    /* 把正确选项也亮出来，方便对照规则 */
+    opts.forEach(function (o) {
+      if (o.getAttribute('onclick').indexOf('true') > -1) {
+        o.classList.add('right');
+        o.classList.remove('dim');
+      }
+    });
+  } else {
+    quizRight++;
+  }
+
+  const fb = document.getElementById(qid + 'fb');
+  fb.innerHTML = correct ? QUIZ_FB[qid].ok : QUIZ_FB[qid].no;
+  fb.classList.add('show', correct ? 'ok' : 'no');
+
+  document.getElementById('quizScore').innerHTML = '已答對 <b>' + quizRight + '</b> / 3 題';
+}
+</script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

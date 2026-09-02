@@ -1,5 +1,5 @@
 /**
- * auth.js — xueai.app 登录状态与登录 UI（home.html / learn.html 共用）
+ * auth.js — xueai.miyang.cn 登录状态与登录 UI（home.html / learn.html 共用）
  *
  * 依赖后端 /auth/* 接口（米羊 OAuth）。
  * 本地预览没有该接口时静默降级为「未登录」，不影响页面其他功能。
@@ -15,9 +15,9 @@
 (function(){
   /* ── 语言检测：优先读 i18n.js 注入的 window.XUEAI_I18N.lang，
      其次从文件名后缀判断，默认中文 ── */
+  var _m = location.pathname.match(/\.(en|ko|tw|hk)\.html?$/);
   var _lang = (window.XUEAI_I18N && window.XUEAI_I18N.lang)
-    || (location.pathname.match(/\.(en)\.html?$/) ? 'en'
-       : location.pathname.match(/\.(ko)\.html?$/) ? 'ko' : 'zh');
+    || (_m ? _m[1] : 'zh');
 
   /* ── 三语字典 ── */
   var _T = {
@@ -68,11 +68,121 @@
       noticeHeroTitle:    '永久免费',
       noticeHeroSub:      '知识应该被更多人看到',
       noticeHeading:      '郑重声明',
-      noticePara1:        'xueai.app 是免费公益的 AI 学习网站，全部内容<span class="xa-red">永久免费</span>。<br>本站从未授权任何机构或个人将站内内容用于收费课程、付费社群或任何形式的销售。',
+      noticePara1:        'xueai.miyang.cn 是免费公益的 AI 学习网站，全部内容<span class="xa-red">永久免费</span>。<br>本站从未授权任何机构或个人将站内内容用于收费课程、付费社群或任何形式的销售。',
       noticePara2a:       '如果你是在培训机构、付费课程或课包里拿到本网站的，说明你为免费内容付了钱。<br>请尽快向对方申请退款，并保留付款凭证。',
       noticePara2b:       '你也可以访问米羊官网 <a href="https://miyang.cn" target="_blank" rel="noopener">miyang.cn</a>，或邮件 <a href="mailto:connect@miyang.cn">connect@miyang.cn</a> <span class="xa-nb">向我们举报。</span>',
-      noticePara3:        '本站要求登录，仅用于同步学习进度与防止内容被恶意贩卖，不收取任何费用。<br>欢迎关注公众号「洛小山」，我们也会录制教学视频，免费开放给你学习！',
+      noticePara3:        '登录只用于同步学习进度、防止内容被恶意贩卖，不收取任何费用。<br>欢迎关注公众号「洛小山」，我们也会录制教学视频，免费开放给你学习！',
       noticeVision:       '米羊科技的愿景，是让<span class="xa-red">更多人享受到 AI 的便利</span>。<br>我们愿意做一件不那么聪明的事：把我们掌握的知识开源出来。<br>但开源精神，绝不是商业化倒卖的理由。',
+      btnX:               '到 X 支持一下小山！',
+      btnAck:             '我明白了！'
+    },
+    hk: {
+      defaultNickname:    '米羊用戶',
+      loginBtn:           '登入',
+      logoutBtn:          '退出',
+      userTitle:          '米羊個人中心 · AI 學習進展',
+      accountLabel:       '帳號菜單',
+      signedInLabel:      '已登入米羊帳號',
+      profileBtn:         '個人中心',
+      /* 登录邀请弹窗 */
+      heroTitle:          '全部免費',
+      heroSub:            '登入即可解鎖完整課程',
+      modalTitle:         '登入後，你將獲得',
+      modalSub:           '一個帳號，解鎖全部學習資源',
+      qrTitle:            '掃碼加入學習社羣',
+      qrDesc:             '技術分享 · 實戰交流 · 職位推薦',
+      groupQrAlt:         '交流羣QR Code',
+      btnBrowse:          '先看看',
+      btnCancel:          '稍後再説',
+      btnLogin:           '快速登入，免費學習',
+      footNote:           '要求登入也是為了防止內容被惡意販賣。本站永久免費，若你在任何付費課程裏買到過它，請向對方申請退款。',
+      /* 权益列表 */
+      benefit0Title:      '解鎖全部課程',
+      benefit0Desc:       '不花一分錢，所有章節完整學完',
+      benefit1Title:      '學習進度雲同步',
+      benefit1Desc:       '進度保存在雲端，換設備也能接着學',
+      benefit2Title:      'AI 實戰技巧分享',
+      benefit2Desc:       '定期組織技術分享與交流會',
+      benefit3Title:      '職位機會推薦',
+      benefit3Desc:       '幫你對接有 AI 職位需求的公司',
+      /* 交流群弹窗 */
+      groupModalTitle:    '歡迎交流與關注',
+      groupHint:          '微信掃一掃入羣，或關注公眾號與 X 獲取更新',
+      chan0Name:          '交流羣',
+      chan0Desc:          '微信掃碼入羣<br>聊課程與 AI 實戰',
+      chan0Alt:           '小山學堂 交流羣QR Code',
+      chan1Name:          '公眾號',
+      chan1Desc:          '洛小山<br>文章與課程更新',
+      chan1Alt:           '洛小山公眾號QR Code',
+      chan2Name:          '推特',
+      chan2Desc:          '@luoxiaoshan_ai<br>按一下直達主頁',
+      chan2Alt:           'X 主頁QR Code',
+      btnClose:           '關閉',
+      /* 郑重声明弹窗 */
+      noticeAriaLabel:    '鄭重聲明',
+      noticeHeroTitle:    '永久免費',
+      noticeHeroSub:      '知識應該被更多人看到',
+      noticeHeading:      '鄭重聲明',
+      noticePara1:        'xueai.miyang.cn 是免費公益的 AI 學習網站，全部內容<span class="xa-red">永久免費</span>。<br>本站從未授權任何機構或個人將站內內容用於收費課程、付費社羣或任何形式的銷售。',
+      noticePara2a:       '如果你是在培訓機構、付費課程或課包裏拿到本網站的，説明你為免費內容付了錢。<br>請儘快向對方申請退款，並保留付款憑證。',
+      noticePara2b:       '你也可以訪問米羊官網 <a href="https://miyang.cn" target="_blank" rel="noopener">miyang.cn</a>，或郵件 <a href="mailto:connect@miyang.cn">connect@miyang.cn</a> <span class="xa-nb">向我們舉報。</span>',
+      noticePara3:        '登入只用於同步學習進度、防止內容被惡意販賣，不收取任何費用。<br>歡迎關注公眾號「洛小山」，我們也會錄製教學影片，免費開放給你學習！',
+      noticeVision:       '米羊科技的願景，是讓<span class="xa-red">更多人享受到 AI 的便利</span>。<br>我們願意做一件不那麼聰明的事：把我們掌握的知識開源出來。<br>但開源精神，絕不是商業化倒賣的理由。',
+      btnX:               '到 X 支持一下小山！',
+      btnAck:             '我明白了！'
+    },
+    tw: {
+      defaultNickname:    '米羊用戶',
+      loginBtn:           '登入',
+      logoutBtn:          '登出',
+      userTitle:          '米羊個人中心 · AI 學習進展',
+      accountLabel:       '帳號選單',
+      signedInLabel:      '已登入米羊帳號',
+      profileBtn:         '個人中心',
+      /* 登录邀请弹窗 */
+      heroTitle:          '全部免費',
+      heroSub:            '登入即可解鎖完整課程',
+      modalTitle:         '登入後，你將獲得',
+      modalSub:           '一個帳號，解鎖全部學習資源',
+      qrTitle:            '掃碼加入學習社群',
+      qrDesc:             '技術分享 · 實戰交流 · 職缺推薦',
+      groupQrAlt:         '交流群二維碼',
+      btnBrowse:          '先看看',
+      btnCancel:          '稍後再說',
+      btnLogin:           '快速登入，免費學習',
+      footNote:           '要求登入也是為了防止內容被惡意販賣。本站永久免費，若你在任何付費課程裡買到過它，請向對方申請退款。',
+      /* 权益列表 */
+      benefit0Title:      '解鎖全部課程',
+      benefit0Desc:       '不用花一毛錢，所有章節完整學完',
+      benefit1Title:      '學習進度雲同步',
+      benefit1Desc:       '進度儲存在雲端，換裝置也能接著學',
+      benefit2Title:      'AI 實戰技巧分享',
+      benefit2Desc:       '定期舉辦技術分享與交流會',
+      benefit3Title:      '職缺機會推薦',
+      benefit3Desc:       '幫你對接有 AI 職缺需求的公司',
+      /* 交流群弹窗 */
+      groupModalTitle:    '歡迎交流與關注',
+      groupHint:          '微信掃一掃入群，或關注公眾號與 X 獲取更新',
+      chan0Name:          '交流群',
+      chan0Desc:          '微信掃碼入群<br>聊課程與 AI 實戰',
+      chan0Alt:           '小山學堂 交流群二維碼',
+      chan1Name:          '公眾號',
+      chan1Desc:          '洛小山<br>文章與課程更新',
+      chan1Alt:           '洛小山公眾號二維碼',
+      chan2Name:          '推特',
+      chan2Desc:          '@luoxiaoshan_ai<br>點選直達主頁',
+      chan2Alt:           'X 主頁二維碼',
+      btnClose:           '關閉',
+      /* 郑重声明弹窗 */
+      noticeAriaLabel:    '鄭重聲明',
+      noticeHeroTitle:    '永久免費',
+      noticeHeroSub:      '知識應該被更多人看到',
+      noticeHeading:      '鄭重聲明',
+      noticePara1:        'xueai.miyang.cn 是免費公益的 AI 學習網站，全部內容<span class="xa-red">永久免費</span>。<br>本站從未授權任何機構或個人將站內內容用於收費課程、付費社群或任何形式的銷售。',
+      noticePara2a:       '如果你是在培訓機構、付費課程或課包裡拿到本網站的，說明你為免費內容付了錢。<br>請儘快向對方申請退款，並保留付款憑證。',
+      noticePara2b:       '你也可以訪問米羊官網 <a href="https://miyang.cn" target="_blank" rel="noopener">miyang.cn</a>，或郵件 <a href="mailto:connect@miyang.cn">connect@miyang.cn</a> <span class="xa-nb">向我們舉報。</span>',
+      noticePara3:        '登入只用於同步學習進度、防止內容被惡意販賣，不收取任何費用。<br>歡迎關注公眾號「洛小山」，我們也會錄製教學影片，免費開放給你學習！',
+      noticeVision:       '米羊科技的願景，是讓<span class="xa-red">更多人享受到 AI 的便利</span>。<br>我們願意做一件不那麼聰明的事：把我們掌握的知識開源出來。<br>但開源精神，絕不是商業化倒賣的理由。',
       btnX:               '到 X 支持一下小山！',
       btnAck:             '我明白了！'
     },
@@ -119,7 +229,7 @@
       noticeHeroTitle:    'Always Free',
       noticeHeroSub:      'Knowledge should be accessible to all',
       noticeHeading:      'Important Notice',
-      noticePara1:        'xueai.app is a free, public-benefit AI learning site. All content is <span class="xa-red">permanently free</span>.<br>Miyang has never authorized any individual or organization to resell the content here in paid courses, paid communities, or any other commercial form.',
+      noticePara1:        'xueai.miyang.cn is a free, public-benefit AI learning site. All content is <span class="xa-red">permanently free</span>.<br>Miyang has never authorized any individual or organization to resell the content here in paid courses, paid communities, or any other commercial form.',
       noticePara2a:       'If you received this site through a training program, paid course, or course bundle, you paid for something that should be free.<br>Please request a refund immediately and keep your payment records.',
       noticePara2b:       'You can also visit the Miyang website at <a href="https://miyang.cn" target="_blank" rel="noopener">miyang.cn</a> or email <a href="mailto:connect@miyang.cn">connect@miyang.cn</a> <span class="xa-nb">to report the issue.</span>',
       noticePara3:        'Login is only used to sync your learning progress and prevent content from being resold. We charge nothing.<br>Follow "Luo Xiaoshan" on WeChat Official Account — we also publish free tutorial videos there!',
@@ -170,7 +280,7 @@
       noticeHeroTitle:    '영구 무료',
       noticeHeroSub:      '지식은 더 많은 사람들에게 닿아야 합니다',
       noticeHeading:      '중요 공지',
-      noticePara1:        'xueai.app은 무료 공익 AI 학습 사이트로, 모든 콘텐츠는 <span class="xa-red">영구 무료</span>입니다.<br>미양은 어떠한 기관이나 개인에게도 사이트 콘텐츠를 유료 강의, 유료 커뮤니티 또는 기타 상업적 형태로 판매하도록 허가한 적이 없습니다.',
+      noticePara1:        'xueai.miyang.cn은 무료 공익 AI 학습 사이트로, 모든 콘텐츠는 <span class="xa-red">영구 무료</span>입니다.<br>미양은 어떠한 기관이나 개인에게도 사이트 콘텐츠를 유료 강의, 유료 커뮤니티 또는 기타 상업적 형태로 판매하도록 허가한 적이 없습니다.',
       noticePara2a:       '교육 기관, 유료 강의 또는 강의 패키지를 통해 이 사이트를 접하셨다면, 무료 콘텐츠에 비용을 지불하신 것입니다.<br>즉시 환불을 요청하시고 결제 증빙을 보관하시기 바랍니다.',
       noticePara2b:       '미양 공식 웹사이트 <a href="https://miyang.cn" target="_blank" rel="noopener">miyang.cn</a>을 방문하시거나, <a href="mailto:connect@miyang.cn">connect@miyang.cn</a>으로 이메일을 보내 <span class="xa-nb">신고하실 수 있습니다.</span>',
       noticePara3:        '로그인은 학습 진도 동기화와 콘텐츠 무단 판매 방지를 위한 것으로, 어떠한 비용도 청구하지 않습니다.<br>위챗 공식 계정 「뤄샤오산」을 팔로우하세요. 무료 강의 영상도 제공합니다!',
@@ -186,7 +296,10 @@
   /* 整章免登录的篇章前缀，必须与 ops/auth-service.py 的 CHAPTER_FREE_OVERRIDE
      逐项一致。这里漏一个，侧边栏就会给服务端明明放行的课程画上锁——零基础入门篇
      17 节曾因此一直带锁。tests/test_auth_js_free_sync.py 会比对两边。 */
-  var FREE_ALL_PREFIXES = ['lei-', 'zero-', '0-'];
+  var FREE_ALL_PREFIXES = ['lei-', 'zero-', '0-',
+    /* 后 7 项是逐文件放行的纯交互页，切不出付费墙预览，服务端已整页放行 */
+    '1-2-vocab', 'ai-safety-governance', 'ai-tips-context', 'ai-tips-iterate',
+    'ai-tips-scenarios', 'ai-tips-verify', 'prompt-attack-cases'];
   /* 三个联系渠道。二维码都放本地 assets，不走 CDN，弹窗才不会因为外域挂掉而开天窗 */
   var GROUP_QR = 'assets/group-qrcode.png?v=20260817a';
   var GZH_QR = 'assets/qrcode.jpg';
@@ -424,6 +537,26 @@
     return location.pathname + location.hash;
   }
 
+  function loginUrlFor(next){
+    var url = '/auth/login?next=' + encodeURIComponent(next || currentNext());
+    /* 来源只允许页面声明的已知值。敬老版由认证服务换用独立 OAuth client，
+       miyang.cn 才能把注册与登录会话可靠地区分为「小山学堂·敬老版」。 */
+    if(document.documentElement.getAttribute('data-xa-source') === 'elder'){
+      url += '&source=elder';
+    }
+    return url;
+  }
+
+  /* 敬老版页面给 <html> 加 data-xa-login="direct"：那里的「登录」是一次点击直达，
+     不再先弹一层权益说明。老人已经被艾莉告知过为什么要登录，多一次点击就是多一道坎。 */
+  function directLogin(){
+    return document.documentElement.getAttribute('data-xa-login') === 'direct';
+  }
+
+  function goLogin(next){
+    location.href = loginUrlFor(next);
+  }
+
   /* SVG 图标 */
   var SVG_UNLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>';
   var SVG_PEOPLE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
@@ -443,8 +576,12 @@
      用于首页 CTA 等"先弹说明再放行"的场景。 */
   function openLoginModal(next, opts){
     opts = opts || {};
+    if(directLogin()){
+      goLogin(next);
+      return;
+    }
     if(document.querySelector('.xa-scrim')) return;
-    var loginUrl = '/auth/login?next=' + encodeURIComponent(next || currentNext());
+    var loginUrl = loginUrlFor(next);
 
     var benefits = BENEFIT_ITEMS.map(function(item){
       return '<div class="xa-benefit">'
@@ -481,7 +618,7 @@
       + (opts.browseHref
           ? '<a class="xa-btn ghost" data-xa="cancel" href="' + opts.browseHref + '" target="_top">' + T.btnBrowse + '</a>'
           : '<button class="xa-btn ghost" data-xa="cancel">' + T.btnCancel + '</button>')
-      + '<a class="xa-btn primary" href="' + loginUrl + '">' + T.btnLogin + '</a>'
+      + '<a class="xa-btn primary" rel="nofollow" href="' + loginUrl + '">' + T.btnLogin + '</a>'
       + '</div>'
 
       + '<div class="xa-wide-foot">' + T.footNote + '</div>'
@@ -701,6 +838,7 @@
     get state(){ return state; },
     isFree: function(file){ return !!freeSet[file]; },
     openLoginModal: openLoginModal,
+    goLogin: goLogin,
     openGroupModal: openGroupModal,
     mount: mount
   };

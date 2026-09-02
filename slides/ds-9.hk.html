@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>詞表與 Trie：Tokenizer 的切詞秘密 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<!-- SEO Start -->
+<meta name="description" content="大模型原理篇見過分詞，這次看底層：一棵前綴樹怎麼把「五花肉」整塊認出來。親手沿着 Trie 走一次分詞。">
+<meta name="keywords" content="Trie 前綴樹,Tokenizer 分詞,詞表,BPE,詞元 token,最長匹配,大模型分詞原理">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/ds-9.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/ds-9.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/ds-9.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/ds-9.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/ds-9.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/ds-9.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/ds-9.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/ds-9.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="詞表與 Trie：Tokenizer 的切詞秘密">
+<meta property="og:description" content="一棵前綴樹怎麼把「五花肉」整塊認出來？親手沿着 Trie 走一次分詞，看懂貪婪最長匹配。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/ds-9.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/ds-9.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="詞表與 Trie：Tokenizer 的切詞秘密">
+<meta name="twitter:description" content="一棵前綴樹怎麼把「五花肉」整塊認出來？親手沿着 Trie 走一次分詞，看懂貪婪最長匹配。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+
+/* ── Trie 分词演示 ── */
+.trie-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);overflow:hidden}
+.trie-head{padding:14px 22px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.015);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.trie-head-label{font-size:12px;font-weight:800;color:var(--sub)}
+.sent-chip{border:1.5px solid var(--border);background:var(--card);border-radius:999px;padding:6px 16px;font-size:13.5px;font-weight:700;color:var(--text);cursor:pointer;transition:all .15s;font-family:inherit}
+.sent-chip:hover{border-color:rgba(2,132,199,.4)}
+.sent-chip.active{background:var(--ds);border-color:var(--ds);color:#fff}
+.trie-sentence{padding:16px 22px 6px;text-align:center}
+.trie-sentence .sc{display:inline-block;font-size:22px;font-weight:800;padding:5px 9px;margin:0 2px;border-radius:9px;color:var(--text);transition:background .25s,color .25s,opacity .25s}
+.trie-sentence .sc.probe{background:var(--ds);color:#fff}
+.trie-sentence .sc.eaten{background:var(--ds-soft);color:var(--ds-deep);opacity:.65}
+.trie-stage{padding:4px 12px;display:flex;justify-content:center}
+.trie-stage svg{width:100%;max-width:640px;height:auto;display:block}
+.tr-edge{stroke:rgba(0,0,0,.16);stroke-width:1.8;transition:stroke .25s,stroke-width .25s}
+.tr-edge.path{stroke:var(--ds);stroke-width:3}
+.tr-node circle.tr-dot{fill:#fff;stroke:rgba(0,0,0,.22);stroke-width:1.6;transition:fill .25s,stroke .25s}
+.tr-node text.tr-char{fill:var(--text);font-size:15px;font-weight:800;pointer-events:none}
+.tr-node.cur circle.tr-dot{fill:var(--ds);stroke:var(--ds)}
+.tr-node.cur text.tr-char{fill:#fff}
+.tr-node.path circle.tr-dot{fill:var(--ds-soft);stroke:var(--ds)}
+.tr-node.cut circle.tr-dot{fill:#dcfce7;stroke:var(--success)}
+.tr-end{fill:#16a34a;font-size:11px;font-weight:900}
+.tr-root-label{fill:var(--sub);font-size:11px;font-weight:700}
+.trie-narr{margin:6px 22px;padding:13px 16px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13px;line-height:1.8;color:var(--sub);min-height:58px}
+.trie-narr b{color:var(--ds-deep)}
+.trie-narr .bad{color:var(--danger);font-weight:800}
+.trie-narr .ok{color:var(--success);font-weight:800}
+.trie-result{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 22px 8px;min-height:44px}
+.trie-result-label{font-size:12px;font-weight:800;color:var(--sub)}
+.tok-chip{background:var(--ds);color:#fff;font-size:14px;font-weight:800;padding:5px 14px;border-radius:9px;animation:tokPop .35s ease}
+@keyframes tokPop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+.trie-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 22px 16px;border-top:1px solid var(--border)}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+.trie-status{font-size:12.5px;color:var(--sub);font-weight:600}
+
+/* ── BPE 说明卡 ── */
+.bpe-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow-card)}
+.bpe-card h4{font-size:15px;font-weight:800;color:var(--text);margin-bottom:10px}
+.bpe-card p{font-size:13.5px;color:var(--sub);line-height:1.85;margin-bottom:10px}
+.bpe-card p:last-child{margin-bottom:0}
+.bpe-card b{color:var(--ds-deep)}
+.bpe-demo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(0,0,0,.03);border-radius:var(--radius-sm);padding:12px 14px;margin:12px 0;font-size:13px}
+.bpe-tok{padding:3px 10px;border-radius:7px;font-weight:800}
+.bpe-tok.big{background:var(--ds-soft);color:var(--ds-deep);border:1.5px solid var(--ds-line)}
+.bpe-tok.frag{background:rgba(220,38,38,.08);color:var(--danger);border:1.5px dashed rgba(220,38,38,.35)}
+.bpe-arrow{color:var(--sub);font-weight:800}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .trie-sentence .sc{font-size:18px;padding:4px 6px}
+  .trie-narr{margin-left:14px;margin-right:14px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"詞表與 Trie：Tokenizer 的切詞秘密","name":"詞表與 Trie：Tokenizer 的切詞秘密","url":"https://xueai.miyang.cn/slides/ds-9.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 大模型肚子裏的數據結構","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"大模型原理篇見過分詞，這次看底層：一棵前綴樹怎麼把「五花肉」整塊認出來。親手沿着 Trie 走一次分詞。","datePublished":"2026-08-10","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">編程基礎篇 · 大模型肚子裏的數據結構</div>
+    <h1>詞表與 Trie：Tokenizer 的切詞秘密</h1>
+    <p class="subtitle">還記得大模型原理篇那個細節嗎——分詞器把「五花肉」切成<b>一整塊詞元</b>，而不是三個字。當時我們説「常見組合當一個整體」，這次揭底層：分詞器是怎麼在幾萬個詞裏，瞬間認出「五花肉」該整塊拿走的？答案是一種叫 <b>Trie（前綴樹）</b>的收納方式——把詞表按「共享開頭」掛成一棵樹。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>大模型原理篇見過分詞，這次看底層：一棵前綴樹怎麼把「五花肉」整塊認出來。親手沿着 Trie 走一次分詞</p></aside><!--seo:end-->  <div class="sec-label">先看收納 · 詞表怎麼掛成一棵樹</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">假設詞表裏有這些詞：<code>五</code>、<code>五月</code>、<code>五花肉</code>、<code>今天</code>、<code>天</code>、<code>天氣</code>、<code>吃</code>、<code>花</code>、<code>好</code>。按第一個字、第二個字……一層層掛起來，共享開頭的詞就共享樹枝——「五月」和「五花肉」擠同一根「五」枝。<b style="color:var(--text)">帶綠色 ✓ 的節點表示「走到這裏是一個完整的詞」</b>；注意「五→花」那個節點沒有 ✓：它只是路過的中轉站（「五花」不是詞）。</p>
+
+  <div class="trie-box">
+    <div class="trie-head">
+      <span class="trie-head-label">選一句話：</span>
+      <button class="sent-chip active" data-s="今天吃五花肉">今天吃五花肉</button>
+      <button class="sent-chip" data-s="五月天氣好">五月天氣好</button>
+      <button class="sent-chip" data-s="今天吃五花">今天吃五花</button>
+    </div>
+    <div class="trie-sentence" id="trieSentence"></div>
+    <div class="trie-stage">
+      <svg id="trieSvg" viewBox="0 0 640 310" aria-label="前綴樹分詞演示"></svg>
+    </div>
+    <div class="trie-narr" id="trieNarr">點「開始分詞」，光標會<b>逐字沿着樹往下走</b>。留意兩件事：走到 ✓ 時它<b>不急着切</b>（貪心，先試試能不能更長）；走不通時它<b>回退到最近的 ✓ 才切刀</b>。</div>
+    <div class="trie-result">
+      <span class="trie-result-label">分詞結果：</span>
+      <span id="trieTokens"></span>
+    </div>
+    <div class="trie-foot">
+      <button class="btn-ds" id="btnTrie">開始分詞 ▶</button>
+      <span class="trie-status" id="trieStatus">全程約 15 秒，每一步有旁白</span>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked xa-peek" style="margin-top:18px;">
+    <b>這套走法叫「貪婪最長匹配」：能走多深走多深，走不通就回退到最近的詞尾切刀。</b>為什麼要貪？因為「五花肉」整塊切，比「五 / 花 / 肉」三塊更省 token、也更保住語義。而 Trie 的妙處在於：每一步只看「當前節點有沒有這個字的樹枝」，<b>不用回頭把詞表翻一遍</b>——幾萬個詞的詞表，判斷一步只要一次查找。這又是「收納得好，找起來快」。
+  </div>
+
+  <div class="sec-label paywall-locked">揭底 · 真實大模型用的是 BPE，思想同源</div>
+
+  <div class="bpe-card paywall-locked">
+    <h4>🧩 BPE：把「最常一起出現的字符對」反覆合併成塊</h4>
+    <p>真實的 Tokenizer（GPT、DeepSeek 都在用的 <b>BPE</b>）建詞表的方式更野：先把所有文字拆成最小碎片，然後數一數<b>哪兩個碎片最常挨在一起</b>，把它們粘成一塊收進詞表；再數、再粘，重複幾萬次。常見組合就這樣一層層「長」成了大塊詞元——和 Trie「常見的詞整塊收納」是同一個思想。</p>
+    <div class="bpe-demo">
+      <span class="bpe-tok big">的</span>
+      <span class="bpe-tok big">，</span>
+      <span class="bpe-tok big">五花肉</span>
+      <span class="bpe-arrow">→ 高頻，各自一整塊</span>
+    </div>
+    <div class="bpe-demo">
+      <span>「饕餮」</span>
+      <span class="bpe-arrow">→</span>
+      <span class="bpe-tok frag">饕(碎塊1)</span>
+      <span class="bpe-tok frag">饕(碎塊2)</span>
+      <span class="bpe-tok frag">餮(碎塊1)</span>
+      <span class="bpe-tok frag">餮(碎塊2)</span>
+      <span class="bpe-arrow">→ 生僻，被拆成字節碎塊</span>
+    </div>
+    <p>所以你見過的現象都有了解釋：「的」「，」永遠只佔一個 token；生僻字反而被拆成好幾塊。這也是<b>中文普遍比英文費 token</b> 的原因——大多數詞表以英文語料為主訓練，英文常見詞都攢出了整塊詞元，中文攢得少，只好多切幾刀。同一句話，中文版帳單往往更貴，根子就在詞表這本「字典」收納了誰。</p>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 這一課想和你分享的</h3>
+    <ul>
+      <li><b>詞表是一本字典</b>：收納所有詞元；分詞就是「查着字典把句子切成塊」</li>
+      <li><b>Trie 按共享開頭收納</b>：讓「最長匹配」一步一查、不用回頭路</li>
+      <li><b>貪婪最長匹配</b>：能走多深走多深，走不通回退到最近的詞尾切刀</li>
+      <li><b>BPE 思想同源</b>：最常一起出現的組合反覆合併成整塊——常見的省，生僻的碎</li>
+      <li><b>中文費 token 的根子</b>：詞表偏英文，中文整塊詞元少，只好多切幾刀</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+/* ── Trie 结构与布局 ──
+   节点手工排版（SVG 坐标），分词步骤由 tokenize() 按贪婪最长匹配现算，
+   保证动画和算法逻辑严格一致，不靠手写脚本。 */
+const TRIE = {
+  id:'root', end:false, children:{
+    '五':{ id:'n5', end:true, children:{
+      '花':{ id:'n5h', end:false, children:{
+        '肉':{ id:'n5hr', end:true, children:{} },
+      }},
+      '月':{ id:'n5y', end:true, children:{} },
+    }},
+    '今':{ id:'nj', end:false, children:{
+      '天':{ id:'njt', end:true, children:{} },
+    }},
+    '天':{ id:'nt', end:true, children:{
+      '氣':{ id:'ntq', end:true, children:{} },
+    }},
+    '吃':{ id:'nc', end:true, children:{} },
+    '花':{ id:'nf', end:true, children:{} },
+    '好':{ id:'nh', end:true, children:{} },
+  },
+};
+const TRIE_POS = {
+  root:{ x:320, y:38,  label:'詞表' },
+  n5:  { x:100, y:118, label:'五' },
+  nj:  { x:222, y:118, label:'今' },
+  nt:  { x:344, y:118, label:'天' },
+  nc:  { x:446, y:118, label:'吃' },
+  nf:  { x:528, y:118, label:'花' },
+  nh:  { x:602, y:118, label:'好' },
+  n5h: { x:52,  y:200, label:'花' },
+  n5y: { x:148, y:200, label:'月' },
+  njt: { x:222, y:200, label:'天' },
+  ntq: { x:344, y:200, label:'氣' },
+  n5hr:{ x:52,  y:278, label:'肉' },
+};
+const TRIE_EDGES = [
+  ['root','n5'],['root','nj'],['root','nt'],['root','nc'],['root','nf'],['root','nh'],
+  ['n5','n5h'],['n5','n5y'],['nj','njt'],['nt','ntq'],['n5h','n5hr'],
+];
+const TRIE_ENDS = { n5:'五', n5y:'五月', n5hr:'五花肉', njt:'今天', nt:'天', ntq:'天氣', nc:'吃', nf:'花', nh:'好' };
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const trieSvg = document.getElementById('trieSvg');
+function svgEl(tag, attrs){
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+/* 画边 */
+const trieEdgeEls = {};
+TRIE_EDGES.forEach(([a, b]) => {
+  const p1 = TRIE_POS[a], p2 = TRIE_POS[b];
+  const l = svgEl('line', { class:'tr-edge', x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y });
+  trieSvg.appendChild(l);
+  trieEdgeEls[b] = l;   // 每個非根節點唯一一條入邊
+});
+/* 画节点 */
+const trieNodeEls = {};
+Object.entries(TRIE_POS).forEach(([id, p]) => {
+  const g = svgEl('g', { class:'tr-node', 'data-id':id });
+  g.appendChild(svgEl('circle', { class:'tr-dot', cx:p.x, cy:p.y, r: id === 'root' ? 24 : 20 }));
+  const t = svgEl('text', { class:'tr-char', x:p.x, y:p.y + 5.5, 'text-anchor':'middle' });
+  t.textContent = id === 'root' ? '根' : p.label;
+  g.appendChild(t);
+  if (TRIE_ENDS[id]){
+    const badge = svgEl('text', { class:'tr-end', x:p.x + 16, y:p.y - 13 });
+    badge.textContent = '✓';
+    g.appendChild(badge);
+  }
+  trieSvg.appendChild(g);
+  trieNodeEls[id] = g;
+});
+const rootHint = svgEl('text', { class:'tr-root-label', x:TRIE_POS.root.x + 34, y:TRIE_POS.root.y + 4 });
+rootHint.textContent = '← 每個詞都從這裏出發';
+trieSvg.appendChild(rootHint);
+
+/* ── 贪婪最长匹配：生成步骤脚本 ── */
+function tokenize(s){
+  const steps = [];
+  let i = 0;
+  while (i < s.length){
+    steps.push({ type:'start', i, ch:s[i] });
+    let node = TRIE, j = i, lastEnd = -1, lastEndId = null;
+    const path = [];
+    while (j < s.length && node.children[s[j]]){
+      node = node.children[s[j]];
+      j++;
+      path.push(node.id);
+      if (node.end){ lastEnd = j; lastEndId = node.id; }
+      steps.push({ type:'visit', id:node.id, word:s.slice(i, j), end:node.end,
+                   canGo: j < s.length && !!node.children[s[j]], nextCh:s[j] || '', path:[...path], i, j });
+    }
+    if (lastEnd > i){
+      steps.push({ type:'cut', word:s.slice(i, lastEnd), endId:lastEndId,
+                   backed: path.length > 0 && path[path.length - 1] !== lastEndId,
+                   fromWord:s.slice(i, j) });
+      i = lastEnd;
+    } else {
+      steps.push({ type:'unk', ch:s[i] });
+      i++;
+    }
+  }
+  steps.push({ type:'done' });
+  return steps;
+}
+
+/* ── 动画驱动 ── */
+const trieSentence = document.getElementById('trieSentence');
+const trieNarr = document.getElementById('trieNarr');
+const trieTokens = document.getElementById('trieTokens');
+const trieStatus = document.getElementById('trieStatus');
+const btnTrie = document.getElementById('btnTrie');
+let curSentence = '今天吃五花肉';
+let trieBusy = false;
+
+function renderSentence(){
+  trieSentence.innerHTML = [...curSentence].map((c, k) => `<span class="sc" data-k="${k}">${c}</span>`).join('');
+}
+function markSentence(from, to, cls){
+  trieSentence.querySelectorAll('.sc').forEach(el => {
+    const k = +el.dataset.k;
+    if (k >= from && k < to) el.classList.add(cls);
+  });
+}
+function clearProbe(){
+  trieSentence.querySelectorAll('.sc.probe').forEach(el => el.classList.remove('probe'));
+}
+function trieClearHl(){
+  Object.values(trieNodeEls).forEach(g => g.classList.remove('cur','path','cut'));
+  Object.values(trieEdgeEls).forEach(l => l.classList.remove('path'));
+}
+function trieSleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+document.querySelectorAll('.sent-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    if (trieBusy) return;
+    document.querySelectorAll('.sent-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    curSentence = chip.dataset.s;
+    renderSentence();
+    trieTokens.innerHTML = '';
+    trieClearHl();
+    trieNarr.innerHTML = `換了一句：「${curSentence}」。點「開始分詞」看它怎麼切。`;
+    btnTrie.textContent = '開始分詞 ▶';
+  });
+});
+renderSentence();
+
+btnTrie.addEventListener('click', async () => {
+  if (trieBusy) return;
+  trieBusy = true;
+  btnTrie.disabled = true;
+  trieTokens.innerHTML = '';
+  renderSentence();
+  trieClearHl();
+  const steps = tokenize(curSentence);
+  for (const st of steps){
+    if (st.type === 'start'){
+      trieClearHl();
+      clearProbe();
+      trieNodeEls.root.classList.add('cur');
+      trieNarr.innerHTML = `從「<b>${st.ch}</b>」開始新的一塊——回到<b>根節點</b>，兩手空空重新出發。`;
+      await trieSleep(1000);
+    } else if (st.type === 'visit'){
+      trieClearHl();
+      st.path.forEach(id => { trieNodeEls[id].classList.add('path'); trieEdgeEls[id].classList.add('path'); });
+      trieNodeEls[st.path[st.path.length - 1]].classList.add('cur');
+      clearProbe();
+      markSentence(st.i, st.j, 'probe');
+      let msg = `走到「<b>${st.word}</b>」`;
+      if (st.end && st.canGo){
+        msg += ` —— <span class="ok">是個詞尾 ✓</span>，先記在小本本上。但<b>貪心</b>：下面還有「${st.nextCh}」的樹枝，繼續往深處探！`;
+      } else if (st.end && !st.canGo){
+        msg += ` —— <span class="ok">是個詞尾 ✓</span>，而且${st.j >= curSentence.length ? '句子到頭了' : `下一個字「${st.nextCh}」<span class="bad">接不上任何樹枝</span>`}，不用再探了。`;
+      } else if (!st.end && st.canGo){
+        msg += ` —— 這裏<b>沒有 ✓</b>，只是個中轉站（「${st.word}」不是詞），但路還通，繼續走。`;
+      } else {
+        msg += ` —— 沒有 ✓，${st.j >= curSentence.length ? '句子也到頭了' : `想接「${st.nextCh}」卻<span class="bad">沒有這條樹枝，走不通了</span>`}。`;
+      }
+      trieNarr.innerHTML = msg;
+      await trieSleep(1400);
+    } else if (st.type === 'cut'){
+      trieClearHl();
+      trieNodeEls[st.endId].classList.add('cut');
+      clearProbe();
+      const cutMsg = st.backed
+        ? `<span class="bad">回退！</span>探到「${st.fromWord}」走不下去，退回小本本上最近的詞尾「<b>${st.word}</b>」——<b>咔嚓，切一刀！</b>`
+        : `就在詞尾上，<b>咔嚓，切一刀：「${st.word}」</b>入袋。`;
+      trieNarr.innerHTML = cutMsg;
+      const chip = document.createElement('span');
+      chip.className = 'tok-chip';
+      chip.textContent = st.word;
+      trieTokens.appendChild(chip);
+      /* 已消费的前缀 = 结果区所有词元的总长度 */
+      let consumed = 0;
+      trieTokens.querySelectorAll('.tok-chip').forEach(c => { consumed += c.textContent.length; });
+      trieSentence.querySelectorAll('.sc').forEach(el => {
+        el.classList.toggle('eaten', +el.dataset.k < consumed);
+      });
+      await trieSleep(1300);
+    } else if (st.type === 'unk'){
+      trieNarr.innerHTML = `「${st.ch}」在詞表裏查無此字，只能按未知字符單獨成塊（真實分詞器會兜底到字節級碎塊）。`;
+      const chip = document.createElement('span');
+      chip.className = 'tok-chip';
+      chip.textContent = st.ch;
+      trieTokens.appendChild(chip);
+      await trieSleep(1100);
+    } else if (st.type === 'done'){
+      trieClearHl();
+      clearProbe();
+      const tokArr = [...trieTokens.querySelectorAll('.tok-chip')].map(c => c.textContent);
+      let tail = '';
+      if (tokArr.includes('五花肉')) tail = '注意「五花肉」是整塊進的——這就是大模型原理篇那個伏筆的底層答案。';
+      else if (curSentence === '今天吃五花') tail = '有意思吧：這次「五花」後面沒跟「肉」，探不下去只好回退，被拆成「五」和「花」兩塊——同樣的字，跟誰組隊決定了怎麼切。';
+      else tail = '每一刀都落在詞尾 ✓ 上，一次回頭路都沒走。';
+      trieNarr.innerHTML = `<b>✅ 切完了：</b>${tokArr.map(t => `「${t}」`).join(' ')}，共 ${tokArr.length} 個詞元。${tail}`;
+    }
+  }
+  trieStatus.textContent = '換一句話再試試？';
+  btnTrie.disabled = false;
+  btnTrie.textContent = '再分一次 ↻';
+  trieBusy = false;
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  lessonOnView(trieSvg, () => { trieStatus.textContent = '👆 點「開始分詞」看光標走樹'; });
+});
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

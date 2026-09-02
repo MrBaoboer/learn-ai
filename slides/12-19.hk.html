@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Grok Build 源碼課第 19 節：Hooks 事件、matcher、阻斷語義與 fail-open 邊界">
+  <meta name="author" content="洛小山">
+  <title>Hooks 的阻斷語義與失敗邊界 | xueai.miyang.cn</title>
+  <link rel="canonical" href="https://xueai.miyang.cn/slides/12-19.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/12-19.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/12-19.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/12-19.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/12-19.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/12-19.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/12-19.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/12-19.html">
+  <script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+  <style>
+    :root{--ink:#f7f0df;--muted:#b9ad91;--bg:#0c0b09;--panel:#15120d;--panel2:#1d1810;--line:rgba(245,181,58,.26);--amber:#f5b53a;--gold:#ffd978;--danger:#ff876f;--ok:#78d5a5}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(circle at 82% 5%,rgba(245,181,58,.12),transparent 28%),var(--bg);color:var(--ink);font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.7}
+    body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:32px 32px}
+    .lesson{position:relative;max-width:1180px;margin:auto;padding:84px 28px 96px}
+    .eyebrow,.tag{font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--amber)}
+    h1{max-width:900px;margin:16px 0 18px;font-size:clamp(42px,7vw,86px);line-height:1.02;letter-spacing:-.045em}
+    h1 span{color:var(--gold)}
+    .lead{max-width:790px;margin:0;color:#d9cfb8;font-size:clamp(17px,2vw,22px)}
+    .hero-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+    .tag{padding:8px 12px;border:1px solid var(--line);background:rgba(245,181,58,.06);border-radius:999px;letter-spacing:.05em;text-transform:none}
+    section{margin-top:70px}
+    .section-head{display:grid;grid-template-columns:110px 1fr;gap:20px;align-items:start;margin-bottom:24px}
+    .num{color:var(--amber);font:700 14px/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+    h2{margin:0;font-size:clamp(27px,4vw,44px);line-height:1.12}
+    h3{margin:0 0 10px;font-size:20px}
+    p{margin:8px 0;color:#d4cab4}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+    .card{grid-column:span 4;padding:22px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(30,25,16,.96),rgba(17,14,10,.96));box-shadow:0 18px 50px rgba(0,0,0,.25)}
+    .card.wide{grid-column:span 6}.card.full{grid-column:1/-1}
+    .card small{color:var(--amber);font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .objective{counter-reset:item}.objective .card{position:relative;padding-left:62px}.objective .card::before{counter-increment:item;content:"0" counter(item);position:absolute;left:20px;top:22px;color:var(--gold);font:700 14px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .visual{overflow:hidden;padding:18px;border:1px solid var(--line);border-radius:24px;background:#100e0b}
+    .visual svg{display:block;width:100%;height:auto}
+    .matrix{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+    .cell{padding:15px;background:#15120d;color:#d6ccb6}.cell.head{color:var(--gold);font-weight:750;background:#211a0e}.allow{color:var(--ok)}.deny{color:var(--danger)}
+    pre{margin:14px 0 0;padding:20px;overflow:auto;border:1px solid rgba(245,181,58,.18);border-radius:14px;background:#090806;color:#eadfca;font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2}
+    code{color:#ffe09a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .path{display:block;margin-top:15px;color:#9d9178;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
+    .callout{padding:24px;background:linear-gradient(90deg,rgba(245,181,58,.12),transparent);border-radius:16px}
+    .exercise{display:grid;grid-template-columns:140px 1fr;gap:24px;padding:26px;border:1px solid var(--line);border-radius:18px;background:var(--panel2)}
+    .exercise b{color:var(--gold)}ol{margin:8px 0;padding-left:21px;color:#d7cdb7}li+li{margin-top:7px}
+    .snapshot{font-size:13px;color:#a99d83;border-top:1px solid var(--line);padding-top:18px}
+    .takeaway{position:relative;padding:34px;border:1px solid rgba(245,181,58,.5);border-radius:22px;background:linear-gradient(135deg,rgba(245,181,58,.15),rgba(245,181,58,.03))}
+    .takeaway strong{display:block;margin-bottom:8px;color:var(--gold);font-size:25px}
+    @media(max-width:760px){.lesson{padding:64px 18px 78px}.section-head{grid-template-columns:1fr;gap:8px}.card,.card.wide{grid-column:1/-1}.matrix{grid-template-columns:1fr}.matrix .cell.head:not(:first-child){display:none}.exercise{grid-template-columns:1fr}.visual{padding:8px}pre{font-size:11px}}
+  </style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Hooks：明確 deny 才阻斷","name":"Hooks：明確 deny 才阻斷","url":"https://xueai.miyang.cn/slides/12-19.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 權限、沙箱與安全","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Grok Build 源碼課第 19 節：Hooks 事件、matcher、阻斷語義與 fail-open 邊界","datePublished":"2026-07-17","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Hooks：明確 deny 才阻斷"><meta property="og:description" content="Grok Build 源碼課第 19 節：Hooks 事件、matcher、阻斷語義與 fail-open 邊界"><meta property="og:url" content="https://xueai.miyang.cn/slides/12-19.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/12-19.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+  <main class="lesson">
+    <header>
+      <div class="eyebrow">Grok Build Source Course · 12 / 19</div>
+      <h1>Hooks：<span>明確 deny 才阻斷</span></h1>
+      <p class="lead">把 Hook 看成事件上的可編程檢查點。<code>PreToolUse</code> 可以返回明確拒絕，進程崩潰、超時和不可解析輸出則走 fail-open，讓工具調用繼續。</p>
+      <div class="hero-meta">
+        <span class="tag">15 個事件名</span><span class="tag">PreToolUse 可阻斷</span><span class="tag">JSON 配置</span><span class="tag">進程 stdin / stdout</span>
+      </div>
+    </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>核對生命週期事件、matcher、PreToolUse 阻斷和故障 fail-open 語義</p></aside><!--seo:end-->    <section>
+      <div class="section-head"><span class="num">01 / OBJECTIVES</span><h2>課程目標</h2></div>
+      <div class="grid objective">
+        <article class="card"><h3>分清兩類結果</h3><p>識別顯式 <code>Deny</code> 與 Hook 自身執行失敗，它們對工具調用產生相反結果。</p></article>
+        <article class="card"><h3>讀懂事件匹配</h3><p>掌握 <code>matcher</code> 的精確名、正則模式與 Bash 兼容別名。</p></article>
+        <article class="card"><h3>寫出可測試配置</h3><p>按用戶指南的 JSON 結構配置命令 Hook，並設計四條故障測試。</p></article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="num">02 / CORE VISUAL</span><h2>一次 PreToolUse 的決策路徑</h2></div>
+      <div class="visual" role="img" aria-label="PreToolUse Hook 從事件、匹配、執行到工具調用的決策圖">
+        <svg viewBox="0 0 1100 420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g19" x1="0" x2="1"><stop stop-color="#f5b53a" stop-opacity=".22"/><stop offset="1" stop-color="#f5b53a" stop-opacity=".04"/></linearGradient>
+            <marker id="a19" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#f5b53a"/></marker>
+          </defs>
+          <g fill="none" stroke="#f5b53a" stroke-width="2" marker-end="url(#a19)"><path d="M220 110H330"/><path d="M510 110H620"/><path d="M800 110H910"/><path d="M710 170V270"/><path d="M1000 170V270"/></g>
+          <g font-family="Arial, PingFang SC" text-anchor="middle">
+            <g><rect x="40" y="50" width="180" height="120" rx="16" fill="url(#g19)" stroke="#735522"/><text x="130" y="98" fill="#ffd978" font-size="18" font-weight="700">PreToolUse</text><text x="130" y="130" fill="#b9ad91" font-size="14">事件信封寫入 stdin</text></g>
+            <g><rect x="330" y="50" width="180" height="120" rx="16" fill="#17130d" stroke="#735522"/><text x="420" y="98" fill="#ffd978" font-size="18" font-weight="700">matcher</text><text x="420" y="130" fill="#b9ad91" font-size="14">工具名命中才執行</text></g>
+            <g><rect x="620" y="50" width="180" height="120" rx="16" fill="#17130d" stroke="#735522"/><text x="710" y="98" fill="#ffd978" font-size="18" font-weight="700">運行 Hook</text><text x="710" y="130" fill="#b9ad91" font-size="14">命令 / timeout</text></g>
+            <g><rect x="910" y="50" width="150" height="120" rx="16" fill="#17130d" stroke="#735522"/><text x="985" y="98" fill="#ffd978" font-size="18" font-weight="700">解釋結果</text><text x="985" y="130" fill="#b9ad91" font-size="14">decision / exit</text></g>
+            <g><rect x="600" y="270" width="220" height="100" rx="16" fill="#112019" stroke="#3b8c65"/><text x="710" y="312" fill="#78d5a5" font-size="18" font-weight="700">失敗：ALLOW</text><text x="710" y="342" fill="#b9ad91" font-size="14">crash / timeout / invalid result</text></g>
+            <g><rect x="875" y="270" width="220" height="100" rx="16" fill="#25120f" stroke="#a44b3d"/><text x="985" y="312" fill="#ff876f" font-size="18" font-weight="700">明確 DENY：BLOCK</text><text x="985" y="342" fill="#b9ad91" font-size="14">JSON deny / fallback exit 2</text></g>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="num">03 / EVENTS</span><h2>源碼中的事件面</h2></div>
+      <div class="grid">
+        <article class="card wide"><small>會話與工具</small><h3>八個主流程檢查點</h3><p><code>SessionStart</code>、<code>SessionEnd</code>、<code>Stop</code>、<code>StopFailure</code>、<code>PreToolUse</code>、<code>PostToolUse</code>、<code>PostToolUseFailure</code>、<code>PermissionDenied</code>。其中只有 <code>PreToolUse</code> 的 <code>is_blocking()</code> 為真。</p></article>
+        <article class="card wide"><small>用戶、代理與壓縮</small><h3>七個擴展檢查點</h3><p><code>UserPromptSubmit</code>、<code>Notification</code>、<code>SubagentStart</code>、<code>SubagentStop</code>、兼容別名 <code>SubagentEnd</code>、<code>PreCompact</code>、<code>PostCompact</code>。</p></article>
+        <article class="card full"><small>關鍵邊界</small><h3>「事件被觸發」不等於「能控制主流程」</h3><p>事件枚舉負責定義觸發點，<code>is_blocking()</code> 單獨聲明阻斷能力。讀取事件列表時，要同時追蹤結果如何回到調用方。</p><span class="path">crates/codegen/xai-grok-hooks/src/event.rs</span></article>
+      </div>
+    </section>
+
+    <section class="paywall-locked xa-peek">
+      <div class="section-head"><span class="num">04 / SEMANTICS</span><h2>阻斷與 fail-open 矩陣</h2></div>
+      <div class="matrix">
+        <div class="cell head">Hook 結果</div><div class="cell head">dispatcher 解釋</div><div class="cell head">工具調用</div>
+        <div class="cell">JSON decision = <code>deny</code></div><div class="cell deny">顯式拒絕</div><div class="cell deny">阻斷</div>
+        <div class="cell">無有效 JSON，退出碼 <code>2</code></div><div class="cell deny">fallback 拒絕</div><div class="cell deny">阻斷</div>
+        <div class="cell">有效 JSON <code>allow</code>，退出碼 <code>2</code></div><div class="cell allow">JSON 優先</div><div class="cell allow">放行並記錄衝突警告</div>
+        <div class="cell">退出碼非 0 且非 2</div><div class="cell allow">HookRunResult::Failed</div><div class="cell allow">放行並記錄警告</div>
+        <div class="cell">超時或進程崩潰</div><div class="cell allow">HookRunResult::Failed</div><div class="cell allow">放行並記錄警告</div>
+        <div class="cell">stdout 無效或 decision 未知</div><div class="cell allow">回退退出碼或 Failed</div><div class="cell allow">輸出本身不阻斷；fallback 退出碼 2 仍拒絕</div>
+      </div>
+      <div class="callout" style="margin-top:18px"><p><strong>安全含義：</strong>Hook 適合策略提醒、審計和可恢復的前置檢查。需要強制保證時，還應使用權限層與沙箱。源碼註釋明確要求 Hook 故障不能破壞工具可用性。</p></div>
+    </section>
+
+    <section class="paywall-locked">
+      <div class="section-head"><span class="num">05 / SOURCE</span><h2>真實源碼證據</h2></div>
+      <div class="grid">
+        <article class="card wide">
+          <small>dispatcher.rs</small><h3>失敗預設放行</h3>
+          <pre><code>match result {
+    HookRunnerResult::Decision(
+        HookDecision::Deny { reason, .. }
+    ) =&gt; {
+        return PreToolUseResult {
+            decision: HookDecision::Deny { ... },
+            results: run_results,
+        };
+    }
+    HookRunnerResult::Failed(err) =&gt; {
+        tracing::warn!(
+            error = %err,
+            "hook failed; ignoring (fail-open)"
+        );
+    }
+    _ =&gt; {}
+}</code></pre>
+          <span class="path">crates/codegen/xai-grok-hooks/src/dispatcher.rs</span>
+        </article>
+        <article class="card wide">
+          <small>matcher.rs + command.rs</small><h3>匹配與退出碼</h3>
+          <pre><code>pub const DENY_EXIT_CODE: i32 = 2;
+
+pub fn matches(&amp;self, tool_name: &amp;str) -&gt; bool {
+    self.regex.is_match(tool_name)
+        || self.matches_compat_alias(tool_name)
+}</code></pre>
+          <p>兼容映射讓配置裏的 <code>Bash</code> 可命中內部工具名 <code>run_terminal_command</code>。匹配器由正則編譯，用戶指南示例使用工具名。</p>
+          <span class="path">crates/codegen/xai-grok-hooks/src/matcher.rs · runner/command.rs</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="paywall-locked">
+      <div class="section-head"><span class="num">06 / CONFIG</span><h2>配置按真實 JSON 結構書寫</h2></div>
+      <div class="grid">
+        <article class="card full">
+          <small>~/.grok/hooks/*.json · project/.grok/hooks/*.json</small>
+          <pre><code>{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bin/safe-shell-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+          <p>配置層級是「事件 → matcher 組 → 處理器列表」。命令從 stdin 接收事件信封；有效 JSON 決策優先，無有效 JSON 時再按退出碼解釋，退出碼 2 表達拒絕。全局 Hook 位於 <code>~/.grok/hooks/</code>，項目 Hook 位於 <code>.grok/hooks/</code> 且受 folder trust 控制。保留環境變數會被過濾，未解析變數會在啓動前報錯。</p>
+          <span class="path">crates/codegen/xai-grok-hooks/examples/hooks/safe-shell.json · xai-grok-pager/docs/user-guide/10-hooks.md</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="paywall-locked">
+      <div class="section-head"><span class="num">07 / LAB</span><h2>課堂練習：驗證四條路徑</h2></div>
+      <div class="exercise">
+        <div><span class="eyebrow">25 MIN</span><p><b>提交物</b><br>配置、腳本、測試記錄</p></div>
+        <ol>
+          <li>配置一個匹配 <code>Bash</code> 的 <code>PreToolUse</code> 命令 Hook。</li>
+          <li>讓腳本對 <code>rm -rf</code> 返回 JSON <code>deny</code>，記錄工具被阻斷的結果。</li>
+          <li>依次製造退出碼 1、超時、無效 stdout，驗證三者均放行併產生告警。</li>
+          <li>將退出碼改為 2，再驗證無效 stdout 下仍可走明確拒絕路徑。</li>
+          <li>寫一句邊界説明：哪條策略必須移到權限層或沙箱。</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="paywall-locked">
+      <div class="takeaway"><strong>Takeaway</strong><p>判斷 Hook 是否安全，先問兩個問題：它能否表達明確拒絕，以及它自己失效時主流程如何處理。Grok Build 的答案很清楚，顯式 deny 阻斷，Hook 故障 fail-open。</p></div>
+      <p class="snapshot"><b>源碼快照説明：</b>本頁依據本地 <code>grok-build-main</code> 快照中的 hooks crate、用戶指南與示例配置整理。程式碼片段為教學截取，省略日誌字段和錯誤包裝；事件名、JSON 層級、退出碼與決策語義保持源碼一致。</p>
+    </section>
+  </main>
+  <script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+  <script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

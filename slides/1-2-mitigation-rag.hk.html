@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RAG 檢索增強生成：給大模型接上外部知識庫 | xueai.miyang.cn</title>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root {
+  /* 兼容旧变量名：映射到设计系统 */
+  --bg-color: var(--bg);
+  --text-main: var(--text);
+  --text-sub: var(--sub);
+}
+.badge {
+  display: inline-block;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 5px 14px; border-radius: 8px; white-space: nowrap;
+  background: rgba(22,163,106,0.1); color: var(--success);
+  margin-top: 12px;
+}
+.main-area {
+  display: grid; grid-template-columns: 340px 1fr; gap: 20px;
+  align-items: start;
+}
+
+/* Left */
+.left-panel {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.section-label {
+  font-size: 12px; font-weight: 800; color: var(--text-sub);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+}
+.scene-card {
+  background: var(--card); border-radius: var(--radius-sm); padding: 14px 18px;
+  border: 2px solid var(--border); cursor: pointer; transition: all 0.2s;
+}
+.scene-card:hover { border-color: rgba(22,163,106,0.25); }
+.scene-card.active { border-color: var(--success); background: rgba(22,163,106,0.03); }
+.scene-tag { font-size: 12px; font-weight: 800; color: var(--success); margin-bottom: 5px; }
+.scene-name { font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+.scene-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+.decision-box {
+  background: rgba(217,119,6,0.04);
+  border: 1px solid rgba(217,119,6,0.15);
+  border-radius: 12px; padding: 14px 18px;
+}
+.decision-title { font-size: 12px; font-weight: 800; color: var(--amber); margin-bottom: 10px; letter-spacing: 0.3px; }
+.decision-row {
+  display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;
+}
+.decision-row:last-child { margin-bottom: 0; }
+.decision-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.decision-text { font-size: 13px; color: var(--text-sub); line-height: 1.7; }
+.decision-text b { color: var(--text-main); }
+
+/* Right */
+.right-panel {
+  display: flex; flex-direction: column;
+  min-width: 0; gap: 14px;
+}
+.right-top {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 10px;
+}
+.right-top h3 { font-size: 17px; font-weight: 700; color: var(--text-main); }
+.tab-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab-btn {
+  padding: 9px 18px; border-radius: var(--radius-sm); border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.tab-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Flow view */
+.flow-view {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.flow-step-row {
+  display: flex; align-items: stretch; gap: 0;
+}
+.flow-node {
+  flex: 1; background: white; border-radius: 12px; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 6px; position: relative;
+}
+.flow-node.active-node { border: 2px solid var(--accent); }
+.flow-node-num {
+  font-size: 12px; font-weight: 800; color: var(--text-sub); letter-spacing: 0.3px;
+}
+.flow-node-title { font-size: 15px; font-weight: 700; color: var(--text-main); }
+.flow-node-desc { font-size: 13px; color: var(--text-sub); line-height: 1.6; }
+.flow-node-tag {
+  display: inline-block; margin-top: 4px;
+  font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 4px;
+  background: rgba(0,102,255,0.08); color: var(--accent);
+  align-self: flex-start;
+}
+.flow-node-tag.pm { background: rgba(217,119,6,0.1); color: var(--amber); }
+.flow-arrow-v {
+  width: 100%; text-align: center; color: var(--text-sub);
+  font-size: 18px; line-height: 1; padding: 2px 0; flex-shrink: 0;
+}
+.flow-arrow-h {
+  width: 28px; flex-shrink: 0; display: flex; align-items: center;
+  justify-content: center; color: var(--text-sub); font-size: 18px;
+}
+
+/* Compare view */
+.compare-area { display: flex; gap: 16px; }
+.compare-col { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col-label {
+  font-size: 13px; font-weight: 700; padding: 0 2px;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.col-label .dot { width: 10px; height: 10px; border-radius: 50%; }
+.col-label .dot.red { background: var(--danger); }
+.col-label .dot.green { background: var(--success); }
+.col-label span { color: var(--text-sub); }
+.convo-box {
+  flex: 1; background: var(--card); border-radius: var(--radius); padding: 16px 18px;
+  border: 1px solid var(--border);
+  min-height: 260px; max-height: 420px;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+}
+.bubble-user {
+  background: var(--accent); color: white;
+  padding: 11px 15px; border-radius: 12px 12px 4px 12px;
+  font-size: 15px; line-height: 1.6; align-self: flex-end; max-width: 90%;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.bubble-user.show { opacity: 1; transform: translateY(0); }
+.bubble-retrieval {
+  background: rgba(217,119,6,0.06); border: 1px dashed rgba(217,119,6,0.3);
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; color: #92400e; line-height: 1.6;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.bubble-retrieval.show { opacity: 1; transform: translateY(0); }
+.bubble-ai {
+  background: rgba(0,0,0,0.04); color: var(--text-main);
+  padding: 11px 15px; border-radius: 12px 12px 12px 4px;
+  font-size: 15px; line-height: 1.8; align-self: flex-start; max-width: 95%;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.bubble-ai.show { opacity: 1; transform: translateY(0); }
+.bubble-ai .hl-red { color: var(--danger); font-weight: 600; text-decoration: underline wavy var(--danger); text-underline-offset: 3px; }
+.bubble-ai .hl-green { color: var(--success); font-weight: 600; }
+.bubble-ai .source-tag {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px;
+  background: rgba(0,102,255,0.1); color: var(--accent); margin-left: 4px;
+}
+.bubble-typing {
+  display: inline-block; width: 6px; height: 14px;
+  background: var(--text-sub); border-radius: 2px; margin-left: 2px;
+  animation: blink 0.7s step-end infinite; vertical-align: text-bottom;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.verdict {
+  padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  opacity: 0; transition: opacity 0.4s ease;
+}
+.verdict.show { opacity: 1; }
+.verdict.bad { background: rgba(229,62,62,0.06); color: var(--danger); border: 1px solid rgba(229,62,62,0.15); }
+.verdict.good { background: rgba(22,163,106,0.06); color: var(--success); border: 1px solid rgba(22,163,106,0.15); }
+
+.replay-btn {
+  padding: 9px 16px; border-radius: 9px; border: 1px solid rgba(0,0,0,0.1);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--card); color: var(--text-sub); transition: all 0.15s;
+  font-family: inherit;
+}
+.replay-btn:hover { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+/* Why it works */
+.why-box {
+  background: #1c1c1e; border-radius: 12px; padding: 14px 16px;
+  flex-shrink: 0;
+}
+.why-title {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+}
+.token-chain {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;
+}
+.token-chip {
+  padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700;
+}
+.token-chip.context { background: rgba(255,255,255,0.08); color: #9ca3af; }
+.token-chip.retrieved { background: rgba(22,163,106,0.2); color: #6ee7b7; border: 1px solid rgba(22,163,106,0.35); }
+.token-chip.question { background: rgba(0,102,255,0.2); color: #93c5fd; border: 1px solid rgba(0,102,255,0.35); }
+.token-chip.output { background: rgba(22,163,106,0.15); color: #6ee7b7; }
+.token-chip.output-bad { background: rgba(229,62,62,0.2); color: #fca5a5; border: 1px solid rgba(229,62,62,0.35); }
+.token-arrow { color: #4b5563; font-size: 14px; font-weight: 700; padding: 0 2px; align-self: center; }
+.why-insight {
+  font-size: 13px; color: #9ca3af; line-height: 1.7;
+  border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; margin-top: 4px;
+}
+.why-insight b { color: #e5e7eb; }
+.why-insight .key { color: #86efac; font-weight: 700; }
+
+/* "为什么有效" 与流程图视图的响应式行 */
+.why-flex-row { display: flex; gap: 16px; }
+.why-limit-row { display: flex; gap: 20px; }
+.rag-flow-row { display: flex; flex-direction: row; gap: 14px; }
+.rag-flow-left { width: 46%; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.rag-flow-right { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+@media (max-width: 900px) {
+  .main-area { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .compare-area { flex-direction: column; }
+  .why-flex-row { flex-direction: column; }
+  .why-flex-row > div[style*="width:1px"] { display: none; }
+  .why-limit-row { flex-direction: column; }
+  .why-limit-row > div[style*="width:1px"] { display: none; }
+  .rag-flow-row { flex-direction: column; }
+  .rag-flow-left { width: 100%; }
+  .tab-btn { padding: 11px 14px; }
+}
+</style>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style><!-- SEO Start -->
+<meta name="description" content="RAG（Retrieval-Augmented Generation）是解決大模型幻覺最常用的工程方案。深入講解 RAG 的工作原理：向量檢索、上下文注入、有據可查的生成。">
+<meta name="keywords" content="RAG,檢索增強生成,向量數據庫,大模型知識庫,Embedding,幻覺緩解">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/1-2-mitigation-rag.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/1-2-mitigation-rag.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/1-2-mitigation-rag.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/1-2-mitigation-rag.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/1-2-mitigation-rag.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/1-2-mitigation-rag.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/1-2-mitigation-rag.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/1-2-mitigation-rag.html">
+<!-- Open Graph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="RAG 檢索增強生成：給大模型接上外部知識庫">
+<meta property="og:description" content="RAG（Retrieval-Augmented Generation）是解決大模型幻覺最常用的工程方案。深入講解 RAG 的工作原理：向量檢索、上下文注入、有據可查的生成。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/1-2-mitigation-rag.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/1-2-mitigation-rag.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="RAG 檢索增強生成：給大模型接上外部知識庫">
+<meta name="twitter:description" content="RAG（Retrieval-Augmented Generation）是解決大模型幻覺最常用的工程方案。深入講解 RAG 的工作原理：向量檢索、上下文注入、有據可查的生成。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"應對 2：RAG 檢索增強生成","name":"應對 2：RAG 檢索增強生成","url":"https://xueai.miyang.cn/slides/1-2-mitigation-rag.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 幻覺與四種應對","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"RAG（Retrieval-Augmented Generation）是解決大模型幻覺最常用的工程方案。深入講解 RAG 的工作原理：向量檢索、上下文注入、有據可查的生成。","datePublished":"2026-04-12","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">幻覺與應對</div>
+    <h1>RAG 檢索增強生成：讓模型「開卷答題」</h1>
+    <p class="subtitle">PM 視角：什麼場景必須上 RAG？如何設計檢索流程？落地的坑在哪裏。</p>
+    <div class="badge">手段 02 / 04 · 預防</div>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>真實文檔注入上下文，5 步互動流程動畫，對比有無 RAG 的差異</p></aside><!--seo:end-->  <div class="main-area paywall-locked xa-peek">
+    <div class="left-panel">
+      <div>
+        <div class="section-label">選擇業務場景</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="scene-card active" onclick="selectScene(0)">
+            <div class="scene-tag">場景 A · 法律 / 合規</div>
+            <div class="scene-name">合同審查 / 法規查詢助手</div>
+            <div class="scene-desc">法規頻繁更新，模型訓練數據有截止日期，極易引用已廢除的舊條文。</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(1)">
+            <div class="scene-tag">場景 B · 醫療健康</div>
+            <div class="scene-name">藥品説明 / 用藥建議助手</div>
+            <div class="scene-desc">用藥方案高度個性化，模型的通用知識無法反映患者具體情況與醫院規範。</div>
+          </div>
+          <div class="scene-card" onclick="selectScene(2)">
+            <div class="scene-tag">場景 C · 產品文檔</div>
+            <div class="scene-name">SaaS 產品技術支持機器人</div>
+            <div class="scene-desc">產品迭代快，版本號、功能路徑頻繁變化，模型只記得訓練時的舊版本。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="decision-box">
+        <div class="decision-title">PM 決策框架：什麼時候必須上 RAG？</div>
+        <div class="decision-row">
+          <div class="decision-icon">✅</div>
+          <div class="decision-text"><b>知識時效性強</b>：政策/產品/價格頻繁更新，模型訓練數據趕不上</div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-icon">✅</div>
+          <div class="decision-text"><b>私有知識庫</b>：公司內部文檔、產品手冊，模型根本沒見過</div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-icon">✅</div>
+          <div class="decision-text"><b>答錯代價高</b>：法律、醫療、金融場景，錯一句可能引發事故</div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-icon">⚠️</div>
+          <div class="decision-text"><b>閒聊/創意場景不需要</b>：RAG 反而讓回答更死板</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="right-top">
+        <h3 id="rightTitle">對話對比</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="replay-btn" id="replayBtn" onclick="playAnimation()" style="display:none;">↺ 重播</button>
+          <div class="tab-group">
+            <button class="tab-btn active" onclick="setTab('compare')">對比視圖</button>
+            <button class="tab-btn" onclick="setTab('flow')">RAG 流程圖</button>
+            <button class="tab-btn" onclick="setTab('why')">為什麼有效</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compare view -->
+      <div class="compare-area" id="viewCompare">
+        <div class="compare-col">
+          <div class="col-label"><span class="dot red"></span><span>無 RAG（閉卷）</span></div>
+          <div class="convo-box" id="boxBad"></div>
+          <div class="verdict bad" id="verdictBad"></div>
+        </div>
+        <div class="compare-col">
+          <div class="col-label"><span class="dot green"></span><span>有 RAG（開卷）</span></div>
+          <div class="convo-box" id="boxGood"></div>
+          <div class="verdict good" id="verdictGood"></div>
+        </div>
+      </div>
+
+      <!-- Flow view: 左步骤列表 + 右详情 -->
+      <div class="flow-view" id="viewFlow" style="display:none;">
+        <div id="ragSceneLabel" style="font-size:12px;font-weight:700;color:var(--text-sub);background:rgba(0,102,255,0.05);border:1px solid rgba(0,102,255,0.14);border-radius:8px;padding:8px 14px;line-height:1.6;"></div>
+        <div class="rag-flow-row">
+
+          <!-- 左：步骤列表 + 控制按钮 -->
+          <div class="rag-flow-left">
+            <div id="ragStepper" style="background:var(--card);border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,0.07);"></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button id="ragNextBtn" onclick="ragNext()" style="background:var(--accent);color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">下一步 →</button>
+              <button onclick="ragReset()" style="background:var(--card);color:var(--text-sub);border:1px solid rgba(0,0,0,0.1);padding:10px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">重置</button>
+              <span id="ragProgress" style="font-size:13px;color:var(--text-sub);">第 0 / 7 步</span>
+            </div>
+          </div>
+
+          <!-- 右：步骤详情 -->
+          <div class="rag-flow-right">
+            <div style="font-size:13px;font-weight:700;color:var(--text-sub);" id="ragVisTitle">步驟 1：點擊「下一步」開始</div>
+            <div id="ragVisArea" style="background:var(--card);border:1px solid rgba(0,0,0,0.07);border-radius:12px;padding:16px 20px;font-size:14px;line-height:1.85;">
+              <span style="color:var(--text-sub);">點擊左側「下一步」查看每步細節 →</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Why it works view -->
+      <div id="viewWhy" style="display:none;background:var(--card);border-radius:14px;padding:28px 32px;flex-direction:column;gap:22px;border:1px solid rgba(0,0,0,0.06);">
+        <div class="why-flex-row">
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">無 RAG：閉卷考試</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">問題</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(229,62,62,0.08);color:var(--danger);border:1px solid rgba(229,62,62,0.2);">× 訓練記憶推斷</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">前文只有問題本身，模型只能靠訓練數據裏的印象來推 Token</div>
+          </div>
+          <div style="width:1px;background:rgba(0,0,0,0.06);flex-shrink:0;"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-sub);letter-spacing:0.5px;text-transform:uppercase;">有 RAG：開卷考試</div>
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">真實文檔片段</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">+</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(0,0,0,0.05);color:var(--text-sub);">問題</span>
+              <span style="color:var(--text-sub);font-size:18px;font-weight:700;">→</span>
+              <span style="padding:7px 16px;border-radius:8px;font-size:15px;font-weight:700;background:rgba(22,163,106,0.1);color:var(--success);border:1px solid rgba(22,163,106,0.2);">✓ 準確回答</span>
+            </div>
+            <div style="font-size:14px;color:var(--text-sub);line-height:1.8;">檢索到的文檔成為前文的一部分，直接影響每步 Token 的概率分佈</div>
+          </div>
+        </div>
+        <div style="background:rgba(22,163,106,0.05);border:1px solid rgba(22,163,106,0.15);border-radius:12px;padding:20px 24px;">
+          <div style="font-size:16px;color:var(--text-main);line-height:1.9;">
+            模型本質是 <b>Token 推 Token</b>，推出什麼取決於前文是什麼。
+            RAG 就是<span style="color:var(--success);font-weight:700;">「用檢索到的真實文檔作為高質素前文」</span>注入上下文：
+            相同的模型，前文換了，後文的概率分佈就變了。
+            <b>模型沒有變聰明，只是有了一個更好的起點。</b>
+          </div>
+        </div>
+        <div style="background:rgba(229,62,62,0.04);border:1px solid rgba(229,62,62,0.15);border-radius:12px;padding:16px 22px;">
+          <div style="font-size:13px;font-weight:800;color:var(--danger);margin-bottom:10px;letter-spacing:0.3px;">⚠ 侷限性：RAG 不是銀彈</div>
+          <div class="why-limit-row">
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">檢索本身可能出錯</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                檢索召回的文檔片段不準確時，模型會把錯誤文檔當作真實依據，<span style="color:var(--danger);font-weight:600;">幻覺不但沒減少，還多了一個權威出處的外衣</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">模型仍會腦補文檔外的內容</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                檢索到的上下文窗口有限，超出範圍的部分模型仍會用訓練記憶補全，<span style="color:var(--danger);font-weight:600;">RAG + 幻覺混合輸出，比純幻覺更難被用戶識別</span>
+              </div>
+            </div>
+            <div style="width:1px;background:rgba(229,62,62,0.12);flex-shrink:0;"></div>
+            <div style="flex:1;">
+              <div style="font-size:14px;color:var(--text-main);font-weight:700;margin-bottom:4px;">PM 應對策略</div>
+              <div style="font-size:13px;color:var(--text-sub);line-height:1.7;">
+                RAG 的質素上限 = 知識庫質素。需要建立<span style="color:var(--accent);font-weight:600;">檢索命中率評測</span>，同時用<span style="color:var(--amber);font-weight:600;">引用來源強制顯示</span>讓用戶可核查
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</article>
+
+<script>
+const SCENES = [
+  {
+    bad: [
+      { type: 'user', text: '勞動合同法裏，試用期最長能簽幾個月？' },
+      { type: 'ai', bad: true, htmlParts: [
+        { text: '根據勞動合同法規定，試用期最長可簽' },
+        { text: '6個月', cls: 'hl-red' },
+        { text: '，三年以下合同可以約定1-3個月試用期，' },
+        { text: '無固定期限合同最多可簽12個月', cls: 'hl-red' },
+        { text: '試用期…' },
+      ]},
+    ],
+    good: [
+      { type: 'retrieval', text: '已檢索：《勞動合同法》第19條（2024版）· 相似度 0.94' },
+      { type: 'user', text: '勞動合同法裏，試用期最長能簽幾個月？' },
+      { type: 'ai', bad: false, htmlParts: [
+        { text: '根據檢索結果：\n• 合同期 3 個月至 1 年 → 試用期' },
+        { text: '不超過 1 個月', cls: 'hl-green' },
+        { text: '\n• 合同期 1 年至 3 年 → 試用期' },
+        { text: '不超過 2 個月', cls: 'hl-green' },
+        { text: '\n• 3 年以上或無固定期限 → 試用期' },
+        { text: '不超過 6 個月', cls: 'hl-green' },
+        { text: ' ', tag: 'source-tag', tagText: '來源：勞動合同法第19條' },
+      ]},
+    ],
+    verdictBad: '✗ 模型捏造了「無固定期限12個月」，實際上法律規定上限是6個月，答錯會誤導 HR 違法操作。',
+    verdictGood: '✓ 精確引用法條，分場景給出不同上限，並標註來源，可核查。',
+  },
+  {
+    bad: [
+      { type: 'user', text: '我有高血壓，可以服用布洛芬止痛嗎？' },
+      { type: 'ai', bad: true, htmlParts: [
+        { text: '高血壓患者' },
+        { text: '可以短期服用布洛芬', cls: 'hl-red' },
+        { text: '，每次200-400mg，每日不超過3次。建議飯後服用，一般' },
+        { text: '不影響血壓控制', cls: 'hl-red' },
+        { text: '…' },
+      ]},
+    ],
+    good: [
+      { type: 'retrieval', text: '已檢索：布洛芬説明書·禁忌症 + 《高血壓患者用藥指南》· 相似度 0.91' },
+      { type: 'user', text: '我有高血壓，可以服用布洛芬止痛嗎？' },
+      { type: 'ai', bad: false, htmlParts: [
+        { text: '根據用藥指南：布洛芬屬於 NSAIDs 類藥物，' },
+        { text: '高血壓患者需謹慎使用', cls: 'hl-green' },
+        { text: '，可能升高血壓、影響降壓藥效果。', tag: 'source-tag', tagText: '用藥指南' },
+        { text: '\n\n建議：' },
+        { text: '請在醫生或藥師的指導下用藥', cls: 'hl-green' },
+        { text: '，我無法替代專業醫療建議。' },
+      ]},
+    ],
+    verdictBad: '✗ 模型給出了危險的錯誤建議：NSAIDs 對高血壓患者有禁忌，可能加重病情甚至引發事故。',
+    verdictGood: '✓ 檢索到真實指南，給出準確警示，並明確引導到專業醫療渠道。',
+  },
+  {
+    bad: [
+      { type: 'user', text: '怎麼在你們產品裏設置多因素認證 MFA？' },
+      { type: 'ai', bad: true, htmlParts: [
+        { text: '設置 MFA 請進入「設置」→「' },
+        { text: '帳戶安全', cls: 'hl-red' },
+        { text: '」→「' },
+        { text: '雙重驗證', cls: 'hl-red' },
+        { text: '」，點擊「啓用」後掃描QR Code…' },
+      ]},
+    ],
+    good: [
+      { type: 'retrieval', text: '已檢索：產品文檔 v3.2「安全配置」章節 · 相似度 0.96' },
+      { type: 'user', text: '怎麼在你們產品裏設置多因素認證 MFA？' },
+      { type: 'ai', bad: false, htmlParts: [
+        { text: '根據最新文檔（v3.2）：\n進入「工作台」→「組織管理」→「' },
+        { text: '安全策略', cls: 'hl-green' },
+        { text: '」→「MFA 設置」，選擇認證方式後點擊保存。', tag: 'source-tag', tagText: '文檔 v3.2 §4.3' },
+        { text: '\n\n如您使用的是舊版本，路徑可能不同，請告知版本號。' },
+      ]},
+    ],
+    verdictBad: '✗ 模型記的是舊版本路徑（已在 v3.0 改版），用戶按提示根本找不到入口，產生大量客訴。',
+    verdictGood: '✓ 檢索到當前文檔版本，給出精確路徑，並主動提示版本差異。',
+  }
+];
+
+let currentScene = 0;
+let currentTab = 'compare';
+let animTimers = [];
+
+function clearTimers() {
+  animTimers.forEach(t => clearTimeout(t));
+  animTimers = [];
+}
+
+function delay(fn, ms) {
+  const t = setTimeout(fn, ms);
+  animTimers.push(t);
+  return t;
+}
+
+function selectScene(i) {
+  currentScene = i;
+  document.querySelectorAll('.scene-card').forEach((c, j) => c.classList.toggle('active', j === i));
+  if (currentTab === 'compare') playAnimation();
+  else if (currentTab === 'flow') ragReset();  // 流程圖的文檔和問題都跟着場景走，換了就得從頭演
+}
+
+function setTab(t) {
+  currentTab = t;
+  const tabs = ['compare', 'flow', 'why'];
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === t));
+  document.getElementById('viewCompare').style.display = t === 'compare' ? 'flex' : 'none';
+  document.getElementById('viewFlow').style.display = t === 'flow' ? 'flex' : 'none';
+  const whyEl = document.getElementById('viewWhy');
+  whyEl.style.display = t === 'why' ? 'flex' : 'none';
+  document.getElementById('replayBtn').style.display = t === 'compare' ? 'inline-block' : 'none';
+  if (t === 'compare') playAnimation();
+  // 在別的 tab 裏換過場景，回到流程圖時內容已經過時，重來一遍
+  if (t === 'flow' && ragScene !== currentScene) ragReset();
+}
+
+// 把 htmlParts 展平為純文本 tokens（含標記）
+function flattenParts(parts) {
+  const tokens = [];
+  parts.forEach(p => {
+    if (p.tag === 'source-tag') {
+      tokens.push({ html: `<span class="source-tag">${p.tagText}</span>` });
+    } else if (p.cls) {
+      // 帶顏色的詞，整段作為一個 token
+      tokens.push({ html: `<span class="${p.cls}">${p.text}</span>`, isSpecial: true });
+    } else {
+      // 普通文本，逐字拆分
+      const chars = [...p.text];
+      chars.forEach(c => tokens.push({ html: c === '\n' ? '<br>' : c }));
+    }
+  });
+  return tokens;
+}
+
+// 逐 token 打字
+function typeTokens(el, tokens, charDelay, onDone) {
+  el.innerHTML = '';
+  const cursor = document.createElement('span');
+  cursor.className = 'bubble-typing';
+  el.appendChild(cursor);
+
+  let i = 0;
+  function step() {
+    if (i >= tokens.length) {
+      el.removeChild(cursor);
+      if (onDone) onDone();
+      return;
+    }
+    const tok = tokens[i++];
+    const span = document.createElement('span');
+    span.innerHTML = tok.html;
+    el.insertBefore(span, cursor);
+    el.parentElement.scrollTop = el.parentElement.scrollHeight;
+    delay(step, tok.isSpecial ? charDelay * 3 : charDelay);
+  }
+  step();
+}
+
+function playAnimation() {
+  clearTimers();
+  const s = SCENES[currentScene];
+
+  // 清空
+  const boxBad = document.getElementById('boxBad');
+  const boxGood = document.getElementById('boxGood');
+  boxBad.innerHTML = '';
+  boxGood.innerHTML = '';
+  const vBad = document.getElementById('verdictBad');
+  const vGood = document.getElementById('verdictGood');
+  vBad.textContent = '';
+  vGood.textContent = '';
+  vBad.classList.remove('show');
+  vGood.classList.remove('show');
+
+  // === 左側：無 RAG ===
+  // 用戶消息
+  const uBad = document.createElement('div');
+  uBad.className = 'bubble-user';
+  uBad.textContent = s.bad[0].text;
+  boxBad.appendChild(uBad);
+  delay(() => uBad.classList.add('show'), 100);
+
+  // AI 氣泡
+  const aiBad = document.createElement('div');
+  aiBad.className = 'bubble-ai show';
+  boxBad.appendChild(aiBad);
+  const badTokens = flattenParts(s.bad[1].htmlParts);
+
+  delay(() => typeTokens(aiBad, badTokens, 28, () => {
+    vBad.textContent = s.verdictBad;
+    delay(() => vBad.classList.add('show'), 100);
+  }), 700);
+
+  // === 右側：有 RAG ===
+  const goodMsgs = s.good;
+  // 檢索消息先出現
+  const retEl = document.createElement('div');
+  retEl.className = 'bubble-retrieval';
+  retEl.textContent = '🔍 ' + goodMsgs[0].text;
+  boxGood.appendChild(retEl);
+  delay(() => retEl.classList.add('show'), 400);
+
+  // 用戶消息
+  const uGood = document.createElement('div');
+  uGood.className = 'bubble-user';
+  uGood.textContent = goodMsgs[1].text;
+  boxGood.appendChild(uGood);
+  delay(() => uGood.classList.add('show'), 900);
+
+  // AI 氣泡（在左側打字開始後稍微延遲）
+  const aiGood = document.createElement('div');
+  aiGood.className = 'bubble-ai show';
+  boxGood.appendChild(aiGood);
+  const goodTokens = flattenParts(goodMsgs[2].htmlParts);
+
+  delay(() => typeTokens(aiGood, goodTokens, 22, () => {
+    vGood.textContent = s.verdictGood;
+    delay(() => vGood.classList.add('show'), 100);
+  }), 1200);
+}
+
+// ── RAG 7步交互動畫（含知識庫構建階段）──
+/* 流程图 7 步用到的知识库素材，一个场景一份。三个场景走的是同一套流程，
+   变的只是文档、问题和检索结果——所以 RAG_STEPS 只留模板，内容从这里取。
+   下标与 SCENES / .scene-card 一一对应。 */
+const SCENE_KB = [
+  { // A · 法律 / 合規
+    label: '場景 A · 合同審查 / 法規查詢助手',
+    docName: '《勞動合同法》全文及司法解釋（2024 版）',
+    docPages: 186,
+    chunkTotal: 4210,
+    rawText: '第二章 勞動合同的訂立<br>§19 試用期期限…§19 三個月以上不滿一年的…§19 一年以上不滿三年的…§19 三年以上固定期限和無固定期限的…§19 同一用人單位與同一勞動者只能約定一次試用期…',
+    chunks: [
+      { tok: 180, text: '§19 三個月以上不滿一年的，試用期不得超過一個月…' },
+      { tok: 150, text: '§19 一年以上不滿三年的，試用期不得超過二個月…' },
+      { tok: 200, text: '§19 三年以上固定期限和無固定期限的，不得超過六個月…' },
+    ],
+    question: '勞動合同法裏，試用期最長能簽幾個月？',
+    hits: [
+      { score: '0.94', src: '勞動合同法 §19', quote: '「三年以上固定期限和無固定期限的，試用期不得超過六個月…」' },
+      { score: '0.82', src: '司法解釋（三）第 4 條', quote: '「違法約定的試用期已經履行的，用人單位應支付賠償金…」' },
+      { score: '0.75', src: 'HR 合規手冊 p.32', quote: '「同一用人單位與同一勞動者只能約定一次試用期…」' },
+    ],
+    semanticNote: '「新員工能考察多久」和「試用期期限」的向量也會很接近。',
+    sysRole: '你是企業法務助手',
+    answerLines: [
+      '合同期 3 個月至 1 年 → 試用期<b>不超過 1 個月</b>',
+      '合同期 1 年至 3 年 → 試用期<b>不超過 2 個月</b>',
+      '3 年以上或無固定期限 → 試用期<b>不超過 6 個月</b>',
+      '同一單位與同一勞動者<b>只能約定一次</b>試用期',
+    ],
+    finalAnswer: '試用期上限按合同期分三檔：3 個月至 1 年<b>不超過 1 個月</b>，1 至 3 年<b>不超過 2 個月</b>，3 年以上或無固定期限<b>不超過 6 個月</b>。同一單位與同一勞動者只能約定一次試用期。',
+  },
+  { // B · 醫療健康
+    label: '場景 B · 藥品説明 / 用藥建議助手',
+    docName: '布洛芬説明書 +《高血壓患者用藥指南》',
+    docPages: 64,
+    chunkTotal: 1930,
+    rawText: '布洛芬説明書 · 禁忌與注意事項<br>【禁忌】對本品過敏者禁用…【注意事項】NSAIDs 可引起水鈉瀦留、升高血壓…【藥物相互作用】可減弱 ACEI/ARB 類降壓藥療效…',
+    chunks: [
+      { tok: 180, text: '【注意事項】NSAIDs 可引起水鈉瀦留，升高血壓…' },
+      { tok: 150, text: '【藥物相互作用】可減弱 ACEI/ARB 類降壓藥療效…' },
+      { tok: 200, text: '《高血壓患者用藥指南》§5.2 慎用 NSAIDs，須在醫師指導下…' },
+    ],
+    question: '我有高血壓，可以服用布洛芬止痛嗎？',
+    hits: [
+      { score: '0.91', src: '布洛芬説明書 · 注意事項', quote: '「NSAIDs 可引起水鈉瀦留，升高血壓…」' },
+      { score: '0.84', src: '高血壓用藥指南 §5.2', quote: '「高血壓患者慎用 NSAIDs，須在醫師指導下使用…」' },
+      { score: '0.72', src: '藥物相互作用表 p.9', quote: '「可減弱 ACEI/ARB 類降壓藥療效…」' },
+    ],
+    semanticNote: '「吃止痛藥會不會影響血壓」和「NSAIDs 禁忌」的向量也會很接近。',
+    sysRole: '你是用藥諮詢助手',
+    answerLines: [
+      '布洛芬屬 NSAIDs，可引起水鈉瀦留、<b>升高血壓</b>',
+      '可能<b>減弱 ACEI/ARB 類降壓藥</b>的療效',
+      '高血壓患者須<b>慎用</b>，不建議自行服用',
+      '請在<b>醫生或藥師指導下</b>用藥',
+    ],
+    finalAnswer: '布洛芬屬於 NSAIDs，可能<b>升高血壓</b>並減弱降壓藥效果，高血壓患者需<b>謹慎使用</b>。請在醫生或藥師的指導下用藥，我無法替代專業醫療建議。',
+  },
+  { // C · SaaS 產品文檔
+    label: '場景 C · SaaS 產品技術支持機器人',
+    docName: '產品幫助文檔 v3.2（安全配置章節）',
+    docPages: 42,
+    chunkTotal: 2847,
+    rawText: '第四章 安全配置<br>§4.1 登入策略…§4.2 單點登入 SSO…§4.3 多因素認證 MFA…§4.4 版本變更説明…',
+    chunks: [
+      { tok: 180, text: '§4.3 MFA 路徑：工作台 → 組織管理 → 安全策略 → MFA 設置…' },
+      { tok: 150, text: '§4.3 支持的認證方式：短訊驗證碼、TOTP 動態口令、硬件密鑰…' },
+      { tok: 200, text: '§4.4 v3.0 起「帳戶安全」併入「安全策略」，舊路徑失效…' },
+    ],
+    question: '怎麼在你們產品裏設置多因素認證 MFA？',
+    hits: [
+      { score: '0.96', src: '產品文檔 v3.2 §4.3', quote: '「工作台 → 組織管理 → 安全策略 → MFA 設置…」' },
+      { score: '0.85', src: '版本變更日誌 v3.0', quote: '「「帳戶安全」併入「安全策略」，舊路徑失效…」' },
+      { score: '0.74', src: '管理員手冊 p.18', quote: '「僅組織管理員可修改 MFA 策略…」' },
+    ],
+    semanticNote: '「怎麼開二次驗證」和「MFA 設置」的向量也會很接近。',
+    sysRole: '你是產品技術支持助手',
+    answerLines: [
+      '進入「工作台」→「組織管理」→「<b>安全策略</b>」→「MFA 設置」',
+      '支持<b>短訊驗證碼、TOTP 動態口令、硬件密鑰</b>',
+      '僅<b>組織管理員</b>可修改 MFA 策略',
+      'v3.0 起舊的「帳戶安全」路徑<b>已失效</b>',
+    ],
+    finalAnswer: '在 v3.2 中進入「工作台」→「組織管理」→「<b>安全策略</b>」→「MFA 設置」，選擇認證方式後保存。注意 v3.0 起「帳戶安全」已併入「安全策略」，舊路徑不再可用。',
+  },
+];
+
+const RAG_STEPS = [
+  {
+    num:'1', icon:'📄', title:'原始文檔拆段（Chunking）',
+    desc:'把長文檔切成小塊，每塊約 512–800 Token，以段落/標題為邊界',
+    phase: 'build',  // 知識庫構建階段（灰色標註）
+    vis: kb =>`<b>知識庫構建階段（一次性，離綫完成）</b><br><br>
+<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+  <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px;">原始文檔：${kb.docName}（共 ${kb.docPages} 頁）</div>
+  <div style="display:flex;align-items:flex-start;gap:10px;">
+    <div style="flex:1;background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.7;">
+      <div style="font-size:10px;font-weight:800;color:var(--text-sub);margin-bottom:4px;">原文（整段）</div>
+      ${kb.rawText}
+    </div>
+    <div style="display:flex;align-items:center;font-size:20px;color:var(--text-sub);">✂</div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+      ${kb.chunks.map((c, i) => `<div style="background:rgba(0,102,255,0.06);border:1px solid rgba(0,102,255,0.15);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.6;"><b style="color:var(--accent);font-size:10px;">塊 #${i+1} · 約 ${c.tok} Token</b><br>${c.text}</div>`).join('')}
+    </div>
+  </div>
+</div>
+<div style="margin-top:10px;font-size:12px;color:var(--amber);background:rgba(217,119,6,0.05);border:1px solid rgba(217,119,6,0.15);border-radius:8px;padding:8px 12px;">
+  ⚠ <b>PM 注意</b>：切塊粒度影響檢索質素。太大注入冗餘 Token 浪費錢；太小丟失上下文。最佳約 512–800 Token/塊。
+</div>`
+  },
+  {
+    num:'2', icon:'🔢', title:'Embedding 入庫',
+    desc:'每個文檔塊經過 Embedding 模型轉為向量，存入向量數據庫',
+    phase: 'build',
+    vis: kb =>`<b>知識庫構建階段（一次性，離綫完成）</b><br><br>
+<div style="display:flex;gap:10px;align-items:flex-start;margin-top:8px;">
+  <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+    <div style="font-size:11px;font-weight:800;color:var(--text-sub);margin-bottom:2px;">文檔塊（文本）</div>
+    ${kb.chunks.map(c => `<div style="background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.6;">${c.text}</div>`).join('')}
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0 8px;">
+    <div style="font-size:11px;font-weight:700;color:var(--accent);text-align:center;">Embedding<br>模型</div>
+    <div style="font-size:20px;">→</div>
+  </div>
+  <div style="flex:1;">
+    <div style="font-size:11px;font-weight:800;color:var(--text-sub);margin-bottom:6px;">向量數據庫（每行1536維）</div>
+    <div style="background:#1c1c1e;border-radius:8px;padding:10px 12px;font-family:monospace;font-size:10px;color:#6ee7b7;line-height:1.8;">
+      id:1 [0.231, -0.847, 0.562, 0.093, ...]<br>
+      id:2 [0.102,  0.445, -0.231, 0.671, ...]<br>
+      id:3 [-0.583, 0.312,  0.789, -0.044, ...]<br>
+      <span style="color:#4b5563;">… 共 ${kb.chunkTotal} 個塊</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-sub);margin-top:8px;line-height:1.6;">語義相近的文本 → 在高維空間中距離更近<br>查詢時用<b style="color:var(--text-main)">餘弦相似度</b>找最近鄰</div>
+  </div>
+</div>`
+  },
+  {
+    num:'3', icon:'❓', title:'用戶提問 → 向量化',
+    desc:'用戶輸入問題，系統用同一 Embedding 模型將問題轉為向量',
+    phase: 'query',
+    vis: kb =>`<b>查詢階段（每次對話即時執行）</b><br><br>
+<div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
+  <div style="flex:1;background:rgba(0,102,255,0.06);border:1px solid rgba(0,102,255,0.15);border-radius:10px;padding:12px 14px;">
+    <div style="font-size:11px;font-weight:800;color:var(--accent);margin-bottom:6px;">用戶問題（自然語言）</div>
+    <div style="font-size:15px;font-weight:600;color:var(--text-main);">「${kb.question}」</div>
+  </div>
+  <div style="font-size:22px;color:var(--text-sub);">→</div>
+  <div style="flex:1;background:#1c1c1e;border-radius:10px;padding:12px 14px;">
+    <div style="font-size:11px;font-weight:800;color:#6b7280;margin-bottom:6px;">問題向量（Embedding）</div>
+    <div style="font-family:monospace;font-size:10px;color:#6ee7b7;line-height:1.8;">[0.218, -0.831, 0.541, 0.087,<br>-0.308, 0.771, 0.124, -0.452, ...]<br><span style="color:#4b5563;">共 1536 維浮點數</span></div>
+  </div>
+</div>
+<div style="margin-top:10px;font-size:12px;color:var(--text-sub);line-height:1.7;">
+  關鍵：問題向量 與 文檔塊向量 使用<b style="color:var(--text-main)">同一個 Embedding 模型</b>生成，才能在同一語義空間內做相似度比較。
+</div>`
+  },
+  {
+    num:'4', icon:'🔍', title:'向量檢索（Top-K）',
+    desc:'計算問題向量與所有文檔塊向量的餘弦相似度，返回最相關的 Top-K 塊',
+    phase: 'query',
+    vis: kb =>`<b>在向量數據庫中搜索 Top-3 最相關片段：</b><br>
+<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+  ${kb.hits.map((h, i) => `<div style="background:${i === 0 ? 'rgba(0,102,255,0.06)' : 'rgba(0,0,0,0.03)'};border:1px solid ${i === 0 ? 'rgba(0,102,255,0.2)' : 'rgba(0,0,0,0.07)'};border-radius:8px;padding:10px 12px;font-size:12px;display:flex;align-items:center;gap:12px;">
+    <div style="flex-shrink:0;">
+      <div style="font-size:18px;font-weight:900;color:${i === 0 ? 'var(--accent)' : 'var(--text-sub)'};">${h.score}</div>
+      <div style="font-size:9px;color:var(--text-sub);text-align:center;">相似度</div>
+    </div>
+    <div>
+      <div style="font-weight:700;color:var(--text-main);margin-bottom:2px;">${h.src}</div>
+      <div style="color:var(--text-sub);">${h.quote}</div>
+    </div>
+  </div>`).join('')}
+</div>
+<div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.6;">檢索按<b style="color:var(--text-main)">語義相近</b>匹配，只看<b style="color:var(--text-main)">關鍵詞</b>找不到這種關聯。${kb.semanticNote}</div>`
+  },
+  {
+    num:'5', icon:'📋', title:'構建 Prompt',
+    desc:'將檢索到的文檔塊拼入 Prompt，作為「參考資料」注入上下文',
+    phase: 'query',
+    vis: kb =>`<b>發送給 LLM 的 Prompt：</b>
+<div style="background:#1c1c1e;border-radius:8px;padding:12px 16px;font-family:monospace;font-size:11px;color:#9ca3af;margin-top:8px;line-height:1.9;white-space:pre-wrap;"><span style="color:#f38ba8;">System:</span> ${kb.sysRole}。只根據以下參考資料回答，不得引用其他內容。
+
+<span style="color:#a6e3a1;">[參考資料]
+${kb.hits.map((h, i) => `${i+1}. ${h.src}：${h.quote.replace(/^「|」$/g, '')}`).join('\n')}</span>
+
+<span style="color:#89dceb;">User:</span> ${kb.question}
+<span style="color:#cba6f7;">Assistant:</span></div>
+<div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.6;">綠色部分 = 檢索注入的文檔塊，它們成為模型的上下文前文，直接影響後續每個 Token 的概率分佈。</div>`
+  },
+  {
+    num:'6', icon:'🤖', title:'LLM 生成回答',
+    desc:'模型閲讀注入的文檔後，生成有來源依據的準確回答',
+    phase: 'query',
+    vis: kb =>`<b>AI 生成的回答：</b><br><br>
+根據檢索到的資料：<br>
+<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.8;">
+  ${kb.answerLines.map(l => `<div>· ${l}</div>`).join('')}
+</div>
+<div style="margin-top:10px;font-size:12px;color:var(--success);font-weight:600;background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.2);border-radius:8px;padding:8px 12px;">✅ 信息來源：${kb.hits.map(h => h.src).join(' + ')}</div>
+<div style="margin-top:8px;font-size:12px;color:var(--text-sub);line-height:1.6;">模型基於注入的真實文檔作答，無需從訓練參數裏猜，幻覺大幅降低。</div>`
+  },
+  {
+    num:'7', icon:'📤', title:'返回答案（含來源）',
+    desc:'將回答和引用來源一起返回給用戶，答案可溯源、可核查',
+    phase: 'query',
+    vis: kb =>`<b>最終展示給用戶：</b><br><br>
+<div style="background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.2);border-radius:10px;padding:16px;font-size:14px;line-height:1.8;">
+  ${kb.finalAnswer}<br><br>
+  <div style="font-size:12px;color:var(--success);font-weight:600;">📎 引用來源：${kb.hits.map(h => h.src).join(' / ')}</div>
+</div>
+<div style="margin-top:10px;display:flex;gap:10px;">
+  <div style="flex:1;background:rgba(0,102,255,0.05);border:1px solid rgba(0,102,255,0.15);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;">
+    <b style="color:var(--accent);">🔗 來源可溯</b><br>用戶可點擊來源核查原文，信任度大幅提升
+  </div>
+  <div style="flex:1;background:rgba(22,163,74,0.05);border:1px solid rgba(22,163,74,0.15);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;">
+    <b style="color:var(--success);">✅ 知識即時</b><br>更新知識庫即可更新答案，無需重訓模型
+  </div>
+  <div style="flex:1;background:rgba(217,119,6,0.05);border:1px solid rgba(217,119,6,0.15);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;">
+    <b style="color:var(--amber);">🔒 範圍可控</b><br>只基於提供的文檔回答，不亂説文檔外的內容
+  </div>
+</div>`
+  },
+];
+
+let ragStep = 0;
+let ragScene = -1;   // 流程圖當前展示的是哪個場景，和 currentScene 不一致就説明內容過時了
+function ragBuildStepper() {
+  const el = document.getElementById('ragStepper');
+  el.innerHTML = '';
+
+  // 階段分隔標籤
+  let prevPhase = null;
+  RAG_STEPS.forEach((s, i) => {
+    // 插入階段分隔行
+    if (s.phase !== prevPhase) {
+      const sep = document.createElement('div');
+      const isBuild = s.phase === 'build';
+      sep.style.cssText = `padding:5px 16px 4px;font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:${isBuild ? '#8e8e93' : 'var(--accent)'};background:${isBuild ? 'rgba(0,0,0,0.03)' : 'rgba(0,102,255,0.04)'};border-bottom:1px solid rgba(0,0,0,0.05);`;
+      sep.textContent = isBuild ? '📦 知識庫構建階段（一次性離綫）' : '⚡ 查詢階段（每次即時執行）';
+      el.appendChild(sep);
+      prevPhase = s.phase;
+    }
+
+    const div = document.createElement('div');
+    div.dataset.step = i;
+    div.style.cssText = 'display:flex;gap:0;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.05);align-items:flex-start;opacity:0.4;transition:all 0.3s;';
+    div.innerHTML = `<div style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;margin-right:12px;border:2px solid rgba(0,0,0,0.1);background:#f0f0f0;color:#8e8e93;transition:all 0.3s;">${s.num}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;">${s.icon} ${s.title}</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-top:3px;max-height:0;overflow:hidden;transition:max-height 0.3s;line-height:1.55;">${s.desc}</div>
+      </div>`;
+    if (i === RAG_STEPS.length - 1) div.style.borderBottom = 'none';
+    el.appendChild(div);
+  });
+}
+
+function ragGetStepDivs() {
+  return Array.from(document.getElementById('ragStepper').querySelectorAll('[data-step]'));
+}
+
+function ragNext() {
+  if (ragStep >= RAG_STEPS.length) return;
+  const steps = ragGetStepDivs();
+  if (ragStep > 0) {
+    const prev = steps[ragStep - 1];
+    prev.style.opacity = '1';
+    prev.style.background = 'rgba(22,163,74,0.04)';
+    const num = prev.querySelector('div');
+    num.style.background = '#16a34a';
+    num.style.color = 'white';
+    num.style.borderColor = '#16a34a';
+  }
+  const cur = steps[ragStep];
+  cur.style.opacity = '1';
+  const isBuild = RAG_STEPS[ragStep].phase === 'build';
+  cur.style.background = isBuild ? 'rgba(0,0,0,0.03)' : 'rgba(0,102,255,0.04)';
+  const num = cur.querySelector('div');
+  num.style.background = isBuild ? '#6b7280' : 'var(--accent)';
+  num.style.color = 'white';
+  num.style.borderColor = isBuild ? '#6b7280' : 'var(--accent)';
+  // 展開描述
+  const descEl = cur.querySelector('div:last-child div:last-child');
+  if (descEl) descEl.style.maxHeight = '60px';
+
+  const phaseLabel = RAG_STEPS[ragStep].phase === 'build' ? '【構建】' : '【查詢】';
+  document.getElementById('ragVisTitle').textContent = `步驟 ${ragStep+1}：${RAG_STEPS[ragStep].title}`;
+  document.getElementById('ragVisArea').innerHTML = RAG_STEPS[ragStep].vis(SCENE_KB[currentScene]);
+  ragStep++;
+  document.getElementById('ragProgress').textContent = `第 ${ragStep} / ${RAG_STEPS.length} 步`;
+  if (ragStep >= RAG_STEPS.length) {
+    document.getElementById('ragNextBtn').disabled = true;
+    document.getElementById('ragNextBtn').style.opacity = '0.5';
+  }
+}
+function ragReset() {
+  ragStep = 0;
+  ragScene = currentScene;
+  document.getElementById('ragNextBtn').disabled = false;
+  document.getElementById('ragNextBtn').style.opacity = '1';
+  document.getElementById('ragProgress').textContent = `第 0 / ${RAG_STEPS.length} 步`;
+  document.getElementById('ragVisArea').innerHTML = '<span style="color:var(--text-sub);">點擊左側「下一步」查看每步細節 →</span>';
+  document.getElementById('ragVisTitle').textContent = '步驟詳情：';
+  document.getElementById('ragSceneLabel').textContent = `當前示例：${SCENE_KB[currentScene].label}（換左側場景，這裏的文檔和問題會一起變）`;
+  ragBuildStepper();
+}
+
+// 初始化
+setTab('compare');
+ragReset();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="alice-practice-principles.js?v=20260827a"></script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

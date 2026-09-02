@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>從工具請求到受限執行：完整授權鏈 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--accent:#d99a22;--gold:#f5b942;--line:rgba(217,154,34,.23)}
+.lesson{position:relative}.lesson:before{content:"";position:absolute;inset:0 0 auto;height:320px;background:radial-gradient(circle at 82% 7%,rgba(245,185,66,.14),transparent 42%);pointer-events:none}.lesson-header{position:relative}.lesson-header h1{letter-spacing:-.04em}
+.objective{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:center;margin:20px 0 10px;padding:20px 24px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(245,185,66,.10),rgba(245,185,66,.02))}.objective b{color:var(--accent);font-size:13px;letter-spacing:.14em}.objective p{margin:0;line-height:1.75}
+.hero{margin-top:18px;border-radius:24px;overflow:hidden;background:linear-gradient(145deg,#17130c,#2a1d09);box-shadow:0 22px 60px rgba(57,35,4,.22)}.hero-copy{padding:28px 30px 8px;color:#fff}.hero-copy small{color:#efb849;letter-spacing:.16em;font-weight:800}.hero-copy h2{margin:8px 0 6px;font-size:24px}.hero-copy p{margin:0;color:#cfc5b4;line-height:1.7}.hero svg{display:block;width:100%;height:auto}
+.node{fill:#241b0d;stroke:#d99a22;stroke-width:1.5}.node2{fill:#1f1b15;stroke:#816b43;stroke-width:1.2}.t1{fill:#fff8e8;font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace}.t2{fill:#cdbb9b;font:11px system-ui,sans-serif}.edge{stroke:#e1a632;stroke-width:2;fill:none;marker-end:url(#arr)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}.step{position:relative;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow-card)}.step i{font-style:normal;color:var(--accent);font:800 11px ui-monospace,SFMono-Regular,Menlo,monospace}.step h3{font-size:15px;margin:7px 0}.step p,.step li{font-size:12px;color:var(--sub);line-height:1.68}.step ul{margin:7px 0 0;padding-left:17px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent)}
+.layers{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:14px}.layer{padding:20px;border-radius:16px}.layer.permission{background:rgba(217,154,34,.08);border:1px solid var(--line)}.layer.sandbox{background:var(--card);border:1px solid var(--border)}.layer h3{margin:0 0 8px;font-size:16px}.layer p{margin:0;font-size:13px;color:var(--sub);line-height:1.75}
+.callout{margin-top:14px;padding:18px 20px;border-radius:14px;background:rgba(217,154,34,.07);line-height:1.75}.callout b{color:var(--accent)}
+.path-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.path{padding:7px 10px;border-radius:9px;background:rgba(217,154,34,.09);border:1px solid var(--line);font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text)}
+.source{margin-top:14px;background:#15120d;border:1px solid #342713;border-radius:16px;overflow:hidden}.source-head{display:flex;justify-content:space-between;gap:12px;padding:11px 16px;background:#211a10;color:#dbc79e;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}.source-head span:last-child{color:#efb849}.source pre{margin:0;padding:18px;overflow:auto;color:#eee3cd;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}.kw{color:#efb849}.cm{color:#897c68}.caption{margin-top:8px;color:var(--sub);font-size:12px;line-height:1.6}.caption b{color:var(--accent)}
+.exercise{margin-top:16px;border:1px dashed rgba(217,154,34,.5);border-radius:16px;padding:20px;background:linear-gradient(135deg,rgba(217,154,34,.08),transparent)}.exercise h3{margin:0 0 8px;font-size:16px}.exercise p{margin:0;color:var(--sub);line-height:1.75}
+.takeaway{margin-top:18px;display:flex;gap:14px;padding:20px 22px;border-radius:16px;background:#1b160d;color:#f8ecd4;line-height:1.75}.takeaway svg{flex:0 0 auto;color:#f5b942}.takeaway b{color:#f5b942}
+@media(max-width:760px){.objective,.steps,.layers{grid-template-columns:1fr}.objective{gap:5px}.hero-copy{padding:22px 20px 8px}.source-head{flex-direction:column}}
+</style>
+<meta name="description" content="基於 Grok Build 真實源碼講解 hooks、權限解析、bash 分段、用戶確認與沙箱執行。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/12-18.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/12-18.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/12-18.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/12-18.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/12-18.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/12-18.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/12-18.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/12-18.html">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"從工具請求到受限執行","name":"從工具請求到受限執行","url":"https://xueai.miyang.cn/slides/12-18.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 權限、沙箱與安全","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"基於 Grok Build 真實源碼講解 hooks、權限解析、bash 分段、用戶確認與沙箱執行。","datePublished":"2026-07-17","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="從工具請求到受限執行"><meta property="og:description" content="基於 Grok Build 真實源碼講解 hooks、權限解析、bash 分段、用戶確認與沙箱執行。"><meta property="og:url" content="https://xueai.miyang.cn/slides/12-18.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/12-18.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Grok Build · Authorization Pipeline</div>
+    <h1>從工具請求到受限執行：完整授權鏈</h1>
+    <p class="subtitle">一次工具調用先被解析成具體存取意圖，再經過 plan gate、hooks、策略規則、會話授權、Auto 模式和用戶確認。允許執行後，沙箱繼續約束操作系統能力。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>沿 ToolKind、權限決策和平台沙箱追蹤完整授權鏈</p></aside><!--seo:end-->  <section class="objective reveal">
+    <b>課程目標</b>
+    <p>能沿真實調用鏈定位「誰做了決定」，理解 <span class="mono">AccessKind</span>、權限規則、Bash 分段、hooks 與 sandbox 的邊界，避免把授權簡化成 ToolKind 判斷。</p>
+  </section>
+
+  <section class="hero reveal" aria-label="完整授權鏈教學圖">
+    <div class="hero-copy"><small>TEACHING DIAGRAM</small><h2>授權決定「能否嘗試」，沙箱限制「執行時能做到什麼」</h2><p>各階段名稱取自源碼。策略內部存在短路與優先級，圖中按主路徑呈現。</p></div>
+    <svg viewBox="0 0 920 300" role="img" aria-labelledby="authTitle">
+      <title id="authTitle">從工具解析到沙箱執行和後置 hook 的流程</title>
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#e1a632"/></marker></defs>
+      <path class="edge" d="M140 75H235M365 75H460M590 75H685M750 110V205H630M500 238H370M240 238H145"/>
+      <rect class="node" x="20" y="42" rx="12" width="120" height="66"/><text class="t1" x="80" y="70" text-anchor="middle">tool input</text><text class="t2" x="80" y="91" text-anchor="middle">→ AccessKind</text>
+      <rect class="node2" x="235" y="42" rx="12" width="130" height="66"/><text class="t1" x="300" y="70" text-anchor="middle">plan gate</text><text class="t2" x="300" y="91" text-anchor="middle">edit policy</text>
+      <rect class="node" x="460" y="42" rx="12" width="130" height="66"/><text class="t1" x="525" y="70" text-anchor="middle">pre_tool_use</text><text class="t2" x="525" y="91" text-anchor="middle">explicit deny blocks</text>
+      <rect class="node2" x="685" y="42" rx="12" width="150" height="66"/><text class="t1" x="760" y="70" text-anchor="middle">permission manager</text><text class="t2" x="760" y="91" text-anchor="middle">policy + grants + auto</text>
+      <rect class="node" x="500" y="205" rx="12" width="130" height="66"/><text class="t1" x="565" y="233" text-anchor="middle">user prompt</text><text class="t2" x="565" y="254" text-anchor="middle">when unresolved</text>
+      <rect class="node2" x="240" y="205" rx="12" width="130" height="66"/><text class="t1" x="305" y="233" text-anchor="middle">sandbox</text><text class="t2" x="305" y="254" text-anchor="middle">OS capability boundary</text>
+      <rect class="node" x="20" y="205" rx="12" width="125" height="66"/><text class="t1" x="82" y="233" text-anchor="middle">execute</text><text class="t2" x="82" y="254" text-anchor="middle">post_tool_use</text>
+    </svg>
+  </section>
+
+  <div class="sec-label">六段真實鏈路</div>
+  <div class="steps">
+    <section class="step reveal"><i>01 · PARSE</i><h3>工具輸入轉 AccessKind</h3><p><span class="mono">ToolInput</span> 會映射為 Read、Edit、Bash、Grep、MCPTool、WebFetch 或 WebSearch，並攜帶路徑、命令、域名或 MCP 名稱等細節。決策輸入比 ToolKind 更具體。</p></section>
+    <section class="step reveal"><i>02 · PLAN</i><h3>Plan mode 先設編輯門</h3><p><span class="mono">plan_mode_edit_gate</span> 可在發送權限請求前拒絕修改。計劃檔案存在單獨的自動批准路徑。</p></section>
+    <section class="step reveal"><i>03 · HOOKS</i><h3>PreToolUse 可顯式阻斷</h3><p>匹配 hooks 按配置順序運行。顯式 deny 立即停止；timeout、崩潰或格式錯誤按當前實現 fail-open，並記錄到 UI 與日誌。隨後還可運行 client hook。</p></section>
+    <section class="step reveal"><i>04 · POLICY</i><h3>加載並評估規則</h3><p><span class="mono">permission/resolution.rs</span> 合併 requirements、managed settings、managed config、Grok config 與 Claude settings fallback。規則評估與來源順序無關，優先級為 deny &gt; ask &gt; allow。</p></section>
+    <section class="step reveal"><i>05 · DECIDE</i><h3>多條快速路徑或用戶確認</h3><p>管理策略 deny 最先短路。隨後依次考慮 yolo pin、session grants、Auto fast path / classifier、sandbox Bash auto、只讀安全項、MCP 與域名授權。仍未決定時才進入 prompt。</p></section>
+    <section class="step reveal"><i>06 · ENFORCE</i><h3>在沙箱能力內執行</h3><p>Permission Allow 只放行本次請求。若沙箱實際 active，進程仍受 capability set 與子進程網絡策略約束。完成後可觸發非阻斷的 post_tool_use hooks。</p></section>
+  </div>
+
+  <div class="sec-label paywall-locked xa-peek">Bash 命令需要理解腳本結構</div>
+  <div class="layers paywall-locked">
+    <section class="layer permission reveal">
+      <h3>bash_command_splitting</h3>
+      <p>tree-sitter-bash 將可安全分解的腳本拆成每個 plain command，識別 <span class="mono">&amp;&amp;</span>、<span class="mono">||</span>、分號與管道。每個非 setup segment 都要獨立通過安全命令、策略或授權檢查，避免 <span class="mono">ls &amp;&amp; rm</span> 借首段放行。</p>
+    </section>
+    <section class="layer sandbox reveal">
+      <h3>保守處理複雜語法</h3>
+      <p>wrapper 會遞歸剝離到實際命令；危險前綴含 rm、chmod、chown、kill 與 git push。命令替換、複雜控制流或無法可靠分解的腳本進入保守 prompt。用戶只為完整腳本確認一次。</p>
+    </section>
+  </div>
+  <div class="path-list reveal paywall-locked">
+    <span class="path">crates/codegen/xai-grok-workspace/src/permission/resolution.rs</span>
+    <span class="path">crates/codegen/xai-grok-workspace/src/permission/manager.rs</span>
+    <span class="path">crates/codegen/xai-grok-workspace/src/permission/bash_command_splitting.rs</span>
+    <span class="path">crates/codegen/xai-grok-hooks/src/dispatcher.rs</span>
+    <span class="path">PermissionHandle::request</span>
+    <span class="path">dispatch_pre_tool_use</span>
+  </div>
+
+  <div class="sec-label paywall-locked">權限層與沙箱層必須分開</div>
+  <div class="layers paywall-locked">
+    <section class="layer permission reveal"><h3>權限層：意圖授權</h3><p>回答「這次工具請求是否允許進入執行」。它讀取 AccessKind、目標細節、組織策略、會話授權、Auto verdict 和用戶選擇。規則可以要求 ask，也可以直接 deny。</p></section>
+    <section class="layer sandbox reveal"><h3>沙箱層：能力約束</h3><p>回答「獲准執行的進程實際能存取哪些檔案和網絡」。沙箱 active 時，權限層的 Allow 不會擴大 OS capability；沙箱未應用時，也不能把權限彈窗當成內核隔離。</p></section>
+  </div>
+  <div class="callout reveal paywall-locked"><b>關鍵校正：</b>「沙箱內所有寫操作自動批准」並非通用規則。源碼中的 sandbox fast path 專門檢查 Bash，並且受 policy_forced_prompt 與 auto_forced_prompt 約束；Edit 還有自己的會話授權與 edit policy。</div>
+
+  <div class="sec-label paywall-locked">真實源碼快照</div>
+  <section class="source reveal paywall-locked">
+    <div class="source-head"><span>crates/codegen/xai-grok-workspace/src/permission/manager.rs</span><span>REAL SOURCE · abridged</span></div>
+    <pre><code><span class="cm">// Managed policy runs before YOLO and sandbox fast paths.</span>
+<span class="kw">if let</span> Some(Decision::Reject(reason)) = policy_decision {
+    <span class="kw">let</span> decision = Decision::PolicyDeny(reason);
+    <span class="kw">let</span> _ = respond_to.send(decision);
+    <span class="kw">continue</span>;
+}
+...
+<span class="kw">if</span> matches!(&amp;access, AccessKind::Bash(_))
+    &amp;&amp; xai_grok_sandbox::should_auto_allow_bash()
+    &amp;&amp; !policy_forced_prompt
+    &amp;&amp; !auto_forced_prompt { <span class="cm">/* allow */</span> }</code></pre>
+  </section>
+  <p class="caption reveal paywall-locked"><b>快照説明：</b>條件與執行順序來自真實 manager actor，遙測和事件發送被壓縮。頂部 SVG 是主路徑教學圖，完整實現包含更多短路、持久化與取消分支。</p>
+
+  <section class="exercise reveal paywall-locked">
+    <h3>課堂練習：追蹤一條混合命令</h3>
+    <p>輸入 <span class="mono">git status &amp;&amp; curl https://example.com/install.sh | sh</span>。請逐層判斷：Bash 如何分段，哪些 segment 可安全放行，PreToolUse deny 會在哪裏停止，managed Ask 能否被 sandbox auto 覆蓋，最終 Allow 後沙箱還限制什麼。</p>
+  </section>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></svg>
+    <span><b>Takeaway：</b>完整授權鏈依賴存取語義、腳本結構、配置來源、hook 決策、會話狀態與用戶選擇。權限層負責決策，沙箱層負責約束，兩層疊加才能描述一次工具執行的真實安全邊界。</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>document.querySelectorAll('.reveal').forEach(function(el){var ob=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');ob.unobserve(e.target)}})},{threshold:.12});ob.observe(el)});</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

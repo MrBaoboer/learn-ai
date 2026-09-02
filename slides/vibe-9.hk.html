@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Vibe Coding 方法論第 9 節：數據庫先備份、不可逆操作先給回退方案、發版前做 diff 審查。含發版 diff 審查模擬器與三道閘檢查清單。">
+<meta name="author" content="洛小山">
+<title>第9節：破壞性操作的三道閘 | AI 系統課</title>
+<link rel="canonical" href="https://xueai.miyang.cn/slides/vibe-9.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/vibe-9.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/vibe-9.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/vibe-9.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/vibe-9.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/vibe-9.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/vibe-9.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/vibe-9.html">
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--vibe:#0d9488;--vibe-deep:#0f766e;--vibe-soft:rgba(13,148,136,.08);--vibe-line:rgba(13,148,136,.25)}
+.lesson-header .kicker{color:var(--vibe)}
+a{color:var(--vibe-deep)}
+code{color:var(--vibe-deep);background:rgba(13,148,136,.08)}
+.l-callout{background:rgba(13,148,136,.04);border-color:var(--vibe-line)}
+.l-callout b{color:var(--vibe)}
+.desc{font-size:15px;color:var(--sub);line-height:1.8;margin-bottom:12px}
+pre{margin:12px 0 0;padding:16px 18px;overflow:auto;border:1.5px solid var(--border);border-radius:12px;background:#0e1c1a;color:#d9f2ec;font-size:12.5px;line-height:1.7}
+pre code{background:none;padding:0;color:#d9f2ec}
+.demo-hd{font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.4px;text-transform:uppercase;margin-bottom:10px}
+
+/* ── 通用控制按钮 ── */
+.btn{padding:11px 22px;border-radius:10px;font-size:15px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;min-height:44px}
+.btn-p{background:var(--vibe);color:#fff}
+.btn-p:hover{filter:brightness(1.08)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
+.btn-r{background:rgba(0,0,0,.05);color:var(--sub);border:1.5px solid var(--border)}
+.ctrl-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.hint{font-size:13px;color:var(--sub)}
+
+/* ── 三道闸总览 ── */
+.gate-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.gate-grid h3{font-size:15.5px;font-weight:800;margin-bottom:5px}
+.gate-grid p{font-size:13.5px;color:var(--sub);line-height:1.75}
+.gate-tag{display:inline-block;margin-bottom:8px;padding:2px 10px;border:1px solid var(--vibe-line);border-radius:999px;background:var(--vibe-soft);color:var(--vibe-deep);font-family:"SF Mono",Menlo,monospace;font-size:11px;font-weight:800;letter-spacing:.04em}
+
+/* ── 交互一：diff 审查模拟器 ── */
+.rel-card{padding:14px 18px;border:1.5px solid var(--vibe-line);border-radius:12px;background:var(--vibe-soft)}
+.rel-card .rt{font-family:"SF Mono",Menlo,monospace;font-size:13px;font-weight:800;color:var(--vibe-deep);margin-bottom:4px}
+.rel-card p{font-size:14px;line-height:1.7;margin:0}
+.df-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.df-row{display:flex;align-items:center;gap:12px;padding:12px 15px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);flex-wrap:wrap;transition:border-color .15s}
+.df-row.marked-ok{border-color:rgba(22,163,74,.4)}
+.df-row.marked-risk{border-color:rgba(220,38,38,.4)}
+.df-info{flex:1;min-width:220px}
+.df-file{font-family:"SF Mono",Menlo,monospace;font-size:13px;font-weight:700;color:var(--text)}
+.df-desc{font-size:12.5px;color:var(--sub);margin-top:2px;line-height:1.6}
+.df-acts{display:flex;gap:8px}
+.mark-btn{padding:9px 15px;border-radius:9px;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;min-height:44px;transition:all .15s}
+.mark-btn:hover{border-color:rgba(0,0,0,.2)}
+.mark-btn.ok-on{border-color:rgba(22,163,74,.55);background:rgba(22,163,74,.08);color:var(--success)}
+.mark-btn.risk-on{border-color:rgba(220,38,38,.5);background:rgba(220,38,38,.07);color:var(--danger)}
+.report{display:none;margin-top:14px;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card)}
+.report.show{display:block}
+.rp-hd{padding:10px 16px;background:rgba(0,0,0,.03);border-bottom:1px solid var(--border);font-family:"SF Mono",Menlo,monospace;font-size:12.5px;font-weight:800;letter-spacing:.5px;color:var(--sub)}
+.rp-body{padding:14px 16px;display:flex;flex-direction:column;gap:9px}
+.rp-line{font-size:13.5px;line-height:1.65;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.rp-line .rf{font-family:"SF Mono",Menlo,monospace;font-size:12.5px;font-weight:700}
+.rp-line .you-ok{color:var(--success);font-weight:700}
+.rp-line .you-no{color:var(--danger);font-weight:700}
+.rp-why{font-size:12.5px;color:var(--sub);width:100%;line-height:1.65}
+.rp-sum{margin-top:4px;padding:13px 15px;border-radius:10px;font-size:14px;font-weight:700;line-height:1.7;border:1.5px solid rgba(220,38,38,.4);background:rgba(220,38,38,.05);color:var(--danger)}
+
+/* ── 交互二：三道闸检查清单 ── */
+.op-list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.op-btn{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:13px 15px;border-radius:12px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;text-align:left;min-height:44px;transition:all .2s}
+.op-btn:hover{border-color:rgba(0,0,0,.18)}
+.op-btn.active{border-color:var(--vibe);background:var(--vibe-soft)}
+.op-btn h4{font-size:15px;font-weight:800;color:var(--text)}
+.op-btn.active h4{color:var(--vibe-deep)}
+.op-btn p{font-size:12.5px;color:var(--sub);margin:0}
+.gate-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.gate-item{display:flex;gap:12px;padding:13px 15px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);cursor:pointer;transition:all .15s;align-items:flex-start;min-height:44px}
+.gate-item:hover{border-color:rgba(0,0,0,.18)}
+.gate-item.checked{border-color:rgba(22,163,74,.45);background:rgba(22,163,74,.05)}
+.gate-item.blocked{border-color:rgba(220,38,38,.38);background:rgba(220,38,38,.04)}
+.g-box{width:22px;height:22px;border-radius:6px;border:2px solid rgba(0,0,0,.2);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;transition:all .15s;background:var(--card)}
+.gate-item.checked .g-box{background:var(--success);border-color:var(--success)}
+.gate-item.blocked .g-box{border-color:rgba(220,38,38,.55);color:var(--danger);background:rgba(220,38,38,.06)}
+.g-t{font-size:14.5px;font-weight:800}
+.g-d{font-size:13px;color:var(--sub);margin-top:2px;line-height:1.65}
+.gate-result{display:none;margin-top:12px;padding:13px 16px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;line-height:1.75}
+.gate-result.show{display:block}
+.gate-result.pass{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.05)}
+.gate-result.warn{border-color:rgba(217,119,6,.4);background:rgba(217,119,6,.06)}
+.gate-result.stop{border-color:rgba(220,38,38,.4);background:rgba(220,38,38,.05)}
+.gate-result b{color:var(--text)}
+
+/* ── 规则要点 ── */
+.rule-cols h3{font-size:15.5px;font-weight:800;margin-bottom:5px}
+.rule-cols ul{margin:0;padding-left:20px;font-size:13.5px;color:var(--sub);line-height:1.85}
+
+@media (max-width:768px){
+  .gate-grid,.op-list{grid-template-columns:1fr}
+  .df-acts{width:100%}
+  .df-acts .mark-btn{flex:1}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"破壞性操作的三道閘","name":"破壞性操作的三道閘","url":"https://xueai.miyang.cn/slides/vibe-9.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 環境與安全","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Vibe Coding 方法論第 9 節：數據庫先備份、不可逆操作先給回退方案、發版前做 diff 審查。含發版 diff 審查模擬器與三道閘檢查清單。","datePublished":"2026-08-04","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="破壞性操作的三道閘"><meta property="og:description" content="Vibe Coding 方法論第 9 節：數據庫先備份、不可逆操作先給回退方案、發版前做 diff 審查。含發版 diff 審查模擬器與三道閘檢查清單。"><meta property="og:url" content="https://xueai.miyang.cn/slides/vibe-9.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/vibe-9.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">VIBE CODING 方法論 · 第 9 節</div>
+    <h1>破壞性操作的三道閘</h1>
+    <p class="subtitle">發版時以為只改了 A 功能，實際 diff 裏混進了上週調試 B 的臨時改動，半成品程式碼進了生產環境。數據庫、配置、部署這些不可逆操作，必須在執行前設閘。下面兩個演練都可以動手操作。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>數據庫先備份、不可逆操作先給回退方案、發版前做 diff 審查</p></aside><!--seo:end-->  <div class="l-callout reveal">
+    <p style="font-size:14.5px;line-height:1.8"><b>核心原則：</b>不可逆操作的安全感來自閘門。備份攔數據損失，回退方案攔無法恢復，diff 審查攔帶病發版，三道閘都設在執行之前。</p>
+  </div>
+
+  <section>
+    <div class="sec-label">三道閘總覽</div>
+    <div class="gate-grid">
+      <div class="l-card reveal">
+        <span class="gate-tag">GATE 1 · 備份</span>
+        <h3>數據庫改動先備份</h3>
+        <p>備份放項目根目錄 <code>backups/</code>，命名帶時間戳。未備份不得執行任何 migrate、drop、alter、delete 操作。成本是一行命令，賭的是整庫數據。</p>
+      </div>
+      <div class="l-card reveal">
+        <span class="gate-tag">GATE 2 · 回退</span>
+        <h3>不可逆操作先説回退方案</h3>
+        <p>回退方案要回答三件事：如何恢復到操作前的狀態、需要哪些備份文件、預計恢復耗時。説不出這三件事，説明操作還沒想清楚。</p>
+      </div>
+      <div class="l-card reveal">
+        <span class="gate-tag">GATE 3 · 審查</span>
+        <h3>發版前做 diff 審查</h3>
+        <p>把「我以為我改了什麼」和「我實際改了什麼」拆開比對。SubAgent 獨立分析 diff 與 Release Notes 的偏差，有風險就暫停發版。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-label">交互演練一 · 發版 diff 審查模擬器</div>
+    <p class="desc">你是本次發版的 reviewer。Release Notes 只寫了一件事，但實際 diff 有 7 個文件。逐個判斷每個文件的改動「符合預期」還是「存在風險」，全部標完後生成審查報告。</p>
+    <div class="l-card reveal">
+      <div class="rel-card">
+        <div class="rt">RELEASE_NOTES.md · v1.4.0</div>
+        <p>✨ 新增夜間模式：可以在設定裏切換暗色介面，長時間使用不再刺眼。</p>
+      </div>
+      <div class="df-list" id="dfList"></div>
+      <div class="ctrl-row">
+        <button class="btn btn-p" id="dfReport" onclick="dfMakeReport()" disabled>生成審查報告</button>
+        <button class="btn btn-r" onclick="dfReset()">重置</button>
+        <span class="hint" id="dfProg">已標記 0 / 7 個文件</span>
+      </div>
+      <div class="report" id="dfReportBox">
+        <div class="rp-hd">SUBAGENT DIFF REVIEW · v1.3.2 → HEAD</div>
+        <div class="rp-body" id="dfReportBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="paywall-locked xa-peek">
+    <div class="sec-label">交互演練二 · 這個操作要過哪幾道閘</div>
+    <p class="desc">選擇一個操作類型，逐項勾選它要通過的閘門，然後嘗試執行。漏了哪項，就會看到對應的後果。</p>
+    <div class="l-card reveal">
+      <div class="op-list">
+        <button class="op-btn active" id="opBtn0" onclick="pickOp(0)">
+          <h4>migrate 數據庫</h4><p>改表結構，跑遷移腳本</p>
+        </button>
+        <button class="op-btn" id="opBtn1" onclick="pickOp(1)">
+          <h4>修改環境變數</h4><p>換 API Key，調服務配置</p>
+        </button>
+        <button class="op-btn" id="opBtn2" onclick="pickOp(2)">
+          <h4>直接拷文件上伺服器</h4><p>scp 把改好的文件傳上去</p>
+        </button>
+      </div>
+      <div class="gate-list" id="gateList"></div>
+      <div class="ctrl-row">
+        <button class="btn btn-p" onclick="gateRun()">執行操作</button>
+        <span class="hint">先勾閘門，再執行</span>
+      </div>
+      <div class="gate-result" id="gateResult"></div>
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">規則原文要點</div>
+    <div class="l-card reveal">
+      <h3 style="font-size:15.5px;font-weight:800;margin-bottom:4px">備份命令（SQLite 示例）</h3>
+<pre><code># 任何涉及數據庫結構或數據的改動，執行前必須先備份
+cp database.db backups/database_$(date +%Y%m%d_%H%M%S).db</code></pre>
+      <p class="hint" style="margin-top:8px">備份文件命名格式：{原文件名}_{YYYYMMDD_HHMMSS}.db，統一放項目根目錄 backups/ 下。</p>
+    </div>
+    <div class="l-cols rule-cols" style="margin-top:14px">
+      <div class="l-card reveal">
+        <h3>發佈通道</h3>
+        <ul>
+          <li>程式碼發佈、版本發佈、伺服器部署必須通過 GitHub</li>
+          <li>伺服器通過 <code>git pull</code> 或 CI/CD 流水綫拉取程式碼</li>
+          <li>緊急熱修復可以例外，事後必須補 commit 同步</li>
+          <li>在用戶明確確認之前，打 tag、push、部署全部禁止</li>
+        </ul>
+      </div>
+      <div class="l-card reveal">
+        <h3>憑據管理</h3>
+        <ul>
+          <li>所有憑據通過環境變數或 secrets 管理</li>
+          <li>禁止硬編碼在程式碼或配置文件中</li>
+          <li>Key 一旦進入 git 歷史等於永久洩露，只能作廢重發</li>
+        </ul>
+      </div>
+    </div>
+    <div class="l-callout reveal" style="margin-top:14px">
+      <p style="font-size:14px;line-height:1.8"><b>設計意圖：</b>Release Notes 描述的是預期改動，實際 commit 裏可能混入無關調整甚至誤刪。正規團隊靠 CI/CD 加 PR review 攔這個問題，獨立開發者往往跳過 review 直接 push，diff 審查規則等於讓 SubAgent 充當 reviewer。</p>
+    </div>
+  </section>
+
+  <section class="paywall-locked">
+    <div class="sec-label">課堂練習 · 30 分鐘</div>
+    <div class="l-card reveal">
+      <p style="font-size:14px;color:var(--sub);line-height:1.9;margin:0">提交物：一份風險審查報告。① 在測試倉庫裏故意混入一個與發版主題無關的改動（比如改掉一個已有函式的邏輯）；② 寫一份只描述主題功能的 Release Notes，讓 AI 按「取完整 diff → 逐文件比對 → 分類處理」三步做審查；③ 檢查 AI 能否發現混入的改動並暫停發版，把它的風險報告存檔作為流程模板。</p>
+    </div>
+  </section>
+
+  <div class="l-card reveal paywall-locked" style="margin-top:28px">
+    <p style="font-size:12.5px;color:var(--sub);line-height:1.8;margin:0">素材來源：開源倉庫 <a href="https://github.com/itshen/xs_vibe_rules">itshen/xs_vibe_rules</a> 中 <code>rule-opensource.mdc</code> 第六章 6.4/6.5「數據庫備份與回退方案」、第十章「部署與環境」。</p>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+/* ═══ 交互一：发版 diff 审查模拟器 ═══ */
+const D_FILES = [
+  { f:'src/theme/darkTheme.css', d:'新增文件，定義暗色主題的顏色變數與組件樣式', risk:false,
+    why:'夜間模式的核心樣式文件，與 Release Notes 描述一致。' },
+  { f:'src/components/ThemeToggle.tsx', d:'新增文件，設定頁的主題切換開關組件', risk:false,
+    why:'新增組件，屬於本次發版主題。' },
+  { f:'src/App.tsx', d:'修改，掛載 ThemeToggle 並讀取用戶主題偏好', risk:false,
+    why:'為接入夜間模式所做的集成改動，範圍合理。' },
+  { f:'src/utils/messageParser.ts', d:'修改，改寫了已有消息解析函式的分支邏輯', risk:true,
+    why:'與夜間模式無關，改動的是已有功能的邏輯，Release Notes 完全沒提。很可能是上週調試時的臨時改動混了進來。' },
+  { f:'package.json', d:'修改，axios 從 0.27.2 升級到 1.6.0', risk:true,
+    why:'依賴大版本變化且 Release Notes 未提及。axios 1.x 有破壞性變更，可能影響所有網絡請求。' },
+  { f:'src/styles/tokens.css', d:'修改，新增一組顏色變數供暗色主題引用', risk:false,
+    why:'只新增變數，不改已有值，服務於本次主題。' },
+  { f:'docs/RELEASE_NOTES.md', d:'修改，補充 v1.4.0 的更新説明', risk:false,
+    why:'發版流程的常規文檔更新。' }
+];
+let dfMarks = new Array(D_FILES.length).fill(null); // 0 = 符合預期, 1 = 存在風險
+
+function dfRender() {
+  const list = document.getElementById('dfList');
+  list.innerHTML = '';
+  D_FILES.forEach(function (file, i) {
+    const row = document.createElement('div');
+    row.className = 'df-row';
+    row.id = 'dfRow' + i;
+
+    const info = document.createElement('div');
+    info.className = 'df-info';
+    info.innerHTML = '<div class="df-file">' + file.f + '</div><div class="df-desc">' + file.d + '</div>';
+
+    const acts = document.createElement('div');
+    acts.className = 'df-acts';
+    const bOk = document.createElement('button');
+    bOk.className = 'mark-btn';
+    bOk.textContent = '符合預期';
+    bOk.onclick = function () { dfMark(i, 0); };
+    const bRisk = document.createElement('button');
+    bRisk.className = 'mark-btn';
+    bRisk.textContent = '存在風險';
+    bRisk.onclick = function () { dfMark(i, 1); };
+    acts.appendChild(bOk);
+    acts.appendChild(bRisk);
+
+    row.appendChild(info);
+    row.appendChild(acts);
+    list.appendChild(row);
+  });
+}
+
+function dfMark(i, val) {
+  dfMarks[i] = val;
+  const row = document.getElementById('dfRow' + i);
+  row.className = 'df-row ' + (val === 0 ? 'marked-ok' : 'marked-risk');
+  const btns = row.querySelectorAll('.mark-btn');
+  btns[0].className = 'mark-btn' + (val === 0 ? ' ok-on' : '');
+  btns[1].className = 'mark-btn' + (val === 1 ? ' risk-on' : '');
+  const n = dfMarks.filter(function (m) { return m !== null; }).length;
+  document.getElementById('dfProg').textContent = '已標記 ' + n + ' / ' + D_FILES.length + ' 個文件';
+  document.getElementById('dfReport').disabled = n < D_FILES.length;
+}
+
+function dfMakeReport() {
+  const body = document.getElementById('dfReportBody');
+  body.innerHTML = '';
+  let correct = 0, riskCount = 0;
+  D_FILES.forEach(function (file, i) {
+    const truth = file.risk ? 1 : 0;
+    const you = dfMarks[i];
+    const hit = you === truth;
+    if (hit) correct++;
+    if (file.risk) riskCount++;
+    const line = document.createElement('div');
+    line.className = 'rp-line';
+    line.innerHTML =
+      '<span>' + (file.risk ? '⚠️' : '✅') + '</span>' +
+      '<span class="rf">' + file.f + '</span>' +
+      '<span>審查結論：' + (file.risk ? '存在風險' : '符合預期') + '</span>' +
+      '<span class="' + (hit ? 'you-ok' : 'you-no') + '">你的判斷：' + (hit ? '正確' : '錯誤') + '</span>' +
+      '<span class="rp-why">' + file.why + '</span>';
+    body.appendChild(line);
+  });
+  const sum = document.createElement('div');
+  sum.className = 'rp-sum';
+  sum.textContent = '判斷正確 ' + correct + ' / ' + D_FILES.length + ' · 檢出風險改動 ' + riskCount +
+    ' 處 ⚠️ 存在風險：暫停發版，等待用戶確認。在確認之前，打 tag、push、部署全部禁止。';
+  body.appendChild(sum);
+  document.getElementById('dfReportBox').classList.add('show');
+}
+
+function dfReset() {
+  dfMarks = new Array(D_FILES.length).fill(null);
+  document.getElementById('dfProg').textContent = '已標記 0 / ' + D_FILES.length + ' 個文件';
+  document.getElementById('dfReport').disabled = true;
+  document.getElementById('dfReportBox').classList.remove('show');
+  dfRender();
+}
+
+/* ═══ 交互二：三道闸检查清单 ═══ */
+const OPS = [
+  {
+    gates: [
+      { t:'備份閘', d:'執行 cp database.db backups/database_$(date +%Y%m%d_%H%M%S).db，備份放 backups/，命名帶時間戳',
+        miss:'沒有備份的 migrate 一旦出錯，整庫數據沒有任何恢復手段。規則原文：未備份不得執行任何 migrate、drop、alter、delete 操作。' },
+      { t:'回退閘', d:'先説清三要素：如何恢復到操作前的狀態、需要哪些備份文件、預計恢復耗時',
+        miss:'説不出回退三要素，説明操作還沒想清楚。出問題時只能現場翻文檔找恢復辦法，停機時間不可控。' },
+      { t:'通道閘', d:'migration 腳本已提交 GitHub，伺服器通過 git pull 或 CI/CD 取得',
+        miss:'腳本不進倉庫，綫上庫結構和倉庫程式碼會不一致，之後每次部署都可能再出一次問題。' }
+    ],
+    blocked: -1
+  },
+  {
+    gates: [
+      { t:'備份閘', d:'導出當前變數快照到 backups/（帶時間戳），記錄舊值',
+        miss:'改錯後沒人記得舊值是什麼，服務起不來也回不去。' },
+      { t:'回退閘', d:'三要素：如何恢復、需要哪份快照、預計恢復耗時',
+        miss:'環境變數改壞經常表現為服務靜默異常，沒有回退方案時排查會非常慢。' },
+      { t:'憑據閘', d:'新的 Key 通過環境變數或 secrets 注入，禁止硬編碼進程式碼或配置文件',
+        miss:'Key 一旦進了 git 歷史等於永久洩露，只能作廢重發。' }
+    ],
+    blocked: -1
+  },
+  {
+    gates: [
+      { t:'備份閘', d:'把將被覆蓋的舊文件備份到 backups/，帶時間戳',
+        miss:'覆蓋後舊文件就沒了，出問題連改動前後的對比都做不了。' },
+      { t:'回退閘', d:'三要素：如何恢復、需要哪些備份、預計恢復耗時',
+        miss:'手工拷貝的文件沒有版本記錄，不提前想好回退，出事只能憑記憶還原。' },
+      { t:'通道閘', d:'發佈必須通過 GitHub，伺服器 git pull 或 CI/CD 拉取',
+        blockedMsg:'這道閘過不去：直接拷文件繞過版本控制，無法追溯、無法回滾。正確做法是提交 commit 推到 GitHub，伺服器執行 git pull。緊急熱修復可以例外，事後必須補 commit 同步。' }
+    ],
+    blocked: 2
+  }
+];
+let curOp = 0;
+let gateChecks = [];
+
+function pickOp(i) {
+  curOp = i;
+  for (let j = 0; j < 3; j++) document.getElementById('opBtn' + j).classList.toggle('active', j === i);
+  gateChecks = OPS[i].gates.map(function () { return false; });
+  gateRender();
+  const r = document.getElementById('gateResult');
+  r.className = 'gate-result';
+  r.innerHTML = '';
+}
+
+function gateRender() {
+  const op = OPS[curOp];
+  const list = document.getElementById('gateList');
+  list.innerHTML = '';
+  op.gates.forEach(function (g, i) {
+    const isBlocked = i === op.blocked;
+    const item = document.createElement('div');
+    item.className = 'gate-item' + (isBlocked ? ' blocked' : (gateChecks[i] ? ' checked' : ''));
+    const box = document.createElement('div');
+    box.className = 'g-box';
+    box.textContent = isBlocked ? '✕' : (gateChecks[i] ? '✓' : '');
+    const txt = document.createElement('div');
+    txt.innerHTML = '<div class="g-t">' + g.t + '</div><div class="g-d">' + g.d + '</div>';
+    item.appendChild(box);
+    item.appendChild(txt);
+    item.onclick = function () {
+      if (isBlocked) {
+        gateShow('stop', '<b>⛔ 這一項勾不上。</b>' + g.blockedMsg);
+        return;
+      }
+      gateChecks[i] = !gateChecks[i];
+      gateRender();
+    };
+    list.appendChild(item);
+  });
+}
+
+function gateShow(cls, html) {
+  const r = document.getElementById('gateResult');
+  r.className = 'gate-result show ' + cls;
+  r.innerHTML = html;
+}
+
+function gateRun() {
+  const op = OPS[curOp];
+  if (op.blocked >= 0) {
+    gateShow('stop', '<b>⛔ 操作被攔截。</b>' + op.gates[op.blocked].blockedMsg +
+      (gateChecks.some(function (c, i) { return !c && i !== op.blocked; })
+        ? '<br>另外，備份閘和回退閘也還沒全部通過。' : ''));
+    return;
+  }
+  const missing = [];
+  op.gates.forEach(function (g, i) { if (!gateChecks[i]) missing.push(g); });
+  if (missing.length) {
+    gateShow('warn', '<b>⚠️ 還有 ' + missing.length + ' 道閘沒過，操作暫停。</b><br>' +
+      missing.map(function (g) { return '「' + g.t + '」漏了：' + g.miss; }).join('<br>'));
+    return;
+  }
+  gateShow('pass', '<b>✅ 三道閘全部通過，可以執行。</b>執行後記得把備份路徑和回退方案寫進 CHANGELOG，讓這次操作可追溯。');
+}
+
+/* 初始化 */
+dfRender();
+pickOp(0);
+</script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

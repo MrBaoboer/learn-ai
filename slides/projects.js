@@ -8,8 +8,7 @@
 (function () {
   'use strict';
 
-  var LANG = location.pathname.match(/\.en\.html?$/) ? 'en'
-    : location.pathname.match(/\.ko\.html?$/) ? 'ko' : 'zh';
+  var LANG = (location.pathname.match(/\.(en|ko|tw|hk)\.html?$/) || [,'zh'])[1];
 
   var T = {
     zh: {
@@ -25,7 +24,37 @@
       ratings: '条评分', noRating: '暂无评分，来打第一个分',
       anonymous: '米羊用户', likeFail: '操作失败，请重试',
       badgeTip: '项目作者可把评分徽章挂进 README：',
-      langLabel: { zh: '简介', en: 'EN', ko: 'KO' }
+      langLabel: { zh: '简介', hk: '簡介', tw: '簡介', en: 'EN', ko: 'KO' }
+    },
+    hk: {
+      all: '全部', sortFeatured: '綜合推薦', sortStars: 'Star 最多',
+      sortRating: '評分最高', sortNewest: '最新上牆',
+      submit: '登記我的項目', by: '登記：', empty: '這個分類下還沒有項目，來當第一個吧',
+      loadFail: '加載失敗，請刷新重試', back: '← 返回項目牆',
+      viewOnGithub: '去 GitHub 看看', reviews: '用戶評價', noReviews: '還沒有評價，寫下第一條吧',
+      myReviewTitle: '我的評價', reviewPlaceholder: '用起來怎麼樣？説説真實感受（可留空只打分）…',
+      submitReview: '提交評價', updateReview: '更新評價', reviewOk: '評價已提交',
+      reviewPending: '評價已提交，內容將在人工審批通過後公開顯示',
+      loginToReview: '登入後就能打分和評價', loginToLike: '登入後可以讚好',
+      ratings: '條評分', noRating: '暫無評分，來打第一個分',
+      anonymous: '米羊用戶', likeFail: '操作失敗，請重試',
+      badgeTip: '項目作者可把評分徽章掛進 README：',
+      langLabel: { zh: '簡介', hk: '簡介', tw: '簡介', en: 'EN', ko: 'KO' }
+    },
+    tw: {
+      all: '全部', sortFeatured: '綜合推薦', sortStars: 'Star 最多',
+      sortRating: '評分最高', sortNewest: '最新上牆',
+      submit: '登記我的專案', by: '登記：', empty: '這個分類下還沒有專案，來當第一個吧',
+      loadFail: '載入失敗，請重新整理重試', back: '← 返回專案牆',
+      viewOnGithub: '去 GitHub 看看', reviews: '使用者評價', noReviews: '還沒有評價，寫下第一條吧',
+      myReviewTitle: '我的評價', reviewPlaceholder: '用起來怎麼樣？說說真實感受（可留空只打分）…',
+      submitReview: '提交評價', updateReview: '更新評價', reviewOk: '評價已提交',
+      reviewPending: '評價已提交，內容將在人工審核透過後公開顯示',
+      loginToReview: '登入後就能打分和評價', loginToLike: '登入後可以按讚',
+      ratings: '條評分', noRating: '暫無評分，來打第一個分',
+      anonymous: '米羊使用者', likeFail: '操作失敗，請重試',
+      badgeTip: '專案作者可把評分徽章掛進 README：',
+      langLabel: { zh: '簡介', hk: '簡介', tw: '簡介', en: 'EN', ko: 'KO' }
     },
     en: {
       all: 'All', sortFeatured: 'Featured', sortStars: 'Most Stars',
@@ -40,7 +69,7 @@
       ratings: 'ratings', noRating: 'No ratings yet — be the first',
       anonymous: 'Miyang user', likeFail: 'Action failed, please retry',
       badgeTip: 'Project authors can embed the rating badge in README:',
-      langLabel: { zh: 'ZH', en: 'About', ko: 'KO' }
+      langLabel: { zh: 'ZH', hk: 'ZH', tw: 'ZH', en: 'About', ko: 'KO' }
     },
     ko: {
       all: '전체', sortFeatured: '추천', sortStars: 'Star 순',
@@ -55,7 +84,7 @@
       ratings: '개 평점', noRating: '아직 평점이 없습니다 — 첫 평가를 남겨보세요',
       anonymous: '미양 사용자', likeFail: '실패했습니다. 다시 시도해 주세요',
       badgeTip: '프로젝트 작성자는 README에 평점 배지를 넣을 수 있습니다:',
-      langLabel: { zh: 'ZH', en: 'EN', ko: '소개' }
+      langLabel: { zh: 'ZH', hk: 'ZH', tw: 'ZH', en: 'EN', ko: '소개' }
     }
   }[LANG];
 
@@ -317,7 +346,9 @@
     });
 
     document.getElementById('ossReviewSubmit').addEventListener('click', function () {
-      if (!rating) return alert(LANG === 'zh' ? '先点星星打个分' : 'Pick a star rating first');
+      if (!rating) return alert(LANG === 'en' || LANG === 'ko'
+        ? 'Pick a star rating first'
+        : (LANG === 'tw' ? '先點星星打個分' : '先点星星打个分'));
       var content = document.getElementById('ossReviewText').value.trim();
       api('/api/projects/review', {
         method: 'POST',

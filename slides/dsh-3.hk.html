@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>followup / steer / inject：雙隊列 Inbox | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--accent:#4d6bfe;--accent-deep:#3450d4;--accent-soft:rgba(77,107,254,.09)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(77,107,254,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(77,107,254,.04),0 0 0 52px rgba(77,107,254,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:var(--accent-soft);border:1px solid rgba(77,107,254,.28);border-radius:var(--radius);padding:24px;margin:18px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.keypoint{margin:32px 0;padding:22px 24px;border-radius:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);text-align:center;font-size:18px;font-weight:800;color:var(--accent-deep);line-height:1.8}
+.srcnote{font-size:12px;color:var(--sub);line-height:1.8;margin:0 0 20px}
+.visual{background:var(--bg);border:1px solid rgba(77,107,254,.25);border-radius:18px;padding:24px;box-shadow:var(--shadow-card);margin:0 0 20px}
+.visual svg{width:100%;height:auto;display:block}
+.visual-caption{font-size:12px;color:var(--sub);text-align:center;margin-top:12px}
+.sem-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:var(--shadow-card);margin:0 0 20px}
+.sem-card h3{display:flex;align-items:center;gap:10px;margin:0;font-size:16px;color:var(--text)}
+.sem-card h3 code{color:var(--accent);font-weight:800;font-size:15px}
+.sem-card h3 small{font-size:13px;font-weight:600;color:var(--sub)}
+.sem-card h3 svg{color:var(--accent);flex:0 0 auto}
+.sem-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px;margin-top:18px}
+.sem-item b{display:block;font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--accent-deep);margin-bottom:5px}
+.sem-item span{font-size:14px;line-height:1.9;color:var(--sub)}
+.sem-say{grid-column:1/-1;background:var(--accent-soft);border:1px solid rgba(77,107,254,.2);border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.9;color:var(--text)}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.3);border-radius:16px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 8px;color:var(--text);font-size:16px}.exercise p{margin:0;color:var(--sub);font-size:14px;line-height:1.9}
+.takeaway{margin-top:32px;padding:24px;border-radius:16px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.28);color:var(--text);display:flex;gap:14px;line-height:1.9;font-size:14px}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.cmp{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h3{font-size:16px;margin:0 0 12px;color:var(--text)}
+.cmp-card h3 em{font-style:normal;color:var(--accent);font-size:12px;display:block;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:0 0 10px}
+.cmp-card p:last-child{margin-bottom:0}
+
+/* ── 排队模拟器 ── */
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:24px;margin-top:14px}
+.demo-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px}
+.demo-toolbar .gap{flex:1}
+.dbtn{display:inline-flex;align-items:center;gap:10px;min-height:54px;padding:10px 18px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:transform .12s,box-shadow .12s,border-color .12s}
+.dbtn:hover{transform:translateY(-1px);border-color:rgba(77,107,254,.45);box-shadow:0 4px 12px rgba(77,107,254,.12)}
+.dbtn:active{transform:translateY(0)}
+.dbtn svg{flex:0 0 auto}
+.dbtn .bt{display:flex;flex-direction:column;align-items:flex-start;line-height:1.4;text-align:left}
+.dbtn .bt small{font-size:11px;font-weight:600;opacity:.72}
+.dbtn.b-followup{border-color:rgba(77,107,254,.5);color:var(--accent-deep)}
+.dbtn.b-steer{border-color:rgba(217,119,6,.5);color:var(--amber)}
+.dbtn.b-inject{border-color:rgba(8,145,178,.5);color:var(--cyan)}
+.dbtn.b-abort{border-color:rgba(220,38,38,.45);color:var(--danger)}
+.dbtn.b-ctl{color:var(--sub)}
+.d-status{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;padding:8px 14px;border-radius:999px;border:1px solid var(--border);color:var(--sub)}
+.d-status .dot{width:9px;height:9px;border-radius:50%;background:#c4c8cf}
+.d-status.running{color:var(--accent-deep);border-color:rgba(77,107,254,.4)}
+.d-status.running .dot{background:var(--accent);animation:dpulse 1.1s ease infinite}
+@keyframes dpulse{50%{opacity:.35}}
+.lane-wrap{overflow-x:auto;padding:18px 8px;background:var(--bg);border:1px solid var(--border);border-radius:14px}
+.lane{display:flex;align-items:stretch;gap:16px;min-height:158px;padding:8px 12px;width:max-content;min-width:100%}
+.d-turn{border:1.5px solid rgba(77,107,254,.4);border-radius:14px;padding:12px 14px;background:var(--card);display:flex;gap:12px;align-items:stretch;position:relative}
+.d-turn.done{opacity:.55;border-style:dashed}
+.d-turn.aborted{border-color:rgba(220,38,38,.5)}
+.d-turn-tag{position:absolute;top:-10px;left:12px;background:var(--accent);color:#fff;font-size:10px;font-weight:800;letter-spacing:.6px;padding:2px 9px;border-radius:999px}
+.d-turn.aborted .d-turn-tag{background:var(--danger)}
+.d-step{width:126px;border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:10px 11px;display:flex;flex-direction:column;gap:7px}
+.d-step .s-name{font-size:12px;font-weight:800;color:var(--text)}
+.d-step .s-bar{height:5px;border-radius:3px;background:rgba(77,107,254,.15);overflow:hidden}
+.d-step .s-bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px}
+.d-step.running .s-bar i{animation:dfill linear forwards}
+@keyframes dfill{to{width:100%}}
+.d-step.done .s-bar i{width:100%;background:var(--success)}
+.d-step.aborted .s-bar i{width:60%;background:var(--danger)}
+.d-step.aborted .s-name{color:var(--danger)}
+.d-step .s-src{font-size:10.5px;color:var(--sub);line-height:1.6}
+.d-queue{border:1.5px dashed rgba(77,107,254,.45);border-radius:14px;padding:12px 14px;min-width:164px;display:flex;flex-direction:column;gap:8px;background:rgba(77,107,254,.03)}
+.d-queue .q-name{font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--accent-deep);line-height:1.6}
+.d-queue .q-name small{display:block;font-weight:600;color:var(--sub);letter-spacing:0}
+.d-queue.q-step{border-color:rgba(217,119,6,.45)}.d-queue.q-step .q-name{color:var(--amber)}
+.d-queue.flash{animation:qflash .7s ease 2}
+@keyframes qflash{50%{background:rgba(77,107,254,.18);box-shadow:0 0 0 4px rgba(77,107,254,.12)}}
+.msg-card{border-radius:9px;padding:6px 10px;font-size:11.5px;font-weight:700;line-height:1.6;border:1px solid var(--border);background:var(--card);animation:flyin .5s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes flyin{from{opacity:0;transform:translateY(-26px) scale(.6)}to{opacity:1;transform:none}}
+.msg-card.m-followup{border-color:rgba(77,107,254,.55);color:var(--accent-deep)}
+.msg-card.m-steer{border-color:rgba(217,119,6,.55);color:var(--amber)}
+.msg-card.m-inject{border-color:rgba(8,145,178,.55);color:var(--cyan);border-style:dashed}
+.msg-card.m-seed{color:var(--sub)}
+.msg-card .badge{display:inline-block;margin-left:5px;background:var(--danger);color:#fff;border-radius:5px;font-size:9px;padding:0 5px}
+.msg-card.ghost{opacity:.4;text-decoration:line-through}
+.d-caption{display:flex;gap:12px;align-items:flex-start;margin-top:16px;padding:16px 18px;border-radius:12px;background:var(--accent-soft);border:1px solid rgba(77,107,254,.25);min-height:54px}
+.d-caption svg{flex:0 0 auto;color:var(--accent);margin-top:2px}
+.d-caption p{margin:0;font-size:14px;line-height:1.8;color:var(--text);font-weight:600}
+.d-log{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:14px 16px;overflow-y:auto;max-height:168px;margin-top:16px}
+.d-log .t{font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--sub);margin-bottom:8px}
+.d-log .le{font-size:12.5px;line-height:1.7;padding:5px 10px;border-radius:8px;margin-bottom:5px;border:1px solid transparent;animation:flyin .3s ease}
+.d-log .le.sys{color:var(--sub)}
+.d-log .le.turn{color:var(--accent-deep);background:rgba(77,107,254,.07)}
+.d-log .le.step{color:var(--text)}
+.d-log .le.claim{color:var(--amber);background:rgba(217,119,6,.07)}
+.d-log .le.abort{color:var(--danger);background:rgba(220,38,38,.06)}
+.demo-hint{font-size:12px;color:var(--sub);margin-top:14px;line-height:1.8}
+@media(max-width:760px){.sem-grid{grid-template-columns:1fr}.objective{grid-template-columns:1fr}.exercise{grid-template-columns:1fr}.lesson-header:after{display:none}.dbtn{flex:1 1 44%;justify-content:center}.d-log{max-height:140px}.visual{padding:14px}.keypoint{font-size:16px}}
+</style>
+<meta name="description" content="用排隊比喻講清 next-turn 與 next-step 兩條隊列：followup、steer、inject 差在哪，claim 為什麼原子，中斷後為什麼強制降級">
+<meta name="author" content="洛小山">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/dsh-3.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/dsh-3.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/dsh-3.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/dsh-3.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/dsh-3.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/dsh-3.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/dsh-3.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/dsh-3.html">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"followup / steer / inject：雙隊列 Inbox","name":"followup / steer / inject：雙隊列 Inbox","url":"https://xueai.miyang.cn/slides/dsh-3.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 會話與循環","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"用排隊比喻講清 next-turn 與 next-step 兩條隊列：followup、steer、inject 差在哪，claim 為什麼原子，中斷後為什麼強制降級","datePublished":"2026-08-13","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="followup / steer / inject：雙隊列 Inbox"><meta property="og:description" content="用排隊比喻講清 next-turn 與 next-step 兩條隊列：followup、steer、inject 差在哪，claim 為什麼原子，中斷後為什麼強制降級"><meta property="og:url" content="https://xueai.miyang.cn/slides/dsh-3.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness · 會話與循環</div>
+    <h1>followup / steer / inject：雙隊列 Inbox</h1>
+    <p class="subtitle">Agent 正在幹活時你想説句話，消息該排哪條隊、什麼時候被處理。三個 API 共用一個 <code>send()</code>，只差兩個參數。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>拆解 next-turn 與 next-step 兩條隊列的入隊、claim 與喚醒語義，對照 Claude Code 的中斷模型</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
+    <span><b>課程目標</b>讀完本課，你能説清三件事：followup、steer、inject 差在哪兩個參數；消息進了隊列之後，在哪個時刻被取走；中斷之後再説話，為什麼會被強制改排到下一輪。</span>
+  </div>
+
+  <p class="reveal">Agent 跑到一半，用戶突然説話。工程上有三種處理：打斷它重來、排隊等它幹完、悄悄把話塞給它。大多數 harness 只做前兩種。DeepSeek Harness（下稱 DSH）把第三種也做成了正式 API，三種語義共用一個入口 <code>send()</code>，只靠兩個參數區分。</p>
+
+  <div class="sec-label">互動演示 · 排隊模擬器</div>
+  <p class="reveal">先玩再學。把一個 <b>Turn</b>（輪次，一輪完整工作）想成一班車，<b>Step</b>（步驟，一次模型請求）是一站一站地開。next-turn 隊列是等下一班車的人，next-step 隊列是要插進當前這班的人。Agent 運行時隨時點下面三個按鈕，看消息落進哪條隊列、在哪一站被接走。底部字幕會解釋每一步在發生什麼。</p>
+  <div class="demo reveal" id="demo-inbox">
+    <div class="demo-toolbar">
+      <button class="dbtn b-followup" id="btnFollowup" type="button">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v6M9 11h6"/></svg>
+        <span class="bt">followup<small>等下一班車</small></span>
+      </button>
+      <button class="dbtn b-steer" id="btnSteer" type="button">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/></svg>
+        <span class="bt">steer<small>插到當前這班</small></span>
+      </button>
+      <button class="dbtn b-inject" id="btnInject" type="button">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 21h16"/></svg>
+        <span class="bt">inject<small>上車但不催司機</small></span>
+      </button>
+      <button class="dbtn b-abort" id="btnAbort" type="button">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z"/><path d="m9 9 6 6M15 9l-6 6"/></svg>
+        <span class="bt">中斷後再説話<small>看強制降級</small></span>
+      </button>
+      <div class="gap"></div>
+      <span class="d-status" id="dStatus"><span class="dot"></span><span id="dStatusText">空閒</span></span>
+      <button class="dbtn b-ctl" id="btnPlay" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        播放
+      </button>
+      <button class="dbtn b-ctl" id="btnStep" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+        單步
+      </button>
+      <button class="dbtn b-ctl" id="btnReset" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        重置
+      </button>
+    </div>
+    <div class="lane-wrap" id="dLaneWrap">
+      <div class="lane" id="dLane"></div>
+    </div>
+    <div class="d-caption">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <p id="dCaption">Agent 空閒，兩條隊列都是空的。點上面的按鈕，或點播放看完整流程。</p>
+    </div>
+    <div class="d-log">
+      <div class="t">事件記錄（模擬）</div>
+      <div id="dLog"></div>
+    </div>
+    <div class="demo-hint">試一下：Agent 空閒時點 inject，消息會一直留在隊列裏，這就是不喚醒的含義。時間軸為教學化模擬。出處：packages/core/agent-loop/src/agent.ts 第 113 至 132 行。</div>
+  </div>
+
+  <div class="sec-label">思路一 · 插話要分三種，粒度是產品能力</div>
+
+  <p class="reveal"><b>它解決什麼問題。</b>只有一條消息隊列的 harness 裏，用戶説話只有兩種命運：打斷，或者排隊。翻車場景很日常：Agent 正在按計劃改十個文件，改到第三個你發現方向偏了。打斷，前面兩個文件的活白幹；排隊，只能眼睜睜看它把十個文件全改錯。你想做的只是補一句話，這兩個選項都要你拿當前進度去換。</p>
+
+  <p class="reveal"><b>思路是什麼。</b>先把循環拆成兩層。Turn 是一輪完整工作，Step 是一次模型請求外加它觸發的工具執行，一個 Turn 裏通常有好幾個 Step。拆開的原因很實際：消息需要一個比整輪更細的投遞點，模型下一次能看到新消息的機會，就是下一個 Step 的開頭。然後把説話的時機編碼成兩個參數：target 決定排哪條隊（next-turn 等下一班車，next-step 插進當前這班），wakeup 決定要不要叫醒司機（Agent 空閒時是否立刻開工）。三個 API 全是 <code>send()</code> 的參數預設，各自只有三行。</p>
+
+  <div class="keypoint reveal">followup = 排隊 + 叫醒 &nbsp;·&nbsp; steer = 插隊 + 叫醒 &nbsp;·&nbsp; inject = 插隊 + 不吭聲</div>
+
+  <div class="sem-card reveal">
+    <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v6M9 11h6"/></svg><code>followup</code><small>下一件事，等這輪幹完再説</small></h3>
+    <div class="sem-grid">
+      <div class="sem-item"><b>什麼時候用</b><span>這句話和當前任務無關，是下一個任務。不想打擾正在進行的活。</span></div>
+      <div class="sem-item"><b>進哪條隊</b><span>next-turn 隊列。等當前 Turn 完整跑完，下一班車發車時才被接走，一班只接一條。</span></div>
+      <div class="sem-item"><b>喚不喚醒</b><span>喚醒。Agent 睡着也會被叫起來，馬上開一班新車。</span></div>
+      <div class="sem-say">生活化例句：「這個改完之後，幫我再把測試補上。」</div>
+    </div>
+  </div>
+
+  <div class="sem-card reveal">
+    <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/></svg><code>steer</code><small>糾正方向，別推倒重來</small></h3>
+    <div class="sem-grid">
+      <div class="sem-item"><b>什麼時候用</b><span>想糾正正在進行的活，又不想犧牲已有進度。方向偏了、要補個約束，都用它。</span></div>
+      <div class="sem-item"><b>進哪條隊</b><span>next-step 隊列。當前這一步跑完，下一步開頭就被模型看到，全部一次取走。</span></div>
+      <div class="sem-item"><b>喚不喚醒</b><span>喚醒。Agent 空閒時也能直接把它叫起來。</span></div>
+      <div class="sem-say">生活化例句：「等等，配置文件用 YAML 寫，別用 JSON。」</div>
+    </div>
+  </div>
+
+  <div class="sem-card reveal">
+    <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 21h16"/></svg><code>inject</code><small>塞條訊息，別催它幹活</small></h3>
+    <div class="sem-grid">
+      <div class="sem-item"><b>什麼時候用</b><span>插件想給模型塞一條環境提醒，又不想因此觸發一輪空跑。給人的補充是 steer，給環境的旁白是 inject。</span></div>
+      <div class="sem-item"><b>進哪條隊</b><span>next-step 隊列，和 steer 同一條。下一個自然到站時被順路接走。</span></div>
+      <div class="sem-item"><b>喚不喚醒</b><span>不喚醒。Agent 睡着就一直躺在隊列裏，等別的事把它叫醒時一起處理。</span></div>
+      <div class="sem-say">生活化例句：「順便説一句，用戶剛把分支切到 main 了。」</div>
+    </div>
+  </div>
+
+  <p class="reveal"><b>為什麼長期成立。</b>這三種語義是中斷的分類學，和實現語言無關。任何 agent 系統重寫一遍，還是要回答同樣兩個問題：新消息等當前任務結束，還是插進去？插進去時要不要立刻觸發行動？只要模型調用有回合邊界，這套三分法就成立。換 Rust、換 Python 重寫，參數名會變，分類不會。把分類做成 API，用戶補一句話就有了第三種命運，這是把中斷粒度當產品能力來做。</p>
+
+  <p class="srcnote reveal paywall-locked xa-peek">出處：packages/core/agent-loop/src/agent.ts 第 113 至 132 行（send 與三個別名方法）。</p>
+
+  <div class="sec-label paywall-locked">思路二 · 取消息要用領取制</div>
+
+  <p class="reveal paywall-locked"><b>它解決什麼問題。</b>隊列有了，下一個問題是誰來取、怎麼取。如果多處程式碼都能從同一條隊列裏讀消息，兩種事故遲早發生：循環取了一次、某個插件又取一次，同一條消息進兩遍對話歷史；或者讀了還沒處理完進程崩了，重啓後這條消息不知去向。翻車場景：崩潰恢復時重放日誌，一條 steer 被消費兩遍，模型收到兩條一模一樣的指令，然後把同一個改動做了兩次。</p>
+
+  <p class="reveal paywall-locked"><b>思路是什麼。</b>DSH 的答案叫 claim（領取）。每個 Step 開始前，循環調用一次 claim，原子地把 next-step 隊列的全部消息取走；碰上輪次邊界，再多取一條 next-turn 消息。注意是一條：連點三次 followup，會得到三個獨立的 Turn。取走這個動作落盤為一條純刪除事件，所以消息只有兩種狀態：還在隊列裏，或者歸屬某個 Turn，沒有中間態。崩潰後重放日誌，照着刪除事件走，不會重複消費。還有一個容易想錯的點：被 pre-step 插件拒絕的批次不放回隊列，claim 先於裁決發生，拒絕時不開新 Step，輪次直接以 blocked 收場。</p>
+
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 300" role="img" aria-label="claim 領取制：消息從 send 入隊，到 Step 開頭被原子取走">
+      <defs>
+        <linearGradient id="gb" x1="0" x2="1"><stop stop-color="#4d6bfe"/><stop offset="1" stop-color="#3450d4"/></linearGradient>
+        <marker id="ab" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#4d6bfe"/></marker>
+      </defs>
+      <rect x="40" y="106" width="180" height="84" rx="14" fill="url(#gb)"/>
+      <text x="130" y="142" fill="#fff" text-anchor="middle" font-size="15" font-weight="800">send(消息,</text>
+      <text x="130" y="166" fill="#e6ebff" text-anchor="middle" font-size="13">target, wakeup)</text>
+      <path fill="none" d="M220 128 L296 74" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ab)"/>
+      <path fill="none" d="M220 168 L296 222" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ab)"/>
+      <rect x="308" y="36" width="230" height="72" rx="14" fill="#ffffff" stroke="rgba(77,107,254,.35)"/>
+      <text x="423" y="66" fill="var(--accent-deep)" text-anchor="middle" font-size="14" font-weight="700">next-turn 隊列</text>
+      <text x="423" y="90" fill="var(--sub)" text-anchor="middle" font-size="12">每輪只取 1 條</text>
+      <rect x="308" y="190" width="230" height="72" rx="14" fill="#ffffff" stroke="rgba(77,107,254,.35)"/>
+      <text x="423" y="220" fill="var(--accent-deep)" text-anchor="middle" font-size="14" font-weight="700">next-step 隊列</text>
+      <text x="423" y="244" fill="var(--sub)" text-anchor="middle" font-size="12">每步全部取走</text>
+      <path fill="none" d="M538 72 L616 128" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ab)"/>
+      <path fill="none" d="M538 226 L616 170" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ab)"/>
+      <rect x="626" y="110" width="140" height="78" rx="14" fill="rgba(77,107,254,.06)" stroke="rgba(77,107,254,.35)"/>
+      <text x="696" y="143" fill="var(--accent-deep)" text-anchor="middle" font-size="14" font-weight="700">claim()</text>
+      <text x="696" y="167" fill="var(--sub)" text-anchor="middle" font-size="12">原子領取</text>
+      <path fill="none" d="M766 149 H818" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ab)"/>
+      <rect x="826" y="110" width="88" height="78" rx="14" fill="#ffffff" stroke="rgba(77,107,254,.35)"/>
+      <text x="870" y="143" fill="var(--accent-deep)" text-anchor="middle" font-size="14" font-weight="700">Step</text>
+      <text x="870" y="167" fill="var(--sub)" text-anchor="middle" font-size="12">開始</text>
+    </svg>
+    <div class="visual-caption">教學化結構圖。取走落盤為純刪除事件：消息要麼在隊列裏，要麼歸屬某個 Turn，沒有中間態。</div>
+  </div>
+
+  <p class="reveal paywall-locked"><b>為什麼長期成立。</b>領取制是消息隊列幾十年的老共識。數據庫裏叫 SELECT FOR UPDATE，SQS 裏叫可見性超時，本質都是把讀取和佔有合成一個原子動作。只要系統同時滿足兩個條件，多個潛在消費者、崩潰後要能恢復，領取制就是標準答案。DSH 只是把這個共識搬進了 agent 循環，源碼換幾個版本，這個取法不會變。</p>
+
+  <p class="srcnote reveal paywall-locked">出處：packages/core/agent/src/inbox.ts 第 71 至 78 行（claim 本體）；packages/core/agent-loop/src/agent.ts 第 229 行（每步開頭調用）、第 266 至 269 行（reject 分支，被拒批次不回隊）。</p>
+
+  <div class="sec-label paywall-locked">思路三 · 中斷後的喚醒要降級</div>
+
+  <p class="reveal paywall-locked"><b>它解決什麼問題。</b>你按 Esc 中止了當前活動，緊接着又發一條 steer。steer 的語義是插進當前 Turn 的下一個 Step，但這個 Turn 正在死掉，它的下一個 Step 永遠不會到來。如果照原樣入隊，只有兩種壞結局：消息永遠躺在隊列裏沒人接，會話卡死；或者強行插進一個正在收尾的回合，等於插進一個正在死掉的回合，行為沒法預測。</p>
+
+  <p class="reveal paywall-locked"><b>思路是什麼。</b><code>send()</code> 在入隊之前先看一眼現場：這條消息要求喚醒，而當前活動已經被中止？那就把投遞目標改寫成 next-turn，喚醒請求先上閂記着，等被中止的活動善後完畢、狀態收斂到空閒，再重放喚醒，開一班全新的車。判斷發生在入隊之前，所以隊列裏從頭到尾不會出現一條註定沒人接的消息。inject 不要求喚醒，不受這個降級影響，照常排進 next-step，等新一班車的第一站被順路接走。</p>
+
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 280" role="img" aria-label="中斷後的喚醒降級：入隊前判斷活動是否已中止，改投 next-turn">
+      <defs>
+        <marker id="ab2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#4d6bfe"/></marker>
+        <marker id="ar2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#dc2626"/></marker>
+      </defs>
+      <rect x="40" y="100" width="200" height="80" rx="14" fill="rgba(77,107,254,.06)" stroke="rgba(77,107,254,.35)"/>
+      <text x="140" y="134" fill="var(--accent-deep)" text-anchor="middle" font-size="14" font-weight="700">一條要喚醒的消息</text>
+      <text x="140" y="158" fill="var(--sub)" text-anchor="middle" font-size="12">steer 或 followup 到達</text>
+      <path fill="none" d="M240 140 H312" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ab2)"/>
+      <rect x="322" y="100" width="240" height="80" rx="14" fill="#ffffff" stroke="rgba(77,107,254,.35)"/>
+      <text x="442" y="134" fill="var(--accent-deep)" text-anchor="middle" font-size="14" font-weight="700">入隊前檢查</text>
+      <text x="442" y="158" fill="var(--sub)" text-anchor="middle" font-size="12">當前活動被中止了嗎</text>
+      <path fill="none" d="M562 118 L646 76" stroke="#4d6bfe" stroke-width="2" marker-end="url(#ab2)"/>
+      <text x="600" y="82" fill="var(--sub)" font-size="12">沒有</text>
+      <path fill="none" d="M562 162 L646 204" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#ar2)"/>
+      <text x="600" y="204" fill="var(--danger)" font-size="12">中止了</text>
+      <rect x="656" y="36" width="244" height="72" rx="14" fill="#ffffff" stroke="rgba(77,107,254,.35)"/>
+      <text x="778" y="66" fill="var(--accent-deep)" text-anchor="middle" font-size="14" font-weight="700">按原目標入隊</text>
+      <text x="778" y="90" fill="var(--sub)" text-anchor="middle" font-size="12">steer 照常進 next-step</text>
+      <rect x="656" y="172" width="244" height="72" rx="14" fill="rgba(220,38,38,.05)" stroke="rgba(220,38,38,.35)"/>
+      <text x="778" y="202" fill="var(--danger)" text-anchor="middle" font-size="14" font-weight="700">改投 next-turn</text>
+      <text x="778" y="226" fill="var(--sub)" text-anchor="middle" font-size="12">喚醒上閂，收斂後開全新 Turn</text>
+    </svg>
+    <div class="visual-caption">教學化結構圖。降級判斷發生在入隊之前，隊列裏不會出現註定沒人接的消息。</div>
+  </div>
+
+  <p class="reveal paywall-locked"><b>為什麼長期成立。</b>這是併發系統的通用命題：事件到達時，它的目標正在死亡。答案也是通用的：別追一個正在退出的執行體，把事件重新排到下一個穩定邊界。操作系統給正在退出的進程遞信號、Actor 系統給正在停機的 Actor 發消息，處理套路都一樣。DSH 把這個套路放在了 send() 的入口處，位置會隨重構變，判斷本身不會。</p>
+
+  <p class="srcnote reveal paywall-locked">出處：packages/core/agent-loop/src/agent.ts 第 113 至 120 行（wakingAfterAbort 判斷與目標改寫）、第 164 至 193 行（wakeDriver 的上閂與重放）。另外兩處主循環行為：第 299 行（next-step 隊列非空時 Turn 不關閉，繼續開新 Step）、第 324 至 329 行（隊列空了就收工，還有存貨則換一個 AbortController 繼續下一輪）。</p>
+
+  <div class="sec-label paywall-locked">橫向對比 · 三家的運行中插話</div>
+  <p class="reveal paywall-locked">三家都有排隊，差別在插話的粒度。</p>
+  <div class="cmp paywall-locked">
+    <div class="cmp-card reveal">
+      <h3><em><svg fill="currentColor" fill-rule="evenodd" height="13" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="13" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness</em>雙隊列 + 三語義</h3>
+      <p>兩條持久隊列，三個語義共用 <code>send()</code> 一個入口。插話但不打斷的 inject 是獨立的正式 API：投遞、不喚醒、不打斷，等下一個自然的 Step 邊界被領取。</p>
+    </div>
+    <div class="cmp-card reveal">
+      <h3><em><svg fill="currentColor" fill-rule="evenodd" height="13" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="13" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code</em>打斷當前流 + 消息排隊</h3>
+      <p>用戶打斷走生成器終止：Ctrl+C 觸發 <code>.return()</code>，嵌套的生成器一起收尾。運行中的輸入進排隊命令流，等當前流結束後再消費，沒有步級插話。出處：claude-code-sourcemap-main/study/chapters/01-architecture.md。完整調度源碼未公開，結論基於已公開證據的推斷。</p>
+    </div>
+    <div class="cmp-card reveal">
+      <h3><em><svg fill="currentColor" fill-rule="evenodd" height="13" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="13" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build</em>單隊列 + CancellationToken</h3>
+      <p>每個 Session 是獨立綫程上的 Actor（見站內 <a href="12-4.html">Session Actor 課</a>），取消走 <code>CancellationToken</code> 協作式收尾。隊列只有一條：條目按 position 排序等待，running_prompt_id 標記正在執行的那條。沒有對應 inject 的中途插話語義。出處：crates/codegen/xai-prompt-queue/src/types.rs 第 44 至 56 行。</p>
+    </div>
+  </div>
+  <p class="reveal paywall-locked">對比下來，只有 DSH 把插話但不打斷、也不用等整輪結束的 inject 做成了公開 API，消息在當前 Turn 的下一個 Step 就能被模型看到。</p>
+
+  <div class="sec-label paywall-locked">課堂練習</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div><h3>推演一次錯過時機的 inject</h3><p>Agent 正在 Turn 3 的 Step 2 流式輸出，插件調用 <code>inject()</code>。請推演：這條消息最早在哪個時刻被領取？如果 Step 2 本來是本輪最後一步，它會被丟掉，還是把 Turn 續命一步？如果 Agent 已經空閒，它要等到什麼時候才被消費？推完回到上面的演示裏驗證。</p></div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway：</b>DSH 用 next-turn / next-step 兩條持久隊列把説話的時機編碼成數據，三個 API 只是 <code>send()</code> 的參數預設。claim 是原子交接：消息要麼在隊列，要麼歸屬某個 Turn，被拒不回隊。中斷後的喚醒輸入一律改排 next-turn，因為死掉的 Turn 不再有下一個 Step。</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function () {
+  'use strict';
+  var STEP_MS = 2400;
+  var lane = document.getElementById('dLane');
+  var laneWrap = document.getElementById('dLaneWrap');
+  var logEl = document.getElementById('dLog');
+  var capEl = document.getElementById('dCaption');
+  var statusEl = document.getElementById('dStatus');
+  var statusText = document.getElementById('dStatusText');
+  var demoEl = document.getElementById('demo-inbox');
+
+  var st = null;
+  var timers = [];
+  var msgSeq = 0;
+  var qTurnEl = null, qStepEl = null;
+
+  function later(fn, ms) { var t = setTimeout(fn, ms); timers.push(t); return t; }
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+  function cap(text) { capEl.textContent = text; }
+  function log(cls, text) {
+    var d = document.createElement('div');
+    d.className = 'le ' + cls;
+    d.textContent = text;
+    logEl.insertBefore(d, logEl.firstChild);
+    while (logEl.children.length > 40) logEl.removeChild(logEl.lastChild);
+  }
+  function setStatus(running) {
+    statusText.textContent = running ? '運行中' : '空閒';
+    statusEl.classList.toggle('running', running);
+  }
+  function scrollLane() { laneWrap.scrollLeft = laneWrap.scrollWidth; }
+
+  function makeQueue(cls, name, hint) {
+    var q = document.createElement('div');
+    q.className = 'd-queue ' + cls;
+    var t = document.createElement('div');
+    t.className = 'q-name';
+    t.textContent = name;
+    var h = document.createElement('small');
+    h.textContent = hint;
+    t.appendChild(h);
+    q.appendChild(t);
+    return q;
+  }
+  function queueCards(q) { return q.querySelectorAll('.msg-card'); }
+  function makeCard(kind, label) {
+    var c = document.createElement('div');
+    c.className = 'msg-card m-' + kind;
+    c.textContent = label;
+    return c;
+  }
+  function flashQueue(q) {
+    q.classList.remove('flash');
+    void q.offsetWidth;
+    q.classList.add('flash');
+  }
+
+  function reset() {
+    clearTimers();
+    st = { on: false, idle: true, turn: 0, stepNo: 0, naturalLeft: 0, aborted: false, curTurnEl: null, curStepEl: null };
+    msgSeq = 0;
+    lane.innerHTML = '';
+    logEl.innerHTML = '';
+    qStepEl = makeQueue('q-step', 'next-step 隊列', '插到當前這班');
+    qTurnEl = makeQueue('q-turn', 'next-turn 隊列', '等下一班車');
+    lane.appendChild(qStepEl);
+    lane.appendChild(qTurnEl);
+    setStatus(false);
+    cap('Agent 空閒，兩條隊列都是空的。點上面的按鈕，或點播放看完整流程。');
+    log('sys', 'Agent 空閒，兩條隊列都空着');
+  }
+
+  function start() {
+    reset();
+    st.on = true;
+    var seed = makeCard('seed', '用戶的第一條消息');
+    qTurnEl.appendChild(seed);
+    cap('用戶發來第一條消息。followup 把它排進 next-turn 隊列，順手叫醒司機，馬上發車。');
+    log('sys', 'followup：第一條消息排進 next-turn 隊列，叫醒司機');
+    later(beginTurn, 800);
+  }
+
+  function beginTurn() {
+    if (!st.on) return;
+    st.turn += 1;
+    st.stepNo = 0;
+    st.naturalLeft = st.turn === 1 ? 2 : 1;
+    st.aborted = false;
+    st.idle = false;
+    setStatus(true);
+    var tEl = document.createElement('div');
+    tEl.className = 'd-turn';
+    var tag = document.createElement('div');
+    tag.className = 'd-turn-tag';
+    tag.textContent = 'Turn ' + st.turn;
+    tEl.appendChild(tag);
+    lane.insertBefore(tEl, qTurnEl);
+    st.curTurnEl = tEl;
+    cap('發車：Turn ' + st.turn + ' 開始。發車這站會先去 next-turn 隊列接一位乘客。');
+    log('turn', '第 ' + st.turn + ' 班車發車（Turn ' + st.turn + ' 開始）');
+    claimAndStep('next-turn');
+  }
+
+  function claimAndStep(target) {
+    var labels = [];
+    Array.prototype.forEach.call(queueCards(qStepEl), function (c) {
+      labels.push(c.textContent);
+      c.remove();
+    });
+    if (target === 'next-turn') {
+      var first = queueCards(qTurnEl)[0];
+      if (first) { labels.push(first.textContent); first.remove(); }
+    }
+    if (labels.length) {
+      cap('到站開門：claim 一次性把隊列裏的消息接上車（' + labels.join('、') + '），交給下一個 Step。');
+      log('claim', '領取：一次取走 ' + labels.length + ' 條消息（' + labels.join('、') + '）');
+    } else {
+      cap('這一站沒人排隊。模型上一步要用工具，現在帶着工具結果繼續開。');
+      log('claim', '領取：這一站隊列是空的，帶着工具結果繼續開');
+    }
+    runStep(labels);
+  }
+
+  function runStep(labels) {
+    st.stepNo += 1;
+    var s = document.createElement('div');
+    s.className = 'd-step running';
+    var n = document.createElement('div');
+    n.className = 's-name';
+    n.textContent = 'Step ' + st.stepNo;
+    s.appendChild(n);
+    var bar = document.createElement('div');
+    bar.className = 's-bar';
+    var fill = document.createElement('i');
+    fill.style.animationDuration = STEP_MS + 'ms';
+    bar.appendChild(fill);
+    s.appendChild(bar);
+    if (labels && labels.length) {
+      var src = document.createElement('div');
+      src.className = 's-src';
+      src.textContent = '接走：' + labels.join('、');
+      s.appendChild(src);
+    }
+    st.curTurnEl.appendChild(s);
+    st.curTurnEl.appendChild(qStepEl);
+    st.curStepEl = s;
+    log('step', 'Turn ' + st.turn + ' 的第 ' + st.stepNo + ' 步開始');
+    scrollLane();
+    later(stepEnd, STEP_MS);
+  }
+
+  function stepEnd() {
+    if (!st.on || st.aborted) return;
+    st.curStepEl.classList.remove('running');
+    st.curStepEl.classList.add('done');
+    log('step', 'Turn ' + st.turn + ' 的第 ' + st.stepNo + ' 步跑完');
+    if (queueCards(qStepEl).length > 0) {
+      flashQueue(qStepEl);
+      cap('這一步跑完了。next-step 隊列裏還有人等，車不收班，馬上開下一步接他們。');
+      log('claim', 'next-step 隊列裏還有人，這班車不收班，馬上開下一步');
+      later(function () { claimAndStep('next-step'); }, 450);
+      return;
+    }
+    if (st.naturalLeft > 0) {
+      st.naturalLeft -= 1;
+      cap('模型這一步調了工具。工具結果得讓模型再看一眼，所以繼續開下一步。');
+      log('step', '模型要用工具，工具結果還得讓它看一眼，繼續開下一步');
+      later(function () { claimAndStep('next-step'); }, 450);
+      return;
+    }
+    endTurn(false);
+  }
+
+  function endTurn(aborted) {
+    st.curTurnEl.classList.add('done');
+    if (aborted) st.curTurnEl.classList.add('aborted');
+    lane.insertBefore(qStepEl, qTurnEl);
+    log('turn', 'Turn ' + st.turn + ' 收班（' + (aborted ? '被中止' : '順利完成') + '）');
+    if (!aborted && queueCards(qTurnEl).length > 0) {
+      flashQueue(qTurnEl);
+      cap('這班車跑完收班。next-turn 隊列還有人等，司機不下班，馬上發下一班。');
+      log('sys', 'next-turn 隊列還有人等，司機不下班，馬上發下一班');
+      later(beginTurn, 700);
+      return;
+    }
+    if (!aborted) {
+      st.idle = true;
+      setStatus(false);
+      cap('這班車收班，隊列也空了。司機下班，Agent 回到空閒。');
+      log('sys', '隊列全空，司機下班，Agent 回到空閒');
+    }
+  }
+
+  function submit(kind) {
+    if (!st || !st.on) { start(); return; }
+    msgSeq += 1;
+    var label = kind + ' 第' + msgSeq + '條';
+    if (st.aborted) {
+      if (kind === 'inject') {
+        qStepEl.appendChild(makeCard('inject', label));
+        cap('你點了 inject：不喚醒的消息不受降級影響，照常排進 next-step，等新一班車的第一站被接走。');
+        log('sys', 'inject：不帶喚醒，不受降級影響，照常排進 next-step');
+      } else {
+        var down = makeCard(kind, label);
+        var b = document.createElement('span');
+        b.className = 'badge';
+        b.textContent = '降級 next-turn';
+        down.appendChild(b);
+        qTurnEl.appendChild(down);
+        flashQueue(qTurnEl);
+        cap('你點了 ' + kind + '：它想叫醒司機，但這班車剛被中止。DSH 把它改排到 next-turn，等新一班發車再處理。');
+        log('abort', kind + '：想叫醒司機，但這班車剛被中止，改排到 next-turn');
+      }
+      scrollLane();
+      return;
+    }
+    if (st.idle) {
+      if (kind === 'inject') {
+        qStepEl.appendChild(makeCard('inject', label));
+        cap('你點了 inject：Agent 在睡覺，inject 不叫醒它。消息一直留在隊列裏，等下次有別的事叫醒 Agent 時一起處理。');
+        log('sys', 'inject：悄悄排進 next-step，不叫醒，消息先躺着');
+        scrollLane();
+        return;
+      }
+      var q0 = kind === 'followup' ? qTurnEl : qStepEl;
+      q0.appendChild(makeCard(kind, label));
+      cap('你點了 ' + kind + '：Agent 本來空閒，wakeup 為 true 直接叫醒司機，馬上發新一班車。');
+      log('sys', kind + '：入隊並叫醒司機，馬上發新一班車');
+      scrollLane();
+      later(beginTurn, 600);
+      return;
+    }
+    if (kind === 'followup') {
+      qTurnEl.appendChild(makeCard('followup', label));
+      flashQueue(qTurnEl);
+      cap('你點了 followup：消息排進 next-turn 隊列，等這一班跑完、下一班發車時才上車。');
+      log('sys', 'followup：排進 next-turn，等這一班跑完再上車');
+    } else if (kind === 'steer') {
+      qStepEl.appendChild(makeCard('steer', label));
+      flashQueue(qStepEl);
+      cap('你點了 steer：消息插進當前這班的 next-step 隊列，這一步跑完馬上處理，不用等整輪結束。');
+      log('sys', 'steer：插進 next-step，這一步跑完馬上被接走');
+    } else {
+      qStepEl.appendChild(makeCard('inject', label));
+      cap('你點了 inject：消息上了車，但不催司機。等下一個自然到站，它會被順路接走。');
+      log('sys', 'inject：悄悄排進 next-step，不催司機，順路被接走');
+    }
+    scrollLane();
+  }
+
+  function abortScenario() {
+    if (!st || !st.on || st.idle) {
+      cap('中斷情景要在 Agent 運行中觸發：先點播放，再點這個按鈕。');
+      log('abort', '中斷後再説話，要在運行中按下');
+      return;
+    }
+    clearTimers();
+    st.aborted = true;
+    st.curStepEl.classList.remove('running');
+    st.curStepEl.classList.add('aborted');
+    cap('你按了 Esc：當前 Step 被中止，隊列清空，這班車報廢。');
+    log('abort', '你按了 Esc：當前 Step 被掐斷，隊列清空，這班車報廢');
+    Array.prototype.forEach.call(queueCards(qStepEl), function (c) { c.classList.add('ghost'); });
+    Array.prototype.forEach.call(queueCards(qTurnEl), function (c) { c.classList.add('ghost'); });
+    later(function () {
+      Array.prototype.forEach.call(lane.querySelectorAll('.msg-card.ghost'), function (c) { c.remove(); });
+      endTurn(true);
+    }, 500);
+    later(function () {
+      msgSeq += 1;
+      var label = 'steer 第' + msgSeq + '條';
+      var tmp = makeCard('steer', label);
+      tmp.classList.add('ghost');
+      qStepEl.appendChild(tmp);
+      cap('這時又來一條 steer：它想插的那班車已經沒了，下一個 Step 永遠不會到來。');
+      log('abort', '又來一條 steer：它想插的那班車已經沒了');
+      later(function () {
+        tmp.remove();
+        var real = makeCard('steer', label);
+        var badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = '降級 next-turn';
+        real.appendChild(badge);
+        qTurnEl.appendChild(real);
+        flashQueue(qTurnEl);
+        cap('降級：send() 在入隊前把目標改成 next-turn，喚醒請求先記着，等中止的活動收拾乾淨再處理。');
+        log('abort', '降級：入隊前把目標改成 next-turn，喚醒請求先記帳');
+        scrollLane();
+      }, 700);
+    }, 1100);
+    later(function () {
+      cap('中止的活動收拾完畢，重放喚醒：發一班全新的車，降級的消息在第一站上車。');
+      log('sys', '善後完畢，重放喚醒，發一班全新的車');
+      st.aborted = false;
+      beginTurn();
+    }, 3000);
+  }
+
+  document.getElementById('btnFollowup').addEventListener('click', function () { submit('followup'); });
+  document.getElementById('btnSteer').addEventListener('click', function () { submit('steer'); });
+  document.getElementById('btnInject').addEventListener('click', function () { submit('inject'); });
+  document.getElementById('btnAbort').addEventListener('click', abortScenario);
+  document.getElementById('btnPlay').addEventListener('click', start);
+  document.getElementById('btnStep').addEventListener('click', function () {
+    if (!st || !st.on) { start(); return; }
+    if (st.idle || st.aborted) { cap('單步：當前沒有運行中的 Step。'); return; }
+    if (st.curStepEl && st.curStepEl.classList.contains('running')) {
+      clearTimers();
+      cap('單步：快進當前 Step 到邊界，看隊列在這一站怎麼被處理。');
+      stepEnd();
+    } else {
+      cap('單步：正處於步與步之間的邊界，等待下一個 Step 開啓。');
+    }
+  });
+  document.getElementById('btnReset').addEventListener('click', reset);
+
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(demoEl, start);
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

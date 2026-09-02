@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tell the model it can go parallel — a lock keeps the floor | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* 变量挂在 .lesson 上：nav-inject.js 会在页面样式之后再注入一次 :root 主色，
+   靠就近继承才能保住专题色。 */
+:root,.lesson{--accent:#414b5a;--accent-deep:#262d38;--accent-soft:rgba(65,75,90,.085)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(65,75,90,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(65,75,90,.04),0 0 0 52px rgba(65,75,90,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(65,75,90,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.q-tag{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font-size:13px;font-weight:800;margin:28px 0 14px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.visual{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eff1f5,var(--card));border:1px solid rgba(65,75,90,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.9}.exercise p:last-child{margin:0}
+.ex-q{margin:0 0 10px;padding:12px 14px;border-radius:9px;background:var(--card);border:1px solid var(--border);font-size:14px;line-height:1.9;color:var(--text)}
+.ex-q:last-child{margin:0}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);color:var(--text);display:flex;gap:14px;font-size:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.compare{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h4{margin:0;font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}.cmp-card h4 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:12px 0 0}
+.cmp-card .cmp-tag{display:inline-block;margin-top:14px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent-deep);border:1px solid rgba(65,75,90,.25)}
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card)}
+.demo-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo-ctrl button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;min-height:44px;min-width:44px;border:1px solid rgba(65,75,90,.35);border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font:600 14px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:filter .15s}
+.demo-ctrl button:active{filter:brightness(.92)}
+.dm-budget{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-budget .dm-b-label{font-size:13px;font-weight:700;color:var(--text)}
+.dm-budget .dm-b-hint{font-size:12px;color:var(--sub);line-height:1.7}
+.dm-seg{display:flex;gap:8px;flex-wrap:wrap}
+.dm-seg button{min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--sub);font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all .15s cubic-bezier(.4,0,.2,1)}
+.dm-seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dm-tools{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.dm-tool{min-height:72px;padding:12px 10px;border-radius:10px;border:1px solid var(--border);background:var(--card);text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-tools.is-live .dm-tool{opacity:.4;transform:scale(.98)}
+.dm-tools.is-live .dm-tool.run,.dm-tools.is-live .dm-tool.wait{opacity:1;transform:scale(1)}
+.dm-tool .nm{font:700 12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);overflow-wrap:anywhere}
+.dm-tool .bd{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--sub)}
+.dm-tool.read .bd{background:var(--accent-soft);border-color:rgba(65,75,90,.35);color:var(--accent-deep)}
+.dm-tool.write .bd{background:rgba(65,75,90,.16);border-color:rgba(65,75,90,.45);color:var(--accent-deep)}
+.dm-tool.late{border-style:dashed}
+.dm-tool.run{background:var(--accent-soft);border-color:rgba(65,75,90,.45)}
+.dm-tool.wait{background:var(--bg)}
+.dm-tool.done{opacity:.55}
+.dm-tools.is-live .dm-tool.done{opacity:.4;transform:scale(.98)}
+.dm-tool .st{font-size:11px;color:var(--sub);line-height:1.4}
+.dm-tool.is-enter{opacity:0;transform:translateY(8px) scale(.98)}
+.dm-tool.is-enter.in{opacity:1;transform:scale(1)}
+.dm-tool.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-tool.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-gate{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.dm-zone{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:14px 14px 12px;min-height:96px;transition:border-color .35s cubic-bezier(.4,0,.2,1),background .35s cubic-bezier(.4,0,.2,1)}
+.dm-zone.hot,.dm-queue.hot{border-color:rgba(65,75,90,.45);background:var(--accent-soft)}
+.dm-zone.firing,.dm-queue.firing,.dm-status.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-zone b{display:block;font-size:12px;color:var(--accent-deep);margin-bottom:8px}
+.dm-zone .hint{font-size:11px;color:var(--faint);margin:-4px 0 8px;line-height:1.5}
+.dm-slots{display:flex;flex-wrap:wrap;gap:8px;min-height:28px}
+.dm-fill{display:block;height:4px;margin-top:10px;width:100%;border-radius:99px;background:var(--accent);transform:scaleX(0);transform-origin:left center;transition:transform .5s cubic-bezier(.25,1,.5,1)}
+.dm-chip{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);font:600 12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub);opacity:1;transform:none;transition:opacity .35s cubic-bezier(.4,0,.2,1),transform .35s cubic-bezier(.25,1,.5,1),background .3s cubic-bezier(.4,0,.2,1)}
+.dm-chip.on{background:var(--accent-soft);border-color:rgba(65,75,90,.45);color:var(--accent-deep)}
+.dm-chip.done{opacity:.5}
+.dm-chip.is-enter{opacity:0;transform:translateY(8px)}
+.dm-chip.is-enter.in{opacity:1;transform:none}
+.dm-chip.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-queue{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:14px;margin-bottom:16px;transition:border-color .35s cubic-bezier(.4,0,.2,1),background .35s cubic-bezier(.4,0,.2,1)}
+.dm-queue b{display:block;font-size:12px;color:var(--accent-deep);margin-bottom:8px}
+.dm-belts{display:flex;flex-direction:column;gap:10px;margin-bottom:4px}
+.dm-belt{border:1px solid var(--border);border-radius:10px;background:var(--bg);padding:12px 14px}
+.dm-belt .lb{font-size:12px;font-weight:800;color:var(--text);margin-bottom:8px}
+.dm-belt .row{display:flex;flex-wrap:wrap;gap:8px;min-height:28px}
+.dm-status{padding:12px 14px;border-radius:9px;font-size:12.5px;line-height:1.75;background:var(--bg);border:1px dashed var(--border);color:var(--sub);min-height:48px;margin-top:16px;transition:background .35s cubic-bezier(.4,0,.2,1),border-color .35s cubic-bezier(.4,0,.2,1),color .3s cubic-bezier(.4,0,.2,1)}
+.dm-status.hold{border-style:solid;border-color:rgba(65,75,90,.4);background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-status.ok{border-style:solid;border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.07);color:var(--success);font-weight:600}
+.dm-trace{margin-top:24px;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.dm-trace-tag{padding:12px 18px;background:var(--card);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--sub)}
+.dm-trace ol{margin:0;padding:10px 0;list-style:none}
+.dm-trace li{display:flex;justify-content:space-between;gap:16px;padding:9px 18px;font-size:12.5px;line-height:1.7;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-trace.is-live li{opacity:.4;transform:scale(.98)}
+.dm-trace li.on{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-trace.is-live li.on{opacity:1;transform:scale(1)}
+.dm-trace li span.ln{flex:0 0 auto;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)}
+.dm-trace li.on span.ln{color:var(--accent-deep)}
+.dm-caption{margin-top:20px;min-height:56px;display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.dm-caption svg{flex:0 0 auto;color:var(--accent)}
+#dm-caption-text{transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-summary{display:flex;flex-direction:column;gap:14px;max-height:0;overflow:hidden;opacity:0;margin-top:0;padding:0 22px;border:1px solid transparent;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),var(--card));transition:max-height .5s cubic-bezier(.25,1,.5,1),opacity .4s cubic-bezier(.4,0,.2,1)}
+.dm-summary.on{max-height:420px;opacity:1;margin-top:20px;padding:20px 22px;border-color:rgba(65,75,90,.3)}
+.dm-summary .dm-s{font-size:13px;line-height:1.8;color:var(--sub)}.dm-summary .dm-s b{display:block;font-size:13.5px;color:var(--accent-deep);margin-bottom:2px}
+.demo-caption{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.7}
+@keyframes flashPop{0%{transform:scale(.8)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(65,75,90,.3)}50%{box-shadow:0 0 20px 6px rgba(65,75,90,.2)}100%{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.demo,.demo *{transition-duration:0s!important;animation-duration:0s!important}}
+@media(max-width:760px){.lesson{overflow-x:hidden}.compare{grid-template-columns:1fr}.dm-tools{grid-template-columns:1fr 1fr}.dm-gate{grid-template-columns:1fr}.objective{grid-template-columns:1fr}.lesson-header:after{display:none}.demo{padding:18px}.demo-ctrl{width:100%}.demo-ctrl button{flex:1}.visual{padding:14px}.demo,.visual,.cmp-card{max-width:100%;min-width:0}.dm-trace li{flex-direction:column;gap:4px}}
+</style>
+<meta name="description" content="The model is allowed to emit several tool calls at once. A request flag, a per-tool boolean, and one read-write lock work separately; history still books in emit order">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Tell the model it can go parallel — a lock keeps the floor","name":"Tell the model it can go parallel — a lock keeps the floor","url":"https://xueai.miyang.cn/slides/codex-11.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Tools","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"The model is allowed to emit several tool calls at once. A request flag, a per-tool boolean, and one read-write lock work separately; history still books in emit order","datePublished":"2026-08-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Tell the model it can go parallel — a lock keeps the floor"><meta property="og:description" content="The model is allowed to emit several tool calls at once. A request flag, a per-tool boolean, and one read-write lock work separately; history still books in emit order"><meta property="og:url" content="https://xueai.miyang.cn/slides/codex-11.en.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.miyang.cn/slides/codex-11.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/codex-11.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/codex-11.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/codex-11.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/codex-11.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/codex-11.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/codex-11.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/codex-11.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI Product Manager Training">
+<meta property="og:locale" content="en_US">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>OpenAI Codex · Tool dispatch</div>
+    <h1>Tell the model it can go parallel — a lock keeps the floor</h1>
+    <p class="subtitle">What the model sees, what actually runs, and what history records are three different orders. One flag lets a response emit many calls. One read-write lock decides who can stack in.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>What the model sees, what actually runs, and what history records are three different orders. One flag lets a response emit many calls. One read-write lock decides who can stack in.</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5" fill="none"/></svg>
+    <span><b>Course goal</b>After this lesson you can explain three things. The parallel flag sent to the model only means one response may contain several tool calls. Each tool defaults to the write lock; parallel takes an override. When results land in the session, they still line up in the order the model originally emitted the calls.</span>
+  </div>
+
+  <div class="sec-label">Try it first · Several tools leave the blocks together</div>
+  <div class="demo reveal" id="demo-gate">
+    <div class="demo-top">
+      <div class="demo-title">One read-write lock: who gets the menu, who waits outside the kitchen</div>
+      <div class="demo-ctrl">
+        <button id="dm-play" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="none"/></svg>Play</button>
+        <button id="dm-step" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z" fill="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Step</button>
+        <button id="dm-reset" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" fill="none"/><path d="M3 3v5h5" fill="none"/></svg>Reset</button>
+      </div>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">Scene</span>
+      <div class="dm-seg" id="dm-seg">
+        <button type="button" data-scene="four" class="on">Default four</button>
+        <button type="button" data-scene="late">Late reader</button>
+        <button type="button" data-scene="writes">Two exclusives</button>
+      </div>
+      <span class="dm-b-hint">Click a tile to flip read or write. Late reader shows a fair lock: once a writer is queued, later readers cannot cut in.</span>
+    </div>
+    <div class="dm-tools" id="dm-tools"></div>
+    <div class="dm-gate">
+      <div class="dm-zone">
+        <b>Menu · read lock</b>
+        <div class="hint">Parallel tools can stand here together</div>
+        <div class="dm-slots" id="dm-read"></div>
+      </div>
+      <div class="dm-zone">
+        <b>Kitchen · write lock</b>
+        <div class="hint">Exclusive — one at a time</div>
+        <div class="dm-slots" id="dm-write"></div>
+      </div>
+    </div>
+    <div class="dm-queue">
+      <b>Queued outside</b>
+      <div class="dm-slots" id="dm-queue"></div>
+    </div>
+    <div class="dm-belts">
+      <div class="dm-belt">
+        <div class="lb">Order the model emitted</div>
+        <div class="row" id="dm-belt-model"></div>
+      </div>
+      <div class="dm-belt">
+        <div class="lb">Order that actually ran</div>
+        <div class="row" id="dm-belt-exec"></div>
+      </div>
+      <div class="dm-belt">
+        <div class="lb">Order booked into history</div>
+        <div class="row" id="dm-belt-hist"></div>
+      </div>
+    </div>
+    <div class="dm-status" id="dm-status">Waiting to start. Hit Play and watch the lock split traffic.</div>
+    <div class="dm-trace">
+      <div class="dm-trace-tag">Logic trail · each animation step maps to a stretch of source</div>
+      <ol id="dm-trace">
+        <li><span>build_prompt writes the parallel flag as true</span><span class="ln">turn.rs L1321</span></li>
+        <li><span>AND it with the Lite flag when building the request</span><span class="ln">client.rs L952</span></li>
+        <li><span>The router looks up the registry; missing means false</span><span class="ln">router.rs L137</span></li>
+        <li><span>Hidden is serial even if it claims parallel</span><span class="ln">registry.rs L472</span></li>
+        <li><span>Spawn first, wait ready, then take the lock</span><span class="ln">parallel.rs L144</span></li>
+        <li><span>Read if parallel, otherwise write</span><span class="ln">parallel.rs L152</span></li>
+        <li><span>Results book in FuturesOrdered insert order</span><span class="ln">turn.rs L2135</span></li>
+      </ol>
+    </div>
+    <div class="dm-caption" id="dm-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none"/></svg><span id="dm-caption-text">Hit Play. After several tools leave together, see who can stack in and who must wait.</span></div>
+    <div class="dm-summary" id="dm-summary">
+      <div class="dm-s"><b>Who can run in parallel</b>Read-badge tools enter the menu and can overlap. Write-badge tools take the kitchen alone. Once a writer is outside, later readers line up behind it.</div>
+      <div class="dm-s"><b>Three orders</b>The model emits 1, 2, 3, 4. Execution can overlap. History still books in emit order — first emitted, first booked, even if it finished later.</div>
+      <div class="dm-s"><b>The boundary you can change</b>Flip the patch to a read badge and all four walk in together. Flip a reader to write and they block each other. Late reader is there to show a fair lock will not let you cut in.</div>
+    </div>
+    <div class="demo-caption">Teaching demo: Tiles and timings are teaching fixtures, to show the lock split and that the three orders can disagree. Line numbers on the logic trail match openai/codex commit 4f39251a01.</div>
+  </div>
+
+  <div class="sec-label">Idea 1 · Tell the model it can go parallel, then split traffic yourself</div>
+
+  <div class="q-tag reveal">What problem it solves</div>
+  <p class="reveal">You ask the model to read <code>src/main.rs</code> and <code>src/lib.rs</code> at once, then apply a patch. On screen the two reads almost progress together. The patch beat pauses.</p>
+  <p class="reveal">If the runtime treats “can go parallel” as these calls overlapping, two <code>apply_patch</code> hits would edit the shared diff ledger together and scramble it. If the calls go head-to-tail, even two file reads queue and you burn another wall-clock round. The request-side flag only answers whether the model is willing to emit several boxes at once. It cannot say who may overlap when those boxes land.</p>
+
+  <div class="q-tag reveal">What the idea is</div>
+  <p class="reveal">The flag sent to the model lives on <code>Prompt</code>. The field defaults to <code>false</code>. The main sample path walks <code>build_prompt</code> and writes it <code>true</code>. When the Responses body is built, it is ANDed with whether the model is Responses Lite. On Lite the flag turns off. The two compact pack paths also hard-code <code>true</code>, so they match the main sample request’s shape. Websocket reuse compares field by field, and this flag is one of them.</p>
+  <p class="src-note reveal">Source:<code>codex-rs/core/src/session/turn.rs</code> lines 1312–1328 · <code>codex-rs/core/src/client.rs</code> lines 946–953</p>
+  <p class="reveal">The exec side has another table. <code>ToolExecutor</code>’s <code>supports_parallel_tool_calls</code> defaults to <code>false</code>. Miss the override and you take the write lock. <code>exec_command</code>, <code>view_image</code>, and <code>tool_search</code> override to <code>true</code>. <code>apply_patch</code> does not. The router looks up the registry first; missing means <code>false</code>. Hidden stays serial even if the handler itself returns <code>true</code>. MCP still needs a server switch or a read-only hint; the default is serial.</p>
+  <p class="src-note reveal">Source:<code>codex-rs/tools/src/tool_executor.rs</code> lines 122–124 · <code>codex-rs/core/src/tools/registry.rs</code> lines 470–473</p>
+  <p class="reveal">The model only sees <code>parallel_tool_calls</code> as <code>true</code>, or <code>false</code> on Lite. It cannot see who can actually overlap. The tool list does not drop an item just because that tool will take the write lock.</p>
+  <div class="visual reveal paywall-locked xa-peek">
+    <svg viewBox="0 0 940 280" role="img" aria-label="Request flag, classify table, and gate in three layers">
+      <defs><marker id="arrA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="24" y="36" width="260" height="200" rx="14" fill="#ffffff" stroke="rgba(65,75,90,.35)"/>
+      <text x="154" y="68" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Request side</text>
+      <text x="154" y="104" text-anchor="middle" fill="#262d38" font-size="13">build_prompt writes true</text>
+      <text x="154" y="132" text-anchor="middle" fill="#6b7280" font-size="13">Lite ANDs it to false</text>
+      <text x="154" y="168" text-anchor="middle" fill="#6b7280" font-size="13">The model may emit several at once</text>
+      <text x="154" y="196" text-anchor="middle" fill="#9aa19d" font-size="13">No promise they overlap on the floor</text>
+      <rect x="340" y="36" width="260" height="200" rx="14" fill="#eef0f4" stroke="rgba(65,75,90,.35)"/>
+      <text x="470" y="68" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Classify table</text>
+      <text x="470" y="104" text-anchor="middle" fill="#262d38" font-size="13">Default false; override if you want parallel</text>
+      <text x="470" y="132" text-anchor="middle" fill="#6b7280" font-size="13">Hidden and unknown names are serial</text>
+      <text x="470" y="168" text-anchor="middle" fill="#6b7280" font-size="13">MCP needs opt-in or a read-only hint</text>
+      <text x="470" y="196" text-anchor="middle" fill="#9aa19d" font-size="13">The model cannot see this table</text>
+      <rect x="656" y="36" width="260" height="200" rx="14" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="786" y="68" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Gate</text>
+      <text x="786" y="104" text-anchor="middle" fill="#262d38" font-size="13">Parallel takes the read lock</text>
+      <text x="786" y="132" text-anchor="middle" fill="#6b7280" font-size="13">Serial takes the write lock</text>
+      <text x="786" y="168" text-anchor="middle" fill="#6b7280" font-size="13">One RwLock for the whole floor</text>
+      <text x="786" y="196" text-anchor="middle" fill="#9aa19d" font-size="13">Spawn first, then take the lock</text>
+      <path fill="none" d="M284 136H332" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <path fill="none" d="M600 136H648" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+    </svg>
+    <div class="visual-caption">Teaching diagram: One flag, one table, one lock — each owns a stretch.</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">The promise to the model can split from host scheduling. That travels across languages. The request side only answers whether it is willing to emit several calls at once. The exec side only answers whether this one may overlap. Lite tests turn the flag off, so the authors accept losing that hint on some model paths. The gate stays. If the model still emits two calls in one response, both tasks still spawn and still take the lock from the local table.</p>
+
+  <div class="sec-label paywall-locked">Idea 2 · One floor-wide read-write lock as the gate</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">Classify right and someone still has to watch the door. Two readers can coexist; one writer must be exclusive. Grab the lock first and then wait for an MCP server to connect, and one cold start will stall a neighboring <code>exec_command</code> that is already ready.</p>
+  <p class="reveal paywall-locked">Then fairness. If a later reader can climb over a waiting writer, a patch may never get the lock. Swap in the stdlib <code>RwLock</code> and priority depends on the OS — writers can starve.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">One sample shares a single <code>tokio::sync::RwLock&lt;()&gt;</code>. The guarded value is the unit type — no business data, just a gate. Tasks <code>spawn</code> first, optionally wait ready, then take the lock. Parallel takes <code>read</code>; otherwise <code>write</code>. Readiness waits outside the lock. An MCP server that has not connected yet will not sit on the write lock and stall a neighboring shell.</p>
+  <p class="src-note reveal paywall-locked">Source:<code>codex-rs/core/src/tools/parallel.rs</code> lines 144–156</p>
+  <p class="reveal paywall-locked">This lock’s priority is fair, also called write-preferring. Until a queued write is acquired and released, later read locks are not issued. A <code>view_image</code> is still running, <code>apply_patch</code> is already outside, and a new <code>exec_command</code> could overlap with <code>view_image</code> — yet it must line up behind the patch. Fairness buys “writers do not starve.” The cost is later readers being separated by the writer.</p>
+  <p class="reveal paywall-locked">Classify grain is the tool instance; it cannot see this call’s arguments. <code>exec_command</code> takes the read lock whether it runs <code>ls</code> or <code>rm</code>. <code>apply_patch</code> takes the write lock no matter how large the patch is. Two unrelated serial tools also block each other. Search the business code: there is no capacity cap. Ten shells can walk in together. Capacity is left to the process, the sandbox, and the OS.</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 300" role="img" aria-label="While readers hold, a writer queues; later readers cannot cut in">
+      <defs><marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="24" y="40" width="360" height="220" rx="14" fill="#eef0f4" stroke="rgba(65,75,90,.35)"/>
+      <text x="204" y="72" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Menu · already holding the read lock</text>
+      <rect x="48" y="96" width="150" height="56" rx="10" fill="#ffffff" stroke="rgba(65,75,90,.4)"/>
+      <text x="123" y="130" text-anchor="middle" fill="#262d38" font-size="13" font-weight="700">view_image</text>
+      <rect x="210" y="96" width="150" height="56" rx="10" fill="#ffffff" stroke="rgba(65,75,90,.4)"/>
+      <text x="285" y="130" text-anchor="middle" fill="#262d38" font-size="13" font-weight="700">exec_command</text>
+      <text x="204" y="186" text-anchor="middle" fill="#6b7280" font-size="13">Whoever already entered keeps running</text>
+      <text x="204" y="214" text-anchor="middle" fill="#9aa19d" font-size="13">Two people can read the menu together</text>
+      <rect x="430" y="40" width="230" height="220" rx="14" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="545" y="72" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Outside · write lock queued</text>
+      <rect x="454" y="108" width="182" height="64" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.45)"/>
+      <text x="545" y="136" text-anchor="middle" fill="#262d38" font-size="13" font-weight="700">apply_patch</text>
+      <text x="545" y="158" text-anchor="middle" fill="#6b7280" font-size="13">Waiting for readers to drop the lock</text>
+      <text x="545" y="214" text-anchor="middle" fill="#6b7280" font-size="13">Writers enter a FIFO</text>
+      <rect x="700" y="40" width="216" height="220" rx="14" fill="#ffffff" stroke="rgba(65,75,90,.35)" stroke-dasharray="7 5"/>
+      <text x="808" y="72" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">Late reader</text>
+      <rect x="722" y="108" width="172" height="64" rx="10" fill="#ffffff" stroke="rgba(65,75,90,.4)"/>
+      <text x="808" y="136" text-anchor="middle" fill="#262d38" font-size="13" font-weight="700">exec_command</text>
+      <text x="808" y="158" text-anchor="middle" fill="#6b7280" font-size="13">Cannot cut in</text>
+      <text x="808" y="214" text-anchor="middle" fill="#6b7280" font-size="13">Line up behind the writer</text>
+      <path fill="none" d="M384 150H422" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <path fill="none" d="M660 150H692" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+    </svg>
+    <div class="visual-caption">Teaching sketch: Readers already inside keep running. A later reader sees a writer queued and lines up behind.</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">The question is whether anyone is exclusive right now. A restaurant can have many people at the menu; only one enters the kitchen. Fairness lives in the lock implementation. Business code only asks parallel or exclusive. Swap in a lock that lets new readers cut in, and writers can starve. Waiting for ready outside the lock is the same judgment: if you are not ready, do not occupy the door.</p>
+
+  <div class="sec-label paywall-locked">Idea 3 · Finish order does not decide bookkeeping order</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">Two <code>exec_command</code>s overlap and the later emit may finish first. Book history by finish order and the next round’s results will not match the calls the model emitted. Building a future on each <code>OutputItemDone</code> in the stream governs when work starts. This layer governs who may overlap after start, and in what order results book.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">The sample loop pushes <code>tool_future</code> into <code>FuturesOrdered</code> in arrival order. <code>drain</code> pops in insert order, then writes the session. The read lock lets two shells overlap; booking still follows emit order. First emitted, first booked — even if it actually finished later.</p>
+  <p class="src-note reveal paywall-locked">Source:<code>codex-rs/core/src/session/turn.rs</code> lines 2130–2140</p>
+  <div class="key-line reveal paywall-locked">The order the model thinks, the order that happens on the lock, and the order written into history can disagree.</div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">Observation order and execution overlap are split in the structure. Parallel only changes wall-clock, not the ledger. When you build an Agent, write those two queues separately. Tell the model it can go parallel, consult the local table when tools run, and still accept results in the original call-list order.</p>
+
+  <div class="sec-label paywall-locked">Side-by-side · Another answer to the same question</div>
+  <div class="compare paywall-locked">
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DeepSeek Harness: classify by args, exclusive as a barrier</h4>
+      <p>DSH lets each tool provide <code>isConcurrencySafe(args)</code>. Only a literal <code>true</code> joins the parallel set. Missing declaration, bad args, or a throwing classifier: exclusive. bash has no classifier, so the whole tool is exclusive. The scheduler waits for the full message, packs consecutive parallel calls into a group, and treats each exclusive call as its own barrier group. Inside a group it rolls a pool, default cap 10.</p>
+      <p>Codex can skip that grouping because it compresses the decision into a per-tool boolean, then simulates a barrier with one lock. DSH can keep even read-only bash serial and give up some concurrency. Codex can overlap two <code>ls</code> — and two <code>rm</code> as well.</p>
+      <span class="cmp-tag">Source checked on both sides · 2026-08-22</span>
+    </div>
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code: batch by args; only read-only bash goes parallel</h4>
+      <p>Claude’s <code>isConcurrencySafe</code> defaults to <code>false</code>. <code>BashTool</code> hands parallel to <code>isReadOnly</code>: the command returns <code>true</code> only if it passes a read-only constraint. <code>ls</code> can join a parallel batch; commands with write side effects join a serial batch. Consecutive safe calls pack into one concurrent batch; each unsafe call is its own batch, and even inside a batch they go one after another. The cap comes from an env var; parse failure yields 10.</p>
+      <p>Codex’s <code>exec_command</code> skips command parsing; even write commands take the read lock. All three hide scheduling metadata in the host; they close the door in different places. Codex closes on the default and Hidden, and is loosest on shell. DSH closes on the classifier, so bash is fully serial. Claude sits in the middle.</p>
+      <span class="cmp-tag">Source checked on both sides · 2026-08-22</span>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div>
+      <h3>Can a late reader cut in?</h3>
+      <p><code>view_image</code> is still running; <code>apply_patch</code> is already queued outside. The model emits another <code>exec_command</code>. In the demo switch to Late reader, step through, and match the three questions below.</p>
+      <div class="ex-q">Can this <code>exec_command</code> overlap with the still-running <code>view_image</code>?</div>
+      <div class="ex-q">In what order do the three results book into history?</div>
+      <div class="ex-q">If you flip the <code>apply_patch</code> tile to a read badge, will the gate still hold it alone?</div>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/></svg>
+    <span><b>Takeaway:</b>Telling the model it can go parallel is the request-side flag. Who may overlap depends on whether the tool overrode the default; Hidden and unknown names stay exclusive. After they finish, history books in emit order. The three orders can disagree.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function(){
+  var BASE = {
+    four: [
+      {id:'1', name:'exec_command', parallel:true},
+      {id:'2', name:'view_image', parallel:true},
+      {id:'3', name:'apply_patch', parallel:false},
+      {id:'4', name:'tool_search', parallel:true}
+    ],
+    writes: [
+      {id:'1', name:'exec_command', parallel:true},
+      {id:'2', name:'apply_patch', parallel:false},
+      {id:'3', name:'request_user_input', parallel:false},
+      {id:'4', name:'view_image', parallel:true}
+    ]
+  };
+  var scene = 'four';
+  var tools = cloneTools(BASE.four);
+  var hasLate = false;
+  var steps = [], idx = 0, autoId = null, pauseUntil = 0, played = false;
+  var prevOcc = {read:0, write:0, queue:0};
+  var toolBox = document.getElementById('dm-tools');
+  var readBox = document.getElementById('dm-read');
+  var writeBox = document.getElementById('dm-write');
+  var queueBox = document.getElementById('dm-queue');
+  var beltModel = document.getElementById('dm-belt-model');
+  var beltExec = document.getElementById('dm-belt-exec');
+  var beltHist = document.getElementById('dm-belt-hist');
+  var statusEl = document.getElementById('dm-status');
+  var traceRows = Array.prototype.slice.call(document.querySelectorAll('#dm-trace li'));
+  var captionText = document.getElementById('dm-caption-text');
+  var summary = document.getElementById('dm-summary');
+  var IDLE = 'Hit Play. After several tools leave together, see who can stack in and who must wait.';
+
+  function cloneTools(list){
+    return list.map(function(t){ return {id:t.id, name:t.name, parallel:t.parallel, late:!!t.late}; });
+  }
+  function chip(label, cls){
+    return '<span class="dm-chip' + (cls ? ' ' + cls : '') + '">' + label + '</span>';
+  }
+  function shortName(t){ return t.id + ' ' + t.name; }
+
+  function drainHist(doneSet, emitIds){
+    var out = [];
+    for (var i = 0; i < emitIds.length; i++) {
+      if (doneSet[emitIds[i]]) out.push(emitIds[i]);
+      else break;
+    }
+    return out;
+  }
+
+  function buildSteps(){
+    var batch = cloneTools(tools);
+    var late = hasLate ? {id:String(batch.length + 1), name:'exec_command', parallel:true, late:true} : null;
+    var emit = batch.concat(late ? [late] : []);
+    var emitIds = emit.map(function(t){ return t.id; });
+    var frames = [];
+
+    function snap(opts){
+      var zone = opts.zone || {};
+      var done = opts.done || {};
+      var started = opts.started || {};
+      var arrived = opts.arrived || {};
+      var status = {};
+      emit.forEach(function(t){
+        if (!arrived[t.id] && t.late) status[t.id] = 'Not here';
+        else if (done[t.id]) status[t.id] = 'Done';
+        else if (zone[t.id] === 'read' || zone[t.id] === 'write') status[t.id] = 'Running';
+        else if (zone[t.id] === 'queue') status[t.id] = 'Queued';
+        else if (zone[t.id] === 'spawn') status[t.id] = 'Spawned';
+        else status[t.id] = arrived[t.id] ? 'Arrived' : 'Not here';
+      });
+      var execOrder = [];
+      emit.forEach(function(t){
+        if (started[t.id]) execOrder.push(t.id);
+      });
+      frames.push({
+        cap: opts.cap,
+        trace: opts.trace,
+        zone: zone,
+        done: done,
+        started: started,
+        arrived: arrived,
+        status: status,
+        emit: emit,
+        hist: drainHist(done, emitIds),
+        execOrder: execOrder,
+        gate: opts.gate || '',
+        kind: opts.kind || '',
+        fin: !!opts.fin
+      });
+    }
+
+    var arrived0 = {};
+    batch.forEach(function(t){ arrived0[t.id] = true; });
+    var nRead = batch.filter(function(t){ return t.parallel; }).length;
+    var nWrite = batch.length - nRead;
+    snap({
+      cap: 'The model emitted ' + batch.length + ' calls. ' + nRead + ' show a read badge, ' + nWrite + ' a write badge. Click a tile to flip.',
+      trace: 0,
+      arrived: arrived0,
+      zone: {},
+      gate: 'The counter took the calls. Work has not started.',
+      kind: ''
+    });
+
+    var spawnZ = {};
+    batch.forEach(function(t){ spawnZ[t.id] = 'spawn'; });
+    snap({
+      cap: 'Tasks start first, then queue at the door. The stretch before entry is dispatch. Classify is done before spawn; while waiting for the lock it does not ask the registry again.',
+      trace: 4,
+      arrived: arrived0,
+      zone: spawnZ,
+      gate: 'Four tasks have spawned and are lining up at the gate.',
+      kind: 'hold'
+    });
+
+    var readers = batch.filter(function(t){ return t.parallel; });
+    var writers = batch.filter(function(t){ return !t.parallel; });
+    var admitZ = {};
+    var started = {};
+    readers.forEach(function(t){ admitZ[t.id] = 'read'; started[t.id] = true; });
+    writers.forEach(function(t){ admitZ[t.id] = 'queue'; });
+    var admitCap = readers.length
+      ? (writers.length
+        ? 'Read-badge tools enter the menu and can overlap. Write-badge tools take the kitchen alone and wait outside.'
+        : 'No write-lock request. Read badges walk in together and overlap.')
+      : 'Nobody overrode the default. Every call takes the write lock and enters one by one in emit order.';
+    if (!readers.length && writers.length) admitZ[writers[0].id] = 'write';
+    if (!readers.length && writers.length) started[writers[0].id] = true;
+    snap({
+      cap: admitCap,
+      trace: 5,
+      arrived: arrived0,
+      zone: admitZ,
+      started: Object.assign({}, started),
+      gate: readers.length ? ('read ×' + readers.length + (writers.length ? ', write queued ' + writers.length : '')) : ('write exclusive · ' + writers[0].name),
+      kind: 'hold'
+    });
+
+    if (late) {
+      var lateArr = Object.assign({}, arrived0); lateArr[late.id] = true;
+      var lateZ = Object.assign({}, admitZ); lateZ[late.id] = 'queue';
+      snap({
+        cap: 'Another read arrives. A writer is already queued, so the late reader cannot cut in. This is a fair lock, not the OS one.',
+        trace: 5,
+        arrived: lateArr,
+        zone: lateZ,
+        started: Object.assign({}, started),
+        gate: 'The read lock is still held. A late reader joined the queue outside.',
+        kind: 'hold'
+      });
+      arrived0 = lateArr;
+      admitZ = lateZ;
+    }
+
+    function finishGroup(ids, nextZone, nextStarted, cap, trace, gate, fin){
+      var done = {};
+      emit.forEach(function(t){
+        if (ids.indexOf(t.id) >= 0 || (nextZone[t.id] === undefined && started[t.id] && admitZ[t.id] !== 'read' && admitZ[t.id] !== 'write')) {
+          /* keep */
+        }
+      });
+      var newDone = {};
+      ids.forEach(function(id){ newDone[id] = true; });
+      Object.keys(admitZ).forEach(function(id){
+        if (admitZ[id] === 'done') newDone[id] = true;
+      });
+      Object.keys(nextZone).forEach(function(id){
+        if (nextZone[id] === 'done') newDone[id] = true;
+      });
+      ids.forEach(function(id){ nextZone[id] = 'done'; });
+      snap({
+        cap: cap,
+        trace: trace,
+        arrived: arrived0,
+        zone: nextZone,
+        done: newDone,
+        started: nextStarted,
+        gate: gate,
+        kind: fin ? 'ok' : 'hold',
+        fin: fin
+      });
+      admitZ = nextZone;
+      started = nextStarted;
+      return newDone;
+    }
+
+    var queue = writers.slice();
+    if (!readers.length && writers.length) queue = writers.slice(1);
+    if (late) queue.push(late);
+
+    if (readers.length) {
+      var afterR = {};
+      var afterS = Object.assign({}, started);
+      Object.keys(admitZ).forEach(function(id){
+        if (admitZ[id] === 'read') afterR[id] = 'done';
+        else afterR[id] = admitZ[id];
+      });
+      var nextW = queue[0];
+      if (nextW) {
+        afterR[nextW.id] = nextW.parallel ? 'read' : 'write';
+        afterS[nextW.id] = true;
+        queue = queue.slice(1);
+      }
+      var names = readers.map(function(t){ return t.name; }).join('、');
+      var nextCap = nextW
+        ? (nextW.parallel
+          ? 'Readers drop the lock. Late ' + nextW.name + ' only now gets the read lock — the writer separated it.'
+          : 'Readers drop the lock. ' + nextW.name + ' takes the kitchen. History books in emit order; unfinished later calls are not written yet.')
+        : 'Readers finish together. No writer; the gate is empty.';
+      finishGroup(readers.map(function(t){ return t.id; }), afterR, afterS, nextCap, 6, nextW ? (nextW.parallel ? 'read ×1' : 'write exclusive · ' + nextW.name) : 'Gate idle', !nextW && !queue.length);
+    }
+
+    while (queue.length || Object.keys(admitZ).some(function(id){ return admitZ[id] === 'write' || admitZ[id] === 'read'; })) {
+      var running = [];
+      emit.forEach(function(t){
+        if (admitZ[t.id] === 'write' || admitZ[t.id] === 'read') running.push(t);
+      });
+      if (!running.length) break;
+      var after = {};
+      var afterS2 = Object.assign({}, started);
+      Object.keys(admitZ).forEach(function(id){ after[id] = admitZ[id]; });
+      running.forEach(function(t){ after[t.id] = 'done'; });
+      var nxt = queue[0];
+      if (nxt) {
+        after[nxt.id] = nxt.parallel ? 'read' : 'write';
+        afterS2[nxt.id] = true;
+        queue = queue.slice(1);
+      }
+      var runIds = running.map(function(t){ return t.id; });
+      var more = queue.length || nxt;
+      var cap2 = nxt
+        ? (nxt.parallel
+          ? running[0].name + ' finished. The late reader now enters.'
+          : running[0].name + ' finished. The next exclusive enters the kitchen. Two write locks relay in emit order; they cannot overlap.')
+        : running.map(function(t){ return t.name; }).join(', ') + ' finished. On the three belts, history still drops in emit order.';
+      finishGroup(runIds, after, afterS2, cap2, 6, nxt ? (nxt.parallel ? 'read ×1' : 'write exclusive · ' + nxt.name) : 'Gate idle', !more);
+    }
+
+    var last = frames[frames.length - 1];
+    if (!last.fin) {
+      var allDone = {};
+      emit.forEach(function(t){ allDone[t.id] = true; });
+      var zDone = {};
+      emit.forEach(function(t){ zDone[t.id] = 'done'; });
+      snap({
+        cap: 'Done. Who overlapped in execution is the lock’s job. Who books first is FuturesOrdered. The two belts need not agree.',
+        trace: 6,
+        arrived: arrived0,
+        zone: zDone,
+        done: allDone,
+        started: started,
+        gate: 'Gate idle. History finished writing in emit order.',
+        kind: 'ok',
+        fin: true
+      });
+    }
+    return frames;
+  }
+
+  function renderTools(st, animate){
+    var list = st ? st.emit : (hasLate ? tools.concat([{id:String(tools.length+1), name:'exec_command', parallel:true, late:true}]) : tools);
+    if (st) toolBox.classList.add('is-live');
+    else toolBox.classList.remove('is-live');
+    var have = {};
+    Array.prototype.slice.call(toolBox.querySelectorAll('.dm-tool')).forEach(function(el){
+      have[el.getAttribute('data-id')] = el;
+    });
+    var want = list.map(function(t){ return t.id; });
+    Object.keys(have).forEach(function(id){
+      if (want.indexOf(id) < 0) have[id].remove();
+    });
+    list.forEach(function(t, i){
+      var src = t.late ? t : tools[i] || t;
+      var parallel = t.late ? true : (src ? src.parallel : t.parallel);
+      var zone = st && st.zone[t.id];
+      var d = have[t.id];
+      var isNew = !d;
+      if (isNew) {
+        d = document.createElement('button');
+        d.type = 'button';
+        d.setAttribute('data-id', t.id);
+        d.innerHTML = '<span class="nm"></span><span class="bd"></span><span class="st"></span>';
+        d.disabled = !!t.late;
+        if (!t.late) {
+          d.addEventListener('click', function(){
+            var hit = tools.filter(function(x){ return x.id === t.id; })[0];
+            if (!hit) return;
+            hit.parallel = !hit.parallel;
+            reset();
+          });
+        }
+        toolBox.appendChild(d);
+      }
+      var wasRun = d.classList.contains('run');
+      var cls = 'dm-tool ' + (parallel ? 'read' : 'write');
+      if (t.late) cls += ' late';
+      if (zone === 'read' || zone === 'write') cls += ' run';
+      else if (zone === 'queue' || zone === 'spawn') cls += ' wait';
+      else if (zone === 'done') cls += ' done';
+      d.className = cls;
+      d.querySelector('.nm').textContent = t.name;
+      d.querySelector('.bd').textContent = parallel ? 'read · parallel' : 'write · exclusive';
+      d.querySelector('.st').textContent = st ? (st.status[t.id] || '') : 'Pending';
+      if (animate && isNew) {
+        d.classList.add('is-enter');
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){ d.classList.add('in'); });
+        });
+      }
+      if (animate && !isNew && !wasRun && (zone === 'read' || zone === 'write')) {
+        d.classList.add('pop');
+        d.classList.add('firing');
+      }
+    });
+  }
+
+  function snapshotChips(){
+    var map = {slot:{}, model:{}, exec:{}, hist:{}};
+    function grab(host, bucket){
+      Array.prototype.slice.call(host.querySelectorAll('[data-id]')).forEach(function(el){
+        map[bucket][el.getAttribute('data-id')] = el.getBoundingClientRect();
+      });
+    }
+    grab(readBox, 'slot');
+    grab(writeBox, 'slot');
+    grab(queueBox, 'slot');
+    grab(beltModel, 'model');
+    grab(beltExec, 'exec');
+    grab(beltHist, 'hist');
+    return map;
+  }
+
+  function settleChip(el, oldMap){
+    var id = el.getAttribute('data-id');
+    var old = oldMap && oldMap[id];
+    if (!old) {
+      el.classList.add('is-enter');
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          el.classList.add('in');
+          el.classList.add('pop');
+        });
+      });
+      return;
+    }
+    var now = el.getBoundingClientRect();
+    var dx = old.left - now.left;
+    var dy = old.top - now.top;
+    if (!dx && !dy) return;
+    el.style.transition = 'none';
+    el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    requestAnimationFrame(function(){
+      el.style.transition = '';
+      el.style.transform = '';
+    });
+  }
+
+  function fillSlots(host, ids, emit, done, animate, oldMap){
+    host.innerHTML = ids.map(function(id){
+      var t = emit.filter(function(x){ return x.id === id; })[0];
+      return '<span class="dm-chip ' + (done[id] ? 'done' : 'on') + '" data-id="' + id + '">' + (t ? t.name : id) + '</span>';
+    }).join('') || '<span class="dm-chip">Empty</span>';
+    if (!animate) return;
+    Array.prototype.slice.call(host.querySelectorAll('.dm-chip[data-id]')).forEach(function(el){
+      settleChip(el, oldMap);
+    });
+  }
+
+  function fillBelt(host, items, emptyText, animate, oldMap){
+    if (!items.length) {
+      host.innerHTML = '<span class="dm-chip">' + emptyText + '</span>';
+      return;
+    }
+    host.innerHTML = items.map(function(it){
+      return '<span class="dm-chip ' + it.cls + '" data-id="' + it.id + '">' + it.label + '</span>';
+    }).join('');
+    if (!animate) return;
+    Array.prototype.slice.call(host.querySelectorAll('.dm-chip[data-id]')).forEach(function(el){
+      settleChip(el, oldMap);
+    });
+  }
+
+  function ensureFill(slotHost){
+    var box = slotHost.parentNode;
+    var bar = null;
+    Array.prototype.slice.call(box.children).forEach(function(el){
+      if (el.classList.contains('dm-fill')) bar = el;
+    });
+    if (!bar) {
+      bar = document.createElement('i');
+      bar.className = 'dm-fill';
+      box.appendChild(bar);
+    }
+    return bar;
+  }
+
+  function setFill(slotHost, n, max){
+    ensureFill(slotHost).style.transform = 'scaleX(' + (max ? (n / max) : 0) + ')';
+  }
+
+  function pulseBox(slotHost, n, key, animate){
+    var box = slotHost.parentNode;
+    box.classList.toggle('hot', n > 0);
+    if (animate && n > prevOcc[key]) {
+      box.classList.remove('firing');
+      void box.offsetWidth;
+      box.classList.add('firing');
+    }
+    prevOcc[key] = n;
+  }
+
+  function paint(st, animate){
+    var old = snapshotChips();
+    renderTools(st, animate);
+    var readIds = [], writeIds = [], qIds = [];
+    st.emit.forEach(function(t){
+      if (st.zone[t.id] === 'read') readIds.push(t.id);
+      else if (st.zone[t.id] === 'write') writeIds.push(t.id);
+      else if (st.zone[t.id] === 'queue' || st.zone[t.id] === 'spawn') qIds.push(t.id);
+    });
+    fillSlots(readBox, readIds, st.emit, st.done, animate, old.slot);
+    fillSlots(writeBox, writeIds, st.emit, st.done, animate, old.slot);
+    fillSlots(queueBox, qIds, st.emit, st.done, animate, old.slot);
+    setFill(readBox, readIds.length, 4);
+    setFill(writeBox, writeIds.length, 1);
+    setFill(queueBox, qIds.length, 4);
+    pulseBox(readBox, readIds.length, 'read', animate);
+    pulseBox(writeBox, writeIds.length, 'write', animate);
+    pulseBox(queueBox, qIds.length, 'queue', animate);
+
+    fillBelt(beltModel, st.emit.filter(function(t){ return st.arrived[t.id]; }).map(function(t){
+      return {id:t.id, label:t.id + ' ' + t.name, cls:'on'};
+    }), 'Not emitted yet', animate, old.model);
+    fillBelt(beltExec, st.execOrder.map(function(id){
+      var t = st.emit.filter(function(x){ return x.id === id; })[0];
+      return {id:id, label:(t ? t.name : id) + (st.zone[id] === 'read' || st.zone[id] === 'write' ? ' · run' : ''), cls: st.done[id] ? 'done' : 'on'};
+    }), 'Not started yet', animate, old.exec);
+    fillBelt(beltHist, st.hist.map(function(id){
+      var t = st.emit.filter(function(x){ return x.id === id; })[0];
+      return {id:id, label:t ? t.name : id, cls:'on'};
+    }), 'Not booked yet', animate, old.hist);
+
+    var nextKind = 'dm-status' + (st.kind ? ' ' + st.kind : '');
+    var kindChanged = statusEl.className !== nextKind && !!st.kind;
+    statusEl.className = nextKind;
+    statusEl.textContent = st.gate;
+    if (animate && kindChanged) {
+      statusEl.classList.remove('firing');
+      void statusEl.offsetWidth;
+      statusEl.classList.add('firing');
+    }
+    document.querySelector('.dm-trace').classList.add('is-live');
+    if (st.trace !== null && st.trace !== undefined) {
+      traceRows.forEach(function(el, n){ el.classList.toggle('on', n === st.trace); });
+    }
+    if (animate) {
+      captionText.style.opacity = '0';
+      requestAnimationFrame(function(){
+        captionText.textContent = st.cap;
+        requestAnimationFrame(function(){ captionText.style.opacity = '1'; });
+      });
+    } else {
+      captionText.textContent = st.cap;
+    }
+    if (st.fin) summary.classList.add('on');
+    else summary.classList.remove('on');
+  }
+
+  function holdFor(i){
+    var st = steps[i];
+    if (!st) return 1100;
+    if (st.fin) return 2400;
+    var lateWait = false;
+    st.emit.forEach(function(t){
+      if (t.late && st.arrived[t.id] && !st.done[t.id]) lateWait = true;
+    });
+    if (lateWait) return 2200;
+    if (st.trace === 5) return 2000;
+    if (st.trace === 6) return 1800;
+    if (st.trace === 4) return 1100;
+    if (st.trace === 0) return 1400;
+    return 1200;
+  }
+
+  function tick(){
+    if (idx >= steps.length) { stop(); return; }
+    paint(steps[idx], true);
+    idx++;
+    if (idx >= steps.length) stop();
+  }
+  function stop(){
+    if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+    pauseUntil = 0;
+  }
+  function loop(ts){
+    if (idx >= steps.length) { autoId = null; return; }
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(loop); return; }
+    paint(steps[idx], true);
+    var wait = holdFor(idx);
+    idx++;
+    pauseUntil = ts + wait;
+    if (idx >= steps.length) { autoId = null; return; }
+    autoId = requestAnimationFrame(loop);
+  }
+  function reset(){
+    stop(); idx = 0;
+    prevOcc = {read:0, write:0, queue:0};
+    steps = buildSteps();
+    toolBox.innerHTML = '';
+    toolBox.classList.remove('is-live');
+    renderTools(null, false);
+    readBox.innerHTML = '<span class="dm-chip">Empty</span>';
+    writeBox.innerHTML = '<span class="dm-chip">Empty</span>';
+    queueBox.innerHTML = '<span class="dm-chip">Empty</span>';
+    beltModel.innerHTML = '<span class="dm-chip">Not emitted yet</span>';
+    beltExec.innerHTML = '<span class="dm-chip">Not started yet</span>';
+    beltHist.innerHTML = '<span class="dm-chip">Not booked yet</span>';
+    setFill(readBox, 0, 4);
+    setFill(writeBox, 0, 1);
+    setFill(queueBox, 0, 4);
+    readBox.parentNode.classList.remove('hot', 'firing');
+    writeBox.parentNode.classList.remove('hot', 'firing');
+    queueBox.parentNode.classList.remove('hot', 'firing');
+    statusEl.className = 'dm-status';
+    statusEl.textContent = 'Waiting to start. Hit Play and watch the lock split traffic.';
+    document.querySelector('.dm-trace').classList.remove('is-live');
+    traceRows.forEach(function(el){ el.classList.remove('on'); });
+    summary.classList.remove('on');
+    captionText.style.opacity = '1';
+    captionText.textContent = IDLE;
+  }
+  function play(){
+    if (idx >= steps.length) reset();
+    if (autoId) return;
+    pauseUntil = 0;
+    autoId = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('dm-play').addEventListener('click', play);
+  document.getElementById('dm-step').addEventListener('click', function(){ stop(); tick(); });
+  document.getElementById('dm-reset').addEventListener('click', reset);
+  document.getElementById('dm-seg').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    Array.prototype.forEach.call(this.children, function(el){ el.classList.remove('on'); });
+    b.classList.add('on');
+    scene = b.getAttribute('data-scene');
+    if (scene === 'writes') { tools = cloneTools(BASE.writes); hasLate = false; }
+    else { tools = cloneTools(BASE.four); hasLate = scene === 'late'; }
+    reset();
+  });
+
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(document.getElementById('demo-gate'), function(){
+      if (played) return; played = true; play();
+    });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

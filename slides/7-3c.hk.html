@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>長期記憶：讓 Agent 記住上個月的事 | xueai.miyang.cn</title>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<style>
+:root{--green:var(--success);--orange:var(--amber)}
+/* ── 类比条 ── */
+.analogy{display:flex;gap:20px;align-items:center;flex-wrap:wrap;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow-card)}
+.analogy-item{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text)}
+.analogy-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.analogy-label{font-weight:800;font-size:13px;margin-bottom:1px}
+.analogy-desc{font-size:13px;color:var(--sub);line-height:1.4}
+.analogy-arrow{font-size:18px;color:var(--sub);font-weight:800}
+.analogy-note{font-size:13px;color:var(--sub);line-height:1.5}
+.analogy-note b{color:var(--amber)}
+
+/* ── 演示区双列 ── */
+.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.col{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-card)}
+.col-hd{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--card)}
+.col-title{font-size:14px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:6px}
+.col-badge{padding:3px 9px;border-radius:6px;font-size:12px;font-weight:800}
+.col-body{padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+
+.mem-entry{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);transition:all .4s ease;cursor:default;position:relative}
+.mem-entry.matched{border-color:rgba(22,163,74,.5);background:rgba(22,163,74,.04)}
+.mem-entry.filtered{border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.02);opacity:.55}
+.mem-entry.dimmed{opacity:.35}
+.mem-date{font-size:12px;font-weight:700;color:var(--sub);white-space:nowrap;min-width:72px;padding-top:1px}
+.mem-text{font-size:13px;color:var(--text);line-height:1.5;flex:1;padding-right:44px}
+.mem-score{position:absolute;right:10px;top:8px;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:800;opacity:0;transform:scale(.8);transition:all .3s}
+.mem-score.show{opacity:1;transform:scale(1)}
+.mem-score.pass{background:rgba(22,163,74,.1);color:var(--success)}
+.mem-score.fail{background:rgba(220,38,38,.08);color:var(--danger)}
+
+.query-section{padding:12px 16px;border-bottom:1px solid var(--border)}
+.query-label{font-size:12px;font-weight:800;color:var(--sub);margin-bottom:8px;letter-spacing:.4px}
+.query-btns{display:flex;gap:8px;flex-wrap:wrap}
+.q-btn{padding:10px 14px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;font-size:13px;font-weight:600;color:var(--text);font-family:inherit;transition:all .15s;line-height:1.4;min-height:44px}
+.q-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.q-btn.active{border-color:var(--cyan);background:rgba(8,145,178,.06);color:var(--cyan);font-weight:700}
+
+.process-area{padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-height:120px}
+.proc-step{border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.6;opacity:0;transform:translateY(6px);transition:all .35s ease;display:flex;align-items:flex-start;gap:8px}
+.proc-step.show{opacity:1;transform:translateY(0)}
+.proc-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;margin-top:1px}
+.proc-text{flex:1}
+.proc-text b{font-weight:800}
+
+.inject-preview{margin-top:6px;padding:8px 10px;border-radius:8px;background:rgba(124,58,237,.04);border:1px solid rgba(124,58,237,.12);font-size:12px;color:var(--sub);line-height:1.6}
+.inject-preview b{color:var(--purple);font-weight:700}
+
+.spec-bar{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap}
+.spec-item{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--sub)}
+.spec-item b{color:var(--text);font-weight:700}
+
+/* ── 设计决策 ── */
+.decisions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.dec-card{background:rgba(217,119,6,.05);border:1.5px solid rgba(217,119,6,.18);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text);line-height:1.6}
+.dec-card b{color:var(--amber)}
+
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.2)}50%{box-shadow:0 0 0 6px rgba(22,163,74,0)}}
+.mem-entry.matched{animation:pulse .8s ease 1}
+
+@media (max-width:768px){
+  .demo-grid{grid-template-columns:1fr}
+  .decisions{grid-template-columns:1fr}
+  .analogy{gap:12px}
+  .analogy-arrow{display:none}
+}
+</style>
+<meta name="description" content="長期記憶讓 Agent 記住上個月的事：通過向量檢索，把用戶偏好、項目配置、歷史 Bug 注入當前對話，實現真正的個性化服務。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/7-3c.hk.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/7-3c.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/7-3c.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/7-3c.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/7-3c.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/7-3c.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/7-3c.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/7-3c.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="長期記憶：讓 Agent 記住上個月的事">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/7-3c.hk.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/7-3c.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_HK">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"長期記憶：向量檢索","name":"長期記憶：向量檢索","url":"https://xueai.miyang.cn/slides/7-3c.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · Agent 工程","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"長期記憶讓 Agent 記住上個月的事：通過向量檢索，把用戶偏好、項目配置、歷史 Bug 注入當前對話，實現真正的個性化服務。","datePublished":"2026-04-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:description" content="長期記憶讓 Agent 記住上個月的事：通過向量檢索，把用戶偏好、項目配置、歷史 Bug 注入當前對話，實現真正的個性化服務。"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Agent 工程</div>
+    <h1>長期記憶：向量檢索</h1>
+    <p class="subtitle">讓 Agent 記住上個月的事：通過向量檢索，把用戶偏好、項目配置、歷史 Bug 注入當前對話。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>Embedding → 向量數據庫 → 語義搜索，topK 與 minScore 的設計決策</p></aside><!--seo:end-->  <div class="sec-label">一個類比</div>
+  <div class="analogy">
+    <div class="analogy-item">
+      <div class="analogy-icon" style="background:rgba(8,145,178,.08)">🗂</div>
+      <div>
+        <div class="analogy-label" style="color:var(--cyan)">短期記憶 = 你的桌面</div>
+        <div class="analogy-desc">上下文窗口，放得下的資訊有限</div>
+      </div>
+    </div>
+    <div class="analogy-arrow">→</div>
+    <div class="analogy-item">
+      <div class="analogy-icon" style="background:rgba(124,58,237,.08)">🗄</div>
+      <div>
+        <div class="analogy-label" style="color:var(--purple)">長期記憶 = 你的檔案櫃</div>
+        <div class="analogy-desc">向量數據庫，需要時檢索相關檔案放到桌面上</div>
+      </div>
+    </div>
+    <div class="analogy-note">桌面放不下所有東西，但你可以隨時從檔案櫃裏<b>調取最相關的檔案</b></div>
+  </div>
+
+  <div class="sec-label">交互演示：點擊提問，觀察檢索過程</div>
+  <div class="demo-grid paywall-locked xa-peek">
+    <div class="col">
+      <div class="col-hd">
+        <span class="col-title">
+          <span style="font-size:16px">🗄</span> 記憶庫
+        </span>
+        <span class="col-badge" style="background:rgba(124,58,237,.08);color:var(--purple)">8 條歷史記憶</span>
+      </div>
+      <div class="col-body" id="memStore"></div>
+      <div class="spec-bar">
+        <div class="spec-item"><b>Embedding</b> gemini-embedding-001</div>
+        <div class="spec-item"><b>維度</b> 768</div>
+        <div class="spec-item"><b>存儲</b> LanceDB</div>
+        <div class="spec-item"><b>topK</b> 5</div>
+        <div class="spec-item"><b>minScore</b> 0.3</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="query-section">
+        <div class="query-label">點擊模擬不同的用戶提問</div>
+        <div class="query-btns" id="queryBtns"></div>
+      </div>
+      <div class="col-hd" style="border-bottom:1px solid var(--border)">
+        <span class="col-title">
+          <span style="font-size:16px">🔍</span> 向量檢索過程
+        </span>
+        <span id="matchInfo" class="col-badge" style="background:rgba(22,163,74,.08);color:var(--success);opacity:0;transition:opacity .3s">—</span>
+      </div>
+      <div class="process-area" id="processArea"></div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">三個設計決策</div>
+  <div class="decisions paywall-locked">
+    <div class="dec-card"><b>📌 設計決策 ①</b><br>什麼資訊該存入長期記憶？用戶偏好、項目配置、歷史 Bug、常用操作，這些決定了 Agent 的個性化程度。</div>
+    <div class="dec-card"><b>📌 設計決策 ②</b><br>記憶檢索質素取決於 Embedding 模型。「修登入接口」和「登入接口併發 500」，模型能匹配到同一條記憶嗎？</div>
+    <div class="dec-card"><b>📌 設計決策 ③</b><br>記憶太多也是問題：topK=5 意味着每次最多召回 5 條。如何保證最重要的記憶排在最前面？</div>
+  </div>
+
+  <div class="sec-label paywall-locked">Takeaway</div>
+  <div class="l-callout paywall-locked">
+    <b>Takeaway</b>　短期記憶（上下文窗口）讓 Agent 記住當前對話，長期記憶（向量檢索）讓 Agent 記住上個月的事。兩者配合，Agent 才能像真正的助手一樣：既瞭解你現在在做什麼，也記得你過去的偏好。
+  </div>
+</article>
+
+<script>
+var MEMORIES = [
+  {id:0, date:'2026-03-15', text:'用戶偏好：喜歡簡潔的程式碼風格，不喜歡過多註釋', tags:['style','code']},
+  {id:1, date:'2026-03-20', text:'項目架構：使用 React + FastAPI，數據庫是 SQLite', tags:['arch','api','react']},
+  {id:2, date:'2026-04-01', text:'用戶説過：API Key 存在 .env 檔案裏', tags:['config','api','env']},
+  {id:3, date:'2026-04-05', text:'上次部署：伺服器 IP 是 120.xx.xx.xx，用 nginx 反代', tags:['deploy','server','nginx']},
+  {id:4, date:'2026-04-10', text:'用戶習慣：每次改完程式碼喜歡先跑測試', tags:['test','habit']},
+  {id:5, date:'2026-04-15', text:'Bug 記錄：登入接口在併發時會 500', tags:['bug','login','api']},
+  {id:6, date:'2026-04-18', text:'用戶要求：所有 API 都要流式返回', tags:['api','stream','requirement']},
+  {id:7, date:'2026-04-20', text:'性能優化：圖片壓縮後上傳，減少帶寬', tags:['perf','upload']}
+];
+
+var QUERIES = [
+  {
+    text: '幫我修一下登入接口的問題',
+    results: [
+      {id:5, score:0.92},
+      {id:3, score:0.41},
+      {id:6, score:0.38},
+      {id:1, score:0.28},
+      {id:4, score:0.22}
+    ],
+    threshold: 0.3,
+    steps: [
+      {num:'1', color:'var(--cyan)', bg:'rgba(8,145,178,.06)', text:'<b>Embedding 編碼</b>：把用戶的話「幫我修一下登入接口的問題」轉成 768 維向量'},
+      {num:'2', color:'var(--purple)', bg:'rgba(124,58,237,.05)', text:'<b>向量相似度搜索</b>：在記憶庫 8 條記憶中找 topK=5 條最相似的'},
+      {num:'3', color:'var(--green)', bg:'rgba(22,163,74,.05)', text:'<b>閾值過濾</b>：minScore=0.3，過濾掉相似度太低的條目 → <b>3 條通過</b>，2 條被過濾'},
+      {num:'4', color:'var(--orange)', bg:'rgba(234,88,12,.05)',
+        text:'<b>注入 System Message</b>：把 3 條記憶插入到 system prompt 中',
+        inject: [
+          '以下是與用戶當前問題相關的歷史記憶：',
+          '• [0.92] Bug 記錄：登入接口在併發時會 500',
+          '• [0.41] 上次部署：伺服器 IP 是 120.xx.xx.xx，用 nginx 反代',
+          '• [0.38] 用戶要求：所有 API 都要流式返回'
+        ]
+      }
+    ]
+  },
+  {
+    text: '幫我加一個新的 API',
+    results: [
+      {id:6, score:0.88},
+      {id:1, score:0.82},
+      {id:2, score:0.45},
+      {id:0, score:0.36},
+      {id:5, score:0.21}
+    ],
+    threshold: 0.3,
+    steps: [
+      {num:'1', color:'var(--cyan)', bg:'rgba(8,145,178,.06)', text:'<b>Embedding 編碼</b>：把用戶的話「幫我加一個新的 API」轉成 768 維向量'},
+      {num:'2', color:'var(--purple)', bg:'rgba(124,58,237,.05)', text:'<b>向量相似度搜索</b>：在記憶庫 8 條記憶中找 topK=5 條最相似的'},
+      {num:'3', color:'var(--green)', bg:'rgba(22,163,74,.05)', text:'<b>閾值過濾</b>：minScore=0.3，過濾掉相似度太低的條目 → <b>4 條通過</b>，1 條被過濾'},
+      {num:'4', color:'var(--orange)', bg:'rgba(234,88,12,.05)',
+        text:'<b>注入 System Message</b>：把 4 條記憶插入到 system prompt 中',
+        inject: [
+          '以下是與用戶當前問題相關的歷史記憶：',
+          '• [0.88] 用戶要求：所有 API 都要流式返回',
+          '• [0.82] 項目架構：使用 React + FastAPI，數據庫是 SQLite',
+          '• [0.45] 用戶説過：API Key 存在 .env 檔案裏',
+          '• [0.36] 用戶偏好：喜歡簡潔的程式碼風格，不喜歡過多註釋'
+        ]
+      }
+    ]
+  },
+  {
+    text: '幫我部署到伺服器',
+    results: [
+      {id:3, score:0.95},
+      {id:1, score:0.52},
+      {id:2, score:0.40},
+      {id:7, score:0.33},
+      {id:4, score:0.18}
+    ],
+    threshold: 0.3,
+    steps: [
+      {num:'1', color:'var(--cyan)', bg:'rgba(8,145,178,.06)', text:'<b>Embedding 編碼</b>：把用戶的話「幫我部署到伺服器」轉成 768 維向量'},
+      {num:'2', color:'var(--purple)', bg:'rgba(124,58,237,.05)', text:'<b>向量相似度搜索</b>：在記憶庫 8 條記憶中找 topK=5 條最相似的'},
+      {num:'3', color:'var(--green)', bg:'rgba(22,163,74,.05)', text:'<b>閾值過濾</b>：minScore=0.3，過濾掉相似度太低的條目 → <b>4 條通過</b>，1 條被過濾'},
+      {num:'4', color:'var(--orange)', bg:'rgba(234,88,12,.05)',
+        text:'<b>注入 System Message</b>：把 4 條記憶插入到 system prompt 中',
+        inject: [
+          '以下是與用戶當前問題相關的歷史記憶：',
+          '• [0.95] 上次部署：伺服器 IP 是 120.xx.xx.xx，用 nginx 反代',
+          '• [0.52] 項目架構：使用 React + FastAPI，數據庫是 SQLite',
+          '• [0.40] 用戶説過：API Key 存在 .env 檔案裏',
+          '• [0.33] 性能優化：圖片壓縮後上傳，減少帶寬'
+        ]
+      }
+    ]
+  }
+];
+
+var activeQuery = -1;
+var animTimer = null;
+
+function initMemStore() {
+  var html = '';
+  for (var i = 0; i < MEMORIES.length; i++) {
+    var m = MEMORIES[i];
+    html += '<div class="mem-entry" id="mem' + m.id + '">' +
+      '<span class="mem-date">' + m.date + '</span>' +
+      '<span class="mem-text">' + m.text + '</span>' +
+      '<span class="mem-score" id="score' + m.id + '"></span>' +
+      '</div>';
+  }
+  document.getElementById('memStore').innerHTML = html;
+}
+
+function initQueryBtns() {
+  var html = '';
+  for (var i = 0; i < QUERIES.length; i++) {
+    html += '<button class="q-btn" id="qbtn' + i + '" onclick="selectQuery(' + i + ')">"' + QUERIES[i].text + '"</button>';
+  }
+  document.getElementById('queryBtns').innerHTML = html;
+}
+
+function clearState() {
+  if (animTimer) { clearTimeout(animTimer); animTimer = null; }
+  for (var i = 0; i < MEMORIES.length; i++) {
+    var el = document.getElementById('mem' + i);
+    el.className = 'mem-entry';
+    var sc = document.getElementById('score' + i);
+    sc.className = 'mem-score';
+    sc.textContent = '';
+  }
+  document.getElementById('processArea').innerHTML = '';
+  document.getElementById('matchInfo').style.opacity = '0';
+  for (var j = 0; j < QUERIES.length; j++) {
+    document.getElementById('qbtn' + j).classList.remove('active');
+  }
+}
+
+function selectQuery(idx) {
+  clearState();
+  activeQuery = idx;
+  document.getElementById('qbtn' + idx).classList.add('active');
+  runSearch(QUERIES[idx]);
+}
+
+function runSearch(query) {
+  var area = document.getElementById('processArea');
+  var steps = query.steps;
+  var results = query.results;
+  var threshold = query.threshold;
+
+  var passCount = 0;
+  for (var k = 0; k < results.length; k++) {
+    if (results[k].score >= threshold) passCount++;
+  }
+
+  function showStep(i) {
+    if (i >= steps.length) return;
+    var s = steps[i];
+    var el = document.createElement('div');
+    el.className = 'proc-step';
+    el.style.background = s.bg;
+    el.style.border = '1px solid rgba(0,0,0,.05)';
+
+    var inner = '<div class="proc-num" style="background:' + s.bg + ';color:' + s.color + ';border:1.5px solid ' + s.color + '">' + s.num + '</div>';
+    inner += '<div class="proc-text">' + s.text;
+    if (s.inject) {
+      inner += '<div class="inject-preview"><b>注入到 system message 的內容：</b><br>';
+      for (var x = 0; x < s.inject.length; x++) {
+        inner += s.inject[x] + '<br>';
+      }
+      inner += '</div>';
+    }
+    inner += '</div>';
+    el.innerHTML = inner;
+    area.appendChild(el);
+
+    requestAnimationFrame(function() { requestAnimationFrame(function() {
+      el.classList.add('show');
+    })});
+
+    if (i === 2) {
+      highlightMemories(results, threshold);
+    }
+
+    animTimer = setTimeout(function() { showStep(i + 1); }, 700);
+  }
+
+  animTimer = setTimeout(function() { showStep(0); }, 200);
+
+  setTimeout(function() {
+    var info = document.getElementById('matchInfo');
+    info.textContent = passCount + ' 條命中 / ' + (results.length - passCount) + ' 條過濾';
+    info.style.opacity = '1';
+  }, 2400);
+}
+
+function highlightMemories(results, threshold) {
+  var matchedIds = {};
+  for (var i = 0; i < results.length; i++) {
+    matchedIds[results[i].id] = results[i].score;
+  }
+
+  for (var j = 0; j < MEMORIES.length; j++) {
+    var el = document.getElementById('mem' + j);
+    var sc = document.getElementById('score' + j);
+
+    if (matchedIds[j] !== undefined) {
+      var score = matchedIds[j];
+      var pass = score >= threshold;
+
+      (function(el, sc, score, pass, delay) {
+        setTimeout(function() {
+          el.className = 'mem-entry ' + (pass ? 'matched' : 'filtered');
+          sc.textContent = score.toFixed(2);
+          sc.className = 'mem-score show ' + (pass ? 'pass' : 'fail');
+        }, delay);
+      })(el, sc, score, pass, j * 60);
+    } else {
+      (function(el, delay) {
+        setTimeout(function() {
+          el.className = 'mem-entry dimmed';
+        }, delay);
+      })(el, j * 60);
+    }
+  }
+}
+
+initMemStore();
+initQueryBtns();
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="skill-data.hk.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

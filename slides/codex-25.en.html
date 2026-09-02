@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>What a hook can change is set by the event contract | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* 变量挂在 .lesson 上：nav-inject.js 会在页面样式之后再注入一次 :root 主色，
+   靠就近继承才能保住专题色。 */
+:root,.lesson{--accent:#414b5a;--accent-deep:#262d38;--accent-soft:rgba(65,75,90,.085)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(65,75,90,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(65,75,90,.04),0 0 0 52px rgba(65,75,90,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson code{overflow-wrap:anywhere;word-break:break-all}
+.lesson .sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(65,75,90,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.q-tag{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font-size:13px;font-weight:800;margin:28px 0 14px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.visual{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eff1f5,var(--card));border:1px solid rgba(65,75,90,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.9}.exercise p:last-child{margin:0}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);color:var(--text);display:flex;gap:14px;font-size:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.compare{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h4{margin:0;font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}.cmp-card h4 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:12px 0 0}
+.cmp-card .cmp-tag{display:inline-block;margin-top:14px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent-deep);border:1px solid rgba(65,75,90,.25);overflow-wrap:anywhere;word-break:break-all}
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card)}
+.demo-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo-ctrl button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;min-height:44px;min-width:44px;border:1px solid rgba(65,75,90,.35);border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font:600 14px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:filter .15s}
+.demo-ctrl button:active{filter:brightness(.92)}
+.dm-budget{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px;padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-budget .dm-b-label{font-size:13px;font-weight:700;color:var(--text)}
+.dm-budget .dm-b-hint{font-size:12px;color:var(--sub);line-height:1.7;flex:1;min-width:180px}
+.dm-seg{display:flex;gap:8px;flex-wrap:wrap}
+.dm-seg button{min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--sub);font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all .15s cubic-bezier(.4,0,.2,1)}
+.dm-seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dm-rail{padding:18px;border-radius:12px;background:var(--bg);border:1px solid var(--border);margin-bottom:20px}
+.dm-rail-tag{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:12px}
+.dm-hooks{position:relative;display:flex;flex-wrap:wrap;gap:8px;padding-bottom:12px}
+.dm-hooks:after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:99px;background:var(--accent);transform:scaleX(var(--bar,0));transform-origin:left center;transition:transform .5s cubic-bezier(.25,1,.5,1)}
+.dm-h{min-height:44px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--faint);font-size:12px;font-weight:700;text-align:center;min-width:88px;opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-hooks.is-live .dm-h,.dm-sub.is-live .dm-h{opacity:.4;transform:scale(.98)}
+.dm-hooks.is-live .dm-h.now,.dm-sub.is-live .dm-h.now{opacity:1;transform:scale(1)}
+.dm-h.on{border-color:rgba(65,75,90,.5);background:var(--accent-soft);color:var(--accent-deep)}
+.dm-h.skip{border-style:dashed}
+.dm-h.block{border-color:rgba(220,38,38,.4);background:rgba(220,38,38,.06);color:var(--danger)}
+.dm-h.pass{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.07);color:var(--success)}
+.dm-h.hold{border-color:rgba(65,75,90,.5);background:var(--accent-soft);color:var(--accent-deep)}
+.dm-h.late{text-decoration:line-through}
+.dm-h.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-sub{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.dm-sub .dm-h{min-width:110px;font-weight:600}
+.dm-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.dm-col{border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+.dm-head{padding:14px 16px;background:var(--card);border-bottom:1px solid var(--border);font-size:13px;font-weight:800;color:var(--text)}
+.dm-body{padding:16px;display:flex;flex-direction:column;gap:10px;min-height:148px}
+.dm-kv{padding:12px 14px;border-radius:9px;background:var(--card);border:1px solid var(--border);font-size:13px;line-height:1.8;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-cols.is-live .dm-kv{opacity:.4;transform:scale(.98)}
+.dm-cols.is-live .dm-kv.now{opacity:1;transform:scale(1)}
+.dm-kv b{display:block;color:var(--accent-deep);font-size:13px;margin-bottom:2px}
+.dm-kv [data-val]{transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-kv.warn{border-color:rgba(220,38,38,.3);color:var(--danger)}
+.dm-kv.ok{border-color:rgba(22,163,74,.3)}
+.dm-kv.hold{border-color:rgba(65,75,90,.35);background:var(--accent-soft);color:var(--accent-deep)}
+.dm-kv.pop{animation:flashPop .8s cubic-bezier(.25,1,.5,1)}
+.dm-kv.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-trace{margin-top:24px;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.dm-trace-tag{padding:12px 18px;background:var(--card);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--sub)}
+.dm-trace ol{margin:0;padding:10px 0;list-style:none}
+.dm-trace li{display:flex;justify-content:space-between;gap:16px;padding:9px 18px;font-size:12.5px;line-height:1.7;color:var(--sub);opacity:1;transform:scale(1);transition:all .35s cubic-bezier(.4,0,.2,1)}
+.dm-trace.is-live li{opacity:.4;transform:scale(.98)}
+.dm-trace li.on,.dm-trace.is-live li.on{background:var(--accent-soft);color:var(--accent-deep);font-weight:600;opacity:1;transform:scale(1)}
+.dm-trace li.firing{animation:fireGlow .8s cubic-bezier(.25,1,.5,1)}
+.dm-trace li span.ln{flex:0 0 auto;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)}
+.dm-trace li.on span.ln{color:var(--accent-deep)}
+.dm-caption{margin-top:20px;min-height:56px;display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.dm-caption svg{flex:0 0 auto;color:var(--accent)}
+#dm-caption-text{transition:opacity .3s cubic-bezier(.4,0,.2,1)}
+.dm-summary{display:flex;flex-direction:column;gap:14px;max-height:0;overflow:hidden;opacity:0;margin-top:0;padding:0 22px;border:1px solid transparent;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),var(--card));transition:max-height .5s cubic-bezier(.25,1,.5,1),opacity .4s cubic-bezier(.4,0,.2,1)}
+.dm-summary.on{max-height:320px;opacity:1;margin-top:20px;padding:20px 22px;border-color:rgba(65,75,90,.3)}
+.dm-summary .dm-s{font-size:13px;line-height:1.8;color:var(--sub)}.dm-summary .dm-s b{display:block;font-size:13.5px;color:var(--accent-deep);margin-bottom:2px}
+.demo-caption{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.7}
+@keyframes flashPop{0%{transform:scale(.8)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(65,75,90,.3)}50%{box-shadow:0 0 20px 6px rgba(65,75,90,.2)}100%{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.demo,.demo *{transition-duration:0s!important;animation-duration:0s!important}}
+@media(max-width:760px){
+  .lesson{overflow-x:hidden}
+  .compare{grid-template-columns:1fr}
+  .objective{grid-template-columns:1fr}
+  .lesson-header:after{display:none}
+  .demo{padding:18px}
+  .demo-ctrl{width:100%}
+  .demo-ctrl button{flex:1}
+  .dm-cols{grid-template-columns:1fr}
+  .dm-body{min-height:0}
+  .visual{padding:14px}
+  .dm-trace li{flex-direction:column;gap:4px}
+  .dm-h{flex:1 1 calc(50% - 8px);min-width:0}
+  .dm-summary.on{max-height:520px}
+}
+</style>
+<meta name="description" content="Codex’s hook protocol names eleven events and four handler types, but the runtime table only loads commands and MCP. In one turn: what each hook gets, what it can change, and when it’s already too late">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"What a hook can change is set by the event contract","name":"What a hook can change is set by the event contract","url":"https://xueai.miyang.cn/slides/codex-25.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Extensions","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"Codex’s hook protocol names eleven events and four handler types, but the runtime table only loads commands and MCP. In one turn: what each hook gets, what it can change, and when it’s already too late","datePublished":"2026-08-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="What a hook can change is set by the event contract"><meta property="og:description" content="Codex’s hook protocol names eleven events and four handler types, but the runtime table only loads commands and MCP. In one turn: what each hook gets, what it can change, and when it’s already too late"><meta property="og:url" content="https://xueai.miyang.cn/slides/codex-25.en.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="https://xueai.miyang.cn/slides/codex-25.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/codex-25.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/codex-25.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/codex-25.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/codex-25.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/codex-25.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/codex-25.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/codex-25.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI Product Manager Training"><meta property="og:locale" content="en_US"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>OpenAI Codex · Hooks</div>
+    <h1>What a hook can change is set by the event contract</h1>
+    <p class="subtitle">One turn walks eleven hooks. The protocol names four handler types; the runtime table only loads commands and MCP. Timeouts fail open. Teardown drops stdout.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>One turn walks eleven hooks. The protocol names four handler types; the runtime table only loads commands and MCP. Timeouts fail open. Teardown drops stdout.</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5" fill="none"/></svg>
+    <span><b>Course goal</b>After this you can name three things: which of the four types actually enter the runtime table; why a hook timeout cannot stop a tool; and why <code>SessionEnd</code> never reads output. A hook point is a reserved socket on the lifecycle. What can change the next step is the event contract, not the name in a config file.</span>
+  </div>
+
+  <div class="sec-label">Try it first · In what order hooks fire in one turn</div>
+  <div class="demo reveal" id="demo-hooks">
+    <div class="demo-top">
+      <div class="demo-title">Same session timeline, swap the return value, see who can still change the next step</div>
+      <div class="demo-ctrl">
+        <button id="dm-play" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="none"/></svg>Play</button>
+        <button id="dm-step" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z" fill="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Step</button>
+        <button id="dm-reset" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" fill="none"/><path d="M3 3v5h5" fill="none"/></svg>Reset</button>
+      </div>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">How it answers this time</span>
+      <div class="dm-seg" id="dm-seg">
+        <button type="button" data-mode="timeout" class="on">Timeout</button>
+        <button type="button" data-mode="deny">Exit code 2</button>
+        <button type="button" data-mode="prompt">Prompt type</button>
+        <button type="button" data-mode="stop">Stop continue</button>
+        <button type="button" data-mode="end">SessionEnd JSON</button>
+      </div>
+      <span class="dm-b-hint">Five return values hang on the same axis. Timeouts and unimplemented types cannot change the next step. An explicit deny, or a block that carries a prompt, can.</span>
+    </div>
+    <div class="dm-rail">
+      <div class="dm-rail-tag">Main axis · hooks one turn walks</div>
+      <div class="dm-hooks" id="dm-hooks"></div>
+      <div class="dm-rail-tag" style="margin-top:16px">Side axis · sub-agents on ThreadSpawn only</div>
+      <div class="dm-sub" id="dm-sub"></div>
+    </div>
+    <div class="dm-cols">
+      <div class="dm-col">
+        <div class="dm-head">What this step gets, what it can change</div>
+        <div class="dm-body">
+          <div class="dm-kv" id="dm-got"><b>Got</b>Hasn’t started yet.</div>
+          <div class="dm-kv" id="dm-can"><b>Can change</b>Pick a return value, then play.</div>
+        </div>
+      </div>
+      <div class="dm-col">
+        <div class="dm-head">Tool, approval, context</div>
+        <div class="dm-body">
+          <div class="dm-kv" id="dm-tool"><b>Tool</b>Not at PreToolUse yet.</div>
+          <div class="dm-kv" id="dm-ctx"><b>Context</b>Empty.</div>
+        </div>
+      </div>
+    </div>
+    <div class="dm-trace">
+      <div class="dm-trace-tag">Logic trail · each animation step maps to a source span</div>
+      <ol id="dm-trace">
+        <li><span>Protocol enum lists eleven event names</span><span class="ln">protocol.rs L1510</span></li>
+        <li><span>Config accepts four types; the last two are empty structs</span><span class="ln">hook_config.rs L183</span></li>
+        <li><span>Discovery writes Prompt and Agent as not supported yet</span><span class="ln">discovery.rs L626</span></li>
+        <li><span>Runtime table only accepts Command and McpTool</span><span class="ln">engine/mod.rs L107</span></li>
+        <li><span>Only a sync hook can apply a control effect</span><span class="ln">engine/mod.rs L146</span></li>
+        <li><span>Timeout writes error; should_block stays false</span><span class="ln">command_runner.rs L317</span></li>
+        <li><span>Exit code 2 plus stderr is what marks Blocked</span><span class="ln">pre_tool_use.rs L261</span></li>
+        <li><span>Allow maps to a one-shot Approved</span><span class="ln">approvals.rs L465</span></li>
+        <li><span>A Stop block only continues at the turn layer if it carries a prompt</span><span class="ln">turn.rs L509</span></li>
+        <li><span>SessionEnd treats exit 0 as done and drops stdout</span><span class="ln">session_end.rs L109</span></li>
+      </ol>
+    </div>
+    <div class="dm-caption" id="dm-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none"/></svg><span id="dm-caption-text">Hit Play. Watch what each hook gets in one turn, what it can change, and when it’s already too late.</span></div>
+    <div class="dm-summary" id="dm-summary">
+      <div class="dm-s"><b>A name is not a capability</b>Config can write Prompt and Agent; discovery tears those cards off. What can actually run is commands and MCP tools.</div>
+      <div class="dm-s"><b>Fail open</b>Timeouts, crashes, and illegal JSON all leave the control bit at false. To block, give an explicit deny, or exit code 2 plus a reason.</div>
+      <div class="dm-s" id="dm-s-end"><b>Position sets the contract</b>Block after the tool ran, and you block the result. Write JSON at teardown, and stdout is dropped.</div>
+    </div>
+    <div class="demo-caption">Teaching sketch:The main axis is compressed to eight points; compaction and sub-agents sit on a side path, to show firing order and contract gaps. Line numbers on the logic trail map to openai/codex commit 4f39251a01.</div>
+  </div>
+
+  <div class="sec-label">Idea 1 · Recognized and runnable are two tables</div>
+
+  <div class="q-tag reveal">What problem it solves</div>
+  <p class="reveal">You just moved a <code>hooks.json</code> over from Claude Code. Three handlers sit in the file: a command that blocks a dangerous shell, a prompt that lets a small model review the user submit, and an agent that starts a child session at Stop to run a linter. On Claude, all three run.</p>
+  <p class="reveal">Paste it into Codex and start a session. The command lights up. The other two each log <code>not supported yet</code>. The protocol enum clearly lists <code>Prompt</code> and <code>Agent</code>, and config parsing accepts both tags. What lands in the runtime table is only commands and MCP tools.</p>
+
+  <div class="q-tag reveal">What the idea is</div>
+  <p class="reveal">The kernel shows the outside three tables, and they are not the same width.</p>
+  <p class="reveal">The protocol face lists eleven event names; serde uses <code>snake_case</code>. Four handler types sit beside them: <code>Command</code>, <code>McpTool</code>, <code>Prompt</code>, <code>Agent</code>.</p>
+  <p class="src-note reveal">Source:<code>codex-rs/protocol/src/protocol.rs</code> lines 1508–1531</p>
+  <p class="reveal">The config face catches all four names with a <code>type</code> tag. The last two are empty structs. Parsing succeeds; the fields hold nothing executable.</p>
+  <p class="src-note reveal">Source:<code>codex-rs/config/src/hook_config.rs</code> lines 183–187</p>
+  <p class="reveal">Discovery sees those last two and <code>continue</code>s, with the copy <code>prompt hooks are not supported yet</code> and <code>agent hooks are not supported yet</code>. Inside the engine, the only executable kinds are commands and MCP tools. In ordinary user config they only become warnings, and the session continues. A managed required hook that names them fails startup.</p>
+  <p class="src-note reveal">Source:<code>codex-rs/hooks/src/engine/discovery.rs</code> lines 626–645</p>
+  <div class="visual reveal">
+    <svg viewBox="0 0 940 280" role="img" aria-label="Protocol, config, and runtime tables are three different widths">
+      <defs><marker id="arrA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="36" width="200" height="88" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="140" y="72" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">Protocol enum</text>
+      <text x="140" y="96" fill="#6b7280" text-anchor="middle" font-size="13">11 events, 4 types</text>
+      <path fill="none" d="M248 80H318" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="326" y="36" width="220" height="88" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="436" y="72" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">Config parse</text>
+      <text x="436" y="96" fill="#6b7280" text-anchor="middle" font-size="13">Prompt / Agent are empty structs</text>
+      <path fill="none" d="M554 80H624" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="632" y="20" width="268" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="766" y="54" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">Runtime: Command / McpTool</text>
+      <path fill="none" d="M554 110H624" stroke="#414b5a" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrA)"/>
+      <rect x="632" y="90" width="268" height="56" rx="10" fill="#ffffff" stroke="rgba(65,75,90,.35)" stroke-dasharray="7 5"/>
+      <text x="766" y="124" fill="#6b7280" text-anchor="middle" font-size="13" font-weight="700">skip: not supported yet</text>
+      <text x="470" y="196" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">The engine type is literally named ClaudeHooksEngine</text>
+      <text x="470" y="226" fill="#6b7280" text-anchor="middle" font-size="13">Claude-compatible hooks.json is the product door: catch four names first, fill executors later</text>
+      <text x="470" y="256" fill="#6b7280" text-anchor="middle" font-size="13">The wire enum omits SessionEnd, because teardown never inspects stdout</text>
+    </svg>
+    <div class="visual-caption">Write the three tables apart: recognized, parseable, and runnable are three different facts.</div>
+  </div>
+  <p class="reveal">The JSON hook runtime type is literally <code>ClaudeHooksEngine</code>. Compatibility is not a wish in a comment — it is the type name. stdin is fed JSON; stdout is parsed against a schema. An old notify path still sits beside it, fire-and-forget one command when a turn clocks out. Don’t mix the two roads.</p>
+  <p class="src-note reveal">Source:<code>codex-rs/hooks/src/engine/mod.rs</code> lines 107–119</p>
+
+  <div class="q-tag reveal">Why it lasts</div>
+  <p class="reveal paywall-locked xa-peek">The config face can be wider than the executor. Catch the four types already in the ecosystem first, so an unknown tag does not blow up the whole <code>hooks.json</code>. The cost: people who migrate will read capability off the enum names. So discovery must leave stable copy, and a required policy that hits an unimplemented type must refuse to start. Rewrite it in another language and the minimum shape is still two tables plus a skip.</p>
+
+  <div class="sec-label paywall-locked">Idea 2 · Fail open</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">Someone wrote a <code>PreToolUse</code> script, set timeout to 1 second, and slept 5 seconds inside. They thought a crashed hook meant a block. The tool still ran. In the log that hook is <code>failed</code>, with copy <code>timed out after 1s</code>.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked"><code>run_command</code> on timeout writes <code>error</code> as <code>hook timed out after {n}s</code>, and <code>exit_code</code> is empty. Parsing sees <code>error</code> and only marks <code>Failed</code>; <code>should_block</code> stays the default <code>false</code>. The tool registry then continues into <code>handle_any_tool</code>.</p>
+  <p class="src-note reveal paywall-locked">Source:<code>codex-rs/hooks/src/engine/command_runner.rs</code> lines 317–326</p>
+  <p class="reveal paywall-locked">Only two roads actually block. JSON gives deny or <code>block</code>. Or exit code 2 with nonempty stderr. Exit code 2 with no reason counts as failure, not a block. An async hook that returns deny still cannot apply a control effect. Only a sync, trusted, not-timed-out handler can change the next step.</p>
+  <p class="src-note reveal paywall-locked">Source:<code>codex-rs/hooks/src/events/pre_tool_use.rs</code> lines 261–277</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 260" role="img" aria-label="Fork between timeout-pass and exit-code-2 block">
+      <defs><marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker><marker id="arrR" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#dc2626"/></marker></defs>
+      <rect x="40" y="96" width="170" height="64" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="125" y="134" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">PreToolUse</text>
+      <path fill="none" d="M218 108H300" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <path fill="none" d="M218 148H300" stroke="#dc2626" stroke-width="2" marker-end="url(#arrR)"/>
+      <text x="259" y="94" fill="#6b7280" text-anchor="middle" font-size="12">Timeout / crash</text>
+      <text x="259" y="176" fill="#6b7280" text-anchor="middle" font-size="12">Exit code 2 + reason</text>
+      <rect x="308" y="70" width="250" height="56" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="433" y="104" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">Failed, keep running the tool</text>
+      <rect x="308" y="138" width="250" height="56" rx="12" fill="#fdeaea" stroke="rgba(220,38,38,.4)"/>
+      <text x="433" y="172" fill="#dc2626" text-anchor="middle" font-size="14" font-weight="700">Blocked, skip the tool</text>
+      <path fill="none" d="M566 98H648" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <path fill="none" d="M566 166H648" stroke="#dc2626" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="656" y="70" width="244" height="56" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="778" y="104" fill="#262d38" text-anchor="middle" font-size="13" font-weight="700">handle_any_tool</text>
+      <rect x="656" y="138" width="244" height="56" rx="12" fill="#ffffff" stroke="rgba(220,38,38,.4)"/>
+      <text x="778" y="172" fill="#dc2626" text-anchor="middle" font-size="13" font-weight="700">RespondToModel</text>
+      <text x="470" y="232" fill="#6b7280" text-anchor="middle" font-size="13">If the hook itself crashes, the tool still runs. That is fail open.</text>
+    </svg>
+    <div class="visual-caption">Same hook point: timeout and an explicit block take the tool two different ways.</div>
+  </div>
+  <p class="reveal paywall-locked">On the approval path the rule flips. <code>PermissionRequest</code> runs before Guardian and the user approval UI. It does not rewrite tool input. Fold: any deny wins at once; otherwise keep the last allow. Allow maps to a one-shot <code>Approved</code> and does not enter the session cache. The same command next time gets asked again.</p>
+  <p class="src-note reveal paywall-locked">Source:<code>codex-rs/core/src/tools/approvals.rs</code> lines 454–474</p>
+  <p class="reveal paywall-locked">Claude’s <code>PermissionRequest</code> output has <code>updatedInput</code>. Codex marks that field reserved and fail-closes if it sees it. Move a rewrite approval hook over from Claude as-is, and it fails here — it will not rewrite.</p>
+
+  <div class="key-line reveal paywall-locked">To block, give a reason. Silence and timeouts both pass.</div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">A crashed linter hook should not freeze every tool. Availability sits in front of intercept reliability. To change the flow you must be sync, and you must have an explicit decision. To send a notice you can be async, at most eight in parallel. The approval path fail-closes on ambiguous output, because that layer cannot treat an unread field as allow.</p>
+
+  <div class="sec-label paywall-locked">Idea 3 · Too late cannot undo what already happened</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked"><code>PostToolUse</code> wants to block a dangerous write — the file is already on disk. <code>SessionEnd</code> wants to stuff a wrap-up into context — stdout is dropped. The wire enum does not even have that event name. Both wrecks share one fact: the hook point has already walked the stretch it could change.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">Eleven hook points line up on the lifecycle. The main axis is <code>SessionStart</code> → <code>UserPromptSubmit</code> → <code>PreToolUse</code> → <code>PermissionRequest</code> → tool → <code>PostToolUse</code> → <code>PreCompact</code> → <code>PostCompact</code> → <code>Stop</code> → <code>SessionEnd</code>. Sub-agents walk a thinner axis; <code>SubagentStart</code> and <code>SubagentStop</code> only fire on ThreadSpawn.</p>
+  <p class="reveal paywall-locked">Each point has a different contract.</p>
+  <p class="reveal paywall-locked"><code>PreToolUse</code> can block a tool and rewrite input. Failures fail open. <code>PostToolUse</code> only runs after a successful tool; a block rejects the result, and the side effect already happened. A <code>Stop</code> block that carries a continuation prompt is what <code>continue</code>s at the turn layer, without re-emitting <code>TurnStarted</code>. A block with no prompt is ignored. <code>should_stop</code> is what hands control back to the task shell. stop beats block.</p>
+  <p class="src-note reveal paywall-locked">Source:<code>codex-rs/core/src/session/turn.rs</code> lines 509–538</p>
+  <p class="reveal paywall-locked">A <code>UserPromptSubmit</code> block is written as <code>should_stop</code>: it stops this user message, and does not take stderr as the next-round prompt. matcher is ignored here. <code>SessionStart</code> honors <code>continue: false</code>. <code>SubagentStart</code> only injects context; the same field is dropped.</p>
+  <p class="reveal paywall-locked"><code>SessionEnd</code> is a teardown notice. Timeout defaults to 1 second, cap 3, to leave slack for app-server’s five-second shutdown. Exit 0 means done; the whole stdout is dropped. The MCP shape is skipped outright. reason is currently hardcoded <code>other</code>.</p>
+  <p class="src-note reveal paywall-locked">Source:<code>codex-rs/hooks/src/events/session_end.rs</code> lines 20–24</p>
+  <p class="reveal paywall-locked">Hook text becomes a developer-role snippet before it reaches the model. Default budget is about 2500 approximate tokens. Over the cap, the full text is written to a temp directory; the model sees a head-and-tail preview plus one path line. If the write fails, it is only truncated.</p>
+  <p class="src-note reveal paywall-locked">Source:<code>codex-rs/hooks/src/output_spill.rs</code> lines 53–91</p>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">A hook’s power is bound to where it sits on the lifecycle. Before the tool runs, you can rewrite input or skip. After it ran, you can only change the slice the model sees. Teardown has a few seconds; reading JSON, pouring context back, then waiting on MCP would drag shutdown past the cap. So it becomes a pure notice. Swap the runtime and the question is still: is this point still in time to change what already happened?</p>
+
+  <div class="sec-label paywall-locked">Side-by-side · Three ways to take the same hooks.json</div>
+  <div class="compare paywall-locked">
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code: twenty-seven events, and Prompt and Agent actually run</h4>
+      <p>In the restored source, <code>HOOK_EVENTS</code> has 27 entries. Codex’s eleven are all there, plus post-failure events, notifications, worktree and file changes. <code>execPromptHook</code> runs a prompt on a small model, and when it builds the user message it bypasses <code>processUserInput</code> so <code>UserPromptSubmit</code> does not fire again. <code>execAgentHook</code> starts a full query.</p>
+      <p>Claude’s runtime face is wider than its config face. Codex flips that: catch four types first, fill executors later. Event names overlap heavily — that is the alignment move. The type name <code>ClaudeHooksEngine</code> writes the product judgment into an identifier.</p>
+      <span class="cmp-tag">Both sides checked against source · 2026-08-22</span>
+    </div>
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DSH: the plugin waterfall is native; the hook file is a compatibility bridge</h4>
+      <p>DSH’s tool pipeline opens a waterfall on <code>tools/pre-execute</code> and another on <code>tools/post-execute</code>. A native plugin can do everything the bridge can. <code>hooks-codex</code> only maps five points: <code>PreToolUse</code>, <code>PostToolUse</code>, <code>SessionStart</code>, <code>UserPromptSubmit</code>, <code>Stop</code>. No rewrite, no <code>PermissionRequest</code>. Anything other than <code>type: command</code>, and anything async, is skipped after parse.</p>
+      <p>DSH had plugins first, then added file compatibility. Codex had the Claude file contract first, then lets plugins stuff declarations into the same engine. Grok fills the observation face with fifteen event names; <code>is_blocking()</code> returns true only for <code>PreToolUse</code>, and there is no pre-approval hook.</p>
+      <span class="cmp-tag">Both sides checked against source · 2026-08-22 · <a href="dsh-12.html">DSH · Plugin waterfall</a></span>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div>
+      <h3>One PreToolUse, two return values</h3>
+      <p>The project has a <code>PreToolUse</code> command hook whose matcher points at a harmless <code>echo</code>. First set timeout to 1 and sleep 5 seconds in the script. Then change the script to exit 2 and write <code>blocked by test</code> to stderr.</p>
+      <p>Walk both endings: does the tool run, what does the model see, and is the hook <code>failed</code> or <code>blocked</code>. Then explain why the first trip cannot treat “the hook died” as a block.</p>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/></svg>
+    <span><b>Takeaway:</b>Protocol, config, and runtime are three tables; only commands and MCP can run. Failures fail open — to block, give a reason. What each hook can change is bound to its place on the lifecycle. After teardown, and after the tool has run, it is already too late to change what happened.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function(){
+  var MAIN = [
+    {id:'SessionStart', name:'SessionStart'},
+    {id:'UserPromptSubmit', name:'UserPromptSubmit'},
+    {id:'PreToolUse', name:'PreToolUse'},
+    {id:'PermissionRequest', name:'PermissionRequest'},
+    {id:'Tool', name:'Tool run'},
+    {id:'PostToolUse', name:'PostToolUse'},
+    {id:'Stop', name:'Stop'},
+    {id:'SessionEnd', name:'SessionEnd'}
+  ];
+  var SUB = [
+    {id:'SubagentStart', name:'SubagentStart'},
+    {id:'SubagentStop', name:'SubagentStop'}
+  ];
+  var mode = 'timeout';
+  var steps = [], idx = 0, autoId = null, pauseUntil = 0, played = false, prevTrace = null;
+  var hooksEl = document.getElementById('dm-hooks');
+  var subEl = document.getElementById('dm-sub');
+  var colsEl = document.querySelector('.dm-cols');
+  var traceBox = document.querySelector('.dm-trace');
+  var gotEl = document.getElementById('dm-got');
+  var canEl = document.getElementById('dm-can');
+  var toolEl = document.getElementById('dm-tool');
+  var ctxEl = document.getElementById('dm-ctx');
+  var traceRows = Array.prototype.slice.call(document.querySelectorAll('#dm-trace li'));
+  var captionText = document.getElementById('dm-caption-text');
+  var summary = document.getElementById('dm-summary');
+  var endSum = document.getElementById('dm-s-end');
+  var IDLE = 'Hit Play. Watch what each hook gets in one turn, what it can change, and when it’s already too late.';
+
+  function chip(item){
+    var d = document.createElement('div');
+    d.className = 'dm-h';
+    d.setAttribute('data-id', item.id);
+    d.textContent = item.name;
+    return d;
+  }
+  function buildChips(){
+    hooksEl.innerHTML = '';
+    subEl.innerHTML = '';
+    MAIN.forEach(function(h){ hooksEl.appendChild(chip(h)); });
+    SUB.forEach(function(h){ subEl.appendChild(chip(h)); });
+  }
+  function allChips(){
+    return Array.prototype.slice.call(document.querySelectorAll('#dm-hooks .dm-h, #dm-sub .dm-h'));
+  }
+  function bump(el, cls){
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+  function setBar(st){
+    var order = MAIN.map(function(x){ return x.id; });
+    var n = 0;
+    if (st && st.on && order.indexOf(st.on) >= 0) n = order.indexOf(st.on) + 1;
+    else if (st && st.done && st.done.length) {
+      st.done.forEach(function(id){
+        var i = order.indexOf(id);
+        if (i + 1 > n) n = i + 1;
+      });
+    }
+    hooksEl.style.setProperty('--bar', String(n / MAIN.length));
+  }
+  function paintHooks(onId, kind, extras, animate){
+    extras = extras || {};
+    var chips = allChips();
+    var oldRects = {};
+    if (animate) {
+      chips.forEach(function(el){
+        oldRects[el.getAttribute('data-id')] = el.getBoundingClientRect();
+      });
+    }
+    hooksEl.classList.add('is-live');
+    subEl.classList.add('is-live');
+    chips.forEach(function(el){
+      var id = el.getAttribute('data-id');
+      var prev = el.className;
+      var cls = 'dm-h';
+      if (extras.late && extras.late.indexOf(id) >= 0) cls += ' late';
+      else if (extras.skip && extras.skip.indexOf(id) >= 0) cls += ' skip';
+      else if (id === onId) cls += ' ' + (kind || 'on');
+      else if (extras.done && extras.done.indexOf(id) >= 0) cls += ' on';
+      if (id === onId) cls += ' now';
+      el.className = cls;
+      if (animate && id === onId && prev !== cls) bump(el, 'firing');
+    });
+    if (animate) {
+      chips.forEach(function(el){
+        var old = oldRects[el.getAttribute('data-id')];
+        if (!old) return;
+        var now = el.getBoundingClientRect();
+        var dx = old.left - now.left;
+        var dy = old.top - now.top;
+        if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+        el.style.transition = 'none';
+        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        requestAnimationFrame(function(){
+          el.style.transition = '';
+          el.style.transform = '';
+        });
+      });
+    }
+  }
+
+  function buildSteps(m){
+    var out = [];
+    if (m === 'prompt') {
+      out.push({
+        cap: 'The config wrote type: prompt. Parsing succeeds; the field is an empty struct.',
+        trace: 1, on: null, kind: 'skip', skip: [],
+        got: 'The Prompt tag in hooks.json',
+        can: 'Config knows the name; there is still no executable field',
+        tool: 'Not at the tool yet', ctx: 'Empty',
+        tk: '', ck: ''
+      });
+      out.push({
+        cap: 'Discovery tears the card off and leaves not supported yet. The runtime table is empty.',
+        trace: 2, on: null, kind: 'skip', skip: MAIN.map(function(x){return x.id;}).concat(['SubagentStart','SubagentStop']),
+        got: 'A declaration that will never enter the runtime table',
+        can: 'Nothing can change; the session continues',
+        tool: 'No hook is watching it', ctx: 'No extra context',
+        tk: '', ck: 'hold'
+      });
+      out.push({
+        cap: 'The timeline walks on. UserPromptSubmit and PreToolUse have no handler to run.',
+        trace: 3, on: 'UserPromptSubmit', kind: 'skip', skip: ['UserPromptSubmit','PreToolUse'],
+        done: ['SessionStart'],
+        got: 'That user sentence',
+        can: 'This message could have been stopped, but the card is already gone',
+        tool: 'Will run on the default path', ctx: 'No hook injection',
+        tk: '', ck: ''
+      });
+      out.push({
+        cap: 'The tool runs, Stop passes, SessionEnd says hello. The Prompt type never had an executor.',
+        trace: 3, on: 'SessionEnd', kind: 'skip', skip: ['SessionEnd'],
+        done: ['SessionStart','UserPromptSubmit','PreToolUse','PermissionRequest','Tool','PostToolUse','Stop'],
+        got: 'Teardown notice',
+        can: 'Even if a command hung here, output is not read',
+        tool: 'Already finished', ctx: 'Still blank',
+        tk: 'ok', ck: '', fin: true
+      });
+      return out;
+    }
+
+    out.push({
+      cap: 'Discovery looks at type first. Command enters the runtime table; Prompt and Agent are dropped here.',
+      trace: 3, on: null, kind: 'on',
+      got: 'A Command declaration',
+      can: 'Normalize timeout first, then check trust',
+      tool: 'Not at PreToolUse yet', ctx: 'Empty',
+      tk: '', ck: ''
+    });
+    out.push({
+      cap: 'SessionStart fires first. matcher eats startup / resume / clear / compact. Here you can stop startup, or inject context.',
+      trace: 0, on: 'SessionStart', kind: 'on', done: [],
+      got: 'Source string startup',
+      can: 'When sync, continue: false can become a stop',
+      tool: 'Not yet', ctx: 'Can inject a developer snippet',
+      tk: '', ck: ''
+    });
+    out.push({
+      cap: 'User messages pass UserPromptSubmit before they enter the turn. matcher is ignored. A block here is written as stop, and stderr is not taken as the next-round prompt.',
+      trace: 0, on: 'UserPromptSubmit', kind: 'on', done: ['SessionStart'],
+      got: 'The raw user submit',
+      can: 'Stop this message, or inject context',
+      tool: 'Not yet', ctx: 'Can attach a note',
+      tk: '', ck: ''
+    });
+
+    if (m === 'timeout') {
+      out.push({
+        cap: 'PreToolUse gets the tool name and input. The script times out; error is written as timed out; should_block stays false.',
+        trace: 5, on: 'PreToolUse', kind: 'skip', done: ['SessionStart','UserPromptSubmit'],
+        got: 'Tool name and JSON input',
+        can: 'Could have blocked or rewritten input; timeout never gets the control bit',
+        tool: 'Will keep running', ctx: 'No extra context',
+        tk: 'hold', ck: ''
+      });
+      out.push({
+        cap: 'The tool gray block walks on. Hook status is failed. Failures fail open.',
+        trace: 5, on: 'Tool', kind: 'pass', done: ['SessionStart','UserPromptSubmit','PreToolUse'],
+        got: 'An invocation you can no longer change',
+        can: 'No hook on this step; the tool is running',
+        tool: 'echo ping already ran', ctx: 'Empty',
+        tk: 'ok', ck: ''
+      });
+      out.push({
+        cap: 'PostToolUse only runs after success. Block now and you block the result; the file was already written.',
+        trace: 5, on: 'PostToolUse', kind: 'on', done: ['SessionStart','UserPromptSubmit','PreToolUse','PermissionRequest','Tool'],
+        got: 'The result the tool already finished',
+        can: 'Reject the result or attach feedback; you cannot undo the side effect',
+        tool: 'The side effect already happened', ctx: 'Can attach a note',
+        tk: 'hold', ck: ''
+      });
+    } else if (m === 'deny') {
+      out.push({
+        cap: 'The same Command card now exits 2 and writes a reason to stderr. Parsing sets should_block true.',
+        trace: 6, on: 'PreToolUse', kind: 'block', done: ['SessionStart','UserPromptSubmit'],
+        got: 'Tool name and JSON input',
+        can: 'Sync, with a reason — this step is still in time to skip the tool',
+        tool: 'Will be skipped', ctx: 'The model will get the block explanation',
+        tk: 'warn', ck: 'hold'
+      });
+      out.push({
+        cap: 'The tool gray block stops. The registry goes straight to RespondToModel. PostToolUse will not run, because the tool did not succeed.',
+        trace: 6, on: 'Tool', kind: 'block', done: ['SessionStart','UserPromptSubmit','PreToolUse'],
+        late: ['PostToolUse'],
+        got: 'Block reason',
+        can: 'Already changed to skip; the later result hook is too late',
+        tool: 'Did not run', ctx: 'Command blocked by PreToolUse hook',
+        tk: 'warn', ck: 'hold'
+      });
+    } else if (m === 'stop') {
+      out.push({
+        cap: 'PreToolUse passes; the tool finishes. The axis walks to Stop.',
+        trace: 4, on: 'Tool', kind: 'pass', done: ['SessionStart','UserPromptSubmit','PreToolUse','PermissionRequest'],
+        got: 'An ordinary tool call',
+        can: 'This trip did not block before the tool',
+        tool: 'Already finished', ctx: 'Empty',
+        tk: 'ok', ck: ''
+      });
+      out.push({
+        cap: 'Stop returns block, and it carries a continuation prompt. The turn layer writes history, continues, and does not re-emit TurnStarted.',
+        trace: 8, on: 'Stop', kind: 'hold', done: ['SessionStart','UserPromptSubmit','PreToolUse','PermissionRequest','Tool','PostToolUse'],
+        got: 'This turn is about to clock out',
+        can: 'Only a prompt can continue; a block with no prompt is ignored',
+        tool: 'Already finished', ctx: 'The continue prompt is written into history',
+        tk: 'ok', ck: 'hold'
+      });
+      out.push({
+        cap: 'The timeline bends from Stop back to sampling. stop_hook_active is written into the next Stop’s stdin, to avoid a tight loop.',
+        trace: 8, on: 'UserPromptSubmit', kind: 'on', done: ['SessionStart'],
+        got: 'A continue prompt, not a new user line',
+        can: 'Still in the same turn; the task shell has not taken over',
+        tool: 'May call once more', ctx: 'Carries that hook prompt from just now',
+        tk: '', ck: 'hold'
+      });
+    } else if (m === 'end') {
+      out.push({
+        cap: 'Earlier points all passed. The axis reaches SessionEnd; the script dumps a long JSON to stdout.',
+        trace: 9, on: 'SessionEnd', kind: 'on', done: ['SessionStart','UserPromptSubmit','PreToolUse','PermissionRequest','Tool','PostToolUse','Stop'],
+        got: 'stdin has hook_event_name and a hardcoded reason: other',
+        can: 'Notice only. Exit 0 means done',
+        tool: 'Already finished', ctx: 'The whole stdout is dropped',
+        tk: 'ok', ck: 'warn'
+      });
+      out.push({
+        cap: 'The card flashes and goes dark. The wire enum has no SessionEnd, and no matching output schema. Teardown does not read output.',
+        trace: 9, on: 'SessionEnd', kind: 'skip', done: ['SessionStart','UserPromptSubmit','PreToolUse','PermissionRequest','Tool','PostToolUse','Stop'],
+        late: ['SessionEnd'],
+        got: 'Teardown only gives 1 to 3 seconds',
+        can: 'No time to pour context back, and MCP is not allowed',
+        tool: 'Already finished', ctx: 'Blank; the JSON was dropped',
+        tk: 'ok', ck: 'warn'
+      });
+    }
+
+    if (m !== 'stop' && m !== 'end' && m !== 'prompt') {
+      out.push({
+        cap: 'Stop passes. SessionEnd says hello and leaves; reason is hardcoded other.',
+        trace: 9, on: 'SessionEnd', kind: 'on',
+        done: ['SessionStart','UserPromptSubmit','PreToolUse','PermissionRequest','Tool','PostToolUse','Stop'],
+        got: 'Teardown notice',
+        can: 'Does not read stdout; must finish in 1 to 3 seconds',
+        tool: m === 'deny' ? 'Did not run this turn' : 'Already finished',
+        ctx: 'No wrap-up note',
+        tk: m === 'deny' ? 'warn' : 'ok', ck: '', fin: true
+      });
+    } else if (m === 'stop' || m === 'end') {
+      out[out.length - 1].fin = true;
+    }
+    return out;
+  }
+
+  function setKv(el, title, text, kind, animate){
+    var span = el.querySelector('[data-val]');
+    if (!span) {
+      el.innerHTML = '<b>' + title + '</b><span data-val></span>';
+      span = el.querySelector('[data-val]');
+    }
+    var prev = span.textContent;
+    var changed = prev !== text;
+    el.className = 'dm-kv' + (kind ? ' ' + kind : '') + (changed ? ' now' : '');
+    if (animate && changed) {
+      span.style.opacity = '0';
+      requestAnimationFrame(function(){
+        span.textContent = text;
+        requestAnimationFrame(function(){ span.style.opacity = '1'; });
+      });
+      bump(el, (kind === 'warn' || kind === 'hold') ? 'firing' : 'pop');
+    } else {
+      span.textContent = text;
+    }
+  }
+
+  function showSummary(){
+    var extra = {
+      timeout: 'On the timeout trip the tool ran; the hook only recorded failed.',
+      deny: 'Exit code 2 plus a reason: the tool is skipped, the model gets the block explanation.',
+      prompt: 'The Prompt type is torn off at discovery; no runnable card sits on the axis.',
+      stop: 'The continue-from-block stays at the turn layer; TurnStarted does not flash.',
+      end: 'SessionEnd JSON never leaves teardown; context stays blank.'
+    };
+    endSum.innerHTML = '<b>How this trip ended</b>' + extra[mode];
+    summary.classList.add('on');
+  }
+
+  function paint(st, animate){
+    paintHooks(st.on, st.kind, {done: st.done, skip: st.skip, late: st.late}, animate);
+    setBar(st);
+    if (colsEl) colsEl.classList.add('is-live');
+    setKv(gotEl, 'Got', st.got, '', animate);
+    setKv(canEl, 'Can change', st.can, st.kind === 'block' ? 'warn' : (st.kind === 'hold' ? 'hold' : ''), animate);
+    setKv(toolEl, 'Tool', st.tool, st.tk || '', animate);
+    setKv(ctxEl, 'Context', st.ctx, st.ck || '', animate);
+    if (st.trace !== null && st.trace !== undefined) {
+      if (traceBox) traceBox.classList.add('is-live');
+      traceRows.forEach(function(el, n){
+        el.classList.toggle('on', n === st.trace);
+        if (animate && n === st.trace && st.trace !== prevTrace) bump(el, 'firing');
+      });
+      prevTrace = st.trace;
+    }
+    if (animate) {
+      captionText.style.opacity = '0';
+      requestAnimationFrame(function(){
+        captionText.textContent = st.cap;
+        requestAnimationFrame(function(){ captionText.style.opacity = '1'; });
+      });
+    } else {
+      captionText.textContent = st.cap;
+    }
+    if (st.fin) showSummary();
+    else summary.classList.remove('on');
+  }
+
+  function holdFor(i){
+    var st = steps[i];
+    if (!st) return 1100;
+    if (st.fin) return 2400;
+    if (st.kind === 'block') return 2200;
+    if (st.on === 'PreToolUse' && st.kind === 'skip') return 2200;
+    if (st.on === 'PostToolUse') return 2000;
+    if (st.on === 'Stop') return 2200;
+    if (st.late && st.late.length) return 2200;
+    if (st.on === 'Tool') return 1800;
+    if (st.skip && st.skip.length > 4) return 1900;
+    if (!st.on) return 1100;
+    if (st.on === 'SessionStart') return 1200;
+    return 1400;
+  }
+
+  function tick(){
+    if (idx >= steps.length) { stop(); return; }
+    paint(steps[idx], true);
+    idx++;
+    if (idx >= steps.length) stop();
+  }
+  function stop(){
+    if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+    pauseUntil = 0;
+  }
+  function loop(ts){
+    if (idx >= steps.length) { autoId = null; return; }
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(loop); return; }
+    paint(steps[idx], true);
+    var wait = holdFor(idx);
+    idx++;
+    pauseUntil = ts + wait;
+    if (idx >= steps.length) { autoId = null; return; }
+    autoId = requestAnimationFrame(loop);
+  }
+  function reset(){
+    stop(); idx = 0; prevTrace = null;
+    steps = buildSteps(mode);
+    hooksEl.classList.remove('is-live');
+    subEl.classList.remove('is-live');
+    if (colsEl) colsEl.classList.remove('is-live');
+    if (traceBox) traceBox.classList.remove('is-live');
+    hooksEl.style.setProperty('--bar', '0');
+    buildChips();
+    setKv(gotEl, 'Got', 'Hasn’t started yet.', '', false);
+    setKv(canEl, 'Can change', 'Pick a return value, then play.', '', false);
+    setKv(toolEl, 'Tool', 'Not at PreToolUse yet.', '', false);
+    setKv(ctxEl, 'Context', 'Empty.', '', false);
+    if (colsEl) colsEl.classList.remove('is-live');
+    traceRows.forEach(function(el){ el.classList.remove('on'); el.classList.remove('firing'); });
+    summary.classList.remove('on');
+    captionText.style.opacity = '1';
+    captionText.textContent = IDLE;
+  }
+  function play(){
+    if (idx >= steps.length) reset();
+    if (autoId) return;
+    pauseUntil = 0;
+    autoId = requestAnimationFrame(loop);
+  }
+
+  document.getElementById('dm-play').addEventListener('click', play);
+  document.getElementById('dm-step').addEventListener('click', function(){ stop(); tick(); });
+  document.getElementById('dm-reset').addEventListener('click', reset);
+  document.getElementById('dm-seg').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    Array.prototype.forEach.call(this.children, function(el){ el.classList.remove('on'); });
+    b.classList.add('on');
+    mode = b.getAttribute('data-mode');
+    reset();
+  });
+
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(document.getElementById('demo-hooks'), function(){
+      if (played) return; played = true; play();
+    });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>快取：AI 帳單的隱形折扣 | xueai.miyang.cn</title>
+<style>@keyframes _si{from{opacity:0}to{opacity:1}}body{opacity:0;animation:_si 0.15s ease 0.08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<!-- SEO Start -->
+<meta name="description" content="KV Cache 和語義快取都是同一招：算過的別再算。親眼看兩輪對話裡前綴 token 怎麼「快取命中，免算」；再拖動命中率滑塊，看客服機器人的月帳單從 6000 元跌到幾百元——Harness 核心篇成本優化的底層原理。">
+<meta name="keywords" content="KV Cache,語義快取,提示詞快取,prompt caching,AI成本優化,快取失效,資料結構入門">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/ds-6.tw.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/ds-6.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/ds-6.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/ds-6.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/ds-6.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/ds-6.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/ds-6.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/ds-6.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:title" content="快取：AI 帳單的隱形折扣">
+<meta property="og:description" content="KV Cache 和語義快取都是同一招：算過的別再算。拖動命中率滑塊即時看帳單變化。">
+<meta property="og:url" content="https://xueai.miyang.cn/slides/ds-6.tw.html">
+<meta property="og:image" content="https://xueai.miyang.cn/slides/og/ds-6.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="快取：AI 帳單的隱形折扣">
+<meta name="twitter:description" content="KV Cache 和語義快取都是同一招：算過的別再算。拖動命中率滑塊即時看帳單變化。">
+<meta name="twitter:image" content="https://xueai.miyang.cn/og-cover.jpg">
+<!-- SEO End -->
+<style>
+:root{--ds:#0284c7;--ds-deep:#075985;--ds-soft:rgba(2,132,199,.08);--ds-line:rgba(2,132,199,.28)}
+.lesson-header .kicker{color:var(--ds)}
+.l-callout b{color:var(--ds)}
+.btn-ds{background:var(--ds);color:#fff;border:none;padding:10px 26px;border-radius:999px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:filter .15s,transform .15s}
+.btn-ds:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ds:disabled{background:#c4c8cf;cursor:not-allowed}
+
+/* ── 交互 1：KV Cache token 序列 ── */
+.kv-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 22px}
+.kv-round{margin-bottom:18px}
+.kv-round-head{display:flex;align-items:baseline;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+.kv-round-head h5{font-size:14px;font-weight:800;color:var(--text)}
+.kv-round-note{font-size:12px;color:var(--sub);font-weight:600}
+.tok-strip{display:flex;flex-wrap:wrap;gap:4px;align-items:flex-end}
+.tok-group{display:flex;flex-direction:column;gap:4px}
+.tok-group-label{font-size:10.5px;font-weight:800;color:var(--sub);text-align:center;letter-spacing:.3px}
+.tok-cells{display:flex;gap:4px}
+.tok{width:22px;height:22px;border-radius:5px;background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.05);transition:background .18s,box-shadow .18s,transform .18s}
+.tok.calc{background:var(--amber);box-shadow:0 0 0 1.5px rgba(217,119,6,.35);transform:scale(1.12)}
+.tok.done{background:rgba(217,119,6,.4);transform:scale(1)}
+.tok.hit{background:var(--success);box-shadow:0 0 0 1.5px rgba(22,163,74,.3)}
+.tok.ghost{opacity:.25}
+.kv-legend{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 16px;font-size:12px;color:var(--sub);font-weight:600}
+.kv-legend .dot{display:inline-block;width:11px;height:11px;border-radius:3.5px;vertical-align:-1px;margin-right:5px}
+.kv-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}
+.kv-status{font-size:12.5px;color:var(--sub);font-weight:600}
+.kv-status b{color:var(--ds-deep)}
+.kv-compare{margin-top:18px;border-top:1px dashed var(--border);padding-top:16px;opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.kv-compare.show{opacity:1;transform:translateY(0)}
+.kv-compare h6{font-size:12.5px;font-weight:800;color:var(--text);margin-bottom:10px}
+.kvc-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.kvc-label{width:130px;font-size:12px;font-weight:700;color:var(--sub);text-align:right;flex-shrink:0}
+.kvc-track{flex:1;height:16px;border-radius:6px;background:rgba(0,0,0,.05);overflow:hidden}
+.kvc-fill{height:100%;border-radius:6px;width:0;transition:width .8s cubic-bezier(.25,1,.5,1)}
+.kvc-row.nocache .kvc-fill{background:var(--amber)}
+.kvc-row.cache .kvc-fill{background:var(--success)}
+.kvc-val{width:120px;font-size:12.5px;font-weight:800;flex-shrink:0;font-variant-numeric:tabular-nums}
+.kvc-row.nocache .kvc-val{color:var(--amber)}
+.kvc-row.cache .kvc-val{color:var(--success)}
+.kv-verdict{margin-top:12px;padding:14px 18px;background:var(--ds-soft);border:1.5px dashed var(--ds-line);border-radius:var(--radius-sm);font-size:13.5px;line-height:1.8;color:var(--sub)}
+.kv-verdict b{color:var(--ds-deep)}
+
+/* ── 交互 2：语义缓存账单 ── */
+.bill-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:20px 24px}
+.bill-scene{font-size:13.5px;color:var(--sub);line-height:1.8;margin-bottom:16px}
+.bill-scene b{color:var(--text)}
+.bill-slider-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.bill-slider-row label{font-size:13.5px;font-weight:800;color:var(--text);flex-shrink:0}
+.bill-slider-row input[type=range]{flex:1;min-width:160px;accent-color:var(--ds)}
+.bill-rate{font-size:16px;font-weight:900;color:var(--ds);font-variant-numeric:tabular-nums;min-width:52px}
+.bill-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.bill-card{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:16px 18px;text-align:center}
+.bill-card .bc-label{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:6px}
+.bill-card .bc-val{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.2}
+.bill-card.pay .bc-val{color:var(--danger)}
+.bill-card.save .bc-val{color:var(--success)}
+.bill-card .bc-sub{font-size:11.5px;color:var(--sub);margin-top:5px;font-weight:600}
+.bill-note{margin-top:16px;font-size:13px;color:var(--sub);line-height:1.8;border-top:1px dashed var(--border);padding-top:13px;min-height:44px}
+.bill-note b{color:var(--ds-deep)}
+
+/* 缓存失效提醒卡 */
+.expire-card{margin-top:18px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a;border-radius:var(--radius);padding:20px 24px}
+.expire-card h4{font-size:15px;font-weight:800;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.expire-card p{font-size:13.5px;color:#78350f;line-height:1.85}
+.expire-card p b{color:#92400e}
+
+/* ── AI 真身 ── */
+.ai-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.ai-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 16px;box-shadow:var(--shadow-card)}
+.ai-card .ic{font-size:24px;margin-bottom:7px}
+.ai-card h4{font-size:14px;font-weight:800;color:var(--text);margin-bottom:5px}
+.ai-card p{font-size:12.5px;color:var(--sub);line-height:1.7}
+.ai-card p b{color:var(--ds-deep)}
+
+/* ── takeaway ── */
+.takeaway-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1.5px solid #bae6fd;border-radius:var(--radius);padding:24px 28px;margin-top:36px}
+.takeaway-box h3{font-size:17px;font-weight:800;color:var(--ds-deep);margin-bottom:10px}
+.takeaway-box ul{list-style:none;padding:0;margin:0}
+.takeaway-box li{font-size:14.5px;color:#0c4a6e;line-height:1.8;padding:4px 0 4px 22px;position:relative}
+.takeaway-box li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;background:var(--ds)}
+
+@media (max-width:768px){
+  .tok{width:15px;height:15px}
+  .bill-cards{grid-template-columns:1fr}
+  .ai-grid{grid-template-columns:1fr 1fr}
+  .kvc-label{width:96px;font-size:11px}
+  .kvc-val{width:92px;font-size:11px}
+}
+</style>
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"快取：AI 帳單的隱形折扣","name":"快取：AI 帳單的隱形折扣","url":"https://xueai.miyang.cn/slides/ds-6.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 雜湊與快取：空間換時間","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"KV Cache 和語義快取都是同一招：算過的別再算。親眼看兩輪對話裡前綴 token 怎麼「快取命中，免算」；再拖動命中率滑塊，看客服機器人的月帳單從 6000 元跌到幾百元——Harness 核心篇成本優化的底層原理。","datePublished":"2026-08-10","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<main class="lesson">
+
+  <header class="lesson-header">
+    <div class="kicker">程式設計基礎篇 · 雜湊與快取：空間換時間</div>
+    <h1>快取：AI 帳單的隱形折扣</h1>
+    <p class="subtitle">上一課的雜湊表解決了「怎麼瞬間找到」，這一課解決另一個問題：<b>算過的東西，別再算第二遍</b>。你在模型價格表上見過的「快取命中五折甚至一折」，帳單上省下的每一分錢，背後都是同一種收納方式——把算過的結果存起來，下次直接取。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>KV Cache 和語義快取都是同一招：算過的別再算。拖動命中率滑塊即時看帳單變化——Harness 核心篇成本優化的底層原理</p></aside><!--seo:end-->  <div class="sec-label">先想一個日常場景</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">你算過一次「37 × 89 = 3293」，第二天有人又問你 37 × 89 等於幾——你會重新列豎式嗎？不會，你直接報答案。<b style="color:var(--text)">快取就是電腦的這種「直接報答案」</b>：把算過的結果按 key 存進上一課的雜湊表，下次遇到同樣的 key，一步直達取結果。雜湊表管「存哪、怎麼找」，快取管「什麼值得存」。兩課合起來才是完整的「空間換時間」。</p>
+
+  <div class="sec-label">互動 1 · KV Cache：同一段開頭別算兩遍</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;">大模型每生成一個字，都要「回頭看」前面所有 token，給每個 token 算一份注意力的中間結果。關鍵在於：<b style="color:var(--text)">只要前綴一模一樣，這些中間結果就一模一樣</b>——那第二輪對話還重算它幹嘛？下面每個小方塊是一個 token，先點「播放第一輪」，再點「播放第二輪」。<b style="color:var(--amber)">留意</b>第二輪裡綠色方塊出現的速度：它們沒有被計算，是直接從快取取的。</p>
+
+  <div class="kv-box">
+    <div class="kv-legend">
+      <span><span class="dot" style="background:var(--amber)"></span>正在計算（燒算力）</span>
+      <span><span class="dot" style="background:rgba(217,119,6,.4)"></span>本輪算過</span>
+      <span><span class="dot" style="background:var(--success)"></span>快取命中，免算</span>
+      <span><span class="dot" style="background:rgba(0,0,0,.06)"></span>還沒輪到</span>
+    </div>
+    <div class="kv-round">
+      <div class="kv-round-head"><h5>第一輪對話</h5><span class="kv-round-note">系統提示詞 + 問題①，每個 token 都要從零計算</span></div>
+      <div class="tok-strip" id="strip1"></div>
+    </div>
+    <div class="kv-round">
+      <div class="kv-round-head"><h5>第二輪對話</h5><span class="kv-round-note">字首（系統提示詞 + 第一輪全部內容）一字沒變</span></div>
+      <div class="tok-strip" id="strip2"></div>
+    </div>
+    <div class="kv-controls">
+      <button class="btn-ds" id="btnRound1">▶ 播放第一輪</button>
+      <button class="btn-ds" id="btnRound2" disabled>▶ 播放第二輪</button>
+      <span class="kv-status" id="kvStatus">先播第一輪，看每個 token 逐個點亮計算</span>
+    </div>
+    <div class="kv-compare" id="kvCompare">
+      <h6>第二輪的計算量對比（方塊數 = 要算的 token 數）</h6>
+      <div class="kvc-row nocache">
+        <div class="kvc-label">沒有 KV Cache</div>
+        <div class="kvc-track"><div class="kvc-fill" id="kvcNo"></div></div>
+        <div class="kvc-val" id="kvcNoVal">0 個 token</div>
+      </div>
+      <div class="kvc-row cache">
+        <div class="kvc-label">有 KV Cache</div>
+        <div class="kvc-track"><div class="kvc-fill" id="kvcYes"></div></div>
+        <div class="kvc-val" id="kvcYesVal">0 個 token</div>
+      </div>
+      <div class="kv-verdict">
+        <b>KV Cache 快取的是「算過的注意力中間結果」</b>（每個 token 的 Key 和 Value，名字就是這麼來的），不是快取答案本身。對話每多一輪，前綴就更長、省得就更多——真實場景裡系統提示詞動輒幾千 token，輪輪重算等於輪輪全價買單。模型廠商價格表上「快取命中的輸入 token 打一折」，指的正是這些綠色方塊。
+      </div>
+    </div>
+  </div>
+
+  <div class="l-callout paywall-locked xa-peek" style="margin-top:18px;">
+    <b>一個立刻能用的驗收直覺：</b>KV Cache 只認「字首一模一樣」。如果你的應用每輪都把系統提示詞改一個字（比如把當前時間拼在最前面），快取就輪輪失效，帳單直接翻幾倍。把會變的內容放到提示詞<b>末尾</b>、固定內容放<b>開頭</b>——這是花一分鐘就能省一大筆的架構習慣。
+  </div>
+
+  <div class="sec-label paywall-locked">互動 2 · 語義快取的帳單</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">KV Cache 省的是「同一段開頭」，還有一種更狠的：<b style="color:var(--text)">同樣的問題，答案整個都別再算</b>。客服機器人每天被問 1 萬次「怎麼退貨」，問法五花八門但意思相同——把「意思」當 key（用向量相似度判斷，第十課細講），命中就直接返回存好的答案，一次模型呼叫都不用發。拖動命中率滑塊，<b style="color:var(--amber)">留意</b>月帳單的變化。</p>
+
+  <div class="bill-box paywall-locked">
+    <div class="bill-scene">場景：客服機器人每天 <b>10,000 次</b>提問，每次呼叫大模型約 <b>0.02 元</b>，一個月 30 天。命中快取的提問直接返回存好的答案，<b>不產生呼叫費</b>。</div>
+    <div class="bill-slider-row">
+      <label>語義快取命中率</label>
+      <input type="range" id="hitRange" min="0" max="95" value="0" step="5">
+      <span class="bill-rate" id="hitRate">0%</span>
+    </div>
+    <div class="bill-cards">
+      <div class="bill-card pay">
+        <div class="bc-label">這個月要付</div>
+        <div class="bc-val" id="billPay">¥6,000</div>
+        <div class="bc-sub" id="billPaySub">每天 10,000 次全部真實呼叫</div>
+      </div>
+      <div class="bill-card save">
+        <div class="bc-label">快取幫你省下</div>
+        <div class="bc-val" id="billSave">¥0</div>
+        <div class="bc-sub">這就是Harness 核心篇講過的語義快取策略在省錢</div>
+      </div>
+    </div>
+    <div class="bill-note" id="billNote"></div>
+  </div>
+
+  <div class="expire-card paywall-locked">
+    <h4>⚠️ 但是——退貨政策改了怎麼辦？</h4>
+    <p>快取裡還躺著按<b>舊政策</b>生成的標準答案，機器人會一本正經地拿它繼續回答十天半個月，比不快取錯得更穩定、更理直氣壯。所以工程師常說：<b>快取最難的不是存，是知道什麼時候作廢</b>（術語叫「快取失效」，電腦科學兩大難題之一）。常見做法：給快取設個保質期（比如 24 小時過期）、或者政策一更新就主動清掉相關條目。設計任何快取前先想好這一步，否則省下的錢會用客訴還回來。</p>
+  </div>
+
+  <div class="sec-label paywall-locked">它在 AI 世界的真身</div>
+
+  <p style="font-size:15px;color:var(--sub);margin-bottom:16px;" class="paywall-locked">「算過的別再算」這一招無處不在，下面四個你天天在享受的東西，本質上是同一個結構。</p>
+
+  <div class="ai-grid paywall-locked">
+    <div class="ai-card"><div class="ic">🧠</div><h4>KV Cache</h4><p>大模型推理的標配：字首 token 的注意力中間結果只算一次。<b>沒有它，長對話根本跑不動</b>。</p></div>
+    <div class="ai-card"><div class="ic">💬</div><h4>語義快取</h4><p>把「問題的意思」當 key，相似提問直接複用答案。高頻客服場景能砍掉一大半呼叫費。</p></div>
+    <div class="ai-card"><div class="ic">🌐</div><h4>瀏覽器快取</h4><p>圖片、樣式檔案下載一次就存本地，第二次開啟網頁秒開——你刷網頁快，一半功勞是它的。</p></div>
+    <div class="ai-card"><div class="ic">🗺</div><h4>CDN</h4><p>把內容提前存到離你最近的機房，全國使用者都像訪問本地伺服器。<b>快取 + 地理位置</b>，還是那一招。</p></div>
+  </div>
+
+  <div class="takeaway-box paywall-locked">
+    <h3>✅ 這一課想和你分享的</h3>
+    <ul>
+      <li><b>快取 = 算過的別再算</b>：結果按 key 存進雜湊表，下次直達取——上一課的結構在這一課開始賺錢</li>
+      <li><b>KV Cache 認前綴</b>：固定內容放提示詞開頭、會變的放末尾，快取命中率直接決定帳單</li>
+      <li><b>語義快取更狠</b>：意思相同的提問連模型都不調，高頻場景省錢效果按命中率線性放大</li>
+      <li><b>快取三問</b>：存什麼（值得複用的結果）、存哪（記憶體 / 磁碟 / 離使用者近的地方）、何時作廢（最難的一問）</li>
+      <li><b>驗收視角</b>：看到「每次請求都重新呼叫模型 / 重新計算」的設計，就該問一句「這裡為什麼不快取？」</li>
+    </ul>
+  </div>
+
+</main>
+<script>
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* ══ 交互 1：KV Cache token 序列 ══
+   token 数是示意（真实系统提示词动辄几千 token），
+   比例设计成前缀占大头，让「免算」的绿色一眼占优。 */
+const GROUPS1 = [
+  { label: '系統提示詞', n: 10 },
+  { label: '問題①', n: 4 },
+  { label: '回答①', n: 5 },
+];
+const GROUPS2 = [
+  { label: '系統提示詞', n: 10 },
+  { label: '問題①', n: 4 },
+  { label: '回答①', n: 5 },
+  { label: '問題②', n: 4 },
+];
+function renderStrip(el, groups){
+  el.innerHTML = groups.map(g => `
+    <div class="tok-group">
+      <div class="tok-cells">${'<div class="tok"></div>'.repeat(g.n)}</div>
+      <div class="tok-group-label">${g.label}</div>
+    </div>`).join('');
+  return [...el.querySelectorAll('.tok')];
+}
+const strip1 = document.getElementById('strip1');
+const strip2 = document.getElementById('strip2');
+const toks1 = renderStrip(strip1, GROUPS1);
+const toks2 = renderStrip(strip2, GROUPS2);
+toks2.forEach(t => t.classList.add('ghost'));
+
+const btnRound1 = document.getElementById('btnRound1');
+const btnRound2 = document.getElementById('btnRound2');
+const kvStatus = document.getElementById('kvStatus');
+const kvCompare = document.getElementById('kvCompare');
+const PREFIX_N = 19;   /* 系统提示词10 + 问题①4 + 回答①5 */
+const ROUND2_TOTAL = 23;
+let kvBusy = false;
+
+btnRound1.addEventListener('click', async () => {
+  if (kvBusy) return;
+  kvBusy = true;
+  btnRound1.disabled = true;
+  toks1.forEach(t => t.className = 'tok');
+  kvStatus.innerHTML = '第一輪：每個 token 逐個點亮計算……';
+  for (let i = 0; i < toks1.length; i++){
+    if (i > 0) { toks1[i-1].classList.remove('calc'); toks1[i-1].classList.add('done'); }
+    toks1[i].classList.add('calc');
+    await sleep(110);
+  }
+  toks1[toks1.length-1].classList.remove('calc');
+  toks1[toks1.length-1].classList.add('done');
+  kvStatus.innerHTML = `第一輪算完 <b>${toks1.length} 個 token</b>，中間結果全部存進 KV Cache。現在播第二輪`;
+  btnRound2.disabled = false;
+  kvBusy = false;
+});
+
+btnRound2.addEventListener('click', async () => {
+  if (kvBusy) return;
+  kvBusy = true;
+  btnRound2.disabled = true;
+  toks2.forEach(t => t.className = 'tok ghost');
+  kvStatus.innerHTML = '第二輪：先看前綴……';
+  await sleep(400);
+  /* 前缀 19 个 token 快速刷绿：缓存命中，免算 */
+  for (let i = 0; i < PREFIX_N; i++){
+    toks2[i].classList.remove('ghost');
+    toks2[i].classList.add('hit');
+    await sleep(28);
+  }
+  kvStatus.innerHTML = `字首 <b>${PREFIX_N} 個 token 快取命中，免算</b>——直接從上一輪的結果裡取`;
+  await sleep(800);
+  /* 只有新增的问题② 4 个 token 需要计算 */
+  for (let i = PREFIX_N; i < toks2.length; i++){
+    if (i > PREFIX_N) { toks2[i-1].classList.remove('calc'); toks2[i-1].classList.add('done'); }
+    toks2[i].classList.remove('ghost');
+    toks2[i].classList.add('calc');
+    await sleep(160);
+  }
+  toks2[toks2.length-1].classList.remove('calc');
+  toks2[toks2.length-1].classList.add('done');
+  kvStatus.innerHTML = `第二輪只真正計算了 <b>${ROUND2_TOTAL - PREFIX_N} 個新 token</b>`;
+  await sleep(400);
+  /* 对比条 */
+  kvCompare.classList.add('show');
+  await sleep(60);
+  document.getElementById('kvcNo').style.width = '100%';
+  document.getElementById('kvcNoVal').textContent = ROUND2_TOTAL + ' 個 token 全價';
+  document.getElementById('kvcYes').style.width = ((ROUND2_TOTAL - PREFIX_N) / ROUND2_TOTAL * 100) + '%';
+  document.getElementById('kvcYesVal').textContent = (ROUND2_TOTAL - PREFIX_N) + ' 個 token，省 ' + Math.round(PREFIX_N / ROUND2_TOTAL * 100) + '%';
+  btnRound1.disabled = false;
+  btnRound1.textContent = '↻ 重播第一輪';
+  kvBusy = false;
+});
+
+/* ══ 交互 2：语义缓存账单 ══
+   月账单 = 10000 次/天 × 30 天 × 0.02 元 × (1 - 命中率) = 6000 × (1 - h)。
+   数字用短动画过渡，拖滑块时有「账单在掉」的体感。 */
+const hitRange = document.getElementById('hitRange');
+const hitRate = document.getElementById('hitRate');
+const billPay = document.getElementById('billPay');
+const billSave = document.getElementById('billSave');
+const billPaySub = document.getElementById('billPaySub');
+const billNote = document.getElementById('billNote');
+const FULL_BILL = 10000 * 30 * 0.02;   /* 6000 元 */
+let shownPay = FULL_BILL, shownSave = 0, billAnim = null;
+
+function fmtYuan(v){ return '¥' + Math.round(v).toLocaleString('zh-CN'); }
+
+function animateBill(targetPay, targetSave){
+  if (billAnim) cancelAnimationFrame(billAnim);
+  const fromPay = shownPay, fromSave = shownSave, t0 = performance.now();
+  function tick(t){
+    const p = Math.min(1, (t - t0) / 300);
+    const e = p * (2 - p);
+    shownPay = fromPay + (targetPay - fromPay) * e;
+    shownSave = fromSave + (targetSave - fromSave) * e;
+    billPay.textContent = fmtYuan(shownPay);
+    billSave.textContent = fmtYuan(shownSave);
+    if (p < 1) billAnim = requestAnimationFrame(tick); else billAnim = null;
+  }
+  billAnim = requestAnimationFrame(tick);
+}
+
+function updBill(){
+  const h = +hitRange.value;
+  hitRate.textContent = h + '%';
+  const pay = FULL_BILL * (1 - h / 100);
+  animateBill(pay, FULL_BILL - pay);
+  const missPerDay = Math.round(10000 * (1 - h / 100));
+  billPaySub.textContent = h === 0 ? '每天 10,000 次全部真實呼叫' : `每天只有 ${missPerDay.toLocaleString('zh-CN')} 次真的呼叫模型`;
+  if (h === 0) {
+    billNote.innerHTML = '<b>命中率 0%，全價買單。</b>每一次「怎麼退貨」都讓模型從零生成一遍幾乎一樣的答案——想想 37 × 89 每次都重新列豎式。往右拖拖看。';
+  } else if (h < 50) {
+    billNote.innerHTML = `<b>命中率 ${h}%，帳單開始鬆動。</b>高頻重複的問題先被快取接住了。客服場景的問題高度集中，幾十個標準問答往往就能覆蓋大半流量。`;
+  } else if (h < 80) {
+    billNote.innerHTML = `<b>命中率 ${h}%，帳單砍掉一大半。</b>注意省下的不只是錢：命中快取的回答幾乎零延遲，使用者體驗反而更好——省錢和提速在這裡是同一件事。`;
+  } else {
+    billNote.innerHTML = `<b>命中率 ${h}%，接近天花板。</b>剩下的都是真正的長尾新問題，該花的錢。但命中率越高，下面那張卡說的「失效」風險越要當回事——存量答案多了，過期的也多。`;
+  }
+}
+hitRange.addEventListener('input', updBill);
+updBill();
+
+/* 进入视野时轻推一下滑块演示，提示这里可以拖。
+   lessonOnView 定义在 lesson.js（本脚本之后加载），所以等 DOMContentLoaded 再调 */
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof lessonOnView !== 'function') return;
+  lessonOnView(document.querySelector('.bill-box'), async () => {
+    if (+hitRange.value !== 0) return;
+    await sleep(600);
+    if (+hitRange.value !== 0) return;
+    hitRange.value = 30;
+    updBill();
+  });
+});
+</script>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script src="skill-data.tw.js?v=20260903a"></script>
+<script src="skill-copy.js?v=20260817a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

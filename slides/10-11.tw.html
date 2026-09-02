@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>為什麼 Agent 跑不了長任務 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}} body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+.scenario-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px 28px;margin:16px 0;box-shadow:var(--shadow-card)}
+.scenario-box .scenario-label{font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.scenario-box .scenario-prompt{font-size:18px;font-weight:800;color:var(--text);line-height:1.5;padding:12px 18px;background:rgba(0,0,0,.03);border-radius:var(--radius-sm);font-family:"SF Mono","Fira Code",Menlo,monospace}
+
+.failure-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px 28px;margin:16px 0;box-shadow:var(--shadow-card);position:relative;overflow:hidden}
+.failure-card::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%}
+.failure-card.f1::before{background:var(--danger)}
+.failure-card.f2::before{background:var(--amber)}
+.failure-card .f-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.failure-card .f-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.failure-card.f1 .f-icon{background:rgba(220,38,38,.08);color:var(--danger)}
+.failure-card.f2 .f-icon{background:rgba(217,119,6,.08);color:var(--amber)}
+.failure-card .f-title{font-size:17px;font-weight:800;color:var(--text)}
+.failure-card .f-subtitle{font-size:13px;color:var(--sub);font-weight:600}
+.failure-card .f-body{font-size:14px;color:var(--text);line-height:1.8}
+.failure-card .f-body ul{list-style:none;padding:0;margin:10px 0 0}
+.failure-card .f-body li{padding:8px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px}
+.failure-card .f-body li:last-child{border-bottom:none}
+.failure-card .f-body li .li-icon{flex-shrink:0;margin-top:2px;color:var(--sub)}
+
+.analogy-box{background:rgba(124,58,237,.04);border:1.5px solid rgba(124,58,237,.18);border-radius:var(--radius);padding:22px 26px;margin:16px 0;display:flex;gap:16px;align-items:flex-start}
+.analogy-box .a-icon{flex-shrink:0;width:44px;height:44px;border-radius:12px;background:rgba(124,58,237,.08);display:flex;align-items:center;justify-content:center;color:var(--purple)}
+.analogy-box .a-content{flex:1}
+.analogy-box .a-title{font-size:15px;font-weight:800;color:var(--purple);margin-bottom:6px}
+.analogy-box .a-desc{font-size:14px;color:var(--text);line-height:1.8}
+
+.takeaway{background:rgba(0,102,255,.04);border:1.5px solid rgba(0,102,255,.18);border-radius:var(--radius);padding:18px 22px;font-size:15px;color:var(--text);display:flex;gap:12px;line-height:1.7;margin-top:24px}
+.takeaway b{color:var(--accent)}
+
+.sim-container{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;margin:16px 0;box-shadow:var(--shadow-card)}
+.sim-panel{display:flex;gap:20px;min-height:340px}
+.sim-ctx-col{display:flex;flex-direction:column;align-items:center;gap:8px;width:60px;flex-shrink:0}
+.sim-ctx-label{font-size:11px;font-weight:700;color:var(--sub);text-align:center;white-space:nowrap}
+.sim-ctx-bar{width:28px;flex:1;background:rgba(0,0,0,.05);border-radius:14px;position:relative;overflow:hidden;border:1.5px solid var(--border);min-height:240px}
+.sim-ctx-fill{position:absolute;bottom:0;left:0;right:0;height:0%;border-radius:0 0 12px 12px;transition:height .6s cubic-bezier(.4,0,.2,1),background .4s ease;background:linear-gradient(to top,#3b82f6,#60a5fa)}
+.sim-ctx-fill.warn{background:linear-gradient(to top,#f59e0b,#fbbf24)}
+.sim-ctx-fill.danger{background:linear-gradient(to top,#ef4444,#f87171);animation:ctxPulse 1s ease-in-out infinite}
+@keyframes ctxPulse{0%,100%{opacity:1}50%{opacity:.7}}
+.sim-ctx-pct{font-size:13px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.sim-msg-col{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.sim-msg-area{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0;scroll-behavior:smooth}
+.sim-msg{padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.6;animation:msgIn .3s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.sim-msg.agent{background:rgba(0,102,255,.06);border:1px solid rgba(0,102,255,.12);color:var(--text)}
+.sim-msg.tool{background:rgba(0,0,0,.03);border:1px solid var(--border);color:var(--sub);font-family:"SF Mono","Fira Code",Menlo,monospace;font-size:12px}
+.sim-msg.warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#92400e;font-weight:600}
+.sim-msg.danger{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#991b1b;font-weight:600}
+.sim-msg.system{background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);color:var(--purple);font-weight:700;text-align:center}
+.sim-msg.result{background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.25);color:#991b1b;font-weight:700;padding:14px 18px;border-radius:var(--radius);text-align:center;line-height:1.7}
+.sim-msg .msg-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;opacity:.7}
+.sim-btn{display:flex;align-items:center;justify-content:center;gap:8px;margin:16px auto 0;padding:12px 28px;border:none;border-radius:var(--radius);background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s ease}
+.sim-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,102,255,.3)}
+.sim-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+
+.timeline-visual{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:24px;margin:16px 0;box-shadow:var(--shadow-card)}
+.timeline-visual .tv-title{font-size:13px;font-weight:700;color:var(--sub);margin-bottom:16px;text-align:center}
+.tv-row{display:flex;align-items:center;gap:0;margin:8px 0}
+.tv-block{padding:10px 14px;font-size:12px;font-weight:700;border-radius:8px;text-align:center;white-space:nowrap}
+.tv-block.active{background:rgba(0,102,255,.1);color:var(--accent);border:1.5px solid rgba(0,102,255,.2)}
+.tv-block.fail{background:rgba(220,38,38,.06);color:var(--danger);border:1.5px solid rgba(220,38,38,.15)}
+.tv-block.idle{background:rgba(0,0,0,.03);color:var(--sub);border:1.5px solid var(--border)}
+.tv-connector{width:20px;height:2px;background:var(--border);flex-shrink:0}
+.tv-label{font-size:11px;color:var(--sub);text-align:center;margin-top:6px;font-weight:600}
+</style>
+<meta name="description" content="為什麼讓 Agent 做長任務總是失敗？兩個核心失敗模式：一口氣做太多和過早宣佈完成。">
+<meta name="author" content="洛小山">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/10-11.tw.html">
+<meta property="og:locale" content="zh_TW">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/10-11.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/10-11.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/10-11.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/10-11.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/10-11.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/10-11.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/10-11.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"為什麼 Agent 跑不了長任務","name":"為什麼 Agent 跑不了長任務","url":"https://xueai.miyang.cn/slides/10-11.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 長執行 Agent","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"為什麼讓 Agent 做長任務總是失敗？兩個核心失敗模式：一口氣做太多和過早宣佈完成。","datePublished":"2026-07-04","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:title" content="為什麼 Agent 跑不了長任務"><meta property="og:description" content="為什麼讓 Agent 做長任務總是失敗？兩個核心失敗模式：一口氣做太多和過早宣佈完成。"><meta property="og:url" content="https://xueai.miyang.cn/slides/10-11.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/10-11.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+
+  <header class="lesson-header">
+    <div class="kicker">長執行 Agent</div>
+    <h1>為什麼 Agent 跑不了長任務</h1>
+    <p class="subtitle">讓 Agent 構建一個完整 Web 應用看似簡單，但現實中充滿了交接失敗和上下文斷裂的陷阱。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>一口氣做太多、做完就收工，兩種典型失敗模式</p></aside><!--seo:end-->  <div class="sec-label">問題背景</div>
+
+  <div class="scenario-box reveal">
+    <div class="scenario-label">給 Agent 的高層提示</div>
+    <div class="scenario-prompt">"Build a clone of claude.ai"</div>
+  </div>
+
+  <p style="font-size:15px;color:var(--text);line-height:1.8;margin-top:16px" class="reveal">
+    這不是一個小任務。一個完整的聊天應用需要認證系統、對話管理、流式輸出、檔案上傳、Markdown 渲染、多輪歷史…加起來可能有 200+ 個獨立功能點。<b>讓 Agent 從零到一完成這樣的專案</b>，會遇到什麼問題？
+  </p>
+
+  <div class="sec-label">失敗模式</div>
+
+  <div class="failure-card f1 reveal">
+    <div class="f-header">
+      <div class="f-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </div>
+      <div>
+        <div class="f-title">One-shotting：一口氣做太多</div>
+        <div class="f-subtitle">最常見的失敗模式</div>
+      </div>
+    </div>
+    <div class="f-body">
+      <p>Agent 試圖在一次會話中完成所有功能，結果：</p>
+      <ul>
+        <li>
+          <span class="li-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <span>上下文視窗在實現到一半時<b>被用完</b></span>
+        </li>
+        <li>
+          <span class="li-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <span>下一個 Agent 接手時，面對半成品程式碼，只能<b>猜測</b>前任做了什麼</span>
+        </li>
+        <li>
+          <span class="li-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <span>大量時間浪費在讓基本功能<b>重新跑起來</b>，新功能反而沒時間做</span>
+        </li>
+        <li>
+          <span class="li-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <span>即使有 Compaction（上下文壓縮）也不夠，壓縮後的指令<b>不夠清晰</b>，新 Agent 依然迷路</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="timeline-visual reveal paywall-locked xa-peek">
+    <div class="tv-title">One-shotting 的典型時間線</div>
+    <div class="tv-row">
+      <div class="tv-block active">Agent 1 開始寫</div>
+      <div class="tv-connector"></div>
+      <div class="tv-block active">寫了 50% 功能</div>
+      <div class="tv-connector"></div>
+      <div class="tv-block fail">上下文用完</div>
+      <div class="tv-connector"></div>
+      <div class="tv-block idle">Agent 2 接手</div>
+      <div class="tv-connector"></div>
+      <div class="tv-block fail">花時間修復半成品</div>
+      <div class="tv-connector"></div>
+      <div class="tv-block fail">上下文又用完</div>
+    </div>
+    <div class="tv-label">每次接手都忙於修復，推進陷入停滯</div>
+  </div>
+
+  <div class="failure-card f2 reveal paywall-locked">
+    <div class="f-header">
+      <div class="f-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <div>
+        <div class="f-title">Premature Completion：過早宣佈完成</div>
+        <div class="f-subtitle">Agent 覺得「差不多了」</div>
+      </div>
+    </div>
+    <div class="f-body">
+      <p>Agent 看到已經實現了一些功能，就認為專案已經基本完成：</p>
+      <ul>
+        <li>
+          <span class="li-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <span>宣告專案完成，實際上只完成了<b>核心功能的 30%</b></span>
+        </li>
+        <li>
+          <span class="li-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <span>缺乏任務清單，Agent 不知道<b>還差什麼沒做</b></span>
+        </li>
+        <li>
+          <span class="li-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <span>沒有驗證機制，以為做完了但<b>沒有端到端測試</b>證明</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">模擬演示：看 Agent 如何崩潰</div>
+
+  <div class="sim-container reveal paywall-locked">
+    <div class="sim-panel">
+      <div class="sim-ctx-col">
+        <div class="sim-ctx-label">上下文視窗</div>
+        <div class="sim-ctx-bar">
+          <div class="sim-ctx-fill" id="simCtxFill"></div>
+        </div>
+        <div class="sim-ctx-pct" id="simCtxPct">0%</div>
+      </div>
+      <div class="sim-msg-col">
+        <div class="sim-msg-area" id="simMsgArea"></div>
+      </div>
+    </div>
+    <button class="sim-btn" id="simStartBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      開始模擬
+    </button>
+  </div>
+
+  <div class="sec-label paywall-locked">類比：失憶的換班工程師</div>
+
+  <div class="analogy-box reveal paywall-locked">
+    <div class="a-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div class="a-content">
+      <div class="a-title">想像一個軟體專案</div>
+      <div class="a-desc">
+        每個工程師都只上一個班次。換班時<b>完全失憶</b>：不知道前一個人做了什麼、為什麼做、下一步該做什麼。每個人坐到電腦前，開啟一堆半成品程式碼，只能從零開始理解。這就是沒有交接機制的長執行 Agent 的真實狀態。
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">核心洞察</div>
+
+  <div class="takeaway reveal paywall-locked">
+    <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg></span>
+    <span><b>長任務的核心挑戰是交接，動手做反而不難。</b>Agent 並不缺乏能力，它缺的是在上下文斷裂時維持連續性的機制。解決交接問題，才能解決長執行問題。</span>
+  </div>
+
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+(function(){
+  var btn = document.getElementById('simStartBtn');
+  var fill = document.getElementById('simCtxFill');
+  var pct = document.getElementById('simCtxPct');
+  var area = document.getElementById('simMsgArea');
+  var running = false;
+
+  var steps = [
+    {type:'agent', text:'收到任務：構建一個完整的聊天應用', ctx:5},
+    {type:'tool', text:'> 建立專案結構...', ctx:12},
+    {type:'agent', text:'實現使用者認證模組...', ctx:25},
+    {type:'agent', text:'實現訊息傳送功能...', ctx:40},
+    {type:'agent', text:'實現即時通知系統...', ctx:55},
+    {type:'agent', text:'實現檔案上傳功能...', ctx:72},
+    {type:'agent', text:'實現搜尋功能...', ctx:85},
+    {type:'warn', text:'上下文即將滿... 還有好多功能沒做...', ctx:92},
+    {type:'system', text:'觸發 Compaction! 壓縮上下文...', ctx:'compact'},
+    {type:'agent', text:'[新 Agent 接手] 讀取壓縮後的上下文...但之前的認證模組程式碼在哪？', ctx:35},
+    {type:'agent', text:'程式碼似乎有問題...使用者登入報錯了...', ctx:45},
+    {type:'agent', text:'花了 10 分鐘修復上一個 Agent 留下的問題...', ctx:60},
+    {type:'result', text:'3 小時後：只完成了 40% 的功能，大量時間浪費在修復交接問題上', ctx:60}
+  ];
+
+  function setCtx(value, animate){
+    fill.style.height = value + '%';
+    pct.textContent = value + '%';
+    fill.classList.remove('warn','danger');
+    if(value >= 85) fill.classList.add('danger');
+    else if(value >= 60) fill.classList.add('warn');
+  }
+
+  function addMsg(step){
+    var el = document.createElement('div');
+    el.className = 'sim-msg ' + step.type;
+    if(step.type === 'agent'){
+      el.innerHTML = '<div class="msg-label">Agent</div>' + step.text;
+    } else if(step.type === 'tool'){
+      el.innerHTML = '<div class="msg-label">Tool Call</div>' + step.text;
+    } else if(step.type === 'warn'){
+      el.innerHTML = '<div class="msg-label">Warning</div>' + step.text;
+    } else {
+      el.textContent = step.text;
+    }
+    area.appendChild(el);
+    el.scrollIntoView({behavior:'smooth', block:'end'});
+  }
+
+  function runSim(){
+    if(running) return;
+    running = true;
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg> 模擬中...';
+    area.innerHTML = '';
+    setCtx(0);
+
+    var i = 0;
+    function next(){
+      if(i >= steps.length){
+        running = false;
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> 重新模擬';
+        return;
+      }
+      var step = steps[i];
+      if(step.ctx === 'compact'){
+        addMsg(step);
+        fill.style.transition = 'height .3s ease-in';
+        setCtx(95);
+        setTimeout(function(){
+          fill.style.transition = 'height 1.2s cubic-bezier(.4,0,.2,1)';
+          setCtx(10);
+          setTimeout(function(){
+            fill.style.transition = 'height .6s cubic-bezier(.4,0,.2,1)';
+            i++;
+            next();
+          }, 1400);
+        }, 400);
+      } else {
+        addMsg(step);
+        setCtx(step.ctx);
+        i++;
+        setTimeout(next, 1100);
+      }
+    }
+    setTimeout(next, 400);
+  }
+
+  btn.addEventListener('click', runSim);
+})();
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

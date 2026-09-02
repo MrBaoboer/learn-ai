@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dream 的真實機制 | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si .15s ease .08s forwards}</style>
+<script id="xueaiThemeBridge" src="theme-bridge.js?v=20260816k"></script>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+:root{--accent:#d99a22;--gold:#f5b942;--ink:#17120a;--night:#17130c;--line:rgba(217,154,34,.22)}
+.lesson{position:relative}.lesson:before{content:"";position:absolute;inset:0 0 auto;height:310px;background:radial-gradient(circle at 82% 8%,rgba(245,185,66,.15),transparent 44%);pointer-events:none}
+.lesson-header{position:relative}.lesson-header h1{letter-spacing:-.04em}.subtitle{max-width:780px}
+.objective{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:center;margin:20px 0 10px;padding:20px 24px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(245,185,66,.10),rgba(245,185,66,.025))}
+.objective b{color:var(--accent);font-size:13px;letter-spacing:.14em}.objective p{margin:0;color:var(--text);line-height:1.75}
+.hero{margin-top:18px;border-radius:24px;overflow:hidden;background:linear-gradient(145deg,#17130c,#2a1d09);box-shadow:0 22px 60px rgba(57,35,4,.22)}
+.hero-copy{padding:28px 30px 10px;color:#fff}.hero-copy small{color:#efb849;letter-spacing:.16em;font-weight:800}.hero-copy h2{margin:8px 0 6px;font-size:24px}.hero-copy p{margin:0;color:#cfc5b4;line-height:1.7}
+.hero svg{display:block;width:100%;height:auto}.node{fill:#241b0d;stroke:#d99a22;stroke-width:1.5}.node-text{fill:#fff8e8;font:700 13px ui-monospace,SFMono-Regular,Menlo,monospace}.note-text{fill:#cdbb9b;font:12px system-ui,sans-serif}.flow{stroke:#e1a632;stroke-width:2;fill:none;marker-end:url(#arrow)}
+.grid3,.grid2{display:grid;gap:14px;margin-top:14px}.grid3{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow-card)}.card h3{font-size:15px;margin:0 0 8px;color:var(--text)}.card p,.card li{font-size:13px;color:var(--sub);line-height:1.7}.card ul{margin:8px 0 0;padding-left:18px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent)}
+.path-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.path{padding:7px 10px;border-radius:9px;background:rgba(217,154,34,.09);border:1px solid var(--line);font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text)}
+.callout{margin-top:14px;padding:18px 20px;border-radius:14px;background:rgba(217,154,34,.07);color:var(--text);line-height:1.75}.callout b{color:var(--accent)}
+.source{margin-top:14px;background:#15120d;border:1px solid #342713;border-radius:16px;overflow:hidden}.source-head{display:flex;justify-content:space-between;gap:12px;padding:11px 16px;background:#211a10;color:#dbc79e;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}.source-head span:last-child{color:#efb849}.source pre{margin:0;padding:18px;overflow:auto;color:#eee3cd;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}.kw{color:#efb849}.cm{color:#897c68}.fn{color:#ffd98a}
+.caption{margin-top:8px;color:var(--sub);font-size:12px;line-height:1.6}.caption b{color:var(--accent)}
+.exercise{margin-top:16px;border:1px dashed rgba(217,154,34,.5);border-radius:16px;padding:20px;background:linear-gradient(135deg,rgba(217,154,34,.08),transparent)}.exercise h3{margin:0 0 8px;font-size:16px}.exercise p{margin:0;color:var(--sub);line-height:1.75}
+.takeaway{margin-top:18px;display:flex;gap:14px;padding:20px 22px;border-radius:16px;background:#1b160d;color:#f8ecd4;line-height:1.75}.takeaway svg{flex:0 0 auto;color:#f5b942}.takeaway b{color:#f5b942}
+@media(max-width:760px){.objective{grid-template-columns:1fr;gap:5px}.grid3,.grid2{grid-template-columns:1fr}.hero-copy{padding:22px 20px 8px}.source-head{flex-direction:column}.card{padding:17px}.takeaway{align-items:flex-start}}
+</style>
+<meta name="description" content="從 Grok Build 真實源碼理解 Dream 的門控、冪等、鎖與失敗恢復。">
+<meta name="author" content="洛小山">
+<link rel="canonical" href="https://xueai.miyang.cn/slides/12-13.hk.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI 產品經理培訓">
+<meta property="og:locale" content="zh_HK">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/12-13.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/12-13.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/12-13.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/12-13.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/12-13.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/12-13.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/12-13.html">
+<link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Dream 的真實機制","name":"Dream 的真實機制","url":"https://xueai.miyang.cn/slides/12-13.hk.html","inLanguage":"zh-Hant-HK","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 上下文與記憶","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"從 Grok Build 真實源碼理解 Dream 的門控、冪等、鎖與失敗恢復。","datePublished":"2026-07-17","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Dream 的真實機制"><meta property="og:description" content="從 Grok Build 真實源碼理解 Dream 的門控、冪等、鎖與失敗恢復。"><meta property="og:url" content="https://xueai.miyang.cn/slides/12-13.hk.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/12-13.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker">Grok Build · Memory Engineering</div>
+    <h1>Dream 的真實機制</h1>
+    <p class="subtitle">Dream 會把近期 session 日誌與現有 MEMORY.md 合併成長期記憶。它由會話結束、可選週期檢查或手動命令進入，並受門控與最佳努力鎖共同約束。</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>核對空閒門控、DreamLock、後台整理和記憶寫回的實際邊界</p></aside><!--seo:end-->  <section class="objective reveal">
+    <b>課程目標</b>
+    <p>讀懂 Dream 從觸發到重建索引的完整鏈路，能解釋 <span class="mono">DreamGate</span>、冪等要求、鎖競爭和寫入失敗回滾各自解決什麼問題。</p>
+  </section>
+
+  <section class="hero reveal" aria-label="Dream 教學化流程圖">
+    <div class="hero-copy">
+      <small>TEACHING DIAGRAM</small>
+      <h2>一次 Dream 的狀態機</h2>
+      <p>下圖是教學化圖示。節點名稱來自源碼，佈局與文字説明經過課程化整理。</p>
+    </div>
+    <svg viewBox="0 0 920 285" role="img" aria-labelledby="dreamTitle dreamDesc">
+      <title id="dreamTitle">Dream 從入口到索引同步的流程</title>
+      <desc id="dreamDesc">入口經過三道門控，構建消息，調用模型，取得鎖，寫入記憶，清理並同步索引。</desc>
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#e1a632"/></marker></defs>
+      <path class="flow" d="M135 76H265M395 76H525M655 76H785M790 108V190H675M545 222H415M285 222H155"/>
+      <rect class="node" x="25" y="45" rx="12" width="110" height="62"/><text class="node-text" x="80" y="71" text-anchor="middle">入口</text><text class="note-text" x="80" y="91" text-anchor="middle">end / timer / slash</text>
+      <rect class="node" x="265" y="45" rx="12" width="130" height="62"/><text class="node-text" x="330" y="71" text-anchor="middle">DreamGate</text><text class="note-text" x="330" y="91" text-anchor="middle">enabled / hours / sessions</text>
+      <rect class="node" x="525" y="45" rx="12" width="130" height="62"/><text class="node-text" x="590" y="71" text-anchor="middle">build message</text><text class="note-text" x="590" y="91" text-anchor="middle">32K input cap</text>
+      <rect class="node" x="785" y="45" rx="12" width="110" height="62"/><text class="node-text" x="840" y="71" text-anchor="middle">model call</text><text class="note-text" x="840" y="91" text-anchor="middle">30 min timeout</text>
+      <rect class="node" x="545" y="191" rx="12" width="130" height="62"/><text class="node-text" x="610" y="217" text-anchor="middle">try_acquire</text><text class="note-text" x="610" y="237" text-anchor="middle">best effort lock</text>
+      <rect class="node" x="285" y="191" rx="12" width="130" height="62"/><text class="node-text" x="350" y="217" text-anchor="middle">write MEMORY</text><text class="note-text" x="350" y="237" text-anchor="middle">failure → rollback</text>
+      <rect class="node" x="25" y="191" rx="12" width="130" height="62"/><text class="node-text" x="90" y="217" text-anchor="middle">cleanup + index</text><text class="note-text" x="90" y="237" text-anchor="middle">only deleted stems</text>
+    </svg>
+  </section>
+
+  <div class="sec-label">入口與門控</div>
+  <div class="grid3 paywall-locked xa-peek">
+    <section class="card reveal"><h3>1. 配置門</h3><p><span class="mono">MemoryDreamConfig.enabled</span> 預設為 true。子 Agent 會話直接跳過 Dream。</p></section>
+    <section class="card reveal"><h3>2. 時間門</h3><p><span class="mono">min_hours</span> 預設為 4。鎖檔案 mtime 記錄上次成功 consolidation 的時間。</p></section>
+    <section class="card reveal"><h3>3. 會話門</h3><p><span class="mono">min_sessions</span> 預設為 3。統計上次 consolidation 後修改的 session Markdown，並排除當前會話。</p></section>
+  </div>
+  <div class="callout reveal paywall-locked"><b>觸發事實：</b>預設 <span class="mono">check_interval_secs = None</span>，代表不啓用週期檢查。源碼明確支持 session end 和 <span class="mono">/dream</span>；只有配置檢查間隔後，session actor 才會按週期檢查門控。因此不能概括為「所有空閒時必然自動運行」。</div>
+  <div class="path-list reveal paywall-locked">
+    <span class="path">crates/codegen/xai-grok-memory/src/dream.rs</span>
+    <span class="path">crates/codegen/xai-grok-memory/src/dream_lock.rs</span>
+    <span class="path">crates/codegen/xai-grok-memory/src/storage.rs</span>
+    <span class="path">crates/codegen/xai-grok-memory/src/index.rs</span>
+    <span class="path">crates/codegen/xai-grok-config-types/src/memory.rs</span>
+    <span class="path">crates/codegen/xai-grok-shell/src/session/acp_session_impl/memory_dream.rs</span>
+    <span class="path">check_dream_gates</span>
+    <span class="path">maybe_run_dream</span>
+  </div>
+
+  <div class="sec-label paywall-locked">鎖、冪等與失敗恢復</div>
+  <div class="grid2 paywall-locked">
+    <section class="card reveal">
+      <h3>DreamLock 是最佳努力協調</h3>
+      <p><span class="mono">.dream-lock</span> 保存 PID，並用 mtime 兼作上次成功時間。活進程持有且未過期時返回 <span class="mono">Ok(None)</span>。死進程或超時鎖可被回收。</p>
+      <p>源碼註釋明確説明它並非嚴格互斥。寫後復讀能降低競爭概率，仍可能有兩個進程都認為自己獲勝，所以 Dream 必須容忍重複 consolidation。</p>
+    </section>
+    <section class="card reveal">
+      <h3>成功邊界決定清理邊界</h3>
+      <ul>
+        <li>模型返回空、NO_REPLY 或無 Markdown 標題時，不寫入也不刪 session。</li>
+        <li>寫 MEMORY.md 失敗時調用 <span class="mono">rollback(prior)</span> 恢復舊鎖狀態。</li>
+        <li>寫入成功後才清理已讀取的 session；5 分鐘內仍活躍的檔案會跳過。</li>
+        <li>搜索索引只移除實際刪掉的路徑，再為新 MEMORY.md 重建索引與 embedding。</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="sec-label paywall-locked">真實源碼快照</div>
+  <section class="source reveal paywall-locked">
+    <div class="source-head"><span>crates/codegen/xai-grok-memory/src/dream.rs</span><span>REAL SOURCE · abridged</span></div>
+    <pre><code><span class="kw">pub fn</span> <span class="fn">check_dream_gates</span>(
+    config: &amp;MemoryDreamConfig,
+    lock: &amp;DreamLock,
+    sessions_dir: &amp;Path,
+    current_session_sid8: Option&lt;&amp;str&gt;,
+) -&gt; DreamGate {
+    <span class="kw">if</span> !config.enabled { <span class="kw">return</span> DreamGate::Disabled; }
+    <span class="cm">// Time gate, then session gate</span>
+    ...
+    DreamGate::Open { sessions }
+}</code></pre>
+  </section>
+  <p class="caption reveal paywall-locked"><b>快照説明：</b>程式碼保留真實函式簽名與返回類型，中間實現以省略號壓縮。頁面中的狀態機 SVG 屬於教學化表達，不對應倉庫生成的架構圖。</p>
+
+  <section class="exercise reveal paywall-locked">
+    <h3>課堂練習：定位失敗後的系統狀態</h3>
+    <p>情境：Dream 已完成模型調用，但寫入 MEMORY.md 失敗。請回答：鎖檔案應恢復到什麼狀態？哪些 session 檔案可以刪除？索引需要更新嗎？再從 <span class="mono">execute_dream</span> 的分支給出依據。</p>
+  </section>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+    <span><b>Takeaway：</b>Dream 的可靠性來自成功邊界設計。門控減少無效調用，最佳努力鎖降低併發，冪等承擔少量重複風險，回滾與延遲清理保證失敗後仍能再次嘗試。</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script src="nav-inject.js?v=20260903a"></script>
+<script>
+document.querySelectorAll('.reveal').forEach(function(el){var ob=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');ob.unobserve(e.target)}})},{threshold:.12});ob.observe(el)});
+</script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>

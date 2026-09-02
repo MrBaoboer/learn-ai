@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mid-turn interrupt: this turn, next turn, or refused | xueai.miyang.cn</title>
+<style>@keyframes _si{to{opacity:1}}body{opacity:0;animation:_si.15s ease.08s forwards}</style>
+<link rel="stylesheet" href="lesson.css?v=20260827a">
+<style>
+/* 变量挂在 .lesson 上：nav-inject.js 会在页面样式之后再注入一次 :root 主色，
+   靠就近继承才能保住专题色。 */
+:root,.lesson{--accent:#414b5a;--accent-deep:#262d38;--accent-soft:rgba(65,75,90,.085)}
+.lesson-header{position:relative;overflow:hidden}
+.lesson-header:after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border:1px solid rgba(65,75,90,.22);border-radius:50%;box-shadow:0 0 0 26px rgba(65,75,90,.04),0 0 0 52px rgba(65,75,90,.025)}
+.lesson>p{font-size:15px;line-height:2;margin:0 0 20px}
+.lesson.sec-label{margin:56px 0 20px}
+.objective{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,var(--accent-soft),rgba(255,255,255,.75));border:1px solid rgba(65,75,90,.28);border-radius:var(--radius);padding:24px;margin:24px 0 32px}
+.objective svg{color:var(--accent)}.objective b{display:block;color:var(--accent);margin-bottom:6px}.objective span{font-size:14px;line-height:1.9;color:var(--text)}
+.q-tag{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font-size:13px;font-weight:800;margin:28px 0 14px}
+.key-line{margin:32px 0;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);text-align:center;font-size:18px;font-weight:800;line-height:1.8;color:var(--accent-deep)}
+.visual{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;margin:24px 0;box-shadow:var(--shadow-card)}
+.visual svg{width:100%;height:auto;display:block}.visual-caption{font-size:12.5px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.7}
+.src-note{font-size:12.5px;color:var(--sub);line-height:1.8;margin:-8px 0 20px}.src-note code{font-size:11.5px}
+.exercise{display:grid;grid-template-columns:52px 1fr;gap:18px;background:linear-gradient(135deg,#eff1f5,var(--card));border:1px solid rgba(65,75,90,.3);border-radius:14px;padding:24px;margin-top:12px}
+.exercise-num{width:46px;height:46px;border-radius:12px;background:var(--accent);color:white;display:grid;place-items:center;font-weight:900}
+.exercise h3{margin:0 0 10px;color:var(--text);font-size:16px}.exercise p{margin:0 0 12px;color:var(--sub);font-size:14px;line-height:1.9}.exercise p:last-child{margin:0}
+.takeaway{margin-top:32px;padding:24px;border-radius:14px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.25);color:var(--text);display:flex;gap:14px;font-size:14px;line-height:1.9}
+.takeaway svg{flex:0 0 auto;color:var(--accent)}.takeaway b{color:var(--accent-deep)}
+.compare{display:grid;grid-template-columns:1fr;gap:20px;margin-top:14px}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:var(--shadow-card)}
+.cmp-card h4{margin:0;font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}.cmp-card h4 svg{color:var(--accent)}
+.cmp-card p{font-size:14px;line-height:1.9;color:var(--sub);margin:12px 0 0}
+.cmp-card.cmp-tag{display:inline-block;margin-top:14px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent-deep);border:1px solid rgba(65,75,90,.25)}
+/* ── 交互演示 ── */
+.demo{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-card)}
+.demo-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.demo-title{font-size:14px;font-weight:700;color:var(--text)}
+.demo-ctrl{display:flex;gap:12px;flex-wrap:wrap}
+.demo-ctrl button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;min-height:44px;min-width:44px;border:1px solid rgba(65,75,90,.35);border-radius:999px;background:var(--accent-soft);color:var(--accent-deep);font:600 14px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:filter.15s}
+.demo-ctrl button:active{filter:brightness(.92)}
+.dm-budget{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:16px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-budget.dm-b-label{font-size:13px;font-weight:700;color:var(--text);padding-top:10px}
+.dm-budget.dm-b-hint{font-size:12px;color:var(--sub);line-height:1.7;flex:1 1 160px;padding-top:10px}
+.dm-seg{display:flex;gap:8px;flex-wrap:wrap}
+.dm-seg button{min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--sub);font:600 13px/1 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer;transition:all.15s cubic-bezier(.4,0,.2,1)}
+.dm-seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dm-input{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px;padding:12px 18px;border-radius:12px;background:var(--bg);border:1px solid var(--border)}
+.dm-input label{font-size:13px;font-weight:700;color:var(--text)}
+.dm-input input{flex:1 1 180px;min-height:44px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+.dm-stage{display:grid;grid-template-columns:1fr;gap:16px}
+.dm-meta{display:flex;flex-wrap:wrap;gap:10px}
+.dm-pill{padding:8px 14px;border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:12.5px;font-weight:700;color:var(--sub);transition:all.3s cubic-bezier(.4,0,.2,1)}
+.dm-pill b{color:var(--accent-deep)}
+.dm-pill.hot{background:var(--accent-soft);border-color:rgba(65,75,90,.4);color:var(--accent-deep)}
+.dm-pill.warn{border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.05);color:var(--danger)}
+.dm-pills-ok{border-color:rgba(22,163,74,.35);background:rgba(22,163,74,.07);color:var(--success)}
+.dm-bins{position:relative;display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.dm-bin{border:1px solid var(--border);border-radius:12px;background:var(--bg);min-height:148px;padding:14px;display:flex;flex-direction:column;gap:10px;opacity:1;transform:scale(1);transition:all.35s cubic-bezier(.4,0,.2,1)}
+.dm-bins.has-focus.dm-bin{opacity:.4;transform:scale(.98)}
+.dm-bins.has-focus.dm-bin.active{opacity:1;transform:scale(1)}
+.dm-bin.on{border-color:rgba(65,75,90,.45);background:var(--accent-soft)}
+.dm-bin.drop{border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.04)}
+.dm-bin.firing{animation:fireGlow.8s cubic-bezier(.25,1,.5,1)}
+.dm-bin::after{content:"";display:block;height:4px;width:48px;margin-top:auto;border-radius:99px;background:var(--accent);transform:scaleX(0);transform-origin:left center;transition:transform.5s cubic-bezier(.25,1,.5,1)}
+.dm-bin.drop::after{background:var(--danger)}
+.dm-bin.fill-1::after{transform:scaleX(.5)}
+.dm-bin.fill-2::after{transform:scaleX(1)}
+.dm-bin h3{margin:0;font-size:13px;font-weight:800;color:var(--text)}
+.dm-bin.dm-bin-sub{font-size:11.5px;color:var(--sub);line-height:1.6}
+.dm-slip{padding:10px 12px;border-radius:8px;border:1px solid rgba(65,75,90,.28);background:var(--card);font-size:12.5px;line-height:1.7;color:var(--accent-deep);font-weight:600;opacity:1;transform:none;transition:opacity.35s cubic-bezier(.4,0,.2,1),transform.35s cubic-bezier(.4,0,.2,1)}
+.dm-slip.mail{border-style:dashed}
+.dm-slip.ghost{opacity:.4;border-style:dashed;font-weight:500;color:var(--faint)}
+.dm-slip.is-enter,.dm-empty.is-enter{opacity:0;transform:translateY(8px)}
+.dm-slip.is-enter.in,.dm-empty.is-enter.in{opacity:1;transform:none;transition:opacity.35s cubic-bezier(.25,1,.5,1),transform.35s cubic-bezier(.25,1,.5,1)}
+.dm-ghost{position:absolute;z-index:2;pointer-events:none;margin:0;transition:all.4s cubic-bezier(.25,1,.5,1)}
+.dm-ghost.fly{opacity:0;transform:translateY(-18px) scale(.9)}
+.dm-empty{font-size:12.5px;color:var(--faint);line-height:1.7;padding:8px 0;max-height:48px;overflow:hidden;transition:max-height.4s cubic-bezier(.25,1,.5,1),opacity.35s cubic-bezier(.4,0,.2,1)}
+.dm-verdict{padding:12px 14px;border-radius:9px;font-size:13px;line-height:1.75;background:var(--card);border:1px dashed var(--border);color:var(--sub);min-height:48px;transition:background.3s cubic-bezier(.4,0,.2,1),border-color.3s cubic-bezier(.4,0,.2,1),color.3s cubic-bezier(.4,0,.2,1)}
+.dm-verdict.ok{border-style:solid;border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.07);color:var(--success);font-weight:600}
+.dm-verdict.hold{border-style:solid;border-color:rgba(65,75,90,.4);background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-verdict.warn{border-style:solid;border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.05);color:var(--danger);font-weight:600}
+.dm-verdict.pop{animation:flashPop.8s cubic-bezier(.25,1,.5,1)}
+.dm-trace{margin-top:24px;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.dm-trace-tag{padding:12px 18px;background:var(--card);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--sub)}
+.dm-trace ol{margin:0;padding:10px 0;list-style:none}
+.dm-trace li{display:flex;justify-content:space-between;gap:16px;padding:9px 18px;font-size:12.5px;line-height:1.7;color:var(--sub);opacity:1;transform:scale(1);transition:opacity.35s cubic-bezier(.4,0,.2,1),transform.35s cubic-bezier(.4,0,.2,1),background.35s cubic-bezier(.4,0,.2,1)}
+#dm-trace.is-live li{opacity:.4;transform:scale(.98)}
+#dm-trace.is-live li.on{opacity:1;transform:scale(1);background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-trace li.on{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+.dm-trace li span.ln{flex:0 0 auto;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)}
+.dm-trace li.on span.ln{color:var(--accent-deep)}
+.dm-caption{margin-top:20px;min-height:56px;display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:10px;background:var(--accent-soft);border:1px solid rgba(65,75,90,.22);font-size:14px;line-height:1.8;color:var(--text)}
+.dm-caption svg{flex:0 0 auto;color:var(--accent)}
+#dm-caption-text{transition:opacity.3s cubic-bezier(.4,0,.2,1)}
+.dm-summary{display:flex;flex-direction:column;gap:14px;max-height:0;overflow:hidden;opacity:0;margin-top:0;padding:0 22px;border:1px solid transparent;border-radius:12px;background:linear-gradient(135deg,var(--accent-soft),var(--card));transition:max-height.5s cubic-bezier(.25,1,.5,1),opacity.4s cubic-bezier(.4,0,.2,1)}
+.dm-summary.on{max-height:360px;opacity:1;margin-top:20px;padding:20px 22px;border-color:rgba(65,75,90,.3)}
+.dm-summary.dm-s{font-size:13px;line-height:1.8;color:var(--sub)}.dm-summary.dm-s b{display:block;font-size:13.5px;color:var(--accent-deep);margin-bottom:2px}
+.demo-caption{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.7}
+@keyframes flashPop{0%{transform:scale(.8)}30%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes fireGlow{0%{box-shadow:0 0 0 0 rgba(65,75,90,.3)}50%{box-shadow:0 0 20px 6px rgba(65,75,90,.2)}100%{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.demo,.demo *{transition-duration:0s!important;animation-duration:0s!important}}
+@media(max-width:760px){.lesson{overflow-x:hidden}.compare{grid-template-columns:1fr}.dm-bins{grid-template-columns:1fr}.objective{grid-template-columns:1fr}.lesson-header:after{display:none}.demo{padding:18px}.demo-ctrl{width:100%}.demo-ctrl button{flex:1}.visual{padding:14px}.dm-trace li{flex-direction:column;gap:4px}.dm-budget.dm-b-label{padding-top:0}.demo,.visual,.cmp-card{max-width:100%;min-width:0}.lesson code{overflow-wrap:anywhere;word-break:break-word}}
+</style>
+<meta name="description" content="The Agent is editing a file when you add a constraint. Codex uses one entry, three modes, and a two-stage mailbox to decide start, steer, or refuse on the spot.">
+<meta name="author" content="Luo Xiaoshan (洛小山)">
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"Mid-turn interrupt: this turn, next turn, or refused","name":"Mid-turn interrupt: this turn, next turn, or refused","url":"https://xueai.miyang.cn/slides/codex-04.en.html","inLanguage":"en","author":{"@type":"Person","name":"Luo Xiaoshan (洛小山)"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"Course","educationalLevel":"Beginner to Advanced","isPartOf":{"@type":"Course","name":"AI Practitioner Course · Governance and Loops","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"The Agent is editing a file when you add a constraint. Codex uses one entry, three modes, and a two-stage mailbox to decide start, steer, or refuse on the spot.","datePublished":"2026-08-22","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="Mid-turn interrupt: this turn, next turn, or refused"><meta property="og:description" content="The Agent is editing a file when you add a constraint. Codex uses one entry, three modes, and a two-stage mailbox to decide start, steer, or refuse on the spot."><meta property="og:url" content="https://xueai.miyang.cn/slides/codex-04.en.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr.xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked.paywall-locked:not(.xa-peek){display:none!important}html.xa-locked.xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<link rel="canonical" href="https://xueai.miyang.cn/slides/codex-04.en.html">
+<link rel="alternate" hreflang="zh-CN" href="https://xueai.miyang.cn/slides/codex-04.html">
+<link rel="alternate" hreflang="en" href="https://xueai.miyang.cn/slides/codex-04.en.html">
+<link rel="alternate" hreflang="ko" href="https://xueai.miyang.cn/slides/codex-04.ko.html">
+<link rel="alternate" hreflang="zh-TW" href="https://xueai.miyang.cn/slides/codex-04.tw.html">
+<link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/codex-04.hk.html">
+<link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/codex-04.hk.html">
+<link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/codex-04.html">
+<meta property="og:site_name" content="xueai.miyang.cn · AI Product Manager Training">
+<meta property="og:locale" content="en_US">
+</head>
+<body>
+<article class="lesson wide">
+  <header class="lesson-header">
+    <div class="kicker"><svg fill="currentColor" fill-rule="evenodd" height="14" style="flex:none;line-height:1;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>OpenAI Codex · Turn loop</div>
+    <h1>Mid-turn interrupt: this turn, next turn, or refused</h1>
+    <p class="subtitle">The Agent is editing the third file. You see the direction drift and add: config in YAML. After Enter, is this sentence a start, an insert into the current turn, or a refusal on the spot? Core decides now. It does not wait for the model to speak.</p>
+  </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">In one sentence</span><p>The Agent is editing the third file. You see the direction drift and add: config in YAML. After Enter, is this sentence a start, an insert into the current turn, or a refusal on the spot? Core decides now. It does not wait for the model to speak.</p></aside><!--seo:end-->  <div class="objective reveal">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5" fill="none"/></svg>
+    <span><b>Course goal</b>After this lesson you can explain three things. First: why submit must return Started, Steered, or NotSubmitted at once. Second: why review and compact refuse an interrupt, and will not open a new turn for it. Third: after a final answer hits the screen, why a late sub-mail defaults to the next turn — and why one more user interrupt can open the door.</span>
+  </div>
+
+  <div class="sec-label">Play first · The same sentence, four moments</div>
+  <div class="demo reveal" id="demo-inbox">
+    <div class="demo-top">
+      <div class="demo-title">Mailbox sort desk: the same constraint, different drop times, different landings</div>
+      <div class="demo-ctrl">
+        <button id="dm-play" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="none"/></svg>Play</button>
+        <button id="dm-step" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z" fill="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>Step</button>
+        <button id="dm-reset" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" fill="none"/><path d="M3 3v5h5" fill="none"/></svg>Reset</button>
+      </div>
+    </div>
+    <div class="dm-budget">
+      <span class="dm-b-label">Moment</span>
+      <div class="dm-seg" id="dm-seg">
+        <button type="button" data-scene="idle" class="on">Idle</button>
+        <button type="button" data-scene="busy">Sampling</button>
+        <button type="button" data-scene="answer">Answer on screen</button>
+        <button type="button" data-scene="review">In review</button>
+      </div>
+      <span class="dm-b-hint">Four moments share the same input. Idle starts work. Sampling steers. After the answer is on screen, a sub-mail lies down first. In review it is stopped at the door.</span>
+    </div>
+    <div class="dm-input">
+      <label for="dm-text">This sentence</label>
+      <input id="dm-text" type="text" value="Config in YAML, not JSON" autocomplete="off">
+    </div>
+    <div class="dm-stage">
+      <div class="dm-meta">
+        <span class="dm-pill" id="dm-clock">Clock · Idle</span>
+        <span class="dm-pill" id="dm-kind">Task · none</span>
+        <span class="dm-pill" id="dm-phase">Phase · —</span>
+      </div>
+      <div class="dm-bins">
+        <div class="dm-bin" id="dm-bin-now">
+          <h3>This turn</h3>
+          <div class="dm-bin-sub">pending_input, taken when the phase is CurrentTurn</div>
+          <div id="dm-now-items"><div class="dm-empty">Empty</div></div>
+        </div>
+        <div class="dm-bin" id="dm-bin-next">
+          <h3>Next turn</h3>
+          <div class="dm-bin-sub">Session mailbox, queued but not taken when the phase is NextTurn</div>
+          <div id="dm-next-items"><div class="dm-empty">Empty</div></div>
+        </div>
+        <div class="dm-bin drop" id="dm-bin-drop">
+          <h3>Refused at the door</h3>
+          <div class="dm-bin-sub">NotSubmitted — settings do not land either</div>
+          <div id="dm-drop-items"><div class="dm-empty">Empty</div></div>
+        </div>
+      </div>
+      <div class="dm-verdict" id="dm-verdict">Waiting to deliver.</div>
+    </div>
+    <div class="dm-trace">
+      <div class="dm-trace-tag">Logic trail · each animation step maps to a source span</div>
+      <ol id="dm-trace">
+        <li><span>Dispatch on TurnInputMode, default StartOrSteer</span><span class="ln">turn_input.rs L141</span></li>
+        <li><span>Try steer_input first; only NoActiveTurn starts work</span><span class="ln">turn_input.rs L195</span></li>
+        <li><span>Only Regular accepts. Review and Compact refuse on the spot.</span><span class="ln">turn_input.rs L507</span></li>
+        <li><span>If idle, apply_started then spawn_task</span><span class="ln">turn_input.rs L242</span></li>
+        <li><span>An interrupt writes pending and flips the phase back to CurrentTurn</span><span class="ln">turn_input.rs L558</span></li>
+        <li><span>A final answer defers the delivery phase to NextTurn</span><span class="ln">input_queue.rs L206</span></li>
+        <li><span>A tool item accepts the phase back to CurrentTurn</span><span class="ln">stream_events_utils.rs L302</span></li>
+        <li><span>get_pending_input looks at the phase, then decides whether to empty the mailbox</span><span class="ln">input_queue.rs L297</span></li>
+      </ol>
+    </div>
+    <div class="dm-caption" id="dm-caption"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none"/></svg><span id="dm-caption-text">Pick a moment, hit Play. Watch the same sentence enter this turn, lie until the next, or stop at the door.</span></div>
+    <div class="dm-summary" id="dm-summary">
+      <div class="dm-s"><b>Where a user interrupt lands</b>Idle is Started. Sampling is Steered. Review is NotSubmitted — it will not secretly open a regular turn.</div>
+      <div class="dm-s"><b>Where a sub-mail lands</b>Once the answer is on screen, a late sub-mail lies in the session mailbox. This turn treats pending input as empty.</div>
+      <div class="dm-s"><b>When the door reopens</b>One more user interrupt, or another tool call from the model, flips the phase back to CurrentTurn. Backlogged sub-mail rides into the next sample.</div>
+    </div>
+    <div class="demo-caption">Teaching sketch: bins and slips are course metaphors for in-turn pending_input and the session mailbox. Line numbers on the trail match openai/codex commit 4f39251a01.</div>
+  </div>
+
+  <div class="sec-label">Idea 1 · Submit returns a verdict at once</div>
+
+  <div class="q-tag reveal">What problem it solves</div>
+  <p class="reveal">Three everyday endings all sting. Interrupt now and the first two files may sit half-done on disk. Queue for the next turn and you watch it finish the rest the old way. Stuff it into the current context without waking the loop, and the model sees it only the next time it speaks. Your constraint arrives late.</p>
+
+  <div class="q-tag reveal">What the idea is</div>
+  <p class="reveal">Codex folds this into one entry and three modes. The caller picks <code>StartOrSteer</code>, <code>StartIfIdle</code>, or <code>Steer</code> — it does not shout start. Core judges from busy/idle and task kind, and returns <code>Started</code>, <code>Steered</code>, or <code>NotSubmitted</code> at once. The decision ends there. It waits for no user-prompt hook, no history persist, no model sampling.</p>
+  <p class="src-note reveal">Source: <code>codex-rs/core/src/session/turn_input.rs</code> lines 1–9; <code>codex-rs/protocol/src/turn_input.rs</code> lines 127–136</p>
+  <p class="reveal"><code>StartOrSteer</code> follows its name. Try an interrupt first. Only <code>NoActiveTurn</code> leads to <code>apply_started</code> then <code>spawn_task</code>. Other refuse reasons wrap as <code>NotSubmitted</code>. It will not start work in secret. TUI live voice takes this path too, sharing the default entry’s verdict.</p>
+  <p class="src-note reveal">Source: <code>codex-rs/core/src/session/turn_input.rs</code> lines 141–156, lines 195–249</p>
+  <p class="reveal">Settings cannot change before the verdict. <code>prepare</code> previews thread settings first. A failed preview is <code>InvalidRequest</code>. Real writes happen in <code>apply_started</code> or <code>apply_steered</code>. A refused input does not even change settings. A successful interrupt only persists settings. This turn’s <code>TurnContext</code> does not swap. Start-only options, like a structured-output schema, apply only on Started.</p>
+  <p class="src-note reveal paywall-locked xa-peek">Source: <code>codex-rs/core/src/session/turn_input.rs</code> lines 58–80</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 280" role="img" aria-label="Three exits after one input enters handle">
+      <defs><marker id="arrA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="40" y="104" width="150" height="72" rx="12" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="115" y="136" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">User submit</text>
+      <text x="115" y="158" fill="#6b7280" text-anchor="middle" font-size="13">TurnInputMode</text>
+      <path fill="none" d="M198 140H268" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="276" y="96" width="196" height="88" rx="12" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="374" y="132" fill="#262d38" text-anchor="middle" font-size="14" font-weight="800">handle</text>
+      <text x="374" y="156" fill="#6b7280" text-anchor="middle" font-size="13">Try steer first; start only if idle</text>
+      <path fill="none" d="M472 118H542" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <path fill="none" d="M472 140H542" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <path fill="none" d="M472 162H542" stroke="#414b5a" stroke-width="2" marker-end="url(#arrA)"/>
+      <rect x="550" y="36" width="350" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="725" y="70" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">Started · open a Regular turn</text>
+      <rect x="550" y="112" width="350" height="56" rx="10" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="725" y="146" fill="#262d38" text-anchor="middle" font-size="14" font-weight="700">Steered · insert into the current Regular turn</text>
+      <rect x="550" y="188" width="350" height="56" rx="10" fill="#ffffff" stroke="rgba(220,38,38,.45)"/>
+      <text x="725" y="222" fill="#dc2626" text-anchor="middle" font-size="14" font-weight="700">NotSubmitted · the thread stays as-is</text>
+    </svg>
+    <div class="visual-caption">Teaching diagram: The entry only judges. Hooks, persist, and sampling have not started.</div>
+  </div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">Start and steer must finish under the same lock. Check for an active turn, then kind, then write pending. Midway, another submit must not swap the turn. Settings preview first, write second, because a refuse path must leave the thread unchanged. Verdict and enqueue are two lock takes. When Enter and a sub-mail arrive together, you can get a window that looked idle at judge time and occupied at enqueue time.</p>
+
+  <div class="sec-label paywall-locked">Idea 2 · Only Regular accepts an interrupt</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">A review task opens its own one-shot child conversation. A compact task is swapping the window. If the user adds “use YAML” now, no current-turn tool loop can catch it. Open a regular turn for it and the review result and compact summary fight the new conversation for the same <code>active_turn</code>.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked"><code>steer_input</code> does every check under the <code>active_turn</code> lock. No active turn, or a slot with no task, is <code>NoActiveTurn</code>. <code>TaskKind</code> has three variants: Regular, Review, Compact. Review and compact return <code>ActiveTurnNotSteerable</code>. <code>StartOrSteer</code> will not start work because of that.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>codex-rs/core/src/session/turn_input.rs</code> lines 507–519; <code>codex-rs/core/src/state/turn.rs</code> lines 67–72</p>
+  <p class="reveal paywall-locked">After the checks pass, user input is pushed into <code>pending_input</code> and the mailbox phase flips back to <code>CurrentTurn</code>. Exhaustive match has a product cost here: add a new task kind and the compiler forces you to say whether it can take an interrupt.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>codex-rs/core/src/session/turn_input.rs</code> lines 546–564</p>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">Internal tasks have their own lifetime. Weld a user interrupt into a review turn and two jobs fight one exec slot. The caller gets a refuse. This input will not be silently queued into a new conversation. Rewrite in another language and the rule stays: tasks that can take an interrupt and tasks that cannot must be split in the type system.</p>
+
+  <div class="sec-label paywall-locked">Idea 3 · One flip-card decides whether you may continue writing</div>
+
+  <div class="q-tag reveal paywall-locked">What problem it solves</div>
+  <p class="reveal paywall-locked">The main agent already printed something that looks like a final answer. A sub-agent sends progress at the same time. Merge them and the answer the user already saw gets continued. Always wait for the next turn and the sub-agent result may skip a sample before it reaches the model.</p>
+
+  <div class="q-tag reveal paywall-locked">What the idea is</div>
+  <p class="reveal paywall-locked">A user interrupt enters in-turn <code>pending_input</code>. A sub-agent letter goes to session-level <code>mailbox_pending_mails</code>. Whether the two stocks merge into this turn is <code>MailboxDeliveryPhase</code>. The phase starts at <code>CurrentTurn</code>. After the user has seen a final answer it flips to <code>NextTurn</code>. One more user interrupt, or another tool call, reopens the phase.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>codex-rs/core/src/state/turn.rs</code> lines 37–56</p>
+  <p class="reveal paywall-locked">Flipping to <code>NextTurn</code> has one exception: if <code>pending_input</code> still has a sub-mail that is not “queue and don’t wake,” the current phase stays. Taking mail looks at this card too. On <code>NextTurn</code>, in-turn pending is not taken, and the session mailbox is not emptied. On <code>CurrentTurn</code>, take in-turn pending first, then empty the session mailbox and append it. So after a final answer lands, a sub-mail can lie in the mailbox while the loop thinks there is no pending input, and this turn closes.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>codex-rs/core/src/session/input_queue.rs</code> lines 206–227, lines 284–336</p>
+  <div class="visual reveal paywall-locked">
+    <svg viewBox="0 0 940 260" role="img" aria-label="Mailbox phase flips between CurrentTurn and NextTurn">
+      <defs><marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#414b5a"/></marker></defs>
+      <rect x="80" y="70" width="280" height="100" rx="14" fill="#ffffff" stroke="#414b5a" stroke-width="2"/>
+      <text x="220" y="114" fill="#262d38" text-anchor="middle" font-size="16" font-weight="800">CurrentTurn</text>
+      <text x="220" y="140" fill="#6b7280" text-anchor="middle" font-size="13">pending plus mailbox, merge into this turn</text>
+      <rect x="580" y="70" width="280" height="100" rx="14" fill="#eef0f4" stroke="rgba(65,75,90,.4)"/>
+      <text x="720" y="114" fill="#262d38" text-anchor="middle" font-size="16" font-weight="800">NextTurn</text>
+      <text x="720" y="140" fill="#6b7280" text-anchor="middle" font-size="13">Neither stock is taken</text>
+      <path fill="none" d="M360 90H572" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <text x="466" y="78" fill="#6b7280" text-anchor="middle" font-size="13">Final answer on screen</text>
+      <path fill="none" d="M580 150H368" stroke="#414b5a" stroke-width="2" marker-end="url(#arrB)"/>
+      <text x="474" y="196" fill="#6b7280" text-anchor="middle" font-size="13">A user interrupt, a tool call, or the model still needs follow-up</text>
+    </svg>
+    <div class="visual-caption">Teaching diagram: After the answer is on screen, close the gate. Clear same-turn work opens it again.</div>
+  </div>
+  <p class="reveal paywall-locked">What counts as a user-visible final answer? Assistant body text. <code>phase</code> Commentary does not count, nor does a trim-empty body. An unlabeled assistant message is treated as a final answer. An unlabeled provider defaults to the safer path: close the mailbox to the next turn first. Approval, permission, ask, elicitation, and dynamic tools are five separate oneshot tables. They do not enter this mailbox. Each waits for its own receipt.</p>
+  <p class="src-note reveal paywall-locked">Source: <code>codex-rs/core/src/stream_events_utils.rs</code> lines 486–501; <code>codex-rs/core/src/state/turn.rs</code> lines 87–103</p>
+
+  <div class="key-line reveal paywall-locked">The user already saw the answer. A late letter does not continue it by default.</div>
+
+  <div class="q-tag reveal paywall-locked">Why it lasts</div>
+  <p class="reveal paywall-locked">“The user already saw the answer” is a product boundary. It does not depend on Rust or a mailbox implementation. Rewrite in another language and you still need a flip-card: late sidecar messages do not continue an on-screen answer by default. Clear same-turn work — another user interrupt, another tool call — opens the door again.</p>
+
+  <div class="sec-label paywall-locked">Side-by-side · another answer to the same question</div>
+  <div class="compare paywall-locked">
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>DSH: two parameters, two tracks</h4>
+      <p>DSH exposes three aliases on one <code>send</code>. Target queue and whether to wake are two orthogonal parameters. <code>followup</code> owns a turn and wakes. <code>steer</code> inserts at the next stop and wakes. <code>inject</code> boards without nudging the driver. Inbox is two durable lists, <code>next-turn</code> and <code>next-step</code>. <code>claim</code> empties <code>next-step</code> first, and takes one more when the target is <code>next-turn</code>.</p>
+      <p>Codex has no three public functions. <code>StartOrSteer</code> welds idle-start and busy-steer into one verdict. DSH can skip the flip-card because wait-for-the-turn and wait-for-the-next-stop are two lists. The cost: after the answer is on screen, a non-empty <code>next-step</code> still keeps the current Turn alive.</p>
+      <span class="cmp-tag">Source-checked on both sides · 2026-08-22 · <a href="dsh-3.html">DSH · Inbox</a></span>
+    </div>
+    <div class="cmp-card reveal">
+      <h4><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"></path></svg>Claude Code: one queue, priority fills in the timing</h4>
+      <p>In the reconstructed source, user input, task notices, and orphan permissions share one <code>commandQueue</code>. Priority is now > next > later, FIFO inside a level. User commands default to next, task notices to later, so user input is not starved by system messages. Consume happens after the current stream ends. There is no step-level interrupt. That YAML constraint you added waits for the current generator to finish before it reaches the model.</p>
+      <span class="cmp-tag">Checked against reconstructed source · 2026-08-22 · messageQueueManager.ts</span>
+    </div>
+  </div>
+
+  <div class="sec-label paywall-locked">Classroom Exercise</div>
+  <div class="exercise reveal paywall-locked">
+    <div class="exercise-num">01</div>
+    <div>
+      <h3>After the answer is on screen, when is this sub-mail seen?</h3>
+      <p>After the final answer lands, enqueue a <code>trigger_turn: false</code> sub-mail, then feed a <code>FunctionCall</code>. On paper, walk what <code>get_pending_input</code> should return.</p>
+      <p>The path to check: when the body persists, the phase flips to <code>NextTurn</code> and this letter is invisible. After a tool item arrives the phase reopens, and only the next lap can take it into the same turn’s next model request.</p>
+    </div>
+  </div>
+
+  <div class="takeaway reveal paywall-locked">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/></svg>
+    <span><b>Takeaway: </b>Submit returns a verdict at once — accepted or refused — before sampling starts. Only Regular takes an interrupt. Review and compact refuse on the spot. After the answer is on screen, do not continue it by default. Another user interrupt or tool call opens the door.</span>
+  </div>
+</article>
+<script src="i18n.js?v=20260903a"></script>
+<script src="lesson.js"></script>
+<script>
+(function(){
+  var scene = 'idle';
+  var steps = [], idx = 0, autoId = null, pauseUntil = 0, played = false, prevSt = null;
+  var clockEl = document.getElementById('dm-clock');
+  var kindEl = document.getElementById('dm-kind');
+  var phaseEl = document.getElementById('dm-phase');
+  var nowHost = document.getElementById('dm-now-items');
+  var nextHost = document.getElementById('dm-next-items');
+  var dropHost = document.getElementById('dm-drop-items');
+  var binNow = document.getElementById('dm-bin-now');
+  var binNext = document.getElementById('dm-bin-next');
+  var binDrop = document.getElementById('dm-bin-drop');
+  var binsBox = document.querySelector('.dm-bins');
+  var verdict = document.getElementById('dm-verdict');
+  var traceBox = document.getElementById('dm-trace');
+  var traceRows = Array.prototype.slice.call(document.querySelectorAll('#dm-trace li'));
+  var captionText = document.getElementById('dm-caption-text');
+  var summary = document.getElementById('dm-summary');
+  var textInput = document.getElementById('dm-text');
+  var IDLE = 'Pick a moment, hit Play. Watch the same sentence enter this turn, lie until the next, or stop at the door.';
+
+  function slipText(){
+    var t = (textInput.value || '').trim();
+    return t || 'Config in YAML, not JSON';
+  }
+  function enterEl(el){
+    el.classList.add('is-enter');
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ el.classList.add('in'); });
+    });
+  }
+  function spawnGhost(el){
+    var box = binsBox.getBoundingClientRect();
+    var rc = el.getBoundingClientRect();
+    var ghost = el.cloneNode(true);
+    ghost.className = el.className + ' dm-ghost';
+    ghost.style.left = (rc.left - box.left) + 'px';
+    ghost.style.top = (rc.top - box.top) + 'px';
+    ghost.style.width = rc.width + 'px';
+    binsBox.appendChild(ghost);
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ ghost.classList.add('fly'); });
+    });
+    setTimeout(function(){ if (ghost.parentNode) ghost.remove(); }, 480);
+  }
+  function snapshotSlips(stay, animate){
+    var oldRects = {};
+    [nowHost, nextHost, dropHost].forEach(function(host){
+      Array.prototype.slice.call(host.querySelectorAll('.dm-slip')).forEach(function(el){
+        oldRects[el.textContent] = el.getBoundingClientRect();
+        if (animate && !stay[el.textContent]) spawnGhost(el);
+      });
+    });
+    return oldRects;
+  }
+  function fillHost(host, items, animate, oldRects){
+    host.innerHTML = '';
+    if (!items || !items.length) {
+      var e = document.createElement('div');
+      e.className = 'dm-empty';
+      e.textContent = 'Empty';
+      host.appendChild(e);
+      if (animate) enterEl(e);
+      return;
+    }
+    items.forEach(function(it){
+      var d = document.createElement('div');
+      d.className = 'dm-slip' + (it.mail ? ' mail' : '') + (it.ghost ? ' ghost' : '');
+      d.textContent = it.text;
+      host.appendChild(d);
+      var old = oldRects[it.text];
+      if (animate && old) {
+        var now = d.getBoundingClientRect();
+        var dx = old.left - now.left;
+        var dy = old.top - now.top;
+        if (dx || dy) {
+          d.style.transition = 'none';
+          d.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+          requestAnimationFrame(function(){
+            d.style.transition = '';
+            d.style.transform = '';
+          });
+        }
+      } else if (animate) {
+        enterEl(d);
+      }
+    });
+  }
+  function setBinState(el, items, isActive, doFire, animate){
+    var n = items && items.length ? items.length : 0;
+    el.classList.toggle('on', n > 0);
+    el.classList.toggle('active', !!isActive);
+    el.classList.remove('fill-1', 'fill-2');
+    if (n === 1) el.classList.add('fill-1');
+    else if (n >= 2) el.classList.add('fill-2');
+    el.classList.remove('firing');
+    if (animate && doFire) {
+      void el.offsetWidth;
+      el.classList.add('firing');
+    }
+  }
+  function countOf(st, key){
+    if (!st || !st[key]) return 0;
+    return st[key].length;
+  }
+  function buildSteps(){
+    var msg = slipText();
+    var user = {text: 'User · ' + msg};
+    var mail = {text: 'Sub-agent · the third file is done', mail: true};
+    if (scene === 'idle') {
+      return [
+        {cap:'The thread is idle. No active turn. This sentence takes StartOrSteer and tries steer first.',trace:0,clock:'Idle',kind:'none',phase:'—',left:[],right:[],drop:[],v:'',vk:''},
+        {cap:'steer_input sees no ActiveTurn and returns NoActiveTurn. Other refuse reasons stop here. It will not start work in secret.',trace:1,clock:'Idle',kind:'none',phase:'—',left:[],right:[],drop:[],v:'steer failed: NoActiveTurn',vk:'hold'},
+        {cap:'Only idle gets to start work. apply_started writes thread settings and start options, then spawn_task opens a Regular turn.',trace:3,clock:'Idle',kind:'Regular',phase:'CurrentTurn',left:[],right:[],drop:[],v:'Preparing Started',vk:'hold'},
+        {cap:'Core returns Started. Sampling has not started. This sentence is this turn’s first input, not an interrupt.',trace:3,clock:'Sampling',kind:'Regular',phase:'CurrentTurn',left:[user],right:[],drop:[],v:'Started · open a Regular turn',vk:'ok',fin:true}
+      ];
+    }
+    if (scene === 'busy') {
+      return [
+        {cap:'The model is sampling. The active task is Regular. The phase sits on CurrentTurn. The same sentence is sent again.',trace:0,clock:'Sampling',kind:'Regular',phase:'CurrentTurn',left:[],right:[],drop:[],v:'',vk:''},
+        {cap:'StartOrSteer tries steer_input first. There is an active turn, kind is Regular, so it is allowed.',trace:2,clock:'Sampling',kind:'Regular',phase:'CurrentTurn',left:[],right:[],drop:[],v:'Regular can take an interrupt',vk:'hold'},
+        {cap:'Input is pushed into pending_input. The phase stays CurrentTurn. Core returns Steered. This turn’s TurnContext does not swap.',trace:4,clock:'Sampling',kind:'Regular',phase:'CurrentTurn',left:[user],right:[],drop:[],v:'Steered · insert into this turn',vk:'ok'},
+        {cap:'After the first sample ends, get_pending_input takes this slip into the same turn’s next model request.',trace:7,clock:'Sampling',kind:'Regular',phase:'CurrentTurn',left:[user],right:[],drop:[],v:'Steered · wait for the next sample to see it',vk:'ok',fin:true}
+      ];
+    }
+    if (scene === 'answer') {
+      return [
+        {cap:'Assistant body is on screen and treated as a final answer. The phase flips from CurrentTurn to NextTurn.',trace:5,clock:'Final answer',kind:'Regular',phase:'NextTurn',left:[],right:[],drop:[],v:'Phase closed. This turn treats pending input as empty.',vk:'hold'},
+        {cap:'A sub-agent letter arrives. It skips handle and queues in the session mailbox. The phase is NextTurn, so this letter only enters the right bin.',trace:7,clock:'Final answer',kind:'Regular',phase:'NextTurn',left:[],right:[mail],drop:[],v:'Sub-mail queued · invisible this turn',vk:'hold'},
+        {cap:'The user sends the same sentence again. steer_input is still Regular, writes pending, and flips the phase back to CurrentTurn.',trace:4,clock:'Final answer',kind:'Regular',phase:'CurrentTurn',left:[user],right:[mail],drop:[],v:'Steered · phase reopened',vk:'ok'},
+        {cap:'Next lap, get_pending_input takes pending first, then empties the mailbox. The user interrupt takes the backlogged sub-mail with it.',trace:7,clock:'Sampling',kind:'Regular',phase:'CurrentTurn',left:[user, mail],right:[],drop:[],v:'This turn takes both letters at once',vk:'ok',fin:true}
+      ];
+    }
+    return [
+      {cap:'This turn is Review. Review opens its own child conversation. No ordinary tool loop can catch an interrupt.',trace:0,clock:'In review',kind:'Review',phase:'CurrentTurn',left:[],right:[],drop:[],v:'',vk:''},
+      {cap:'StartOrSteer tries steer_input first. kind is not Regular, so it returns ActiveTurnNotSteerable.',trace:2,clock:'In review',kind:'Review',phase:'CurrentTurn',left:[],right:[],drop:[],v:'ActiveTurnNotSteerable · Review',vk:'warn'},
+      {cap:'Other refuse reasons wrap as NotSubmitted. StartOrSteer will not open a regular turn because of that.',trace:2,clock:'In review',kind:'Review',phase:'CurrentTurn',left:[],right:[],drop:[user],v:'NotSubmitted · settings unchanged',vk:'warn'},
+      {cap:'The slip stops at the door. The root turn id stays the review turn’s. An interrupt will not rewrite the lineage.',trace:2,clock:'In review',kind:'Review',phase:'CurrentTurn',left:[],right:[],drop:[user],v:'NotSubmitted · ActiveTurnNotSteerable',vk:'warn',fin:true}
+    ];
+  }
+  function paint(st, animate){
+    var stay = {};
+    [st.left, st.right, st.drop].forEach(function(arr){
+      (arr || []).forEach(function(it){ stay[it.text] = true; });
+    });
+    var oldRects = snapshotSlips(stay, animate);
+    clockEl.textContent = 'Clock · ' + st.clock;
+    kindEl.textContent = 'Task · ' + st.kind;
+    phaseEl.textContent = 'Phase · ' + st.phase;
+    clockEl.className = 'dm-pill hot';
+    kindEl.className = 'dm-pill' + (st.kind === 'Review' ? ' warn' : (st.kind === 'Regular' ? ' hot' : ''));
+    phaseEl.className = 'dm-pill' + (st.phase === 'NextTurn' ? ' warn' : (st.phase === 'CurrentTurn' ? ' hot' : ''));
+    fillHost(nowHost, st.left, animate, oldRects);
+    fillHost(nextHost, st.right, animate, oldRects);
+    fillHost(dropHost, st.drop, animate, oldRects);
+    var focusNow = countOf(st, 'left') > 0;
+    var focusNext = countOf(st, 'right') > 0;
+    var focusDrop = countOf(st, 'drop') > 0;
+    binsBox.classList.toggle('has-focus', focusNow || focusNext || focusDrop);
+    setBinState(binNow, st.left, focusNow, countOf(st, 'left') > countOf(prevSt, 'left'), animate);
+    setBinState(binNext, st.right, focusNext, countOf(st, 'right') > countOf(prevSt, 'right'), animate);
+    setBinState(binDrop, st.drop, focusDrop, countOf(st, 'drop') > countOf(prevSt, 'drop'), animate);
+    var vText = st.v || 'Waiting to deliver.';
+    verdict.className = 'dm-verdict' + (st.vk ? ' ' + st.vk : '');
+    verdict.textContent = vText;
+    if (animate && (st.vk === 'ok' || st.vk === 'warn') && (!prevSt || prevSt.vk !== st.vk || prevSt.v !== st.v)) {
+      void verdict.offsetWidth;
+      verdict.classList.add('pop');
+    }
+    if (st.trace !== null && st.trace !== undefined) {
+      traceBox.classList.add('is-live');
+      traceRows.forEach(function(el, n){ el.classList.toggle('on', n === st.trace); });
+    }
+    if (animate) {
+      captionText.style.opacity = '0';
+      requestAnimationFrame(function(){
+        captionText.textContent = st.cap;
+        requestAnimationFrame(function(){ captionText.style.opacity = '1'; });
+      });
+    } else {
+      captionText.textContent = st.cap;
+    }
+    if (st.fin) summary.classList.add('on');
+    else summary.classList.remove('on');
+    prevSt = st;
+  }
+  function holdFor(i){
+    var st = steps[i];
+    var before = i > 0 ? steps[i - 1] : null;
+    if (!st) return 1100;
+    if (st.fin) return 2400;
+    var slips = countOf(st, 'left') + countOf(st, 'right') + countOf(st, 'drop');
+    var grew = slips > (countOf(before, 'left') + countOf(before, 'right') + countOf(before, 'drop'));
+    if (st.vk === 'ok' || st.vk === 'warn') return grew ? 2000 : 1700;
+    if (grew) return 1800;
+    if (st.vk === 'hold') return 1500;
+    return 1100;
+  }
+  function tick(){
+    if (idx >= steps.length) { stop(); return; }
+    paint(steps[idx], true);
+    idx++;
+    if (idx >= steps.length) stop();
+  }
+  function stop(){
+    if (autoId) { cancelAnimationFrame(autoId); autoId = null; }
+    pauseUntil = 0;
+  }
+  function loop(ts){
+    if (idx >= steps.length) { autoId = null; return; }
+    if (ts < pauseUntil) { autoId = requestAnimationFrame(loop); return; }
+    paint(steps[idx], true);
+    var wait = holdFor(idx);
+    idx++;
+    pauseUntil = ts + wait;
+    if (idx >= steps.length) { autoId = null; return; }
+    autoId = requestAnimationFrame(loop);
+  }
+  function reset(){
+    stop(); idx = 0; prevSt = null;
+    steps = buildSteps();
+    binsBox.classList.remove('has-focus');
+    Array.prototype.slice.call(binsBox.querySelectorAll('.dm-ghost')).forEach(function(g){ g.remove(); });
+    clockEl.textContent = 'Clock · —'; clockEl.className = 'dm-pill';
+    kindEl.textContent = 'Task · —'; kindEl.className = 'dm-pill';
+    phaseEl.textContent = 'Phase · —'; phaseEl.className = 'dm-pill';
+    fillHost(nowHost, [], false, {}); fillHost(nextHost, [], false, {}); fillHost(dropHost, [], false, {});
+    setBinState(binNow, [], false, false, false);
+    setBinState(binNext, [], false, false, false);
+    setBinState(binDrop, [], false, false, false);
+    verdict.className = 'dm-verdict'; verdict.textContent = 'Waiting to deliver.';
+    traceBox.classList.remove('is-live');
+    traceRows.forEach(function(el){ el.classList.remove('on'); });
+    summary.classList.remove('on');
+    captionText.style.opacity = '1';
+    captionText.textContent = IDLE;
+  }
+  function play(){
+    if (idx >= steps.length) reset();
+    if (autoId) return;
+    pauseUntil = 0;
+    autoId = requestAnimationFrame(loop);
+  }
+  document.getElementById('dm-play').addEventListener('click', play);
+  document.getElementById('dm-step').addEventListener('click', function(){ stop(); tick(); });
+  document.getElementById('dm-reset').addEventListener('click', reset);
+  document.getElementById('dm-seg').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if (!b) return;
+    Array.prototype.forEach.call(this.children, function(el){ el.classList.remove('on'); });
+    b.classList.add('on');
+    scene = b.getAttribute('data-scene');
+    reset();
+  });
+  textInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      reset();
+      play();
+    }
+  });
+  reset();
+  if (window.lessonOnView) {
+    window.lessonOnView(document.getElementById('demo-inbox'), function(){
+      if (played) return; played = true; play();
+    });
+  }
+})();
+</script>
+<script src="nav-inject.js?v=20260903a"></script>
+<!--seo:begin--><script src="watermark.js?v=20260806c"></script><script src="paywall.js?v=20260903a"></script><!--seo:end-->
+</body>
+</html>
