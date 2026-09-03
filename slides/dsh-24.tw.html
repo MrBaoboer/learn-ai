@@ -156,7 +156,7 @@
   </div>
 
   <div class="sec-label">邏輯拆解 · 配置裡只有引用，值每次現取</div>
-  <p class="reveal">先說清一件事：DSH 的設定檔案和 <code>cordis.yml</code> 裡沒有任何一處寫著 API key 的值。它們攜帶的是引用，一個 POSIX 風格的環境變數名，比如 <code>DEEPSEEK_API_KEY</code>。值歸憑據提供方所有，本地提供方按四層來源找：程序環境優先順序最高，然後是 <code>$DSH_HOME/.credentials.yaml</code> 文件，最後是專案和使用者的 <code>.env</code>。這就是副標題說的「配置不落盤」：落盤的只有名字，機密被擋在配置之外（<code>docs/subsystems/credentials.zh.md</code> 第 5 行）。</p>
+  <p class="reveal">先說清一件事：DSH 的設定檔案和 <code>cordis.yml</code> 裡沒有任何一處寫著 API key 的值。它們攜帶的是引用，一個 POSIX 風格的環境變數名，比如 <code>DEEPSEEK_API_KEY</code>。值歸憑據提供方所有，本地提供方按四層來源找：行程環境優先順序最高，然後是 <code>$DSH_HOME/.credentials.yaml</code> 文件，最後是專案和使用者的 <code>.env</code>。這就是副標題說的「配置不落盤」：落盤的只有名字，機密被擋在配置之外（<code>docs/subsystems/credentials.zh.md</code> 第 5 行）。</p>
   <p class="reveal">然後是本課最重要的一條規則：消費方在每個操作中重新解析引用，絕不跨操作快取。文件原話說得很直白，這種按操作進行的讀取正是熱更新機制（同文件第 20 行）。落到 DeepSeek 轉接器上，就是 <code>packages/llm/llm-deepseek/src/adapter.ts</code> 第 214 至 222 行：每次 <code>stream()</code> 開頭，把連線配置和 key 一起凍成一份快照，這個請求從頭到尾用這一份，下一次請求自動重新解析。</p>
   <p class="reveal">大綱裡問的邊界條件在這裡有了答案。請求進行到一半你輪換了 key，本次請求拿舊 key 跑完，新 key 從下一次請求開始生效，中間不會出現半新半舊。而且 key 是從連線快照裡解析出來的，端點和發給它的金鑰永遠來自同一代配置，配置回滾時不會出現新端點配舊 key 的雜交（該處註釋寫明了這個意圖）。</p>
   <p class="reveal">還有兩條容易忽視的 seam 級規則。第一，空的儲存值在任何地方都視為不存在，把 key 設成空字串等於沒配，下一次請求直接報 <code>MISSING_CREDENTIAL</code>，演示最後一步就是它。第二，配置介面走 <code>describe(ref)</code>，只回「配沒配、來自哪層、能不能寫」，絕不回值；由行程環境供值的引用被報成 <code>writable: false</code>，因為往那裡寫會表面成功、而解析繼續返回環境裡的舊值，seam 乾脆提前拒絕（同文件第 34 行）。</p>
@@ -193,7 +193,7 @@
   <p class="src-note reveal paywall-locked">出處：<code>packages/util/atomic-write/src/index.ts</code> 第 86 至 111 行的 <code>withFileLock</code>，核對日期 2026-08-13。</p>
 
   <div class="sec-label paywall-locked">儲存與遙測 · 拒絕遷移，一個身份</div>
-  <p class="reveal paywall-locked">KV 儲存的 SQLite 後端把版本立場延續了下來。<code>STORAGE_SQLITE_SCHEMA_VERSION</code> 當前是 1，寫在 <code>PRAGMA user_version</code> 裡；開啟資料庫時，全新的空庫蓋上當前版本戳，其他任何版本一律拒絕開啟，沒有就地遷移。和<a href="dsh-23.html">上一課</a>的會話日誌版本是同一套哲學：未釋出軟體沒有需要保全的歷史資料，與其揹著一堆遷移程式碼，不如明確拒絕。</p>
+  <p class="reveal paywall-locked">KV 儲存的 SQLite 後端把版本立場延續了下來。<code>STORAGE_SQLITE_SCHEMA_VERSION</code> 當前是 1，寫在 <code>PRAGMA user_version</code> 裡；開啟資料庫時，全新的空庫蓋上當前版本戳，其他任何版本一律拒絕開啟，沒有就地遷移。和<a href="dsh-23.html">上一課</a>的會話日誌版本是同一套哲學：未發布軟體沒有需要保全的歷史資料，與其揹著一堆遷移程式碼，不如明確拒絕。</p>
   <p class="reveal paywall-locked">還有一處小而硬的取捨：journal 模式預設 WAL，壞檔案系統可以退到幾種回滾日誌模式，但 <code>memory</code> 和 <code>off</code> 被從型別上排除了（同檔案第 23 至 29 行註釋）。理由一句話，扔掉日誌永續性會靜默違反 KV 後端合同裡的永續性條款。想快可以，想快到說謊不行。</p>
   <p class="reveal paywall-locked">遙測這塊最怕的是喧賓奪主，DSH 把它做成一項可選能力 seam：不在 agent loop 主幹上，沒有任何遙測內容會進入模型請求，harness 的職責到 <code>emit()</code> 為止（<code>docs/subsystems/session-telemetry.zh.md</code>）。每條記錄匯出前要過一道脫敏流水線，部署方掛規則監聽器；監聽器拋異常按 fail-closed 處理，直接扣下這條記錄不發。脫敏只改匯出副本，權威會話日誌一個字都不動。</p>
   <p class="reveal paywall-locked">最後是匿名身份的設計。一個隨機 UUID v4 落在 <code>$DSH_HOME/.anonymous-user-id</code>，三個消費方共用：OTel 上報的 <code>user.id</code>、<code>/feedback</code> 命令的確認回執、以及每次發往 DeepSeek 的 <code>x-deepseek-harness-user-id</code> 請求頭（<code>packages/identity/anonymous-user-id/README.zh.md</code>）。共用一個 id，接收側才能把三路記錄關聯起來，不用各自生成三個身份。</p>
@@ -203,7 +203,7 @@
   <div class="cmp paywall-locked">
     <div class="cmp-card reveal">
       <h3><svg fill="currentColor" fill-rule="evenodd" height="16" style="flex:none;line-height:1" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></svg>Grok Build</h3>
-      <p>憑據走 <code>AuthCredentialProvider</code> 介面（<code>crates/codegen/xai-grok-auth/src/auth_provider.rs</code>）。介面文件要求實現方在每次取快照前做一次廉價的磁碟重讀，讓 grok-desktop、<code>grok login</code> 這些兄弟行程寫入的新憑據能被當前程序看到，方向和 DSH 的按操作重解析一致。</p>
+      <p>憑據走 <code>AuthCredentialProvider</code> 介面（<code>crates/codegen/xai-grok-auth/src/auth_provider.rs</code>）。介面文件要求實現方在每次取快照前做一次廉價的磁碟重讀，讓 grok-desktop、<code>grok login</code> 這些兄弟行程寫入的新憑據能被當前行程看到，方向和 DSH 的按操作重解析一致。</p>
       <p>它還多一層事後兜底：<code>refresh_after_unauthorized()</code>，請求吃到 401 就嘗試重新整理 token 並重試一次，主要伺候會過期的 OAuth 場景。事前現取加事後重試，比單靠快取的方案穩得多。</p>
     </div>
     <div class="cmp-card reveal">

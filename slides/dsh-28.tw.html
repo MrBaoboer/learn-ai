@@ -164,11 +164,11 @@
   </div>
   <p class="reveal">同一個檔案第 186 到 188 行還有一句反向陳述：工具呼叫的歷史和結果是 append-only 的，新內容跟在可複用前綴後面，不會打翻已有的快取。什麼傷快取、什麼不傷，全部寫成可查的文件條目。</p>
   <p class="reveal"><b>第二件，工具順序由中心列表規範化。</b>工具 schema 是前綴的大頭，它的順序原本跟著外掛註冊順序走。外掛是併發載入的，註冊順序隨環境抖動，DSH 在 CI 裡實際觀察到了不同的請求頭（Agent Note <code>2026-07-06-explicit-tool-order</code> 的問題一節）。順序影響請求位元組，請求位元組影響快取，於是它成了必須顯式治理的對象：配置裡的 <code>toolOrder</code> 列表統一定序，列表裡必須恰好有一個 <code>&lt;unlisted-tools&gt;</code> 其餘項標記，沒配列表就按字典序兜底。規範化發生在 <code>assemble()</code> 內部、waterfall 之前，註冊順序在任何可觀測的位置都不再出現。</p>
-  <p class="reveal paywall-locked xa-peek"><b>第三件，嚴格插值，寧可拋異常不交付壞 prompt。</b>persona 是模板，<code>{{model}}</code> 這樣的變數組嚴格按登錄表解釋：引用了未註冊的變數、變數本次沒有值、花括號組格式錯誤，一律拋異常，輪次直接失敗，一個請求都不會發出去。理由很直接：靜默容錯等於把一個悄悄變形的前綴發給模型，快取悄悄失效，壞 prompt 還可能悄悄改變行為。大聲失敗反而便宜。</p>
+  <p class="reveal paywall-locked xa-peek"><b>第三件，嚴格插值，寧可拋異常不交付壞 prompt。</b>persona 是模板，<code>{{model}}</code> 這樣的變數群組嚴格按註冊表解釋：引用了未註冊的變數、變數本次沒有值、花括號組格式錯誤，一律拋異常，輪次直接失敗，一個請求都不會發出去。理由很直接：靜默容錯等於把一個悄悄變形的前綴發給模型，快取悄悄失效，壞 prompt 還可能悄悄改變行為。大聲失敗反而便宜。</p>
   <div class="facts paywall-locked">
     <div class="fact reveal"><code>順序也是介面</code><p>兩組內容完全相同、只是順序不同的工具 schema，對快取來說是兩個不同的前綴。所以工具順序不能交給載入時序這種環境噪聲決定。</p></div>
     <div class="fact reveal"><code>失效從第一個變化 token 開始</code><p>快取按前綴匹配，越靠前的內容越碰不得。把易變的東西（時間、動態狀態）往後放，把萬年不變的身份和 schema 往前放。</p></div>
-    <div class="fact reveal"><code>追加不傷快取</code><p>對話歷史 append-only 地增長，舊字首原樣保留，只為新增部分付全價。這也是會話日誌只追加設計在帳單上的紅利。</p></div>
+    <div class="fact reveal"><code>追加不傷快取</code><p>對話歷史 append-only 地增長，舊前綴原樣保留，只為新增部分付全價。這也是會話日誌只追加設計在帳單上的紅利。</p></div>
   </div>
 
   <div class="sec-label paywall-locked">關鍵證據 · 中心列表與嚴格插值的原始碼</div>
@@ -187,8 +187,8 @@
 }</code></pre>
   </div>
   <div class="snapshot paywall-locked"><b>原始碼快照說明：</b>依據本地倉庫 deepseek-harness-master，核對檔案 <code>packages/core/system-prompt/src/index.ts</code>，核對日期 2026-08-13。程式碼塊保留原始碼原文。</div>
-  <p class="reveal paywall-locked">兩個邊界條件值得記住，出處都在 Agent Note <code>2026-07-06-explicit-tool-order</code>。外掛熱過載後註冊順序變了，工具順序會變嗎？不會，中心列表在 waterfall 之前規範化，註冊順序無處可觀測。<code>toolOrder</code> 裡寫了個拼錯的工具名會怎樣？該 Note 後果一節寫得很細：輪次在組裝時失敗，不開步驟、不記請求頭、不向介面卡發請求，每個輪次都同樣失敗直到配置修好，行程本身保持執行。</p>
-  <p class="reveal paywall-locked">嚴格插值這邊是三個連著的拋異常分支，一個都不放過。第一個管格式：變數名不匹配命名正則就拋「malformed prompt variable reference」，連 <code>{{}}</code> 這種空名都被註釋點名，走的就是這條格式錯誤路徑。第二個管註冊：名字不在登錄表裡就拋「unknown prompt variable」，報錯順帶列出全部已註冊變數名。第三個管取值：註冊了但這次組裝沒給值，同樣拋異常。三個分支攔下的都是同一件事，一個悄悄變形的字首。</p>
+  <p class="reveal paywall-locked">兩個邊界條件值得記住，出處都在 Agent Note <code>2026-07-06-explicit-tool-order</code>。外掛熱過載後註冊順序變了，工具順序會變嗎？不會，中心列表在 waterfall 之前規範化，註冊順序無處可觀測。<code>toolOrder</code> 裡寫了個拼錯的工具名會怎樣？該 Note 後果一節寫得很細：輪次在組裝時失敗，不開步驟、不記請求頭、不向轉接器發請求，每個輪次都同樣失敗直到配置修好，行程本身保持執行。</p>
+  <p class="reveal paywall-locked">嚴格插值這邊是三個連著的拋異常分支，一個都不放過。第一個管格式：變數名不匹配命名正則就拋「malformed prompt variable reference」，連 <code>{{}}</code> 這種空名都被註釋點名，走的就是這條格式錯誤路徑。第二個管註冊：名字不在註冊表裡就拋「unknown prompt variable」，報錯順帶列出全部已註冊變數名。第三個管取值：註冊了但這次組裝沒給值，同樣拋異常。三個分支攔下的都是同一件事，一個悄悄變形的前綴。</p>
   <p class="src-note reveal paywall-locked">出處：<code>packages/core/system-prompt/src/index.ts</code> 第 277 至 290 行的插值分支，核對日期 2026-08-13。</p>
   <p class="reveal paywall-locked">第 283 行的 <code>Object.hasOwn</code> 有個小心思：用普通屬性訪問查 <code>{{constructor}}</code> 會順著原型鏈摸到 Object 的內建方法，被誤認為已註冊變數。查自有屬性，原型鏈上的名字一律算未註冊。防的就是這種悄悄放行的壞 prompt。</p>
 
@@ -203,7 +203,7 @@
   </div>
   <div class="exercise reveal paywall-locked">
     <div class="exercise-num">02</div>
-    <div><h3>給你的團隊寫一份 KV Cache effect 模板</h3><p>模仿 DSH 的三段式（模型看到什麼 / token 成本 / 快取影響），為你專案裡「會進入模型請求的東西」列一張清單：system prompt、工具 schema、動態注入的上下文、RAG 檢索結果。逐項寫出它的快取影響，標出哪幾項放錯了位置。寫完你大機率會發現至少一個和 Claude Code 那 10.2% 同款的問題。</p></div>
+    <div><h3>給你的團隊寫一份 KV Cache effect 模板</h3><p>模仿 DSH 的三段式（模型看到什麼 / token 成本 / 快取影響），為你專案裡「會進入模型請求的東西」列一張清單：system prompt、工具 schema、動態注入的上下文、RAG 檢索結果。逐項寫出它的快取影響，標出哪幾項放錯了位置。寫完你很可能會發現至少一個和 Claude Code 那 10.2% 同款的問題。</p></div>
   </div>
 
   <div class="takeaway reveal paywall-locked">
@@ -313,13 +313,13 @@
         hitline.innerHTML = '首次請求：無快取可用，全量計算 ' + total() + ' token。';
         hitPctEl.textContent = '0%（首次）';
       } },
-      { cap: '原樣再發一次（比如模型回了話、你接著追問）。字首逐字相同，全部命中，輸入幾乎按折扣價計。這是理想狀態。', run: function () { request(null, 0); } },
+      { cap: '原樣再發一次（比如模型回了話、你接著追問）。前綴逐字相同，全部命中，輸入幾乎按折扣價計。這是理想狀態。', run: function () { request(null, 0); } },
       { cap: '有人把 persona 裡的 helpful 改成了 careful。就一個詞。快取從 persona 的第一個變化 token 起斷掉，後面的工具 schema、上下文、歷史全部重算。', run: function () { segs[1].label = 'persona* 50'; request('persona'); pulse('persona'); } },
       { cap: '新增一個工具 fetch。DSH 按 toolOrder 或字典序插入，這裡落在 edit 和 grep 之間：插入點之前照常命中，之後失效。位置越靠後，傷害越小。', run: function () { segs.splice(4, 0, { id: 't-fetch', label: 'fetch+ 170', tok: 170, cls: 's-tool' }); request('t-fetch'); pulse('t-fetch'); } },
       { cap: '正常對話推進，歷史追加了一條新訊息。append-only：舊前綴原樣保留全部命中，只為新增的 token 付全價。追加不傷快取。', run: function () { segs[segs.length - 1].tok += 90; segs[segs.length - 1].label = '歷史 ' + segs[segs.length - 1].tok; request(null, 90); pulse('hist'); } },
       { cap: '', run: function () {
         if (mode === 'dsh') {
-          caption.textContent = '行程重啟，外掛併發載入，註冊順序這次是亂的。DSH 模式：中心列表在組裝時統一規範化，工具順序紋絲不動，字首原樣，全部命中。抖動被機制消滅了。';
+          caption.textContent = '行程重啟，外掛併發載入，註冊順序這次是亂的。DSH 模式：中心列表在組裝時統一規範化，工具順序紋絲不動，前綴原樣，全部命中。抖動被機制消滅了。';
           request(null, 0);
         } else {
           caption.textContent = '行程重啟，外掛併發載入，註冊順序這次是亂的。對照模式（順序跟隨註冊）：工具 schema 全體重排，從第一個 schema token 起全部失效。內容一個字沒變，只是順序變了，照樣賠錢。';

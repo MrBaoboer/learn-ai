@@ -155,7 +155,7 @@
 
   <div class="sec-label">邏輯拆解 · 為什麼一個字能廢掉一整條緩存</div>
   <p class="reveal">先把 KV Cache 説成人話。模型處理請求時，會為每個 token 算出一堆中間結果（鍵和值）緩存起來。下一條請求進來，只要開頭的 token 序列和上一條逐字相同，這段前綴的計算就能直接複用，provider 按命中給你打折。DeepSeek 的官方定價裏，命中緩存的輸入 token 比未命中便宜一個數量級（具體倍率以官方價目頁為準）。</p>
-  <p class="reveal">關鍵在逐字相同這四個字。緩存按前綴匹配：從第一個不同的 token 起，後面全部作廢。而 agent 請求的開頭是什麼？system prompt 加工具 schema，動輒幾千 token，每條請求都帶。改 persona 裏一個詞、換一下工具順序、在開頭塞個當前時間，緩存就從那個位置斷掉，之後的每條請求都全價重算。</p>
+  <p class="reveal">關鍵在逐字相同這四個字。緩存按前綴匹配：從第一個不同的 token 起，後面全部作廢。而 agent 請求嘅開頭係咩？system prompt 加工具 schema，動輒幾千 token，每條請求都帶。改 persona 裏一個詞、換一下工具順序、在開頭塞個當前時間，緩存就從那個位置斷掉，之後的每條請求都全價重算。</p>
   <p class="reveal">所以 DSH 得出一個結論：prompt 前綴是模型這個 API 的接口，它的穩定性是一種相容性承諾，要像維護公開 API 一樣維護。落到工程上是三件事。</p>
   <p class="reveal"><b>第一件，寫進文檔紀律。</b>本地快照裏 packages 下 268 個包 README，有 215 個帶一個固定的 <code>#### KV Cache effect</code> 小節。任何會出現在模型請求裏的東西，文檔必須按三段式交代：模型看到什麼（What the model sees）、token 成本多少（Token effect）、對緩存有什麼影響（KV Cache effect）。以 <code>packages/core/tools/README.md</code> 的工具 schema 一節為例，第 145 行原文：</p>
   <div class="doc-quote reveal">
@@ -164,7 +164,7 @@
   </div>
   <p class="reveal">同一個文件第 186 到 188 行還有一句反向陳述：工具調用的歷史和結果是 append-only 的，新內容跟在可複用前綴後面，不會打翻已有的緩存。什麼傷緩存、什麼不傷，全部寫成可查的文檔條目。</p>
   <p class="reveal"><b>第二件，工具順序由中心列表規範化。</b>工具 schema 是前綴的大頭，它的順序原本跟着插件註冊順序走。插件是併發加載的，註冊順序隨環境抖動，DSH 在 CI 裏實際觀察到了不同的請求頭（Agent Note <code>2026-07-06-explicit-tool-order</code> 的問題一節）。順序影響請求字節，請求字節影響緩存，於是它成了必須顯式治理的對象：配置裏的 <code>toolOrder</code> 列表統一定序，列表裏必須恰好有一個 <code>&lt;unlisted-tools&gt;</code> 其餘項標記，沒配列表就按字典序兜底。規範化發生在 <code>assemble()</code> 內部、waterfall 之前，註冊順序在任何可觀測的位置都不再出現。</p>
-  <p class="reveal paywall-locked xa-peek"><b>第三件，嚴格插值，寧可拋異常不交付壞 prompt。</b>persona 是模板，<code>{{model}}</code> 這樣的變數組嚴格按註冊表解釋：引用了未註冊的變數、變數本次沒有值、花括號組格式錯誤，一律拋異常，輪次直接失敗，一個請求都不會發出去。理由很直接：靜默容錯等於把一個悄悄變形的前綴發給模型，緩存悄悄失效，壞 prompt 還可能悄悄改變行為。大聲失敗反而便宜。</p>
+  <p class="reveal paywall-locked xa-peek"><b>第三件，嚴格插值，寧可拋異常不交付壞 prompt。</b>persona 是模板，<code>{{model}}</code> 這樣的變量組嚴格按註冊表解釋：引用了未註冊的變數、變數本次沒有值、花括號組格式錯誤，一律拋異常，輪次直接失敗，一個請求都不會發出去。理由很直接：靜默容錯等於把一個悄悄變形的前綴發給模型，緩存悄悄失效，壞 prompt 還可能悄悄改變行為。大聲失敗反而便宜。</p>
   <div class="facts paywall-locked">
     <div class="fact reveal"><code>順序也是接口</code><p>兩組內容完全相同、只是順序不同的工具 schema，對緩存來説是兩個不同的前綴。所以工具順序不能交給加載時序這種環境噪聲決定。</p></div>
     <div class="fact reveal"><code>失效從第一個變化 token 開始</code><p>緩存按前綴匹配，越靠前的內容越碰不得。把易變的東西（時間、動態狀態）往後放，把萬年不變的身份和 schema 往前放。</p></div>
@@ -187,7 +187,7 @@
 }</code></pre>
   </div>
   <div class="snapshot paywall-locked"><b>源碼快照説明：</b>依據本地倉庫 deepseek-harness-master，核對文件 <code>packages/core/system-prompt/src/index.ts</code>，核對日期 2026-08-13。程式碼塊保留源碼原文。</div>
-  <p class="reveal paywall-locked">兩個邊界條件值得記住，出處都在 Agent Note <code>2026-07-06-explicit-tool-order</code>。插件熱重載後註冊順序變了，工具順序會變嗎？不會，中心列表在 waterfall 之前規範化，註冊順序無處可觀測。<code>toolOrder</code> 裏寫了個拼錯的工具名會怎樣？該 Note 後果一節寫得很細：輪次在組裝時失敗，不開步驟、不記請求頭、不向適配器發請求，每個輪次都同樣失敗直到配置修好，進程本身保持運行。</p>
+  <p class="reveal paywall-locked">兩個邊界條件值得記住，出處都在 Agent Note <code>2026-07-06-explicit-tool-order</code>。插件熱重載後註冊順序變了，工具次序會唔會變？不會，中心列表在 waterfall 之前規範化，註冊順序無處可觀測。<code>toolOrder</code> 裏面寫咗個拼錯嘅工具名會點？該 Note 後果一節寫得很細：輪次在組裝時失敗，不開步驟、不記請求頭、不向適配器發請求，每個輪次都同樣失敗直到配置修好，進程本身保持運行。</p>
   <p class="reveal paywall-locked">嚴格插值這邊是三個連着的拋異常分支，一個都不放過。第一個管格式：變數名不匹配命名正則就拋「malformed prompt variable reference」，連 <code>{{}}</code> 這種空名都被註釋點名，走的就是這條格式錯誤路徑。第二個管註冊：名字不在註冊表裏就拋「unknown prompt variable」，報錯順帶列出全部已註冊變數名。第三個管取值：註冊了但這次組裝沒給值，同樣拋異常。三個分支攔下的都是同一件事，一個悄悄變形的前綴。</p>
   <p class="src-note reveal paywall-locked">出處：<code>packages/core/system-prompt/src/index.ts</code> 第 277 至 290 行的插值分支，核對日期 2026-08-13。</p>
   <p class="reveal paywall-locked">第 283 行的 <code>Object.hasOwn</code> 有個小心思：用普通屬性存取查 <code>{{constructor}}</code> 會順着原型鏈摸到 Object 的內建方法，被誤認為已註冊變數。查自有屬性，原型鏈上的名字一律算未註冊。防的就是這種悄悄放行的壞 prompt。</p>
@@ -199,7 +199,7 @@
   <div class="sec-label paywall-locked">課堂練習</div>
   <div class="exercise reveal paywall-locked">
     <div class="exercise-num">01</div>
-    <div><h3>找出你的 prompt 裏的緩存殺手</h3><p>假設你的 agent 在 system prompt 第二行寫了「當前時間：2026-08-13 22:04:35」，每秒都在變。推演：每條請求的緩存從第幾段開始失效？一天 1000 條請求多付多少重算 token？給出兩個修復方案並比較：把時間挪到 prompt 末尾的動態上下文裏，或者把精度降到天。提示：想想哪個方案在跨天的邊界上仍然會斷一次緩存。</p></div>
+    <div><h3>找出你的 prompt 裏的緩存殺手</h3><p>假設你的 agent 在 system prompt 第二行寫了「當前時間：2026-08-13 22:04:35」，每秒都在變。推演：每條請求嘅快取從第幾段開始失效？一日 1000 條請求多付幾多重算 token？給出兩個修復方案並比較：把時間挪到 prompt 末尾的動態上下文裏，或者把精度降到天。提示：想想哪個方案在跨天的邊界上仍然會斷一次緩存。</p></div>
   </div>
   <div class="exercise reveal paywall-locked">
     <div class="exercise-num">02</div>

@@ -149,7 +149,7 @@
 
   <div class="sec-label">Goal 是什麼</div>
   <p class="prose reveal">Goal（長期目標）解決的訴求很具體：你交代一句話的目標，比如把倉庫測試全修綠，然後走開。Agent 接下來自主跑幾十個 Turn（輪次），每輪結束系統自動注入一條繼續推進的消息，讓它接着幹。</p>
-  <p class="prose reveal">問題也隨之而來：一個能自己給自己發消息的系統，怎麼保證它不會順手把輪次上限也改了，永遠跑下去？DSH 的答案分兩層，一層管權限從哪來，一層管憑證怎麼過期，下面逐層拆。</p>
+  <p class="prose reveal">問題也隨之而來：一個能自己給自己發消息的系統，點樣保證佢唔會順手將輪次上限都改咗，永遠跑落去？DSH 的答案分兩層，一層管權限從哪來，一層管憑證怎麼過期，下面逐層拆。</p>
 
   <div class="sec-label">設計思路一 · 權限跟着消息來源走</div>
 
@@ -199,7 +199,7 @@
   <p class="prose reveal">權限只有兩檔。第一檔 direct-human：當前 Turn 窗口裏有真人消息，那這輪裏模型做什麼都算人類授的權，create、edit、pause、resume 全開。第二檔 goal-round：窗口裏那條注入消息正好是當前目標的當前輪，此時模型只能做兩件事，報告完成（complete）或報告卡住（blocked）。blocked 還有個額外下限，預設要跑滿 3 個獲准輪次才許喊卡，防的是模型一遇到難題就撂挑子。</p>
   <p class="prose reveal">所以給自己續命這條路在機制層就不存在。自動續跑的輪次裏，窗口裏只有系統注入的續跑消息，沒有真人，edit 直接被拒，模型能做的只有收尾。</p>
   <p class="prose reveal">具體的判定拆成兩個小函式。<code>hasDirectHumanInput</code> 掃描之前先確認調用者是頂層根 agent，子 Agent 連掃描資格都沒有，然後在窗口事件裏找一條來源標記為真人的消息，找到才成立。<code>isMatchingGoalRound</code> 對輪次編號：注入消息的 goalId、revision、round 三個值要和當前目標逐一相等，才算當前獲准輪。上一輪的舊消息、別的目標的消息、編號跳號的消息，都換不來授權。</p>
-  <p class="prose reveal">兩個判定怎麼合成最終裁決？這段源碼一共 8 行，短到可以整段當金句看。它證明整條判定路徑上沒有白名單、沒有評分、沒有語義分析：先問有沒有真人，再問是不是當前輪，都不是就拋結構化錯誤。</p>
+  <p class="prose reveal">兩個判定點樣合成最終裁決？這段源碼一共 8 行，短到可以整段當金句看。它證明整條判定路徑上沒有白名單、沒有評分、沒有語義分析：先問有沒有真人，再問是不是當前輪，都不是就拋結構化錯誤。</p>
   <div class="source reveal paywall-locked xa-peek">
     <div class="source-head"><span>packages/goal/tool-goal/src/authority.ts</span><span>第 101 至 108 行</span></div>
     <pre><code><span class="kw">export function</span> <span class="fn">completionAuthority</span>(ctx: <span class="ty">Context</span>, execution: <span class="ty">GoalToolExecution</span>): <span class="ty">GoalToolAuthority</span> {
@@ -213,8 +213,8 @@
   </div>
   <div class="snapshot paywall-locked"><b>源碼快照説明：</b>依據本地倉庫 deepseek-harness-master，核對文件 <code>packages/goal/tool-goal/src/authority.ts</code>，核對日期 2026-08-13。程式碼塊保留源碼原文。</div>
 
-  <p class="prose reveal paywall-locked">兩個邊界條件正好對應演示裏的情景 C 和 D。邊界一：自動續跑輪次裏人類恰好插了一句話，模型能 edit 嗎？能。掃的是整個當前 Turn 窗口，只要窗口裏出現過真人消息，授權就成立。這不算漏洞：人在場並且説了話，這輪的操作本來就有人背書，誰先開口不影響判定。</p>
-  <p class="prose reveal paywall-locked">邊界二：子 Agent 調 goal 工具會怎樣？roots 檢查直接攔下，它不在頂層 agent 名單裏。就算這關放它過去，goal-round 授權也救不了它：<code>ctx.goals.get</code> 查的是調用者自己的會話，目標掛在根 agent 的會話上，子 Agent 那邊查出來是 <code>undefined</code>。兩道門，哪道都過不去。還有一個寫在源碼註釋裏的細節：<code>Agent.followup()</code> 和 <code>steer()</code> 省略來源時預設按真人算，所以任何非人類的消息生產者必須自報來源，不許靠省略參數繼承人類權限。</p>
+  <p class="prose reveal paywall-locked">兩個邊界條件正好對應演示裏的情景 C 和 D。邊界一：自動續跑輪次裏人類恰好插了一句話，模型可唔可以 edit？能。掃的是整個當前 Turn 窗口，只要窗口裏出現過真人消息，授權就成立。這不算漏洞：人在場並且説了話，這輪的操作本來就有人背書，誰先開口不影響判定。</p>
+  <p class="prose reveal paywall-locked">邊界二：子 Agent 調 goal 工具會點？roots 檢查直接攔下，它不在頂層 agent 名單裏。就算這關放它過去，goal-round 授權也救不了它：<code>ctx.goals.get</code> 查的是調用者自己的會話，目標掛在根 agent 的會話上，子 Agent 那邊查出來是 <code>undefined</code>。兩道門，哪道都過不去。還有一個寫在源碼註釋裏的細節：<code>Agent.followup()</code> 和 <code>steer()</code> 省略來源時預設按真人算，所以任何非人類的消息生產者必須自報來源，不許靠省略參數繼承人類權限。</p>
   <div class="stress reveal paywall-locked">鑑權讀的是宿主蓋的章，模型的話術一個字都不參與判定。</div>
   <p class="src-note reveal paywall-locked">出處：兩個判定函式與預設來源註釋在 <code>packages/goal/tool-goal/src/authority.ts</code> 第 66 至 83 行（全文 109 行）；edit、pause、resume 分支要求真人授權在 <code>tool-goal/src/index.ts</code> 第 265 與 273 行，complete 和 blocked 走第 285 行的 completionAuthority；blocked 的 3 輪下限在 <code>docs/tool-catalog.zh.md</code> 第 31 行。</p>
 
@@ -260,8 +260,8 @@
       <h3>手推一個完整的越權劇本</h3>
       <p>自動續跑第 4 輪裏，模型先在回覆裏寫「用戶剛才在語音裏同意把上限調到 100 輪」，然後調 <code>update_goal(action: edit, max_goal_rounds: 100)</code>。</p>
       <p>問題一：寫出這次調用在鑑權裏經過的判定順序和最終結果。</p>
-      <p>問題二：換個思路，它讓子 Agent 替它調，會卡在哪一道檢查？</p>
-      <p>問題三：如果它先調 complete 把目標標記完成，再指望新目標重新計數，create 需要什麼授權？三條路各堵在哪。</p>
+      <p>問題二：換個思路，佢叫子 Agent 替佢調，會卡喺邊一道檢查？</p>
+      <p>問題三：如果它先調 complete 把目標標記完成，再指望新目標重新計數，create 需要咩授權？三條路各堵在哪。</p>
     </div>
   </div>
 

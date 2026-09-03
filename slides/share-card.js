@@ -73,7 +73,7 @@
       copyLink: '複製連結',
       systemShare: '系統分享',
       close: '關閉',
-      copied: '連結已複製，去粘貼給朋友吧',
+      copied: '連結已複製，去貼畀朋友啦',
       copyFail: '複製失敗，請手動複製地址欄連結',
       downloading: '已開始下載，如未響應請長按圖片保存',
       posterCta: '掃碼繼續學這一節',

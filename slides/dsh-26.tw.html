@@ -148,7 +148,7 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
   <p class="reveal body">推理對自家便宜，冒煙測試就往真裡做：啟動真實示例、發一條提示詞、檢查外部世界。斷言也有講究：e2e 要重新讀檔案、重跑命令來驗證結果，對 agent 自身輸出做關鍵詞探測會讓作弊的 agent 透過。缺金鑰的環境自動跳過，不阻塞任何人。</p>
 
   <div class="sec-label">邏輯拆解 · 日誌即測試資產</div>
-  <p class="reveal body">重頭戲是回放。上一課講過（見 <a href="dsh-22.html">LLM 適配層</a>），每個流式分片都以 <code>assistant/chunk</code> 事件原樣落進會話日誌。<code>dsh-llm-replay</code> 外掛把這件事反過來用：拿一份錄好的 <code>session.jsonl</code>，把 chunk 事件按 (turn, step) 分組，每組就是當年一次模型呼叫的完整分片序列。測試時真實 agent 照常跑，只是模型那頭換成回放介面卡，逐幀吐回錄製的分片。不確定性只存在於錄製那一次，之後每次重跑都逐位元組一致，不需要 API Key。</p>
+  <p class="reveal body">重頭戲是回放。上一課講過（見 <a href="dsh-22.html">LLM 適配層</a>），每個流式分片都以 <code>assistant/chunk</code> 事件原樣落進會話日誌。<code>dsh-llm-replay</code> 外掛把這件事反過來用：拿一份錄好的 <code>session.jsonl</code>，把 chunk 事件按 (turn, step) 分組，每組就是當年一次模型呼叫的完整分片序列。測試時真實 agent 照常跑，只是模型那頭換成回放轉接器，逐幀吐回錄製的分片。不確定性只存在於錄製那一次，之後每次重跑都逐位元組一致，不需要 API Key。</p>
   <p class="reveal body">這就是日誌即測試資產的意思：fixture 不用手寫 mock 資料，直接就是生產格式的會話日誌本身。快照測試拿它固定整個組裝後的行為，改一行程式碼導致行為分叉，diff 當場標紅。還有個精巧的細節在 fork（分叉會話）：子會話的日誌開頭繼承了父會話的種子事件，回放推導腳本時必須從 <code>seedLength</code> 邊界之後開始切，否則父會話的分片會被誤當成子會話的呼叫重放：</p>
   <div class="source reveal">
     <div class="source-head"><span>packages/test-support/llm-replay/src/index.ts</span><span>第 532 至 542 行</span></div>
@@ -168,10 +168,10 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
   <p class="reveal body paywall-locked xa-peek">跨平臺紀律也從這裡來：簽入的 fixture 必須在 macOS 和 Linux 上都能回放，錄出來的快照哪個平臺掛了就修 fixture 本身。<code>AGENTS.md</code> 第 123 行的原話是「fix fixtures, not normalizers」：修 fixture，別寫歸一化器。歸一化器是在測試和現實之間墊棉花，墊多了就測不到現實了。</p>
 
   <div class="sec-label paywall-locked">邏輯拆解 · 一臺專門騙 LLM 客戶端的伺服器</div>
-  <p class="reveal body paywall-locked">回放測的是行為不變，還差一塊：傳輸層的花式死法。連線被拒、發一半 socket 重置、正常關閉但沒發 <code>[DONE]</code>、限流帶 Retry-After、乾脆停滯不動，每一種在介面卡和恢復層眼裡都是不同的東西，用行程內 mock 全測不到，因為 mock 繞過了 fetch、SSE 分幀、socket 終止和空閒看門狗這些真實邊界。所以 DSH 造了 <code>dsh-llm-mock-server</code>：一臺真的 Node HTTP 伺服器，說 OpenAI 方言，行為完全由腳本控制，每接一個請求消耗一個行為，腳本耗盡就明確報錯（設計動機見 Agent Note <code>2026-07-25-scriptable-llm-wire-fault-server.zh.md</code>）。開發者想手動復現故障，改一下 base URL 和 key 就能把任何應用接上來。</p>
+  <p class="reveal body paywall-locked">回放測的是行為不變，還差一塊：傳輸層的花式死法。連線被拒、發一半 socket 重置、正常關閉但沒發 <code>[DONE]</code>、限流帶 Retry-After、乾脆停滯不動，每一種在轉接器和恢復層眼裡都是不同的東西，用行程內 mock 全測不到，因為 mock 繞過了 fetch、SSE 分幀、socket 終止和空閒看門狗這些真實邊界。所以 DSH 造了 <code>dsh-llm-mock-server</code>：一臺真的 Node HTTP 伺服器，說 OpenAI 方言，行為完全由腳本控制，每接一個請求消耗一個行為，腳本耗盡就明確報錯（設計動機見 Agent Note <code>2026-07-25-scriptable-llm-wire-fault-server.zh.md</code>）。開發者想手動復現故障，改一下 base URL 和 key 就能把任何應用接上來。</p>
   <p class="reveal body paywall-locked">它還有個 random 模式，按權重隨機抽故障做壓力測試，seed 公開且可復現。預設權重表本身就是一份清單，列著 LLM 客戶端在野外會遇到什麼：正常成功佔 48、慢速成功 10、半途掐線（partial_disconnect）10，然後是各佔 5 的連線重置、斷流、空回覆和限流，伺服器錯誤 4，觸頂 max_tokens、停滯掛起和 503 各 2，最刁的兩種各佔 1：流正常收尾卻沒發完的 partial_eof，和吐出壞 JSON 的 malformed_json。原始碼註釋還專門提醒：這是可調的測試壓力配置，並非生產事故頻率的估算。</p>
   <p class="src-note reveal paywall-locked">出處：<code>packages/test-support/llm-mock-server/src/index.ts</code> 第 56 至 70 行的 DEFAULT_MOCK_LLM_RANDOM_WEIGHTS，核對日期 2026-08-13。</p>
-  <p class="reveal body paywall-locked">伺服器的操守很剋制：只報告協議層事實，不判斷可不可以重試，策略歸 harness 自己。真實組合測試讓請求依次穿過 DeepSeek 介面卡、agent loop 和重試外掛，驗證的東西很具體：請求次數精確、重試步驟帶編號、失敗的半截分片不洩漏進歷史、正常 EOF 的半截輸出歸類為 <code>STREAM_CLOSED</code> 且預設不重試。</p>
+  <p class="reveal body paywall-locked">伺服器的操守很剋制：只報告協議層事實，不判斷可不可以重試，策略歸 harness 自己。真實組合測試讓請求依次穿過 DeepSeek 轉接器、agent loop 和重試外掛，驗證的東西很具體：請求次數精確、重試步驟帶編號、失敗的半截分片不洩漏進歷史、正常 EOF 的半截輸出歸類為 <code>STREAM_CLOSED</code> 且預設不重試。</p>
 
   <div class="sec-label paywall-locked">邏輯拆解 · 性質測試，第一槍就見血</div>
   <p class="reveal body paywall-locked">最後一件武器對付的是沒人想得到的交錯。協議形態的程式碼（分片流、事件日誌、收件箱排程）輸入空間是組合爆炸的，示例測試只能固定想到的用例。DSH 給每個協議形態的包配一個 fast-check 驅動的性質測試：生成器造出逼真但對抗性的輸入（重複索引、滯後分片、缺 block-start 的畸形流），斷言的不是具體輸出，是不變式，比如組裝出的塊數不能超過見過的不同索參數、重複呼叫的結果必須穩定。失敗自動列印可復現的 seed。</p>
@@ -184,7 +184,7 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
   <div class="facts paywall-locked">
     <div class="fact reveal"><code>覆蓋率是必要不充分</code><p>按檔案 100% 是 CI 門禁，但它只證明行被執行過。真 bug 藏在交錯序列裡，那是性質測試的地盤；藏在傳輸邊界裡，那是故障伺服器的地盤。</p></div>
     <div class="fact reveal"><code>fixture 就是會話日誌</code><p>回放 fixture 不是手搓的 mock，是生產格式的 <code>session.jsonl</code> 本身。錄一次，處處重放，跨平臺必須過，掛了修 fixture 不修歸一化器。</p></div>
-    <div class="fact reveal"><code>故障伺服器不做策略</code><p>它只誠實地按腳本掐線、限流、停滯，重不重試是 harness 的事。測試基礎設施保持中立，才能同時給介面卡、loop 和重試層作證。</p></div>
+    <div class="fact reveal"><code>故障伺服器不做策略</code><p>它只誠實地按腳本掐線、限流、停滯，重不重試是 harness 的事。測試基礎設施保持中立，才能同時給轉接器、loop 和重試層作證。</p></div>
   </div>
 
   <div class="sec-label paywall-locked">橫向對比 · 別家怎麼測</div>
@@ -274,7 +274,7 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
       { cap: '這是一臺真的 Node HTTP 伺服器，說 OpenAI 方言。行為排成隊：每接一個請求消耗一個，腳本耗盡就明確報錯。測試因此完全確定。', dur: 3000, run: setupA },
       { cap: '客戶端發出請求 #1。隊首行為是 rate_limit：伺服器回 429，並附上 Retry-After: 2。', dur: 2500,
         run: function () { arm(0); addLog('request #1', 'POST /v1/chat/completions'); } },
-      { cap: '介面卡把它規範化成 RATE_LIMIT 錯誤碼。重試外掛認這個碼，而且 provider 給的合法延遲會替換本地退避。llm/retry 事件落盤，等 2 秒。', dur: 3000,
+      { cap: '轉接器把它規範化成 RATE_LIMIT 錯誤碼。重試外掛認這個碼，而且 provider 給的合法延遲會替換本地退避。llm/retry 事件落盤，等 2 秒。', dur: 3000,
         run: function () {
           consume(0);
           addLog('failure', 'RATE_LIMIT · status 429', 'bad');
@@ -340,8 +340,8 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
       { cap: '左邊是一份真實會話日誌 fixture。注意那三條 assistant/chunk：當年模型的每一個分片都原樣躺在裡面。', dur: 2900, run: setupB },
       { cap: '推導：把 chunk 事件按 (turn, step) 分組，每組直接變成一次模型呼叫的回放腳本。沒有手寫 mock，日誌本身就是腳本。', dur: 3000,
         run: function () { fixRows[1].classList.add('armed'); fixRows[2].classList.add('armed'); fixRows[3].classList.add('armed'); } },
-      { cap: '重跑：真實 agent 啟動，模型那頭換成回放介面卡，逐幀吐回錄製的分片。全程不需要 API Key，也沒有任何網路請求。', dur: 2900,
-        run: function () { addLog('replay', '真實 loop + 回放介面卡執行中…'); } },
+      { cap: '重跑：真實 agent 啟動，模型那頭換成回放轉接器，逐幀吐回錄製的分片。全程不需要 API Key，也沒有任何網路請求。', dur: 2900,
+        run: function () { addLog('replay', '真實 loop + 回放轉接器執行中…'); } },
       { cap: 'diff：重跑產物與原始記錄逐行比對，全部打鉤。跑一萬次都是這個結果，非確定性被鎖死在錄製那一次。', dur: 2900,
         run: function () {
           addDiff('user/message 一致');

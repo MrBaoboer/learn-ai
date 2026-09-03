@@ -211,7 +211,7 @@
 
   <div class="sec-label">為什麼「跳過未知事件」是安全事故</div>
   <p class="reveal">版本號管結構變更，管不了詞彙增長：事件的種類由掛了哪些插件決定，一個整數描述不了它。DSH 的方案是逐事件標記。讀取器遇到不認識的事件類型，預設整個會話拒絕恢復，除非那條事件的信封上帶着寫入方聲明的 <code>ignorable: true</code>。已知詞彙清單 <code>KNOWN_SESSION_EVENT_TYPES</code> 不是手寫的，由腳本從全倉庫所有事件聲明合併生成，共 44 個類型，連同 946 行的持久化事件目錄 <code>docs/persistence-catalog.zh.md</code> 一起，有專門的校驗腳本保證不過期。</p>
-  <p class="reveal paywall-locked xa-peek">為什麼預設必需、忘寫標記寧可拒絕過頭？設計筆記把這筆賬算得很清楚。忘寫 <code>ignorable</code> 的後果是一個本可恢復的會話被拒絕打開，用戶不爽，是體驗問題；反過來預設可忽略，同樣的疏忽會靜默恢復出一個內容殘缺的會話，模型接着在錯誤的歷史上繼續工作，是安全事故。演示的場景 A 就是後者的現場：跳過一條裝着用戶消息的未知事件，恢復出來的對話裏助手在回答一個不存在的問題。兩種失敗不對稱，防綫自然偏向吵鬧的那邊。</p>
+  <p class="reveal paywall-locked xa-peek">點解預設必需、唔記得寫標記寧願拒絕過頭？設計筆記把這筆賬算得很清楚。忘寫 <code>ignorable</code> 的後果是一個本可恢復的會話被拒絕打開，用戶不爽，是體驗問題；反過來預設可忽略，同樣的疏忽會靜默恢復出一個內容殘缺的會話，模型接着在錯誤的歷史上繼續工作，是安全事故。演示的場景 A 就是後者的現場：跳過一條裝着用戶消息的未知事件，恢復出來的對話裏助手在回答一個不存在的問題。兩種失敗不對稱，防綫自然偏向吵鬧的那邊。</p>
   <div class="facts paywall-locked">
     <div class="fact reveal"><code>版本是一個單調整數</code><p>不分大小版本。能不能自動升級由那一步的升級器存在與否表達，編號方案不提前承諾。當前 <code>SESSION_FORMAT_VERSION = 0</code>。</p></div>
     <div class="fact reveal"><code>未知事件預設必需</code><p>讀取器拒絕解讀含未知類型的日誌，除非事件帶 <code>ignorable: true</code>。方向性拒絕優於 best-effort parse，靜默跳過就是讀錯。</p></div>
@@ -219,9 +219,9 @@
   </div>
 
   <div class="sec-label paywall-locked">fork 的雙邊界 · seedLength 與 session/end-seed</div>
-  <p class="reveal paywall-locked">分叉一個會話，就是把源會話到某個穩定位置為止的事件深拷貝一份，當作子會話的種子。麻煩在於邊界：子會話日誌的前半段是繼承來的種子，後半段才是自己寫的，兩段在字節層面長得一模一樣。哪裏是分界綫？</p>
+  <p class="reveal paywall-locked">分叉一個會話，就是把源會話到某個穩定位置為止的事件深拷貝一份，當作子會話的種子。麻煩在於邊界：子會話日誌的前半段是繼承來的種子，後半段才是自己寫的，兩段在字節層面長得一模一樣。分界綫係邊度？</p>
   <p class="reveal paywall-locked">直覺答案是數一數構造時種子有幾條，也就是 <code>seed.length</code>。這個答案錯得很隱蔽：恢復的會話拿完整存儲日誌當構造種子，<code>seed.length</code> 算出的邊界會隨着每次重新打開往後跑；header 裏的 <code>seedLength</code> 才一直保留着最初 fork 時的值。所以 DSH 把邊界寫了兩份：第一份在 header，<code>fork()</code> 創建子會話時把 <code>parentSession</code> 和 <code>seedLength</code> 寫進創建元數據；第二份在日誌裏，帶種子的會話把 <code>session/end-seed</code> 事件作為自己的第一次即時寫入追加在種子之後，專門服務只拿得到存儲字節的消費方。</p>
-  <p class="reveal paywall-locked">這條邊界事件解決的問題很具體。種子歷史裏可能有一個沒配對的 <code>compaction/start</code>，它到底是「上個生命週期崩在壓縮中途」還是「此刻正在壓縮」？光看字節分不出來。有了 <code>session/end-seed</code>，在它之前的未配對開啓標記一律屬於已結束的生命週期。類型定義的 JSDoc 裏還有一句狠話：<code>Session</code> 的構造函式是唯一合法寫入方，插件擅自追加一條，等於把它之前的所有即時工作靜默歸類成種子歷史。</p>
+  <p class="reveal paywall-locked">這條邊界事件解決的問題很具體。種子歷史裏可能有一個沒配對的 <code>compaction/start</code>，佢到底係「上個生命週期崩喺壓縮中途」定「而家喺度壓縮」？光看字節分不出來。有了 <code>session/end-seed</code>，在它之前的未配對開啓標記一律屬於已結束的生命週期。類型定義的 JSDoc 裏還有一句狠話：<code>Session</code> 的構造函式是唯一合法寫入方，插件擅自追加一條，等於把它之前的所有即時工作靜默歸類成種子歷史。</p>
   <p class="reveal paywall-locked">順帶一句大日誌的恢復成本。恢復一個 130 萬事件、62 MiB 壓縮數據的會話，DSH 全程不物化整份明文，這輪優化把恢復准入從約 600ms 壓到 263ms（Agent Note 2026-08-05）。校驗和凍結一項沒省：持久存儲屬於運行時邊界，防綫本身不動。</p>
 
   <div class="sec-label paywall-locked">關鍵證據 · 拒絕的原文</div>
@@ -256,7 +256,7 @@
   <div class="sec-label paywall-locked">課堂練習</div>
   <div class="exercise reveal paywall-locked">
     <div class="exercise-num">01</div>
-    <div><h3>給你的插件事件選一個預設值</h3><p>你寫了個 DSH 插件，往會話日誌裏追加自定義事件 <code>myplugin/audit</code>，記錄每次工具調用的審計信息。推演兩種情況：不標 <code>ignorable</code>，用戶把日誌拷到一台沒裝你插件的同版本 harness 上打開，會發生什麼？（提示：<code>KNOWN_SESSION_EVENT_TYPES</code> 由倉庫內聲明生成，倉庫外插件的事件按構造就在清單之外。）標了 <code>ignorable: true</code> 又會怎樣，你的審計信息在重建中去了哪裏？兩種選擇各適合什麼樣的事件，用「丟了它會不會改變日誌其餘部分的解讀」這把尺子量一量。</p></div>
+    <div><h3>給你的插件事件選一個預設值</h3><p>你寫了個 DSH 插件，往會話日誌裏追加自定義事件 <code>myplugin/audit</code>，記錄每次工具調用的審計信息。推演兩種情況：不標 <code>ignorable</code>，用戶把日誌拷到一台沒裝你插件的同版本 harness 上打開，會發生什麼？（提示：<code>KNOWN_SESSION_EVENT_TYPES</code> 由倉庫內聲明生成，倉庫外插件的事件按構造就在清單之外。）標了 <code>ignorable: true</code> 又會怎樣，你嘅審計資訊喺重建裏面去咗邊度？兩種選擇各適合什麼樣的事件，用「掉咗佢會唔會改到日誌其餘部分嘅解讀」這把尺子量一量。</p></div>
   </div>
 
   <div class="takeaway reveal paywall-locked">

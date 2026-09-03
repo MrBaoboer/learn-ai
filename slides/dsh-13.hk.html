@@ -143,7 +143,7 @@
   </div>
 
   <div class="sec-label">機制拆解 · 一個值，三份投影</div>
-  <p class="prose reveal">先回答標題裏的問題：工具結果到底是字串還是結構化值？在 DSH 裏兩個都是，但地位不同。工具的 <code>execute</code> 只返回一個規範 JSON 值（canonical value），這個值必須通過工具自己聲明的 <code>output.schema</code> 校驗。字串是後來才有的：註冊表拿着校驗過的值調用 <code>render(args, value)</code>，投影出模型看到的內容塊。</p>
+  <p class="prose reveal">先回答標題裏的問題：工具結果到底係字串定結構化值？在 DSH 裏兩個都是，但地位不同。工具的 <code>execute</code> 只返回一個規範 JSON 值（canonical value），這個值必須通過工具自己聲明的 <code>output.schema</code> 校驗。字串是後來才有的：註冊表拿着校驗過的值調用 <code>render(args, value)</code>，投影出模型看到的內容塊。</p>
   <p class="prose reveal">所以鏈路是：execute 產出值，schema 把關，render 投影模型內容，可選的 <code>presentationMeta</code> 投影一份可回放的 UI 數據，<code>presentResult</code> 再把它變成一張卡片。render 和 presentResult 都是純函式，不做 I/O，因為它們在即時流式輸出和會話日誌回放兩條路徑上都要跑，跑出來必須一樣。</p>
   <p class="prose reveal">UI 那邊拿到的東西叫渲染意圖（render intent）：一個帶 card 標籤的聯合類型，值域是 generic、terminal、diff、read、search、web 六種卡片。客戶端只需要對 card 做 switch，不需要認識任何工具名。換一個搜索後端 provider，工具實現整個換掉，只要它還產出 search 卡，UI 一行不用改。這就是 UI 契約與工具實現解耦的意思。</p>
   <div class="facts">
@@ -210,7 +210,7 @@
   <div class="snapshot paywall-locked"><b>源碼快照説明：</b>依據本地倉庫 deepseek-harness-master，核對文件 <code>packages/core/tools/src/index.ts</code>，核對日期 2026-08-13。程式碼塊保留源碼原文。</div>
   <p class="prose reveal paywall-locked">值與展示分離還解釋了 post-execute 插件的一條怪規矩：accept 的時候，換 content 和換 value 只能二選一。這條規矩不是靠文檔約定，是寫死在類型定義裏的。<code>PostToolDecision</code> 的 accept 有兩個分支：一個分支允許帶 content，同時把 value 字段的類型標成 <code>never</code>；另一個分支反過來，允許帶 value，把 content 標成 <code>never</code>。TypeScript 裏 <code>never</code> 類型沒有任何合法取值，誰想在一個決定裏同時塞兩個字段，編譯器直接報錯。第三個分支是 block，把糾正性回饋變成錯誤結果。</p>
   <p class="src-note reveal paywall-locked">出處：<code>packages/core/tools/src/index.ts</code> 第 593 至 600 行的 PostToolDecision 類型定義，核對日期 2026-08-13。</p>
-  <p class="prose reveal paywall-locked">為什麼不許同時換？因為兩邊語義不一樣。換 content 是展示層的動作：值保持原樣，只改模型看到的文本。換 value 是數據層的動作：註冊表會拿新值重新過一遍 schema，再重新算 content 和 meta，保證三份投影出自同一個源頭。允許同時換，就可能出現文本説 A、值是 B 的分裂結果。文檔還補了一句要害提醒：內容替換是展示策略，想對程式隱藏值的插件必須換值或者 block，光改文本瞞不住 Code Mode 裏拿值的程式（<code>docs/subsystems/tools.zh.md</code>「後置策略」一節）。</p>
+  <p class="prose reveal paywall-locked">點解唔准同時換？因為兩邊語義唔一樣。換 content 是展示層的動作：值保持原樣，只改模型看到的文本。換 value 是數據層的動作：註冊表會拿新值重新過一遍 schema，再重新算 content 和 meta，保證三份投影出自同一個源頭。允許同時換，就可能出現文本説 A、值是 B 的分裂結果。文檔還補了一句要害提醒：內容替換是展示策略，想對程式隱藏值的插件必須換值或者 block，光改文本瞞不住 Code Mode 裏拿值的程式（<code>docs/subsystems/tools.zh.md</code>「後置策略」一節）。</p>
   <p class="prose reveal paywall-locked">兩個兜底問題也有了答案。render 拋異常，註冊表把它轉成 JSON 安全的 isError，模型看到錯誤文本。第三方工具沒寫 presentCall / presentResult，客戶端回退到 generic 卡：標題就是工具名，原始參數當輸入展示（<code>index.ts</code> 第 79 至 83 行的註釋寫明瞭這條回退）。都不崩，都有着落。</p>
 
   <div class="sec-label paywall-locked">橫向對比 · 渲染長在哪</div>

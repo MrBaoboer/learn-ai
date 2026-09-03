@@ -123,7 +123,7 @@
         <div class="ed-head"><b>觀測帳本</b></div>
         <div class="ed-sub">observation-policy 外掛的記錄：這個會話見過誰、見到的是哪個版本</div>
         <div class="ledger" id="de-ledger"></div>
-        <div class="ledger-note">未見 = 帳本里沒條目；present@vN = 讀到過版本 vN；absent = 確認過不存在</div>
+        <div class="ledger-note">未見 = 帳本裡沒條目；present@vN = 讀到過版本 vN；absent = 確認過不存在</div>
       </div>
       <div class="ed-box" id="eb-gate">
         <div class="ed-head"><b>edit 意圖判定</b></div>
@@ -141,12 +141,12 @@
 
   <div class="sec-label">機制拆解 · 一本帳，三個判定</div>
   <p class="prose reveal">Agent 改檔案的三大翻車現場：改錯位置、覆蓋沒讀過的檔案、拿著過期內容做編輯。DSH 的對策是三件套加一本帳。三件套是面向模型的 read、edit、write 工具（<code>docs/tool-catalog.zh.md</code>）：read 視窗化讀取帶行號的文字，edit 做字面量替換，write 整檔案建立或覆蓋。帳是 <code>fs-observation-policy</code> 外掛肚子裡的一個弱引用對映：以會話為鍵，記下每個檔案目標的觀測狀態。</p>
-  <p class="prose reveal">帳本只有三種狀態。未見：帳本里壓根沒這個檔案的條目。present@vN：讀到過，而且讀到的是版本 vN，版本號是檔案系統後端簽發的不透明新鮮度憑證。absent：確認過這個路徑不存在，比如 read 撲了個空。每次 read、write、edit 成功後，工具會發一個 <code>fs/observed</code> 事件，外掛同步記帳。</p>
+  <p class="prose reveal">帳本只有三種狀態。未見：帳本裡壓根沒這個檔案的條目。present@vN：讀到過，而且讀到的是版本 vN，版本號是檔案系統後端簽發的不透明新鮮度憑證。absent：確認過這個路徑不存在，比如 read 撲了個空。每次 read、write、edit 成功後，工具會發一個 <code>fs/observed</code> 事件，外掛同步記帳。</p>
   <p class="prose reveal">判定發生在動手之前。工具要寫或要改時，會分發 <code>fs/write-intent</code> 或 <code>fs/edit-intent</code> 事件，這是單槽瀑布：第一個返回決定的監聽器獨佔決策權，按部署約定就是這個策略外掛。它對著帳本給出守衛條件，真正的檢查由後端在一個原子臨界區裡完成：先驗版本再匹配再替換，中途誰也插不進來。</p>
   <div class="facts">
     <div class="fact reveal"><code>write 永遠有路走</code><p>沒讀過就 write，守衛是 createIfAbsent：檔案不存在就建立，存在就拒絕（FS_NOT_OBSERVED）。讀過再 write，守衛是 replaceIfVersion：版本對上才替換。新建檔案不用先讀，覆蓋別人的檔案不行。</p></div>
     <div class="fact reveal"><code>edit 一步都不讓</code><p>沒讀過直接 FS_NOT_OBSERVED，帳本記著 absent 就 FS_NOT_FOUND，讀過則帶版本守衛上路。版本檢查排在字面量匹配之前，所以拿過期內容編輯報的是 FS_STALE_VERSION，不會退化成一個誤導性的匹配失敗。</p></div>
-    <div class="fact reveal"><code>錯誤帶結構化身份</code><p>所有失敗都帶穩定的 <code>FsError</code> code，工具登錄檔在錯誤結果上保留 <code>{ name, code }</code>。重試邏輯和 UI 按 code 分支就行，不用解析錯誤文案（<code>docs/subsystems/filesystem.zh.md</code>「錯誤分類體系」）。</p></div>
+    <div class="fact reveal"><code>錯誤帶結構化身份</code><p>所有失敗都帶穩定的 <code>FsError</code> code，工具註冊表在錯誤結果上保留 <code>{ name, code }</code>。重試邏輯和 UI 按 code 分支就行，不用解析錯誤文案（<code>docs/subsystems/filesystem.zh.md</code>「錯誤分類體系」）。</p></div>
   </div>
 
   <div class="sec-label">核心視覺 · 判定流</div>
@@ -197,7 +197,7 @@
   </div>
 
   <div class="sec-label">關鍵證據 · 帳本上的兩個決定</div>
-  <p class="prose reveal">整個策略外掛不到 140 行，核心就是兩個查帳函式。write 的判定是一個三行的選擇：查帳發現讀到過（present），就返回帶版本號的 replaceIfVersion 守衛，版本對上才許替換；帳本里沒條目或者確認過不存在，就返回 createIfAbsent，檔案不存在才許建立。函式頭上的註釋把這張決策表用兩個箭頭寫完了。這就是「write 永遠有路走」的實現：新建檔案不用先讀，覆蓋別人的檔案不行。</p>
+  <p class="prose reveal">整個策略外掛不到 140 行，核心就是兩個查帳函式。write 的判定是一個三行的選擇：查帳發現讀到過（present），就返回帶版本號的 replaceIfVersion 守衛，版本對上才許替換；帳本裡沒條目或者確認過不存在，就返回 createIfAbsent，檔案不存在才許建立。函式頭上的註釋把這張決策表用兩個箭頭寫完了。這就是「write 永遠有路走」的實現：新建檔案不用先讀，覆蓋別人的檔案不行。</p>
   <p class="src-note reveal paywall-locked xa-peek">出處：<code>packages/fs/fs-observation-policy/src/index.ts</code> 第 61 至 71 行的 writeIntent，核對日期 2026-08-13。</p>
   <p class="prose reveal paywall-locked">edit 的判定更嚴，沒讀過連守衛都拿不到，直接拋錯。這個函式值得整段看，兩個 throw 就是本章標題的全部內容：</p>
   <div class="source reveal paywall-locked">
@@ -230,7 +230,7 @@
     <div class="dq-path">grok-build-main/crates/codegen/xai-grok-tools/src/implementations/grok_build/search_replace/mod.rs · 第 111 至 113 行（include_user_edit_hint 欄位註釋）</div>
     <blockquote>「When true, append a hint that the user may have changed the file to <code>NoMatchesFound</code> error messages. This nudges the model to re-read instead of blindly retrying with the same stale content.」</blockquote>
   </div>
-  <p class="prose reveal paywall-locked">翻譯一下：檔案被人改了導致匹配失敗時，Grok 在報錯文案裡加一句提示，勸模型重新讀一遍再試。這是提示語濃度的防線，靠模型自覺。DSH 是版本憑證濃度：版本對不上就 FS_STALE_VERSION，物理上不給寫。Grok 也有自己的強項，編碼坑那關它準備了 <code>unicode_normalized_fallback</code>，智慧引號、長橫線這類肉眼難辨的字元匹配失敗時可以做歸一化重試（同檔案第 103 至 110 行），DSH 的 edit 目前只按行尾規範化後精確匹配。hunk 級的變更追蹤 Grok 單獨抽了 <code>xai-hunk-tracker</code> crate 來做，Grok 工具系統的全景可以看站內 <a href="12-9.html">實現族、登錄檔與動態 MCP</a>。Codex 把力氣花在了 diff 格式本身，讓模型好寫、機器好驗，站內 <a href="codex-21.html">Codex apply-patch</a> 一課拆了它的語法與校驗。</p>
+  <p class="prose reveal paywall-locked">翻譯一下：檔案被人改了導致匹配失敗時，Grok 在報錯文案裡加一句提示，勸模型重新讀一遍再試。這是提示語濃度的防線，靠模型自覺。DSH 是版本憑證濃度：版本對不上就 FS_STALE_VERSION，物理上不給寫。Grok 也有自己的強項，編碼坑那關它準備了 <code>unicode_normalized_fallback</code>，智慧引號、長橫線這類肉眼難辨的字元匹配失敗時可以做歸一化重試（同檔案第 103 至 110 行），DSH 的 edit 目前只按行尾規範化後精確匹配。hunk 級的變更追蹤 Grok 單獨抽了 <code>xai-hunk-tracker</code> crate 來做，Grok 工具系統的全景可以看站內 <a href="12-9.html">實現族、註冊表與動態 MCP</a>。Codex 把力氣花在了 diff 格式本身，讓模型好寫、機器好驗，站內 <a href="codex-21.html">Codex apply-patch</a> 一課拆了它的語法與校驗。</p>
 
   <div class="sec-label paywall-locked">課堂練習</div>
   <div class="exercise reveal paywall-locked">
@@ -329,7 +329,7 @@
     return [
       { cap: '換一個程式碼檔案。模型已經讀過它，帳本 present@v3。注意第 1 行和第 3 行長得一模一樣。', run: function () { box('eb-file', 'on'); ledger('present', 'v3', true); FILES.C.forEach(function (l, i) { l[2] = (i === 0 || i === 2) ? 'dup' : ''; }); renderFile(FILES.C); } },
       { cap: '模型發起 edit：把 count += 1 換成 count += 2，沒傳 replace_all。', run: function () { box('eb-file', ''); box('eb-gate', 'on'); intent("edit: 'count += 1' → 'count += 2'"); } },
-      { cap: '帳本沒問題，版本也對得上。但臨界區裡的字面量匹配數出了兩處命中。', run: function () { gate('', '版本透過，匹配中…'); } },
+      { cap: '帳本沒問題，版本也對得上。但臨界區裡的字面量匹配數出了兩處命中。', run: function () { gate('', '版本通過，匹配中…'); } },
       { cap: '預設要求恰好命中一次。兩處就是歧義，FS_AMBIGUOUS_EDIT，一個字都不改。', run: function () { box('eb-gate', 'bad'); gate('deny', '拒絕：命中兩處，有歧義', 'FS_AMBIGUOUS_EDIT'); } },
       { cap: '模型的正確出路有兩條：把 old_string 加長到能唯一定位，或者確認兩處都要改就傳 replace_all。', run: function () {} },
       { cap: '它選了加上下文：old_string 換成 log(count) 後面那行的組合，唯一命中第 3 行。', run: function () { box('eb-gate', 'on'); intent("edit: 'log(count)\\ncount += 1' → …"); } },

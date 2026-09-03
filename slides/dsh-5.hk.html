@@ -91,7 +91,7 @@
     <p class="subtitle">模型寫一段小程式，<code>run_code</code> 把它送進 worker 沙箱，五次工具調用一輪搞定。本課講這個設計背後的兩個思路。</p>
   </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>官宣叫 PTC，源碼叫 code mode：worker 沙箱的隔離、通信協議與雙重記帳</p></aside><!--seo:end-->  <div class="objective reveal">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
-    <span><b>課程目標</b>讀完能説清兩件事：為什麼讓模型寫一段程式，比逐個發工具調用又快又省；模型寫的程式碼在沙箱裏跑，宿主憑什麼自保，權限為什麼一寸不松。</span>
+    <span><b>課程目標</b>讀完能説清兩件事：點解等模型寫一段程式，比起逐個發工具調用又快又慳；模型寫的程式碼在沙箱裏跑，宿主憑什麼自保，權限點解一寸都唔鬆。</span>
   </div>
 
   <div class="sec-label">先玩一遍 · 一段程式碼 vs 多輪調用</div>
@@ -127,7 +127,7 @@
       <div class="dm-col">
         <div class="dm-head"><span class="dm-name">Code Mode（PTC）</span><span class="dm-meter"><span><b id="dm-r-samp">0</b>輪採樣</span><span><b id="dm-r-tok">0</b>k token</span></span></div>
         <div class="dm-stream" id="dm-right">
-          <div class="dm-i" data-r="0"><div class="dm-bubble"><span class="dm-role">模型 · 第 1 輪採樣</span>寫一段程式，讓沙箱去編排這五步。</div></div>
+          <div class="dm-i" data-r="0"><div class="dm-bubble"><span class="dm-role">模型 · 第 1 輪採樣</span>寫一段程式，等沙箱去編排呢五步。</div></div>
           <div class="dm-i" data-r="1"><div class="dm-code" id="dm-codeblock"><div class="dm-code-tag">示意程式（5 行，課程示例，非源碼引用）</div><span class="cl">let total = 0, errors = 0                          // 統計值，全程留在沙箱裏</span><span class="cl">for (const p of ['a.log', 'b.log', 'c.log']) {     // 三個文件，循環裏讀</span><span class="cl">  total += 統計(await tools.read_file({ path: p })) }</span><span class="cl">await tools.write_file({ path: 'report.md', … })   // 寫報告，照走審批</span><span class="cl">return { total, errors }                           // 只有這一行回到模型</span></div></div>
           <div class="dm-i" data-r="5"><div class="dm-sandbox"><div class="dm-sb-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3"/></svg>worker 沙箱 · 隔離環境裏執行，中間結果不回模型</div>
             <div class="dm-chip" data-r="6" data-hl="3">await tools.read_file("logs/a.log")<span class="dm-note">經宿主轉發，照走審批管綫</span></div>
@@ -253,7 +253,7 @@
     </svg>
     <div class="visual-caption">教學化結構圖：節點與連綫用於解釋源碼關係，內容經過課程化整理。</div>
   </div>
-  <p class="reveal paywall-locked">然後是權限規矩：程式進了沙箱，審批一寸不松。每次 <code>await tools.xxx</code> 都被宿主包裝成子調度，帶着父調用的 token，走和原生模式同一條 pre-execute 審批瀑布，子調用 id 形如 <code>callId:code:n</code>，事件裏全程留痕（出處：<code>packages/core/tools/src/code-mode.ts</code> 第 545、477、470 行）。程式能綁到的工具，正好是系統提示詞裏聲明過的那些，受限工具在名單裏直接消失（出處：同文件第 601 至 608 行）。反過來，<code>mode: code</code> 下想繞開 <code>run_code</code> 直發原生調用，進策略管綫之前就被拒為 UNKNOWN_TOOL（出處：<code>docs/subsystems/tools.zh.md</code>）。入口收窄了，權限沒換門。</p>
+  <p class="reveal paywall-locked">然後係權限規矩：程式入咗沙箱，審批一寸都唔鬆。每次 <code>await tools.xxx</code> 都被宿主包裝成子調度，帶着父調用的 token，走和原生模式同一條 pre-execute 審批瀑布，子調用 id 形如 <code>callId:code:n</code>，事件裏全程留痕（出處：<code>packages/core/tools/src/code-mode.ts</code> 第 545、477、470 行）。程式能綁到的工具，正好是系統提示詞裏聲明過的那些，受限工具在名單裏直接消失（出處：同文件第 601 至 608 行）。反過來，<code>mode: code</code> 下想繞開 <code>run_code</code> 直發原生調用，進策略管綫之前就被拒為 UNKNOWN_TOOL（出處：<code>docs/subsystems/tools.zh.md</code>）。入口收窄了，權限沒換門。</p>
   <p class="reveal paywall-locked">DSH 自己給這套隔離的定位很清醒，README 開門見山：</p>
   <div class="doc-quote reveal paywall-locked">
     <p>「<b>這是隔離措施，而非安全邊界</b>：其信任立場有意與 bash 等價…但提供 bash 沒有的隔離：獨立 isolate、空環境、堆上限與強制終止。」</p>
@@ -285,7 +285,7 @@
   <div class="sec-label paywall-locked">課堂練習</div>
   <div class="exercise reveal paywall-locked">
     <div class="exercise-num">01</div>
-    <div><h3>兩段惡意程式，各撞哪個預算？</h3><p>程式 A 是同步熱循環 <code>while (true) {}</code>，程式 B 是 <code>await new Promise(() =&gt; {})</code>，永遠不會 resolve。對照思路二第三道防綫推演：A 和 B 分別被 computeMs 還是 maxWallMs 終止？為什麼 A 不能靠掛一個待完成的工具調用躲過計費？</p></div>
+    <div><h3>兩段惡意程式，各自撞邊個預算？</h3><p>程式 A 是同步熱循環 <code>while (true) {}</code>，程式 B 是 <code>await new Promise(() =&gt; {})</code>，永遠不會 resolve。對照思路二第三道防綫推演：A 和 B 分別被 computeMs 還是 maxWallMs 終止？點解 A 唔能夠靠掛一個待完成嘅工具調用躲過計費？</p></div>
   </div>
 
   <div class="takeaway reveal paywall-locked">

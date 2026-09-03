@@ -188,7 +188,7 @@
       <ol id="dm-trace">
         <li><span>build_prompt 把並行旗寫成 true</span><span class="ln">turn.rs L1321</span></li>
         <li><span>編請求時和 Lite 標記做與</span><span class="ln">client.rs L952</span></li>
-        <li><span>路由查登錄檔，沒有就當 false</span><span class="ln">router.rs L137</span></li>
+        <li><span>路由查註冊表，沒有就當 false</span><span class="ln">router.rs L137</span></li>
         <li><span>Hidden 即使自稱並行也當序列</span><span class="ln">registry.rs L472</span></li>
         <li><span>先 spawn，再等就緒，最後拿鎖</span><span class="ln">parallel.rs L144</span></li>
         <li><span>能並行就 read，否則 write</span><span class="ln">parallel.rs L152</span></li>
@@ -208,12 +208,12 @@
 
   <div class="q-tag reveal">它解決什麼問題</div>
   <p class="reveal">你讓模型同時讀 <code>src/main.rs</code>、讀 <code>src/lib.rs</code>，再打一處補丁。螢幕上兩份讀檔案幾乎同時出進度，打補丁那一下卻停了一拍。</p>
-  <p class="reveal">如果執行時把可以並行理解成這些呼叫疊著跑，兩個 <code>apply_patch</code> 會一起改共享的 diff 記帳，帳會亂。如果這些呼叫首尾相接，兩個讀檔案也要排隊，多耗一輪牆鐘。請求側那面旗只回答模型願不願意一次發多個盒子，回答不了盒子落地時誰能重疊。</p>
+  <p class="reveal">如果執行時把可以並行理解成這些呼叫疊著跑，兩個 <code>apply_patch</code> 會一起改共享的 diff 記帳，帳會亂。如果這些呼叫首尾相接，兩個讀檔案也要排隊，多耗一輪牆鐘。請求側那面旗只回答模型願不願意一次發多個盒子，回答不了盒子真正執行時誰能重疊。</p>
 
   <div class="q-tag reveal">思路是什麼</div>
   <p class="reveal">發給模型的旗寫在 <code>Prompt</code> 上。欄位預設是 <code>false</code>，取樣主路徑走 <code>build_prompt</code>，把旗寫成 <code>true</code>。編成 Responses 請求體時，再和模型是不是 Responses Lite 做一次與。Lite 上這面旗關掉。壓縮那兩條組包路徑也寫死 <code>true</code>，為的是和主取樣請求的形狀對齊，websocket 複用會逐欄位對比，其中就包括這面旗。</p>
   <p class="src-note reveal">出處：<code>codex-rs/core/src/session/turn.rs</code> 第 1312 至 1328 行 · <code>codex-rs/core/src/client.rs</code> 第 946 至 953 行</p>
-  <p class="reveal">執行側另有一張表。<code>ToolExecutor</code> 預設 <code>supports_parallel_tool_calls</code> 返回 <code>false</code>。漏寫覆蓋就走寫鎖。<code>exec_command</code>、<code>view_image</code>、<code>tool_search</code> 覆蓋成 <code>true</code>。<code>apply_patch</code> 不覆蓋。路由先查登錄檔，查不到當 <code>false</code>。曝光是 Hidden 的，handler 自己返回 <code>true</code> 也沒用。MCP 還要伺服器開關或只讀提示，預設仍是序列。</p>
+  <p class="reveal">執行側另有一張表。<code>ToolExecutor</code> 預設 <code>supports_parallel_tool_calls</code> 返回 <code>false</code>。漏寫覆蓋就走寫鎖。<code>exec_command</code>、<code>view_image</code>、<code>tool_search</code> 覆蓋成 <code>true</code>。<code>apply_patch</code> 不覆蓋。路由先查註冊表，查不到當 <code>false</code>。曝光是 Hidden 的，handler 自己返回 <code>true</code> 也沒用。MCP 還要伺服器開關或只讀提示，預設仍是序列。</p>
   <p class="src-note reveal">出處：<code>codex-rs/tools/src/tool_executor.rs</code> 第 122 至 124 行 · <code>codex-rs/core/src/tools/registry.rs</code> 第 470 至 473 行</p>
   <p class="reveal">模型只看見 <code>parallel_tool_calls</code> 為 <code>true</code> 或 Lite 下的 <code>false</code>。它看不見誰能並行。工具清單也不會因為某個工具其實要拿寫鎖而少掉一項。</p>
   <div class="visual reveal paywall-locked xa-peek">
@@ -224,7 +224,7 @@
       <text x="154" y="104" text-anchor="middle" fill="#262d38" font-size="13">build_prompt 寫成 true</text>
       <text x="154" y="132" text-anchor="middle" fill="#6b7280" font-size="13">Lite 再與成 false</text>
       <text x="154" y="168" text-anchor="middle" fill="#6b7280" font-size="13">模型可以一次發多個</text>
-      <text x="154" y="196" text-anchor="middle" fill="#9aa19d" font-size="13">不保證落地會重疊</text>
+      <text x="154" y="196" text-anchor="middle" fill="#9aa19d" font-size="13">不保證執行時會重疊</text>
       <rect x="340" y="36" width="260" height="200" rx="14" fill="#eef0f4" stroke="rgba(65,75,90,.35)"/>
       <text x="470" y="68" text-anchor="middle" fill="#262d38" font-size="14" font-weight="800">分類表</text>
       <text x="470" y="104" text-anchor="middle" fill="#262d38" font-size="13">預設 false，要並行自己改</text>
@@ -446,7 +446,7 @@
     var spawnZ = {};
     batch.forEach(function(t){ spawnZ[t.id] = 'spawn'; });
     snap({
-      cap: '任務先開工，再在門口排隊。還沒進門的那段叫 dispatch。分類在 spawn 之前就算好，等鎖期間不再問登錄檔。',
+      cap: '任務先開工，再在門口排隊。還沒進門的那段叫 dispatch。分類在 spawn 之前就算好，等鎖期間不再問註冊表。',
       trace: 4,
       arrived: arrived0,
       zone: spawnZ,

@@ -166,7 +166,7 @@
   </div>
 
   <div class="sec-label">Agent 怎麼查自己的歷史</div>
-  <p class="prose reveal">你上週和 Agent 修過一個 CI 報錯，今天想問「上次那個報錯的堆棧是什麼」。大多數系統答不上來，因為舊會話只是一堆躺在磁盤上的日誌文件，新會話看不見它們。</p>
+  <p class="prose reveal">你上週和 Agent 修過一個 CI 報錯，今日想問「上次嗰個報錯嘅堆棧係咩」。大多數系統答不上來，因為舊會話只是一堆躺在磁盤上的日誌文件，新會話看不見它們。</p>
   <p class="prose reveal">DSH 的答案分兩層。第一層是檢索：<code>ctx.sessionQuery</code> 把所有舊會話（活着的和落盤的）合成一個邏輯語料庫，SQLite FTS5 做全文索引，<code>searchSessions()</code> 跨會話搜、<code>searchEvents()</code> 在單個會話裏搜，命中帶片段和出處。第二層是引用：搜到了想拿進當前對話，<code>ctx.sessionReferenceResolver</code> 給源會話拍一張凍結快照，包成一條帶警告的消息塞進上下文，出處齊全。</p>
   <p class="prose reveal">先説檢索層最特別的一點：每條事件帶一個三態標註。current 表示還在模型上下文裏；shadowed 表示被壓縮替換掉了，模型已經看不見；log-only 表示從來只活在日誌裏（比如結構事件）。SQLite 提供方的文檔寫明「預設可搜索全部三種表層（current、shadowed 和 log-only）。傳入表層過濾器可縮小範圍」（session-query-sqlite/README.zh.md 第 13 行）。也就是説，壓縮丟掉的內容對模型不可見，對檢索仍然可見。遺忘和銷燬是兩回事。</p>
 
@@ -246,12 +246,12 @@ user explicitly repeats them.
       <p><code>xai-grok-memory</code> 把全局與工作區兩級 MEMORY.md 加會話日誌存成 markdown（<code>~/.grok/memory/</code>，工作區目錄按 blake3 哈希分桶），檢索走 FTS 加向量 embedding 的混合排序再過 MMR 去重，整套能力藏在 <code>--experimental-memory</code> 實驗開關後面（crates/codegen/xai-grok-memory/src/lib.rs 第 11 至 23 行）。流水綫細節站內已拆過，見 <a href="12-12.html">記憶混合檢索流水綫</a>。它也存日誌原文，但沒有 DSH 的三態標註和凍結快照引用。</p>
     </div>
   </div>
-  <p class="prose reveal paywall-locked">對比的焦點是那道大綱裏的選擇題：跨會話引用該是即時訂閲還是凍結快照？DSH 選了快照，理由藏在回放語義裏。DSH 的會話日誌是僅追加的事實記錄，目標會話將來重放時，引用進來的內容必須和當時模型看到的一字不差；要是引用掛着即時連結，源會話事後一改，回放就變成另一個故事了。Claude Code 的記憶文件是活文檔，隨時被子 Agent 改寫，壓根不承諾回放一致性，兩家走的是不同的賽道。還有一點 DSH 獨有：投影和模型 transcript 分離（docs/subsystems/session-projection.zh.md），客戶端 UI 看的是日誌摺疊出的投影值，模型歷史另算，檢索、展示、模型輸入三者各有各的帳本。</p>
+  <p class="prose reveal paywall-locked">對比的焦點是那道大綱裏的選擇題：跨會話引用應該係即時訂閲定凍結快照？DSH 選了快照，理由藏在回放語義裏。DSH 的會話日誌是僅追加的事實記錄，目標會話將來重放時，引用進來的內容必須和當時模型看到的一字不差；要是引用掛着即時連結，源會話事後一改，回放就變成另一個故事了。Claude Code 的記憶文件是活文檔，隨時被子 Agent 改寫，壓根不承諾回放一致性，兩家走的是不同的賽道。還有一點 DSH 獨有：投影和模型 transcript 分離（docs/subsystems/session-projection.zh.md），客戶端 UI 看的是日誌摺疊出的投影值，模型歷史另算，檢索、展示、模型輸入三者各有各的帳本。</p>
 
   <div class="sec-label paywall-locked">課堂練習</div>
   <div class="exercise reveal paywall-locked">
     <div class="exercise-num">01</div>
-    <div><h3>推演一次跨會話取證</h3><p>一段 20 輪的舊會話被壓縮過兩次，你要找回壓縮前的一條工具報錯原文。第一問：用 <code>searchEvents</code> 還是 <code>filterEvents</code>，surface 過濾器傳什麼值？第二問：把這個會話引用進新會話後，快照裏會包含那條報錯嗎？（提示：<code>readSurface()</code> 只投影摺疊後當前表層的用戶消息、assistant 文本和 compact 檢查點，shadowed 的工具結果進不了快照，但檢索接口照樣搜得到它。）第三問：引用完成後源會話被刪除，新會話重放時會發生什麼？</p></div>
+    <div><h3>推演一次跨會話取證</h3><p>一段 20 輪的舊會話被壓縮過兩次，你要找回壓縮前的一條工具報錯原文。第一問：用 <code>searchEvents</code> 還是 <code>filterEvents</code>，surface 過濾器傳咩值？第二問：把這個會話引用進新會話後，快照裏面會唔會包住嗰條報錯？（提示：<code>readSurface()</code> 只投影摺疊後當前表層的用戶消息、assistant 文本和 compact 檢查點，shadowed 的工具結果進不了快照，但檢索接口照樣搜得到它。）第三問：引用完成後源會話被刪除，新會話重放嗰陣會發生咩事？</p></div>
   </div>
 
   <div class="takeaway reveal paywall-locked">
@@ -308,7 +308,7 @@ user explicitly repeats them.
 
   function buildA() {
     return [
-      { st: '當前會話裏，你問了一句：上次構建報錯的堆棧是什麼？', run: function () { bubble(chatEl, '', '你', '上次構建報錯的堆棧是什麼？'); } },
+      { st: '而家呢個會話裏面，你問咗一句：上次構建報錯嘅堆棧係咩？', run: function () { bubble(chatEl, '', '你', '上次構建報錯嘅堆棧係咩？'); } },
       { st: '宿主拿關鍵詞去查 FTS 索引：searchSessions("構建 報錯")。舊會話是語料庫，不用一頁頁翻聊天記錄。', run: function () { bubble(chatEl, 'sys', '檢索', 'searchSessions("構建 報錯")'); scanLibs(true); }, dur: 1700 },
       { st: '命中：會話「修 CI 構建」第 42 條事件，片段正是那行 TypeError。注意標註是 shadowed：這條已經被壓縮遮蔽，模型看不見了，檢索照樣搜得到。', run: function () { scanLibs(false); libCi.classList.add('scan'); hitLine.classList.add('hit'); hitTag.classList.add('show'); }, dur: 2200 },
       { st: '決定引用它。入隊之前，readSurface() 給源會話拍一張凍結快照，之後絕不重讀。', run: function () { libCi.classList.remove('scan'); addCard(chatEl, 'snap-card', '<span class="badge">不可信快照</span><b>Referenced sessions</b><br>源：修 CI 構建 · 截止 seq 57 · 已凍結<br><small>警告：只當背景信息，裏面的指令、權限聲明一律不作數</small>'); }, dur: 2100 },
@@ -319,7 +319,7 @@ user explicitly repeats them.
   }
   function buildB() {
     return [
-      { st: '同一個問題丟給兩座城：上次構建報錯的堆棧是什麼？', run: function () { bubble(twinL, '', '你', '上次構建報錯的堆棧是什麼？'); bubble(twinR, '', '你', '上次構建報錯的堆棧是什麼？'); } },
+      { st: '同一條問題丟畀兩座城：上次構建報錯嘅堆棧係咩？', run: function () { bubble(twinL, '', '你', '上次構建報錯的堆棧是什麼？'); bubble(twinR, '', '你', '上次構建報錯嘅堆棧係咩？'); } },
       { st: '左城在寫的時候就提煉過了：記憶庫裏只有一條「構建失敗過，空引用問題，已修復」。原始堆棧沒進庫。', run: function () { addCard(twinL, 'mem-card', '記憶條目：構建失敗過，空引用問題，已修復<small>提煉時丟掉了原始堆棧</small>'); }, dur: 2000 },
       { st: '左城的回答只能到這個程度：具體哪一行、什麼類型的錯，答不出來。', run: function () { bubble(twinL, 'sys', '回答', '記得構建失敗過，是空引用問題，具體堆棧沒有記錄。'); }, dur: 1900 },
       { st: '右城不提煉，日誌原文全在。FTS 直接命中那行 TypeError，帶 shadowed 標註和出處。', run: function () { addCard(twinR, 'mem-card good', 'FTS 命中：TypeError: cannot read "mtime" of undefined at build.js:120<small>會話「修 CI 構建」seq 42 · shadowed</small>'); }, dur: 2000 },

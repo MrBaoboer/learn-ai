@@ -82,7 +82,7 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
   .d-btn{flex:1 1 auto;justify-content:center}
 }
 </style>
-<meta name="description" content="DSH 的 LLM 適配層：一次介面卡呼叫就是一次提供方嘗試，重試是持久日誌裡的顯式事件，原始分片流與派生訊息流分開落盤。基於 assembler.ts 與 agent.ts 真實原始碼講解。">
+<meta name="description" content="DSH 的 LLM 適配層：一次轉接器呼叫就是一次提供方嘗試，重試是持久日誌裡的顯式事件，原始分片流與派生訊息流分開落盤。基於 assembler.ts 與 agent.ts 真實原始碼講解。">
 <meta name="author" content="洛小山">
 <link rel="stylesheet" href="lesson-dark-compat.css?v=20260816k">
 <link rel="canonical" href="https://xueai.miyang.cn/slides/dsh-22.tw.html">
@@ -95,7 +95,7 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
 <link rel="alternate" hreflang="zh-HK" href="https://xueai.miyang.cn/slides/dsh-22.hk.html">
 <link rel="alternate" hreflang="zh-MO" href="https://xueai.miyang.cn/slides/dsh-22.hk.html">
 <link rel="alternate" hreflang="x-default" href="https://xueai.miyang.cn/slides/dsh-22.html">
-<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"LLM 適配層：單次嘗試、顯式重試、雙流持久","name":"LLM 適配層：單次嘗試、顯式重試、雙流持久","url":"https://xueai.miyang.cn/slides/dsh-22.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 模型與外部接入","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"DSH 的 LLM 適配層：一次介面卡呼叫就是一次提供方嘗試，重試是持久日誌裡的顯式事件，原始分片流與派生訊息流分開落盤。基於 assembler.ts 與 agent.ts 真實原始碼講解。","datePublished":"2026-08-13","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="LLM 適配層：單次嘗試、顯式重試、雙流持久"><meta property="og:description" content="DSH 的 LLM 適配層：一次介面卡呼叫就是一次提供方嘗試，重試是持久日誌裡的顯式事件，原始分片流與派生訊息流分開落盤。基於 assembler.ts 與 agent.ts 真實原始碼講解。"><meta property="og:url" content="https://xueai.miyang.cn/slides/dsh-22.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
+<!--seo:begin--><script type="application/ld+json">{"@context":"https://schema.org","@type":["Article","LearningResource"],"headline":"LLM 適配層：單次嘗試、顯式重試、雙流持久","name":"LLM 適配層：單次嘗試、顯式重試、雙流持久","url":"https://xueai.miyang.cn/slides/dsh-22.tw.html","inLanguage":"zh-Hant-TW","author":{"@type":"Person","name":"洛小山"},"publisher":{"@type":"Organization","name":"xueai.miyang.cn","url":"https://xueai.miyang.cn"},"learningResourceType":"課程","educationalLevel":"入門到進階","isPartOf":{"@type":"Course","name":"AI 實戰課 · 模型與外部接入","url":"https://xueai.miyang.cn/slides/learn.html"},"isAccessibleForFree":false,"description":"DSH 的 LLM 適配層：一次轉接器呼叫就是一次提供方嘗試，重試是持久日誌裡的顯式事件，原始分片流與派生訊息流分開落盤。基於 assembler.ts 與 agent.ts 真實原始碼講解。","datePublished":"2026-08-13","dateModified":"2026-08-27","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".paywall-locked"}}</script><meta property="og:type" content="article"><meta property="og:title" content="LLM 適配層：單次嘗試、顯式重試、雙流持久"><meta property="og:description" content="DSH 的 LLM 適配層：一次轉接器呼叫就是一次提供方嘗試，重試是持久日誌裡的顯式事件，原始分片流與派生訊息流分開落盤。基於 assembler.ts 與 agent.ts 真實原始碼講解。"><meta property="og:url" content="https://xueai.miyang.cn/slides/dsh-22.tw.html"><meta property="og:image" content="https://xueai.miyang.cn/slides/og/og-default.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><style>.xa-tldr{margin:18px 0 4px;padding:14px 18px;background:rgba(0,102,255,0.04);border:1px solid rgba(0,102,255,0.16);border-radius:10px}.xa-tldr .xa-tldr-tag{display:block;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--accent,#0066ff);margin-bottom:6px}.xa-tldr p{margin:0;font-size:15px;line-height:1.8;color:var(--text,#1f2937)}</style><style>html.xa-locked .paywall-locked:not(.xa-peek){display:none!important}html.xa-locked .xa-peek{max-height:132px;overflow:hidden;pointer-events:none;user-select:none;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%);mask-image:linear-gradient(180deg,#000 0,#000 14%,transparent 94%)}</style><script>try{if(localStorage.getItem('xa_auth')!=='1')document.documentElement.classList.add('xa-locked')}catch(e){document.documentElement.classList.add('xa-locked')}</script><!--seo:end-->
 </head>
 <body>
 <article class="lesson wide">
@@ -105,7 +105,7 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
     <p class="subtitle">推理流與正文流分開存，重試是顯式事件。核心原始碼：<code>packages/llm/llm/src/assembler.ts</code> 與 <code>packages/core/agent-loop/src/agent.ts</code>。</p>
   </header><!--seo:begin--><aside class="xa-tldr"><span class="xa-tldr-tag">一句話速覽</span><p>推理流與正文流分開存，重試是顯式事件</p></aside><!--seo:end-->  <div class="objective reveal">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M21 12h-5"/></svg>
-    <span><b>課程目標</b>讀完你能說清三件事：DSH 為什麼規定一次介面卡呼叫就是一次提供方嘗試、連 SDK 自帶的重試都要禁用；一次流式響應怎麼以兩種形態落盤，原始分片流管回放保真、派生訊息流管對話歷史，失敗的半截輸出為什麼進得了前者進不了後者；以及重試為什麼被做成持久日誌裡的顯式事件，UI 靠它撤回半截輸出，事後靠它解釋每一秒都花在了哪。</span>
+    <span><b>課程目標</b>讀完你能說清三件事：DSH 為什麼規定一次轉接器呼叫就是一次提供方嘗試、連 SDK 自帶的重試都要禁用；一次流式響應怎麼以兩種形態落盤，原始分片流管回放保真、派生訊息流管對話歷史，失敗的半截輸出為什麼進得了前者進不了後者；以及重試為什麼被做成持久日誌裡的顯式事件，UI 靠它撤回半截輸出，事後靠它解釋每一秒都花在了哪。</span>
   </div>
 
   <div class="sec-label">互動演示 · 請求生命週期播放器</div>
@@ -142,8 +142,8 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
   </div>
 
   <div class="sec-label">邏輯拆解 · 一次呼叫就是一次嘗試</div>
-  <p class="reveal body">先立規矩。DSH 的介面卡約定裡有一條寫得很硬：一次介面卡呼叫就是一次提供方嘗試，介面卡必須禁用庫自帶的重試（<code>docs/subsystems/llm-streaming.zh.md</code> 介面卡約定一節）。HTTP 庫們都愛替你悄悄重試，看起來是貼心，實際是把資訊藏起來了：請求為什麼慢、重試了幾次、每次因為什麼失敗，全部消失在庫的內部迴圈裡。DSH 把這層全部剝掉，介面卡只幹一件事：發一次請求，把響應轉成統一的 <code>StreamChunk</code> 分片吐出來，失敗就規範化成一個可序列化的 <code>LlmFailure</code>（帶穩定的錯誤 code），別的不管。</p>
-  <p class="reveal body">防掛起也在這層解決：兩個交付的遠端介面卡都帶 <code>streamIdleTimeoutMs</code> 看門狗，預設五分鐘，provider 停頓超時就對映成 <code>TIMEOUT</code> 錯誤。還有一條容易漏的：空回覆算錯誤。模型返回一個不帶任何內容塊的 stop，介面卡把它對映成 <code>EMPTY_RESPONSE</code> 錯誤而非靜默的成功，這樣重試層才有機會救它。</p>
+  <p class="reveal body">先立規矩。DSH 的轉接器約定裡有一條寫得很硬：一次轉接器呼叫就是一次提供方嘗試，轉接器必須禁用庫自帶的重試（<code>docs/subsystems/llm-streaming.zh.md</code> 轉接器約定一節）。HTTP 庫們都愛替你悄悄重試，看起來是貼心，實際是把資訊藏起來了：請求為什麼慢、重試了幾次、每次因為什麼失敗，全部消失在庫的內部迴圈裡。DSH 把這層全部剝掉，轉接器只幹一件事：發一次請求，把響應轉成統一的 <code>StreamChunk</code> 分片吐出來，失敗就規範化成一個可序列化的 <code>LlmFailure</code>（帶穩定的錯誤 code），別的不管。</p>
+  <p class="reveal body">防掛起也在這層解決：兩個交付的遠端轉接器都帶 <code>streamIdleTimeoutMs</code> 看門狗，預設五分鐘，provider 停頓超時就對映成 <code>TIMEOUT</code> 錯誤。還有一條容易漏的：空回覆算錯誤。模型返回一個不帶任何內容塊的 stop，轉接器把它對映成 <code>EMPTY_RESPONSE</code> 錯誤而非靜默的成功，這樣重試層才有機會救它。</p>
 
   <div class="sec-label">邏輯拆解 · 雙流持久：分片流和訊息流分開存</div>
   <p class="reveal body">然後看落盤。agent loop 消費分片流的時候幹兩件事：每個分片原樣追加一條 <code>assistant/chunk</code> 事件進會話日誌，同時把分片餵給 <code>BlockAssembler</code>（組裝器）。流成功結束，組裝結果作為一條 <code>assistant/message</code> 事件再落一次盤。這就是雙流：chunk 流是原始錄影，回放測試靠它逐幀重建當年的響應；message 流是派生歷史，下一次請求的對話上下文從它派生。推理塊（reasoning，模型的思考過程）和正文塊（text）在分片協議裡就是不同型別，各自獨立組裝、各自落盤。</p>
@@ -161,13 +161,13 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
   </div>
   <div class="snapshot"><b>原始碼快照說明：</b>依據本地倉庫 deepseek-harness-master，核對檔案 <code>packages/core/agent-loop/src/agent.ts</code>，核對日期 2026-08-13。程式碼塊保留原始碼原文。</div>
   <p class="reveal body paywall-locked xa-peek">這九行是雙流的心臟：先落盤，再組裝，一個分片都不例外。流結束後走分岔：finish 是錯誤或中止，就把失敗交給 <code>agent/request-error</code> 事件去決定重不重試（第 354 到 371 行）；成功才在第 381 行追加 <code>assistant/message</code>，並把這批 chunk 的序號寫進 <code>sourceEventSeqs</code>，標明這條訊息是從哪些分片派生的。所以失敗的半截輸出有明確的歸宿：留在 chunk 流裡作證，絕不進派生歷史。下一次請求重建上下文時，那半截就像沒發生過。</p>
-  <p class="reveal body paywall-locked">組裝器本身也值得停一下。<code>BlockAssembler</code> 是全倉庫唯一的分片摺疊實現，介面卡只要按 index 吐格式正確的分片，塊重組不用每家自己寫。它對畸形流有明確態度：處理 <code>block-end</code> 分片時，先看這個塊是不是已經關閉過，關過就直接返回，後面再來的重複關閉一律忽略。註釋裡管這叫「First close wins」，理由是只有第一次關閉說了算，流式輸出和最終組裝出的塊才能保持一致。這一行防禦恰好是性質測試抓過真 bug 的地方（覆盤見 <a href="dsh-26.html">測試一個非確定性系統</a>）。</p>
+  <p class="reveal body paywall-locked">組裝器本身也值得停一下。<code>BlockAssembler</code> 是全倉庫唯一的分片摺疊實現，轉接器只要按 index 吐格式正確的分片，塊重組不用每家自己寫。它對畸形流有明確態度：處理 <code>block-end</code> 分片時，先看這個塊是不是已經關閉過，關過就直接返回，後面再來的重複關閉一律忽略。註釋裡管這叫「First close wins」，理由是只有第一次關閉說了算，流式輸出和最終組裝出的塊才能保持一致。這一行防禦恰好是性質測試抓過真 bug 的地方（事後回顧見 <a href="dsh-26.html">測試一個非確定性系統</a>）。</p>
   <p class="src-note reveal paywall-locked">出處：<code>packages/llm/llm/src/assembler.ts</code> 第 75 至 82 行的 block-end 分支，核對日期 2026-08-13。</p>
 
   <div class="sec-label paywall-locked">邏輯拆解 · 重試是持久日誌裡的顯式事件</div>
   <p class="reveal body paywall-locked">重試住在更高一層。<code>dsh-llm-retry</code> 外掛監聽 <code>agent/request-error</code>，按每條 provider 路由註冊時捕獲的策略決定救不救。預設的 normal 策略：只對 <code>EMPTY_RESPONSE</code>、<code>RATE_LIMIT</code>、<code>SERVER</code>、<code>TIMEOUT</code>、<code>TRANSPORT</code> 五種 code 重試，最多兩次，退避從 500 毫秒到 10 秒，帶 10% 抖動；provider 用 Retry-After 指定的合法延遲會替換本地退避（<code>packages/llm/llm-retry/README.zh.md</code>）。</p>
   <p class="reveal body paywall-locked">關鍵在於它怎麼記帳。等待退避之前，外掛先往會話日誌追加一條 <code>llm/retry</code> 事件，裡面裝著重試 id、提供方、策略 mode、完整的失敗資訊和計劃延遲；退避結束真要動手了，再追加一條 <code>llm/retry-started</code>。這兩條事件不進模型可見的表層，模型對重試一無所知，但 UI 和事後分析全靠它們：UI 據此撤回失敗的半截輸出、顯示「第 1/2 次重試，3 秒後」；排查問題時，日誌裡每一次嘗試、每一段等待都有時間戳。重試本身則開一個新的編號輪次，從持久歷史重建同樣的請求重發，舊輪次的記錄一個字不改。</p>
-  <p class="reveal body paywall-locked">還有一個跨介面卡的細節：replayState。成功的 finish 分片可以攜帶介面卡私有的回放狀態（比如 DeepSeek 推理內容的原生表示），跟著 <code>assistant/message</code> 一起存。下次請求把歷史發給介面卡前，<code>LlmRuntime.forAdapter()</code> 檢查每條歷史訊息：歷史 provider 和目標 provider 歸同一個介面卡例項，狀態才透傳；換了介面卡，狀態被剝離，對方只拿到提供方無關的內容（<code>packages/llm/llm/src/index.ts</code> 第 822 至 836 行）。一家的私貨絕不餵給另一家。</p>
+  <p class="reveal body paywall-locked">還有一個跨轉接器的細節：replayState。成功的 finish 分片可以攜帶轉接器私有的回放狀態（比如 DeepSeek 推理內容的原生表示），跟著 <code>assistant/message</code> 一起存。下次請求把歷史發給轉接器前，<code>LlmRuntime.forAdapter()</code> 檢查每條歷史訊息：歷史 provider 和目標 provider 歸同一個轉接器實例，狀態才透傳；換了轉接器，狀態被剝離，對方只拿到提供方無關的內容（<code>packages/llm/llm/src/index.ts</code> 第 822 至 836 行）。一家的私貨絕不餵給另一家。</p>
   <div class="facts paywall-locked">
     <div class="fact reveal"><code>重試開新輪次</code><p>失敗輪次正常關閉，重試輪次帶新編號從頭開始。沒有任何記錄被改寫，兩次嘗試在日誌裡各自完整，時間線永遠向前。</p></div>
     <div class="fact reveal"><code>半截輸出進 chunk 不進 message</code><p>失敗前收到的分片都留在 <code>assistant/chunk</code> 流裡，回放能精確復現事故現場；但派生歷史裡沒有這半截，模型下一步看到的上下文是乾淨的。</p></div>
@@ -188,12 +188,12 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
   <div class="sec-label paywall-locked">課堂練習</div>
   <div class="exercise reveal paywall-locked">
     <div class="exercise-num">01</div>
-    <div><h3>推演一次斷在 block 中間的流</h3><p>模型正在輸出第 2 個 text 塊，吐了 3 個 <code>text-delta</code> 之後連線被重置，介面卡以 <code>finish {kind:'error', TRANSPORT}</code> 收尾。請回答：日誌裡此刻有幾類事件、各多少條？<code>assistant/message</code> 會不會出現？UI 上那半句話怎麼被撤回，依據是哪條事件？重試成功後，模型重建上下文時能看到那 3 個 delta 嗎？再想一層：如果把這段歷史發給另一家 provider 的介面卡，上一條成功訊息裡的 <code>replayState</code> 去哪了？</p></div>
+    <div><h3>推演一次斷在 block 中間的流</h3><p>模型正在輸出第 2 個 text 塊，吐了 3 個 <code>text-delta</code> 之後連線被重置，轉接器以 <code>finish {kind:'error', TRANSPORT}</code> 收尾。請回答：日誌裡此刻有幾類事件、各多少條？<code>assistant/message</code> 會不會出現？UI 上那半句話怎麼被撤回，依據是哪條事件？重試成功後，模型重建上下文時能看到那 3 個 delta 嗎？再想一層：如果把這段歷史發給另一家 provider 的轉接器，上一條成功訊息裡的 <code>replayState</code> 去哪了？</p></div>
   </div>
 
   <div class="takeaway reveal paywall-locked">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
-    <span><b>Takeaway：</b>介面卡只負責一次誠實的嘗試，重試住在 agent 層並作為 <code>llm/retry</code> 事件落進持久日誌，每一次等待都可審計。一次響應存兩份：chunk 流保回放保真，message 流保歷史乾淨，失敗的半截進前者不進後者。把重試藏進 SDK 省的是程式碼，丟的是證據。</span>
+    <span><b>Takeaway：</b>轉接器只負責一次誠實的嘗試，重試住在 agent 層並作為 <code>llm/retry</code> 事件落進持久日誌，每一次等待都可審計。一次響應存兩份：chunk 流保回放保真，message 流保歷史乾淨，失敗的半截進前者不進後者。把重試藏進 SDK 省的是程式碼，丟的是證據。</span>
   </div>
 </article>
 <script src="i18n.js?v=20260903a"></script>
@@ -258,7 +258,7 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
 
   function buildA() {
     return [
-      { cap: '使用者提問後，agent loop 組裝好請求，呼叫 ctx.llm.stream()。介面卡發出一次、也只發出這一次 HTTP 請求。', dur: 2300 },
+      { cap: '使用者提問後，agent loop 組裝好請求，呼叫 ctx.llm.stream()。轉接器發出一次、也只發出這一次 HTTP 請求。', dur: 2300 },
       chunkStep('block-start', '#0 reasoning', 'rsn', '第一個塊是推理塊（reasoning）。注意右邊：分片剛到就落了一條 assistant/chunk，先記帳再消化。'),
       chunkStep('reasoning-delta', '「先查 CI 日誌」', 'rsn', '', function () { uiRsn = '先查 CI 日誌'; renderUi(); }),
       chunkStep('reasoning-delta', '「定位失敗用例」', 'rsn', '推理流逐幀落盤。UI 把它渲染成摺疊的思考區，正文區還是空的。', function () { uiRsn = '先查 CI 日誌，定位失敗用例'; renderUi(); }),
@@ -267,7 +267,7 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
       chunkStep('text-delta', '「構建失敗是因為」', '', '', function () { uiTxt = '構建失敗是因為'; renderUi(); }),
       chunkStep('text-delta', '「快照過期了」', '', '', function () { uiTxt = '構建失敗是因為快照過期了。'; renderUi(); }),
       chunkStep('block-end', '#1（完整正文塊）', ''),
-      chunkStep('usage', 'in 1204 / out 87', '', 'usage 在 finish 之前到，這是介面卡約定，順序錯了組裝器不認。'),
+      chunkStep('usage', 'in 1204 / out 87', '', 'usage 在 finish 之前到，這是轉接器約定，順序錯了組裝器不認。'),
       chunkStep('finish', 'stop', ''),
       { cap: '流正常結束。BlockAssembler 把分片摺疊成完整訊息，追加一條 assistant/message，並記下它派生自哪些 chunk 的序號。一次響應，兩種形態，各管各的用途。', dur: 3000,
         run: function () { addLog('assistant/message', 'reasoning + text · usage · sourceEventSeqs=[…]', 'msg'); } }
@@ -280,7 +280,7 @@ p.body{font-size:15px;line-height:2;color:var(--text);margin:0 0 20px}
       chunkStep('block-start', '#0 text', ''),
       chunkStep('text-delta', '「正在分析構建」', '', '', function () { uiTxt = '正在分析構建'; renderUi(); }),
       chunkStep('text-delta', '「日誌，初步」', '', '半句話已經上了螢幕，也已經落了盤。', function () { uiTxt = '正在分析構建日誌，初步'; renderUi(); }),
-      { cap: '連線被重置。介面卡不自己重試，把失敗規範化成 finish 錯誤分片：code 是 TRANSPORT，可序列化，帶得走。', dur: 2600,
+      { cap: '連線被重置。轉接器不自己重試，把失敗規範化成 finish 錯誤分片：code 是 TRANSPORT，可序列化，帶得走。', dur: 2600,
         run: function () {
           wire.classList.add('broken');
           addChunk('finish', 'error · TRANSPORT', 'err');

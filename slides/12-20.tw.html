@@ -67,7 +67,7 @@
       <div class="section-head"><span class="num">01 / OBJECTIVES</span><h2>課程目標</h2></div>
       <div class="grid objectives">
         <article class="card"><h3>核對協議角色</h3><p>從呼叫方向判斷客戶端與服務端，避免把內部 Hub Server 等同於 MCP Server。</p></article>
-        <article class="card"><h3>追蹤可見性</h3><p>解釋工具如何從 <code>tools/list</code> 進入快照、搜尋索引與模型登錄檔。</p></article>
+        <article class="card"><h3>追蹤可見性</h3><p>解釋工具如何從 <code>tools/list</code> 進入快照、搜尋索引與模型註冊表。</p></article>
         <article class="card"><h3>設計恢復狀態機</h3><p>把 OAuth、狀態合併、客戶端身份和重啟退避放進同一連線生命週期。</p></article>
       </div>
     </section>
@@ -80,7 +80,7 @@
           <g fill="none" stroke="#f5b53a" stroke-width="2" marker-end="url(#a20)"><path d="M230 132H340"/><path d="M560 132H670"/><path d="M890 132H995"/><path d="M780 190V295"/><path d="M450 190V295"/></g>
           <g font-family="Arial, PingFang SC" text-anchor="middle">
             <g><rect x="25" y="65" width="205" height="130" rx="18" fill="#15120d" stroke="#735522"/><text x="128" y="110" fill="#ffd978" font-size="18" font-weight="700">外部 MCP Server</text><text x="128" y="143" fill="#b9ad91" font-size="14">stdio / HTTP</text><text x="128" y="169" fill="#b9ad91" font-size="14">tools/list + call_tool</text></g>
-            <g><rect x="340" y="65" width="220" height="130" rx="18" fill="url(#g20)" stroke="#735522"/><text x="450" y="110" fill="#ffd978" font-size="18" font-weight="700">xai-grok-mcp</text><text x="450" y="143" fill="#b9ad91" font-size="14">客戶端 / OAuth / 憑據</text><text x="450" y="169" fill="#b9ad91" font-size="14">連線與能力發現</text></g>
+            <g><rect x="340" y="65" width="220" height="130" rx="18" fill="url(#g20)" stroke="#735522"/><text x="450" y="110" fill="#ffd978" font-size="18" font-weight="700">xai-grok-mcp</text><text x="450" y="143" fill="#b9ad91" font-size="14">客戶端 / OAuth / 憑證</text><text x="450" y="169" fill="#b9ad91" font-size="14">連線與能力發現</text></g>
             <g><rect x="670" y="65" width="220" height="130" rx="18" fill="#15120d" stroke="#735522"/><text x="780" y="110" fill="#ffd978" font-size="18" font-weight="700">Session Actor</text><text x="780" y="143" fill="#b9ad91" font-size="14">註冊 / 禁用 / 快照</text><text x="780" y="169" fill="#b9ad91" font-size="14">狀態與重啟</text></g>
             <g><rect x="995" y="80" width="100" height="100" rx="50" fill="#211a0e" stroke="#f5b53a"/><text x="1045" y="125" fill="#ffd978" font-size="16" font-weight="700">MODEL</text><text x="1045" y="149" fill="#b9ad91" font-size="12">tools</text></g>
             <g><rect x="320" y="295" width="260" height="95" rx="16" fill="#111d1a" stroke="#397f75"/><text x="450" y="332" fill="#72d4c6" font-size="17" font-weight="700">credential store</text><text x="450" y="361" fill="#b9ad91" font-size="13">$GROK_HOME/mcp_credentials.json</text></g>
@@ -99,11 +99,11 @@
     </section>
 
     <section>
-      <div class="section-head"><span class="num">04 / OAUTH</span><h2>OAuth 與真實憑證落點</h2></div>
+      <div class="section-head"><span class="num">04 / OAUTH</span><h2>OAuth 與真實憑證存放位置</h2></div>
       <div class="flow">
         <article class="step"><b>1 · 複用或重新整理</b><small>先讀磁碟憑證並嘗試 token refresh</small></article>
         <article class="step"><b>2 · 瀏覽器授權</b><small>需要互動時啟動使用者同意流程</small></article>
-        <article class="step"><b>3 · 回撥換令牌</b><small>授權碼交換存取與重新整理權杖</small></article>
+        <article class="step"><b>3 · 回呼換權杖</b><small>授權碼交換存取與重新整理權杖</small></article>
         <article class="step"><b>4 · 鎖定寫入</b><small>檔案鎖配合原子儲存，支援多行程</small></article>
       </div>
       <div class="grid" style="margin-top:16px">
@@ -137,7 +137,7 @@ oauth_scopes</code></pre><span class="path">crates/codegen/xai-grok-config-types
       <div class="grid" style="margin-top:16px">
         <article class="card wide"><span class="label">50 MS COALESCE</span><h3>同鍵保留最新事件</h3><p><code>mcp_dispatcher</code> 以 <code>(server_name, event_kind)</code> 為鍵，在 50 ms tumbling window 內 last-write-wins。高頻 <code>tools/list_changed</code> 最終只推一次 ACP 狀態。</p></article>
         <article class="card wide"><span class="label">IDENTITY GUARD</span><h3>舊斷線不能誤刪新連線</h3><p>移除 dead client 前比較 <code>client_id</code>。如果斷線事件屬於已被替換的舊客戶端，保持當前客戶端，並丟棄過期狀態。</p></article>
-        <article class="card full"><span class="label">RESTART POLICY</span><h3>不同傳輸採用不同恢復動作</h3><p>stdio 自動重啟使用固定退避 <code>1s → 4s → 16s</code>，並檢查關閉中、已禁用、配置移除等護欄。HTTP 先嚐試客戶端內恢復，並使用獨立退避。成功重連後重新發現與註冊工具，隨後重新整理快照。</p><span class="path">crates/codegen/xai-grok-shell/src/session/mcp_dispatcher.rs · mcp_restart.rs · acp_session_impl/mcp_snapshot.rs</span></article>
+        <article class="card full"><span class="label">RESTART POLICY</span><h3>不同傳輸採用不同恢復動作</h3><p>stdio 自動重啟使用固定退避 <code>1s → 4s → 16s</code>，並檢查關閉中、已禁用、配置移除等護欄。HTTP 先嘗試客戶端內恢復，並使用獨立退避。成功重連後重新發現與註冊工具，隨後重新整理快照。</p><span class="path">crates/codegen/xai-grok-shell/src/session/mcp_dispatcher.rs · mcp_restart.rs · acp_session_impl/mcp_snapshot.rs</span></article>
       </div>
     </section>
 
