@@ -2182,6 +2182,10 @@
     if (document.getElementById('lang-switcher')) return;
     /* 页面自带语言切换 UI 时，声明 data-no-floating-switcher 可禁用浮动切换器 */
     if (document.documentElement.hasAttribute('data-no-floating-switcher')) return;
+    /* 阅读器外壳已经提供语言切换，iframe 内再浮一层会盖住课件控件。 */
+    if (window.self !== window.top ||
+        new URLSearchParams(location.search).get('embed') === '1') return;
+    var slot = document.querySelector('[data-lang-switcher-slot]');
     var cur = location.pathname.split('/').pop() || 'home.html';
     if (!/\.html?$/.test(cur)) cur = 'home.html';
 
@@ -2193,6 +2197,7 @@
     style.textContent = [
       '#lang-switcher{position:fixed;top:14px;right:14px;z-index:10000;',
       'font-family:-apple-system,"PingFang SC","PingFang TC","Apple SD Gothic Neo",sans-serif;}',
+      '#lang-switcher.embedded{position:relative;top:auto;right:auto;z-index:100;}',
       '#lang-switcher .ls-btn{display:flex;align-items:center;gap:5px;height:32px;padding:0 10px;',
       'background:rgba(255,255,255,0.85);backdrop-filter:blur(16px);border:1px solid rgba(0,0,0,0.08);',
       'border-radius:20px;box-shadow:0 2px 12px rgba(0,0,0,0.08);cursor:pointer;',
@@ -2221,7 +2226,9 @@
       '[data-theme="dark"] #lang-switcher .ls-menu a:hover{background:var(--hover,rgba(255,255,255,.06));',
       'color:var(--accent,#5cb595);}',
       '[data-theme="dark"] #lang-switcher .ls-menu a.active{background:var(--accent,#5cb595);color:#fff;}',
-      '@media (max-width:768px){#lang-switcher{top:8px;right:8px;}}'
+      '@media (max-width:768px){#lang-switcher:not(.embedded){top:8px;right:8px;}}',
+      '@media (max-width:520px){#lang-switcher.embedded .ls-btn>span{display:none;}',
+      '#lang-switcher.embedded .ls-btn{min-width:46px;justify-content:center;}}'
     ].join('');
     document.head.appendChild(style);
 
@@ -2235,6 +2242,7 @@
 
     var box = document.createElement('div');
     box.id = 'lang-switcher';
+    if (slot) box.className = 'embedded';
 
     var btn = document.createElement('button');
     btn.type = 'button';
@@ -2288,7 +2296,7 @@
       }
     });
 
-    document.body.appendChild(box);
+    (slot || document.body).appendChild(box);
   }
 
   if (document.readyState === 'loading') {
